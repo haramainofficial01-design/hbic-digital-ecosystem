@@ -1,0 +1,21 @@
+{
+  "name": "@hbic/functions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@hbic/shared": "0.1.0",
+    "firebase-admin": "^12.5.0",
+    "firebase-functions": "^5.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

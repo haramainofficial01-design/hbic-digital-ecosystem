@@ -1,0 +1,8 @@
+demo-recordings/output/
+demo-recordings/output/**
+node_modules/
+.env
+.env.local
+.env.*
+apps/mobile/ios/
+apps/mobile/android/

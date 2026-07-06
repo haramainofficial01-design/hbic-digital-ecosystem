@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function editor() {
+      return signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
+    }
+
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if editor();
+    }
+
+    match /admin/{allPaths=**} {
+      allow read, write: if editor();
+    }
+  }
+}

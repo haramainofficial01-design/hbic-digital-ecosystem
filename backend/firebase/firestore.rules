@@ -1,0 +1,107 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasAdminRole() {
+      return signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'caretaker', 'editor'];
+    }
+
+    function canEditPrayer() {
+      return signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'caretaker'];
+    }
+
+    function canSendNotifications() {
+      return signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'caretaker'];
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director'];
+    }
+
+    match /prayerTimes/{docId} {
+      allow read: if true;
+      allow write: if canEditPrayer();
+    }
+
+    match /iqamahTimes/{docId} {
+      allow read: if true;
+      allow write: if canEditPrayer();
+    }
+
+    match /jumuahSchedules/{docId} {
+      allow read: if true;
+      allow write: if canEditPrayer();
+    }
+
+    match /ramadanSchedules/{docId} {
+      allow read: if true;
+      allow write: if canEditPrayer();
+    }
+
+    match /eidSchedules/{docId} {
+      allow read: if true;
+      allow write: if canEditPrayer();
+    }
+
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'caretaker', 'editor'];
+    }
+
+    match /events/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
+    }
+
+    match /programs/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
+    }
+
+    match /donationCategories/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director'];
+    }
+
+    match /mediaItems/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
+    }
+
+    match /volunteerOpportunities/{docId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
+    }
+
+    match /pushNotificationLogs/{docId} {
+      allow read: if hasAdminRole();
+      allow create: if canSendNotifications();
+      allow update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || request.auth.token.adminRole == 'superAdmin');
+      allow write: if request.auth.token.adminRole == 'superAdmin';
+    }
+
+    match /adminRoles/{uid} {
+      allow read, write: if request.auth.token.adminRole == 'superAdmin';
+    }
+
+    match /auditLogs/{docId} {
+      allow read: if hasAdminRole();
+      allow create: if hasAdminRole();
+      allow update, delete: if false;
+    }
+
+    match /notificationTokens/{tokenId} {
+      allow create: if signedIn();
+      allow read, update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}

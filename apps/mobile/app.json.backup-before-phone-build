@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "HBIC Calgary",
+    "slug": "hbic-calgary",
+    "scheme": "hbiccalgary",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/brand/hbic-app-icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/brand/hbic-splash-mark.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#062238"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ca.hbic.calgary.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/hbic-app-icon.png",
+        "backgroundColor": "#062238"
+      },
+      "package": "ca.hbic.calgary"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

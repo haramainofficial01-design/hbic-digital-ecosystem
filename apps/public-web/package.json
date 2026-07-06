@@ -1,0 +1,25 @@
+{
+  "name": "@hbic/public-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hbic/shared": "0.1.0",
+    "firebase-admin": "^12.5.0",
+    "next": "^15.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/react": "~18.3.12",
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules
+.expo
+.next
+dist
+build
+.env
+.env.local
+firebase-debug.log
+*.tsbuildinfo
+android
+ios
+.vercel
+.env*
+demo-recordings/output/
