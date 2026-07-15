@@ -37,8 +37,7 @@ export function GlassCard({ children, style, tone = "light", compact = false }: 
         compact && styles.compact,
         {
           backgroundColor,
-          borderColor: theme.colors.border,
-          shadowColor: theme.colors.shadow
+          borderColor: theme.colors.border
         },
         style
       ]}
@@ -54,10 +53,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     padding: spacing.md,
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 4,
+    elevation: 2,
     overflow: "hidden"
   },
   compact: {

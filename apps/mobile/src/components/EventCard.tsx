@@ -18,12 +18,18 @@ export function EventCard({ event, onPress, compact = false }: { event: EventIte
   const timeLabel = event.endTime ? `${event.startTime} - ${event.endTime}` : event.startTime;
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" disabled={!onPress}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `${event.title}, ${event.date}, ${timeLabel}` : undefined}
+      accessibilityHint={onPress ? "Opens event details" : undefined}
+      disabled={!onPress}
+    >
       <GlassCard tone={event.category === "Youth" ? "gold" : "light"} style={styles.card}>
         <View style={styles.row}>
           <View style={[styles.datePill, { backgroundColor: theme.colors.navy }]}>
             <Text style={[styles.month, { color: theme.colors.gold }]} numberOfLines={1}>{dateLabel}</Text>
-            <Text style={styles.day} numberOfLines={1} adjustsFontSizeToFit>{dayLabel || "HBIC"}</Text>
+            <Text style={styles.day} numberOfLines={1} adjustsFontSizeToFit>{dayLabel || "Event"}</Text>
           </View>
           <View style={styles.copy}>
             <View style={styles.categoryRow}>
@@ -32,7 +38,7 @@ export function EventCard({ event, onPress, compact = false }: { event: EventIte
             </View>
             <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={compact ? 1 : 2}>{event.title}</Text>
             <Text style={[styles.description, { color: theme.colors.muted }]} numberOfLines={compact ? 2 : 3}>{event.description}</Text>
-            <Text style={[styles.meta, { color: theme.colors.navy }]} numberOfLines={compact ? 1 : 2}>
+            <Text style={[styles.meta, { color: theme.colors.teal }]} numberOfLines={compact ? 1 : 2}>
               {timeLabel} · {event.location}
             </Text>
           </View>

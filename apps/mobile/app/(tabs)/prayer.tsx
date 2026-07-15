@@ -1,4 +1,3 @@
-import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../../src/components/AppButton";
@@ -15,11 +14,11 @@ export default function PrayerScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const { eidSchedule, jumuahSchedule, prayerTime, ramadanSchedule, settings } = content;
+  const { eidSchedule, jumuahSchedule, ramadanSchedule, settings } = content;
 
   return (
     <AppScreen>
-      <SectionHeader title="Prayer & Iqamah" subtitle="Today’s adhan, iqamah, and Jumu'ah times for HBIC Calgary." />
+      <SectionHeader title="Prayer & Iqamah" subtitle="Today’s adhan, iqamah, and Jumu'ah times for Masjid Bilal." />
       <PrayerHero />
       <PrayerTimesList />
 
@@ -27,25 +26,9 @@ export default function PrayerScreen() {
         <Text style={[styles.title, { color: theme.colors.text }]}>Jumu'ah schedule</Text>
         <View style={styles.jumuahGrid}>
           <ScheduleCell label="First khutbah" value={jumuahSchedule.firstKhutbahTime} />
-          <ScheduleCell label="First iqamah" value={jumuahSchedule.firstIqamahTime} />
           <ScheduleCell label="Second khutbah" value={jumuahSchedule.secondKhutbahTime} />
-          <ScheduleCell label="Second iqamah" value={jumuahSchedule.secondIqamahTime} />
         </View>
         <Text style={[styles.note, { color: theme.colors.muted }]}>{jumuahSchedule.notes}</Text>
-      </GlassCard>
-
-      <GlassCard>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Timetable source</Text>
-        <Text style={[styles.note, { color: theme.colors.muted }]}>
-          Prayer times are linked to {prayerTime.source} and reviewed by HBIC before publishing.
-        </Text>
-        <AppButton
-          label="View iqamah.ca"
-          icon="open-outline"
-          variant="secondary"
-          onPress={() => Linking.openURL(prayerTime.sourceUrl ?? "https://iqamah.ca/")}
-          style={styles.button}
-        />
       </GlassCard>
 
       {settings.ramadanMode ? (

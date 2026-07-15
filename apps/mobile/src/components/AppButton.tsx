@@ -12,9 +12,11 @@ interface AppButtonProps extends PropsWithChildren {
   variant?: "primary" | "secondary" | "danger" | "ghost";
   icon?: IconName;
   style?: ViewStyle;
+  disabled?: boolean;
+  accessibilityHint?: string;
 }
 
-export function AppButton({ label, onPress, variant = "primary", icon, style }: AppButtonProps) {
+export function AppButton({ label, onPress, variant = "primary", icon, style, disabled = false, accessibilityHint }: AppButtonProps) {
   const { theme } = useAppTheme();
   const isSecondary = variant === "secondary" || variant === "ghost";
   const backgroundColor =
@@ -31,11 +33,17 @@ export function AppButton({ label, onPress, variant = "primary", icon, style }: 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      android_ripple={{ color: theme.colors.borderStrong, borderless: false }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor, borderColor },
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
         style
       ]}
     >
@@ -68,6 +76,9 @@ const styles = StyleSheet.create({
   pressed: {
     transform: [{ scale: 0.98 }],
     opacity: 0.9
+  },
+  disabled: {
+    opacity: 0.5
   },
   label: {
     fontWeight: "800",

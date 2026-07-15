@@ -31,7 +31,7 @@ export default function YouthScreen() {
           <View style={styles.flex}>
             <Text style={styles.darkKicker}>HBIC Youth</Text>
             <Text style={styles.darkTitle}>Faith, friendship, and beneficial programs</Text>
-            <Text style={styles.darkBody}>Youth updates, reminders, and community activities from HBIC Calgary.</Text>
+            <Text style={styles.darkBody}>Youth updates, reminders, and community activities from Masjid Bilal.</Text>
           </View>
         </View>
       </GlassCard>
@@ -60,7 +60,7 @@ export default function YouthScreen() {
         <Image source={photoAssets.youthProgram} style={styles.image} />
         <Text style={[styles.title, { color: theme.colors.text }]}>Youth programs and reminders</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          HBIC Youth can publish program reminders, registration updates, social clips, and volunteer calls without sharing sensitive personal details.
+          Follow program reminders, registration updates, social clips, and volunteer opportunities from HBIC Youth.
         </Text>
       </GlassCard>
 

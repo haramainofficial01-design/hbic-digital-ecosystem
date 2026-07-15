@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import { Share, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../../src/components/AppButton";
+import { AdaptiveGrid } from "../../src/components/AdaptiveGrid";
 import { AppScreen } from "../../src/components/AppScreen";
 import { GlassCard } from "../../src/components/GlassCard";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -19,7 +20,7 @@ export default function DonateScreen() {
     <AppScreen>
       <SectionHeader title="Donate" subtitle="Support prayer services, classes, youth programs, operations, and community work." />
       <GlassCard tone="navy">
-        <Text style={styles.darkKicker}>HBIC Calgary</Text>
+        <Text style={styles.darkKicker}>Masjid Bilal</Text>
         <Text style={styles.darkTitle}>Support the masjid</Text>
         <Text style={styles.darkBody}>
           Donate by PayPal or credit card, or use e-transfer to {etransferEmail}.
@@ -44,21 +45,23 @@ export default function DonateScreen() {
       <GlassCard tone="gold">
         <Text style={[styles.title, { color: theme.colors.text }]}>Donation notes</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          For donation receipts, e-transfer questions, or giving by another method, contact the HBIC office.
+          For donation receipts, e-transfer questions, or giving by another method, contact the centre office.
         </Text>
       </GlassCard>
 
-      {donationCategories.map((category) => (
-        <GlassCard key={category.id} tone={category.id === "ramadan" && settings.ramadanMode ? "gold" : "light"}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>{category.title}</Text>
-          <Text style={[styles.body, { color: theme.colors.muted }]}>{category.description}</Text>
-          <View style={styles.amounts}>
-            {category.amountSuggestions.map((amount) => (
-              <Text key={amount} style={[styles.amount, { backgroundColor: theme.colors.tintSoft, color: theme.colors.navy }]}>${amount}</Text>
-            ))}
-          </View>
-        </GlassCard>
-      ))}
+      <AdaptiveGrid>
+        {donationCategories.map((category) => (
+          <GlassCard key={category.id} tone={category.id === "ramadan" && settings.ramadanMode ? "gold" : "light"}>
+            <Text style={[styles.title, { color: theme.colors.text }]}>{category.title}</Text>
+            <Text style={[styles.body, { color: theme.colors.muted }]}>{category.description}</Text>
+            <View style={styles.amounts}>
+              {category.amountSuggestions.map((amount) => (
+                <Text key={amount} style={[styles.amount, { backgroundColor: theme.colors.tintSoft, color: theme.colors.text }]}>${amount}</Text>
+              ))}
+            </View>
+          </GlassCard>
+        ))}
+      </AdaptiveGrid>
     </AppScreen>
   );
 }

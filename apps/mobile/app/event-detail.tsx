@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image, StyleSheet, Text, View } from "react-native";
+import { isVisibleItem } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -15,7 +16,8 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const event = content.events.find((item) => item.id === id) ?? content.events[0];
+  const visibleEvents = content.events.filter(isVisibleItem);
+  const event = visibleEvents.find((item) => item.id === id) ?? visibleEvents[0] ?? content.events[0];
   const image = eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] ?? photoAssets.exterior;
 
   return (
@@ -36,7 +38,7 @@ export default function EventDetailScreen() {
       </GlassCard>
       <View style={styles.actions}>
         <AppButton
-          label={event.registrationLink ? "Register / Contact" : "Email HBIC"}
+          label={event.registrationLink ? "Register / Contact" : "Email the Office"}
           icon="mail"
           onPress={() => Linking.openURL(event.registrationLink || `mailto:${content.settings.email}?subject=${encodeURIComponent(event.title)}`)}
           style={styles.flex}

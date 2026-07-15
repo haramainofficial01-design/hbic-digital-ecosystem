@@ -21,23 +21,23 @@ export default function AboutScreen() {
       <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
       <GlassCard tone="navy">
         <Image source={brandAssets.appMark} style={styles.logo} />
-        <Text style={styles.darkTitle}>HBIC Calgary</Text>
+        <Text style={styles.darkTitle}>Masjid Bilal</Text>
         <Text style={styles.darkBody}>A community masjid app for prayer times, iqamah updates, programs, donations, media, and contact information.</Text>
       </GlassCard>
 
-      <SectionHeader title="About HBIC" />
+      <SectionHeader title="About Hazrat Bilal Islamic Centre" />
       <GlassCard>
         <Image source={photoAssets.prayerHall} style={styles.image} />
         <Text style={[styles.title, { color: theme.colors.text }]}>{settings.masjidName}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          HBIC Calgary serves the local community through prayer services, Qur'an learning, youth programs, reminders, community gatherings, volunteer support, and beneficial media.
+          Masjid Bilal serves the local community through prayer services, Qur'an learning, youth programs, reminders, community gatherings, volunteer support, and beneficial media.
         </Text>
       </GlassCard>
 
       <GlassCard tone="gold">
         <Text style={[styles.title, { color: theme.colors.text }]}>Community information</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          For current services, program details, receipts, or office questions, contact HBIC directly using the information in this app.
+          For current services, program details, receipts, or office questions, contact the centre directly using the information in this app.
         </Text>
       </GlassCard>
 

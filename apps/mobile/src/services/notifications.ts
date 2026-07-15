@@ -1,5 +1,6 @@
 import { defaultNotificationPreferences, notificationRouteByType } from "@hbic/shared";
 import type { NotificationPreference, NotificationRoute, NotificationType } from "@hbic/shared";
+import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
@@ -13,26 +14,44 @@ Notifications.setNotificationHandler({
 });
 
 const preferenceFile = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}hbic-notification-preferences.json` : "";
+const apiBase = (process.env.EXPO_PUBLIC_API_URL || "https://hbic-calgary.vercel.app").replace(/\/$/, "");
 const allowedRoutes: NotificationRoute[] = ["/", "/prayer", "/events", "/donate", "/media", "/programs", "/youth", "/contact", "/more"];
 
-export async function registerForPushNotificationsAsync() {
+export async function registerForPushNotificationsAsync({ requestPermission = true }: { requestPermission?: boolean } = {}) {
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "Masjid Bilal",
+      description: "Prayer reminders and community updates from Masjid Bilal.",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 180],
+      lightColor: "#0C9BA8"
+    });
+  }
+
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
-  if (status !== "granted") {
+  if (status !== "granted" && requestPermission) {
     const requested = await Notifications.requestPermissionsAsync();
     status = requested.status;
   }
   if (status !== "granted") return null;
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "HBIC Calgary",
-      importance: Notifications.AndroidImportance.DEFAULT
-    });
-  }
-
-  const token = await Notifications.getExpoPushTokenAsync();
+  const projectId = Constants.easConfig?.projectId ?? (Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined)?.projectId;
+  const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+  const response = await fetch(`${apiBase}/api/notifications/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: token.data,
+      platform: Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "unknown"
+    })
+  });
+  if (!response.ok) throw new Error("Unable to finish notification setup.");
   return token.data;
+}
+
+export async function refreshPushRegistrationAsync() {
+  return registerForPushNotificationsAsync({ requestPermission: false });
 }
 
 export function getDefaultNotificationPreferences(): NotificationPreference {

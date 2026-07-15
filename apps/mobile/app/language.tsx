@@ -14,7 +14,7 @@ import { useAppTheme } from "../src/theme/ThemeProvider";
 const languageFile = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}hbic-language.txt` : "";
 const languages: { code: LanguageCode; label: string; subtitle: string }[] = [
   { code: "en", label: "English", subtitle: "Default app language" },
-  { code: "ur", label: "Urdu", subtitle: "Preferred language for future HBIC updates" }
+  { code: "ur", label: "Urdu", subtitle: "Preferred language for future Masjid Bilal updates" }
 ];
 
 export default function LanguageScreen() {
@@ -50,7 +50,7 @@ export default function LanguageScreen() {
   return (
     <AppScreen>
       <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
-      <SectionHeader title="Language" subtitle="Choose your preferred language for HBIC Calgary updates." />
+      <SectionHeader title="Language" subtitle="Choose your preferred language for Masjid Bilal updates." />
       <GlassCard>
         {languages.map((item) => {
           const active = language === item.code;
@@ -58,6 +58,9 @@ export default function LanguageScreen() {
             <Pressable
               key={item.code}
               accessibilityRole="button"
+              accessibilityLabel={item.label}
+              accessibilityHint={item.subtitle}
+              accessibilityState={{ selected: active }}
               onPress={() => choose(item.code)}
               style={[styles.row, { borderBottomColor: theme.colors.border }]}
             >
@@ -75,7 +78,7 @@ export default function LanguageScreen() {
       <GlassCard tone="gold">
         <Text style={[styles.title, { color: theme.colors.text }]}>Preference saved</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          HBIC can use this preference for future app updates and community communication options.
+          Masjid Bilal can use this preference for future app updates and community communication options.
         </Text>
       </GlassCard>
     </AppScreen>

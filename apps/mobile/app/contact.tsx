@@ -20,7 +20,7 @@ export default function ContactScreen() {
   return (
     <AppScreen>
       <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
-      <SectionHeader title="Contact" subtitle="Reach HBIC Calgary, get directions, and find the masjid address." />
+      <SectionHeader title="Contact" subtitle="Reach Masjid Bilal, get directions, and find the masjid address." />
       <Image source={photoAssets.exterior} style={styles.image} />
 
       <GlassCard tone="teal">
@@ -37,7 +37,7 @@ export default function ContactScreen() {
       <GlassCard>
         <Text style={[styles.title, { color: theme.colors.text }]}>Qibla</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          For qibla guidance at the masjid, follow the prayer hall direction and ask HBIC staff if you need help.
+          For qibla guidance at the masjid, follow the prayer hall direction and ask a staff member if you need help.
         </Text>
       </GlassCard>
     </AppScreen>

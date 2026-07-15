@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "HBIC Calgary",
+    "name": "Masjid Bilal",
     "slug": "hbic-calgary-app",
     "scheme": "hbiccalgary",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/brand/hbic-app-icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sahil.hbiccalgarypreview"
+      "bundleIdentifier": "ca.hbic.calgary.app",
+      "appleTeamId": "ZJ58VWNTX3",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.ca.hbic.calgary.app"
+        ]
+      },
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,10 +32,34 @@
         "backgroundColor": "#062238"
       },
       "package": "ca.hbic.calgary.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "@bacons/apple-targets",
+      "./plugins/withAppleTargetSchemes",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25",
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/brand/hbic-splash-mark.png",
+          "color": "#0C9BA8",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

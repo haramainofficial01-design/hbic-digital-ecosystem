@@ -25,7 +25,7 @@ export default function SettingsScreen() {
 
       <GlassCard>
         <Text style={[styles.title, { color: theme.colors.text }]}>Appearance</Text>
-        <Text style={[styles.body, { color: theme.colors.muted }]}>Choose how HBIC Calgary should look on this device.</Text>
+        <Text style={[styles.body, { color: theme.colors.muted }]}>Choose how Masjid Bilal should look on this device.</Text>
         <View style={styles.options}>
           {themeOptions.map((option) => {
             const active = mode === option.value;
@@ -33,6 +33,8 @@ export default function SettingsScreen() {
               <Pressable
                 key={option.value}
                 accessibilityRole="button"
+                accessibilityLabel={`${option.label} appearance`}
+                accessibilityState={{ selected: active }}
                 onPress={() => setMode(option.value)}
                 style={[
                   styles.option,
@@ -52,7 +54,7 @@ export default function SettingsScreen() {
 
       <GlassCard compact>
         <SettingsRow title="Notifications" subtitle="Prayer, iqamah, events, media, and urgent notices" route="/notifications" />
-        <SettingsRow title="Language" subtitle="Preferred language for HBIC updates" route="/language" />
+        <SettingsRow title="Language" subtitle="Preferred language for Masjid Bilal updates" route="/language" />
       </GlassCard>
     </AppScreen>
   );
@@ -62,7 +64,7 @@ function SettingsRow({ title, subtitle, route }: { title: string; subtitle: stri
   const router = useRouter();
   const { theme } = useAppTheme();
   return (
-    <Pressable accessibilityRole="button" onPress={() => router.push(route as never)} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={subtitle} onPress={() => router.push(route as never)} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
       <View style={styles.flex}>
         <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{title}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>{subtitle}</Text>

@@ -1,18 +1,59 @@
 import type { PropsWithChildren } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { ScrollView, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 
 export function AppScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const { lastUpdatedAt, loading, refresh, refreshError, source } = usePublishedContent();
+  const isWide = width >= 768;
+  const cachedAt = lastUpdatedAt
+    ? new Date(lastUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : null;
+  const showStatus = source !== "api" || Boolean(refreshError);
 
   return (
     <LinearGradient colors={theme.gradients.screen} style={styles.gradient}>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <ScrollView contentContainerStyle={[styles.content, style]} showsVerticalScrollIndicator={false}>
-          {children}
+        <ScrollView
+          contentContainerStyle={[styles.content, isWide && styles.wideContent, style]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.teal} />}
+        >
+          <View style={styles.inner}>
+            {showStatus ? (
+              <View
+                accessibilityRole="alert"
+                style={[
+                  styles.status,
+                  {
+                    backgroundColor: source === "bundled-fallback" ? theme.colors.cardStrong : theme.colors.tintSoft,
+                    borderColor: theme.colors.border
+                  }
+                ]}
+              >
+                <Ionicons
+                  name={source === "bundled-fallback" ? "cloud-offline-outline" : "time-outline"}
+                  size={19}
+                  color={source === "bundled-fallback" ? theme.colors.muted : theme.colors.teal}
+                />
+                <View style={styles.statusCopy}>
+                  <Text style={[styles.statusTitle, { color: theme.colors.text }]}>
+                    {source === "bundled-fallback" ? "Current updates are temporarily unavailable" : "Showing last updated information"}
+                  </Text>
+                  <Text style={[styles.statusBody, { color: theme.colors.muted }]}>
+                    {source === "cache" && cachedAt ? `Updated at ${cachedAt}. Pull to refresh.` : refreshError ?? "Pull to try again."}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            {children}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -27,8 +68,40 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
+    width: "100%",
+    maxWidth: 1080,
+    alignSelf: "center",
     padding: spacing.md,
-    paddingBottom: 120,
+    paddingBottom: 120
+  },
+  wideContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg
+  },
+  inner: {
+    width: "100%",
     gap: spacing.md
+  },
+  status: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  statusCopy: {
+    flex: 1
+  },
+  statusTitle: {
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  statusBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2
   }
 });

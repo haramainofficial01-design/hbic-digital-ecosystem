@@ -1,7 +1,7 @@
 import { defaultNotificationPreferences, notificationCategories, type NotificationPreference } from "@hbic/shared";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -22,7 +22,7 @@ const preferenceRows: { key: BooleanPreferenceKey; title: string; subtitle: stri
   { key: "prayerReminders", title: "Prayer reminders", subtitle: "Adhan reminders when enabled." },
   { key: "iqamahReminders", title: "Iqamah reminders", subtitle: "Default 10 minutes before iqamah." },
   { key: "jumuahReminders", title: "Jumu'ah reminders", subtitle: "Friday schedule and parking reminders." },
-  { key: "announcements", title: "Announcements", subtitle: "General HBIC notices." },
+  { key: "announcements", title: "Announcements", subtitle: "General Masjid Bilal notices." },
   { key: "urgentAnnouncements", title: "Urgent notices", subtitle: "Closures, weather, safety, and important updates." },
   { key: "eventReminders", title: "Events", subtitle: "Community events and halaqah reminders." },
   { key: "programReminders", title: "Programs", subtitle: "Qur'an, classes, and regular program updates." },
@@ -38,7 +38,9 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const [preferences, setPreferences] = useState<NotificationPreference>(defaultNotificationPreferences);
-  const [status, setStatus] = useState("Choose the HBIC updates you want to receive on this device.");
+  const [status, setStatus] = useState("Choose the Masjid Bilal updates you want to receive on this device.");
+  const [registering, setRegistering] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     loadNotificationPreferences().then(setPreferences);
@@ -53,11 +55,20 @@ export default function NotificationsScreen() {
   }
 
   async function register() {
+    setRegistering(true);
+    setPermissionDenied(false);
     try {
       const token = await registerForPushNotificationsAsync();
-      setStatus(token ? "Notifications are enabled for this device." : "Permission was not granted on this device.");
+      if (token) {
+        setStatus("Notifications are enabled for this device.");
+      } else {
+        setPermissionDenied(true);
+        setStatus("Notifications are off. You can enable them in your device settings.");
+      }
     } catch {
-      setStatus("Notifications are not available on this device right now.");
+      setStatus("Couldn't finish notification setup right now. Please try again.");
+    } finally {
+      setRegistering(false);
     }
   }
 
@@ -69,7 +80,17 @@ export default function NotificationsScreen() {
       <GlassCard tone="navy">
         <Text style={styles.darkTitle}>Push setup</Text>
         <Text style={styles.darkBody}>{status}</Text>
-        <AppButton label="Enable Notifications" icon="notifications" onPress={register} style={styles.button} />
+        <AppButton
+          label={registering ? "Enabling..." : "Enable Notifications"}
+          icon="notifications"
+          onPress={register}
+          disabled={registering}
+          accessibilityHint="Requests notification permission and registers this device"
+          style={styles.button}
+        />
+        {permissionDenied ? (
+          <AppButton label="Open Device Settings" icon="settings" variant="secondary" onPress={() => Linking.openSettings()} style={styles.button} />
+        ) : null}
       </GlassCard>
 
       <GlassCard>
@@ -81,6 +102,8 @@ export default function NotificationsScreen() {
               <Text style={[styles.body, { color: theme.colors.muted }]}>{row.subtitle}</Text>
             </View>
             <Switch
+              accessibilityLabel={row.title}
+              accessibilityHint={row.subtitle}
               value={Boolean(preferences[row.key])}
               onValueChange={() => toggle(row.key)}
               trackColor={{ false: theme.colors.borderStrong, true: theme.colors.tintSoft }}
@@ -93,12 +116,12 @@ export default function NotificationsScreen() {
         </Text>
       </GlassCard>
 
-      <SectionHeader title="Notification Types" subtitle="HBIC uses these categories for respectful community updates." />
+      <SectionHeader title="Notification Types" subtitle="Masjid Bilal uses these categories for respectful community updates." />
       {notificationCategories.map((category) => (
         <GlassCard key={category.type} compact>
           <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{category.label}</Text>
           <Text style={[styles.body, { color: theme.colors.muted }]}>{category.description}</Text>
-          <Text style={[styles.meta, { color: theme.colors.teal }]}>Opens {category.route} · {category.defaultAudience}</Text>
+          <Text style={[styles.meta, { color: theme.colors.teal }]}>{category.defaultAudience} audience</Text>
         </GlassCard>
       ))}
     </AppScreen>
