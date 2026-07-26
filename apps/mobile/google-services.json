@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "626062649957",
+    "project_id": "hbic-calgary-prod",
+    "storage_bucket": "hbic-calgary-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:626062649957:android:d5265b1b0b1cf60d5ef48c",
+        "android_client_info": {
+          "package_name": "ca.hbic.calgary.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0WcZ7LYDKUmlBIl9vIaiIAHKheZBu9-M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
