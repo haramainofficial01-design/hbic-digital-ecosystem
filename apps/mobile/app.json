@@ -21,7 +21,6 @@
           "group.ca.hbic.calgary.app"
         ]
       },
-      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -33,7 +32,6 @@
         "backgroundColor": "#062238"
       },
       "package": "ca.hbic.calgary.app",
-      "versionCode": 1,
       "blockedPermissions": [
         "android.permission.ACTIVITY_RECOGNITION"
       ]
