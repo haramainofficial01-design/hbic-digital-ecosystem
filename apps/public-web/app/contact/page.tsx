@@ -11,24 +11,24 @@ export default async function ContactPage() {
   const appleMapsUrl = `https://maps.apple.com/?q=${addressQuery}`;
 
   return (
-    <SiteChrome settings={settings}>
+    <SiteChrome settings={settings} contentVersion={content.version}>
       <section className="section">
         <h2>Contact</h2>
-        <p>Reach the HBIC office, find directions, and follow community updates.</p>
+        <p>Reach the centre office, find directions, and follow community updates.</p>
         <div className="grid">
           <div className="card">
             <span className="kicker">Phone</span>
             <h3>{settings.phone}</h3>
-            <div className="actions"><a className="button primary" href={`tel:${settings.phone}`}>Call HBIC</a></div>
+            <div className="actions"><a className="button primary" href={`tel:${settings.phone}`}>Call the Office</a></div>
           </div>
           <div className="card">
             <span className="kicker">Email</span>
             <h3>{settings.email}</h3>
-            <div className="actions"><a className="button primary" href={`mailto:${settings.email}`}>Email HBIC</a></div>
+            <div className="actions"><a className="button primary" href={`mailto:${settings.email}`}>Email the Office</a></div>
           </div>
           <div className="card dark">
             <span className="kicker">Directions</span>
-            <h3>Visit HBIC Calgary</h3>
+            <h3>Visit Masjid Bilal</h3>
             <p className="muted">{settings.address}</p>
             <div className="actions">
               <a className="button primary" href={googleMapsUrl} target="_blank" rel="noreferrer">Open in Google Maps</a>

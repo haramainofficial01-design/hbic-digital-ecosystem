@@ -1,6 +1,25 @@
 {
   "framework": "nextjs",
-  "installCommand": "npm install --ignore-scripts --no-audit --fund=false",
+  "installCommand": "npm install --legacy-peer-deps --ignore-scripts --no-audit --fund=false",
   "buildCommand": "npm run build:web",
-  "outputDirectory": "apps/public-web/.next"
+  "outputDirectory": "apps/public-web/.next",
+  "alias": [
+    "hbic-calgary.vercel.app",
+    "hbic-calgary-app.vercel.app",
+    "hbic.ca",
+    "www.hbic.ca"
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.hbic.ca"
+        }
+      ],
+      "destination": "https://hbic.ca/$1",
+      "permanent": true
+    }
+  ]
 }

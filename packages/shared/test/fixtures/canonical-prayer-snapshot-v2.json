@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "masjidID": "masjid-bilal-calgary",
+  "masjidName": "Masjid Bilal",
+  "scheduleRevision": "fixture-2026-07-09",
+  "masjidTimeZoneIdentifier": "America/Edmonton",
+  "serviceDate": "2026-07-09",
+  "timezone": "America/Edmonton",
+  "scheduleDate": "2026-07-09",
+  "currentPrayerKey": "maghrib",
+  "nextPrayerKey": "isha",
+  "nextPrayerName": "Isha",
+  "nextPrayerTime": "11:20 PM",
+  "nextPrayerDate": "2026-07-10T05:20:00.000Z",
+  "tomorrowFajrDate": "2026-07-10T10:02:00.000Z",
+  "nextIqamah": "11:25 PM",
+  "nextIqamahDate": "2026-07-10T05:25:00.000Z",
+  "prayers": [
+    {
+      "key": "fajr",
+      "name": "Fajr",
+      "adhan": "4:02 AM",
+      "adhanDate": "2026-07-09T10:02:00.000Z",
+      "iqamah": "4:30 AM",
+      "iqamahDate": "2026-07-09T10:30:00.000Z"
+    },
+    {
+      "key": "sunrise",
+      "name": "Sunrise",
+      "adhan": "5:32 AM",
+      "adhanDate": "2026-07-09T11:32:00.000Z"
+    },
+    {
+      "key": "dhuhr",
+      "name": "Dhuhr",
+      "adhan": "1:41 PM",
+      "adhanDate": "2026-07-09T19:41:00.000Z",
+      "iqamah": "2:00 PM",
+      "iqamahDate": "2026-07-09T20:00:00.000Z"
+    },
+    {
+      "key": "asr",
+      "name": "Asr",
+      "adhan": "6:01 PM",
+      "adhanDate": "2026-07-10T00:01:00.000Z",
+      "iqamah": "6:30 PM",
+      "iqamahDate": "2026-07-10T00:30:00.000Z"
+    },
+    {
+      "key": "maghrib",
+      "name": "Maghrib",
+      "adhan": "9:50 PM",
+      "adhanDate": "2026-07-10T03:50:00.000Z",
+      "iqamah": "10:00 PM",
+      "iqamahDate": "2026-07-10T04:00:00.000Z"
+    },
+    {
+      "key": "isha",
+      "name": "Isha",
+      "adhan": "11:20 PM",
+      "adhanDate": "2026-07-10T05:20:00.000Z",
+      "iqamah": "11:25 PM",
+      "iqamahDate": "2026-07-10T05:25:00.000Z"
+    }
+  ],
+  "jumuah": [
+    {
+      "label": "First Jumu'ah",
+      "khutbah": "1:45 PM",
+      "iqamah": "1:45 PM"
+    },
+    {
+      "label": "Second Jumu'ah",
+      "khutbah": "2:30 PM",
+      "iqamah": "2:30 PM"
+    }
+  ],
+  "jumuahState": {
+    "enabled": true,
+    "serviceDate": "2026-07-09",
+    "firstDoorsCloseTime": "2:00 PM",
+    "title": "First Jumu'ah",
+    "notice": "Doors close at 2:00 PM for the first Jumu'ah prayer.",
+    "parkingNotice": "Please arrive early and park respectfully around the community.",
+    "sessions": [
+      {
+        "label": "First Jumu'ah",
+        "khutbah": "1:45 PM",
+        "iqamah": "1:45 PM"
+      },
+      {
+        "label": "Second Jumu'ah",
+        "khutbah": "2:30 PM",
+        "iqamah": "2:30 PM"
+      }
+    ]
+  },
+  "generatedAt": "2026-07-10T04:00:00.000Z",
+  "sourceUpdatedAt": "2026-07-10T03:58:00.000Z",
+  "expiresAt": "2026-07-10T06:00:00.000Z",
+  "state": "fresh",
+  "availability": "available",
+  "stale": false,
+  "hijri": {
+    "day": 24,
+    "month": "Muharram",
+    "year": 1448,
+    "label": "24 Muharram 1448 AH",
+    "gregorianDate": "2026-07-09",
+    "adjustmentDays": 0,
+    "isWhiteDay": false,
+    "upcomingWhiteDays": [
+      {
+        "gregorianDate": "2026-07-28",
+        "label": "13 Safar 1448 AH"
+      },
+      {
+        "gregorianDate": "2026-07-29",
+        "label": "14 Safar 1448 AH"
+      },
+      {
+        "gregorianDate": "2026-07-30",
+        "label": "15 Safar 1448 AH"
+      }
+    ]
+  },
+  "hijriDate": "24 Muharram 1448 AH",
+  "isWhiteDay": false
+}

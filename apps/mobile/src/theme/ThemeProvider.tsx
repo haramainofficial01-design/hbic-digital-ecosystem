@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import type { PropsWithChildren } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";

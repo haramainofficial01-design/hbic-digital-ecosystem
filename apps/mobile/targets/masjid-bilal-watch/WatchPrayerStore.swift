@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import WatchKit
 import WidgetKit
 
 @MainActor
@@ -9,7 +10,7 @@ final class WatchPrayerStore: ObservableObject {
     @Published private(set) var refreshMessage: String?
 
     private let receiver: WatchSnapshotReceiver
-    private let endpoint = URL(string: "https://hbic-calgary.vercel.app/api/content/prayer-snapshot")!
+    private let endpoint = URL(string: "https://hbic.ca/api/content/prayer-snapshot")!
 
     init() {
         #if DEBUG
@@ -21,7 +22,7 @@ final class WatchPrayerStore: ObservableObject {
         #endif
         receiver = WatchSnapshotReceiver()
         receiver.onSnapshot = { [weak self] data in
-            Task { @MainActor in self?.accept(data: data, state: "fresh") }
+            Task { @MainActor in self?.accept(data: data) }
         }
         receiver.activate()
     }
@@ -30,16 +31,19 @@ final class WatchPrayerStore: ObservableObject {
     var isShowingCachedData: Bool { snapshot?.isStale() == true }
 
     func refreshIfNeeded() async {
-        if snapshot == nil || snapshot?.isStale() == true {
-            await refresh()
-        }
+        await refresh(playFeedback: false)
     }
 
-    func refresh() async {
+    func refresh(playFeedback: Bool = true) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         refreshMessage = nil
         defer { isRefreshing = false }
+
+        if let phoneData = await receiver.latestSnapshotFromPhone(), accept(data: phoneData) {
+            if playFeedback { WKInterfaceDevice.current().play(.success) }
+            return
+        }
 
         do {
             let (data, response) = try await URLSession.shared.data(from: endpoint)
@@ -48,30 +52,43 @@ final class WatchPrayerStore: ObservableObject {
             }
             let result = try JSONDecoder().decode(PrayerSnapshotResponse.self, from: data)
             guard result.ok else { throw URLError(.cannotParseResponse) }
-            accept(snapshot: result.snapshot)
+            if accept(snapshot: result.snapshot) {
+                if playFeedback { WKInterfaceDevice.current().play(.success) }
+            }
         } catch {
-            refreshMessage = snapshot == nil ? "Prayer times are temporarily unavailable." : "Showing last updated times."
+            refreshMessage = snapshot == nil
+                ? "Open Masjid Bilal on your iPhone to sync."
+                : "iPhone unavailable. Using the most recent schedule."
         }
     }
 
-    private func accept(data: Data, state: String) {
-        guard let incoming = MasjidPrayerSnapshot.decode(data) else { return }
-        accept(snapshot: incoming)
+    @discardableResult
+    private func accept(data: Data) -> Bool {
+        guard let incoming = MasjidPrayerSnapshot.decode(data) else { return false }
+        return accept(snapshot: incoming)
     }
 
-    private func accept(snapshot incoming: MasjidPrayerSnapshot) {
+    @discardableResult
+    private func accept(snapshot incoming: MasjidPrayerSnapshot) -> Bool {
         if let current = snapshot,
            let currentDate = current.generatedAtValue,
            let incomingDate = incoming.generatedAtValue,
            incomingDate < currentDate {
-            return
+            return false
         }
 
-        guard let encoded = try? JSONEncoder().encode(incoming) else { return }
-        UserDefaults(suiteName: MasjidSharedData.appGroup)?.set(encoded, forKey: MasjidSharedData.snapshotKey)
+        guard let encoded = try? JSONEncoder().encode(incoming) else { return false }
+        let defaults = UserDefaults(suiteName: MasjidSharedData.appGroup)
+        if defaults?.data(forKey: MasjidSharedData.snapshotKey) == encoded {
+            snapshot = incoming
+            refreshMessage = nil
+            return true
+        }
+        defaults?.set(encoded, forKey: MasjidSharedData.snapshotKey)
         snapshot = incoming
         refreshMessage = nil
         WidgetCenter.shared.reloadTimelines(ofKind: "MasjidPrayerComplications")
+        return true
     }
 }
 
@@ -90,6 +107,23 @@ private final class WatchSnapshotReceiver: NSObject, WCSessionDelegate {
         session.activate()
     }
 
+    func latestSnapshotFromPhone() async -> Data? {
+        guard WCSession.isSupported() else { return nil }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isReachable else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            session.sendMessage(
+                ["request": "prayerSnapshot"],
+                replyHandler: { reply in
+                    let json = reply["prayerSnapshot"] as? String
+                    continuation.resume(returning: json?.data(using: .utf8))
+                },
+                errorHandler: { _ in continuation.resume(returning: nil) }
+            )
+        }
+    }
+
     func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
@@ -98,7 +132,7 @@ private final class WatchSnapshotReceiver: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         guard
-            applicationContext["schemaVersion"] as? Int == MasjidSharedData.schemaVersion,
+            (applicationContext["schemaVersion"] as? Int).map(MasjidSharedData.supportedSchemaVersions.contains) == true,
             let json = applicationContext["prayerSnapshot"] as? String,
             let data = json.data(using: .utf8)
         else {

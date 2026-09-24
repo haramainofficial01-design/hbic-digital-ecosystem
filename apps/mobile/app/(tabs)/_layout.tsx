@@ -1,46 +1,92 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import {
+  Icon,
+  Label,
+  NativeTabs,
+  VectorIcon
+} from "expo-router/unstable-native-tabs";
+import { useAppLanguage } from "../../src/i18n/LanguageProvider";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const iconMap = {
-  index: "home",
-  prayer: "time",
-  events: "calendar",
-  donate: "heart",
-  more: "grid"
-} satisfies Record<string, IconName>;
+type TabDefinition = {
+  name: "index" | "prayer" | "events" | "donate" | "more";
+  label: "home" | "prayer" | "events" | "donate" | "more";
+  sf: {
+    default: "house" | "clock" | "calendar" | "heart" | "square.grid.2x2";
+    selected: "house.fill" | "clock.fill" | "calendar" | "heart.fill" | "square.grid.2x2.fill";
+  };
+  android: IconName;
+};
+
+const tabs: TabDefinition[] = [
+  {
+    name: "index",
+    label: "home",
+    sf: { default: "house", selected: "house.fill" },
+    android: "home"
+  },
+  {
+    name: "prayer",
+    label: "prayer",
+    sf: { default: "clock", selected: "clock.fill" },
+    android: "time"
+  },
+  {
+    name: "events",
+    label: "events",
+    sf: { default: "calendar", selected: "calendar" },
+    android: "calendar"
+  },
+  {
+    name: "donate",
+    label: "donate",
+    sf: { default: "heart", selected: "heart.fill" },
+    android: "heart"
+  },
+  {
+    name: "more",
+    label: "more",
+    sf: { default: "square.grid.2x2", selected: "square.grid.2x2.fill" },
+    android: "grid"
+  }
+];
 
 export default function TabLayout() {
   const { theme } = useAppTheme();
+  const { t } = useAppLanguage();
 
   return (
-    <Tabs
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.teal,
-        tabBarInactiveTintColor: theme.colors.subtle,
-        tabBarStyle: {
-          minHeight: 72,
-          paddingTop: 8,
-          backgroundColor: theme.mode === "dark" ? "rgba(4,21,34,0.96)" : "rgba(255,255,255,0.94)",
-          borderTopColor: theme.colors.border
+    <NativeTabs
+      backgroundColor={null}
+      blurEffect="systemDefault"
+      minimizeBehavior="onScrollDown"
+      tintColor={theme.colors.teal}
+      iconColor={{
+        default: theme.colors.subtle,
+        selected: theme.colors.teal
+      }}
+      labelStyle={{
+        default: {
+          color: theme.colors.subtle,
+          fontWeight: "700"
         },
-        tabBarLabelStyle: {
+        selected: {
+          color: theme.colors.teal,
           fontWeight: "800"
-        },
-        tabBarIcon: ({ color, size }) => {
-          const icon = iconMap[route.name as keyof typeof iconMap] ?? "ellipse";
-          return <Ionicons name={icon} color={color} size={Math.max(22, size)} />;
         }
-      })}
+      }}
     >
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="prayer" options={{ title: "Prayer" }} />
-      <Tabs.Screen name="events" options={{ title: "Events" }} />
-      <Tabs.Screen name="donate" options={{ title: "Donate" }} />
-      <Tabs.Screen name="more" options={{ title: "More" }} />
-    </Tabs>
+      {tabs.map((tab) => (
+        <NativeTabs.Trigger key={tab.name} name={tab.name}>
+          <Icon
+            sf={tab.sf}
+            androidSrc={<VectorIcon family={Ionicons} name={tab.android} />}
+          />
+          <Label>{t(tab.label)}</Label>
+        </NativeTabs.Trigger>
+      ))}
+    </NativeTabs>
   );
 }

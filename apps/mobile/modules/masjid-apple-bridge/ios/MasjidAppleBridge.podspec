@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description = 'App Group storage, WidgetKit reloads, and WatchConnectivity synchronization.'
   s.license = { :type => 'MIT' }
   s.author = 'Masjid Bilal'
-  s.homepage = 'https://hbic-calgary.vercel.app'
+  s.homepage = 'https://hbic.ca'
   s.platforms = { :ios => '15.1' }
   s.swift_version = '5.0'
   s.source = { :path => '.' }

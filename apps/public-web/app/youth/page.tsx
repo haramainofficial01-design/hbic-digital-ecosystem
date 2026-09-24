@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import { getPublicEvents } from "@hbic/shared";
+import Image from "next/image";
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
 
@@ -6,7 +8,8 @@ export const revalidate = 300;
 
 export default async function YouthPage() {
   const { content } = await getPublishedContent();
-  const { events, settings } = content;
+  const { settings } = content;
+  const events = getPublicEvents(content);
   const youthEvents = events.filter((event) => event.category === "Youth");
   const summerCamp = events.find((event) => event.id === "event-summer-camp-2026");
   const socialCards = [
@@ -16,10 +19,10 @@ export default async function YouthPage() {
   ];
 
   return (
-    <SiteChrome settings={settings}>
+    <SiteChrome settings={settings} contentVersion={content.version}>
       <section className="section">
         <div className="page-hero" style={{ "--hero-image": "url('/media/images/youth-program.jpeg')" } as CSSProperties}>
-          <img src="/brand/hbic-youth-logo.png" alt="HBIC Youth logo" style={{ width: 98, borderRadius: 22, background: "white" }} />
+          <Image src="/brand/hbic-youth-logo.png" alt="HBIC Youth logo" width={98} height={98} style={{ width: 98, height: 98, borderRadius: 22, background: "white" }} />
           <h2>HBIC Youth</h2>
           <p>A safe, beneficial space for youth to learn, connect, and grow through reminders, activities, service, and community.</p>
           <div className="actions">
@@ -47,7 +50,7 @@ export default async function YouthPage() {
         <div className="grid">
           {youthEvents.map((event) => (
             <article className="card image-card wide" key={event.id}>
-              <img src="/photos/summer-camp-2026.jpeg" alt={`${event.title} flyer`} />
+              <Image src="/photos/summer-camp-2026.jpeg" alt={`${event.title} flyer`} width={1200} height={800} />
               <span className="kicker">Youth Program</span>
               <h3>{event.title}</h3>
               <p className="muted">{event.description}</p>
@@ -57,7 +60,7 @@ export default async function YouthPage() {
             </article>
           ))}
           <article className="card image-card wide">
-            <img src="/media/images/youth-iftar.jpeg" alt="HBIC youth gathering" />
+            <Image src="/media/images/youth-iftar.jpeg" alt="HBIC youth gathering" width={1200} height={800} />
             <span className="kicker">Youth Gallery</span>
             <h3>Program Moments</h3>
             <p className="muted">Wide community photos are used tastefully to show connection, learning, and service.</p>

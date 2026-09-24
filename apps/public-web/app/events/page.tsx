@@ -1,25 +1,34 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
+import { getPublicEvents, getPublicVolunteerOpportunities } from "@hbic/shared";
+import Image from "next/image";
+import type { CSSProperties } from "react";
 
 function eventImagePath(image: string) {
-  return image === "summer-camp-2026.jpeg" ? `/photos/${image}` : `/media/images/${image}`;
+  return image === "summer-camp-2026.jpeg" || image === "quran-academy.jpeg" ? `/photos/${image}` : `/media/images/${image}`;
 }
 
 export const revalidate = 300;
 
 export default async function EventsPage() {
   const { content } = await getPublishedContent();
-  const { events, settings, volunteerOpportunities } = content;
+  const { settings } = content;
+  const events = getPublicEvents(content);
+  const volunteerOpportunities = getPublicVolunteerOpportunities(content.volunteerOpportunities);
 
   return (
-    <SiteChrome settings={settings}>
-      <section className="section">
-        <h2>Events</h2>
-        <p>Current HBIC programs, halaqah series, youth activities, and community volunteer opportunities.</p>
+    <SiteChrome settings={settings} contentVersion={content.version}>
+      <section className="section interior-page-section">
+        <div className="page-hero" style={{ "--hero-image": "url('/media/images/community-jumuah.jpg')" } as CSSProperties}>
+          <span className="eyebrow">GATHER AT MASJID BILAL</span>
+          <h2>Events</h2>
+          <p>Learning, friendship, and service make the masjid more than a place to pray. Find what&apos;s happening next.</p>
+        </div>
+        <div className="interior-section-intro"><span className="eyebrow">COME AS YOU ARE</span><h3>Find your next gathering.</h3><p>Current programs, halaqah series, youth activities, and ways to volunteer.</p></div>
         <div className="grid">
           {events.map((event) => (
             <article className="card image-card" key={event.id}>
-              <img src={eventImagePath(event.image)} alt={`${event.title} flyer`} />
+              {event.image ? <Image src={eventImagePath(event.image)} alt={`${event.title} flyer`} width={1200} height={800} /> : null}
               <span className="kicker">{event.category}</span>
               <h3>{event.title}</h3>
               <p className="muted">{event.date} · {event.startTime}{event.endTime ? ` · ${event.endTime}` : ""} · {event.location}</p>

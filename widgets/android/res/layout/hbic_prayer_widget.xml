@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/hbic_prayer_widget"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/hbic_widget_background"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/widget_masjid_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="MASJID BILAL"
+        android:textColor="#EBC76B"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_next_prayer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Prayer times"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_adhan_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Adhan unavailable"
+        android:textColor="#D7FBFF"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_iqamah_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Iqamah unavailable"
+        android:textColor="#EBC76B"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_countdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Open app"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/widget_jumuah"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Jumu'ah 1:45 PM / 2:30 PM"
+        android:textColor="#B8CCD2"
+        android:textSize="12sp" />
+</LinearLayout>

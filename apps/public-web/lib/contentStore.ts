@@ -1,8 +1,12 @@
 import "server-only";
 
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type DocumentData } from "firebase-admin/firestore";
 import { defaultContent, normalizeContent, validateContent, type HbicContent } from "@hbic/shared";
+import { applyPrayerSync } from "./prayerSync";
+import { assertPublicationPreconditions, type PublicationPreconditions } from "./publicationGuards";
+import { getFirebaseApp } from "./firebaseAdmin";
+
+export { getFirebaseApp } from "./firebaseAdmin";
 
 type ContentMode = "firestore" | "static-fallback";
 
@@ -16,10 +20,6 @@ const CMS_COLLECTION = "cmsContent";
 const DRAFT_DOC = "draft";
 const PUBLISHED_DOC = "published";
 const VERSION_COLLECTION = "cmsContentVersions";
-
-function normalizePrivateKey(value?: string) {
-  return value?.replace(/\\n/g, "\n");
-}
 
 export function getContentStoreStatus(): ContentStoreStatus {
   const hasProjectId = Boolean(
@@ -45,45 +45,7 @@ export function getContentStoreStatus(): ContentStoreStatus {
   };
 }
 
-function getFirebaseApp(): App | null {
-  const status = getContentStoreStatus();
-  if (!status.configured) return null;
-  const existing = getApps()[0];
-  if (existing) return existing;
-
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const credentialJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
-  if (credentialJson) {
-    const parsed = JSON.parse(credentialJson) as {
-      project_id?: string;
-      client_email?: string;
-      private_key?: string;
-    };
-
-    return initializeApp({
-      credential: cert({
-        projectId: parsed.project_id || projectId,
-        clientEmail: parsed.client_email,
-        privateKey: normalizePrivateKey(parsed.private_key)
-      })
-    });
-  }
-
-  if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-    return initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
-      })
-    });
-  }
-
-  return initializeApp({ projectId });
-}
-
-function getDatabase() {
+export function getDatabase() {
   const app = getFirebaseApp();
   return app ? getFirestore(app) : null;
 }
@@ -113,44 +75,67 @@ export async function getPublishedContent(): Promise<{ content: HbicContent; sta
   const db = getDatabase();
 
   if (!db) {
-    return { content: defaultContent, status };
+    const synced = await applyPrayerSync(defaultContent, null);
+    return { content: synced.content, status };
   }
 
   const snapshot = await db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC).get();
   if (!snapshot.exists) {
-    return { content: defaultContent, status };
+    const synced = await applyPrayerSync(defaultContent, db);
+    return { content: synced.content, status };
   }
 
+  const content = normalizeContent({ ...extractContent(snapshot.data()), status: "published" });
+  const synced = await applyPrayerSync(content, db);
+  return { content: synced.content, status };
+}
+
+export async function getPublishedContentVersion() {
+  const db = getDatabase();
+  if (!db) {
+    return {
+      version: defaultContent.version,
+      updatedAt: defaultContent.updatedAt,
+      publishedAt: defaultContent.publishedAt
+    };
+  }
+  const snapshot = await db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC).get();
+  const data = snapshot.data();
   return {
-    content: normalizeContent({ ...extractContent(snapshot.data()), status: "published" }),
-    status
+    version: Number(data?.content?.version ?? data?.version ?? defaultContent.version),
+    updatedAt: String(data?.content?.updatedAt ?? data?.updatedAt ?? defaultContent.updatedAt),
+    publishedAt: String(data?.content?.publishedAt ?? data?.publishedAt ?? defaultContent.publishedAt)
   };
 }
 
-export async function getDraftContent(): Promise<{ content: HbicContent; status: ContentStoreStatus }> {
+export async function getDraftContent(): Promise<{ content: HbicContent; status: ContentStoreStatus; draftUpdatedAt: string | null }> {
   const status = getContentStoreStatus();
   const db = getDatabase();
 
   if (!db) {
-    return { content: defaultContent, status };
+    const synced = await applyPrayerSync(defaultContent, null);
+    return { content: normalizeContent({ ...synced.content, status: "draft" }), status, draftUpdatedAt: null };
   }
 
   const draftSnapshot = await db.collection(CMS_COLLECTION).doc(DRAFT_DOC).get();
   if (draftSnapshot.exists) {
+    const storedDraftUpdatedAt = draftSnapshot.data()?.updatedAt ?? draftSnapshot.data()?.content?.updatedAt;
     return {
-      content: normalizeContent({ ...extractContent(draftSnapshot.data()), status: "draft" }),
-      status
+      content: (await applyPrayerSync(normalizeContent({ ...extractContent(draftSnapshot.data()), status: "draft" }), db)).content,
+      status,
+      draftUpdatedAt: storedDraftUpdatedAt ? String(storedDraftUpdatedAt) : null
     };
   }
 
   const published = await getPublishedContent();
   return {
     content: normalizeContent({ ...published.content, status: "draft" }),
-    status
+    status,
+    draftUpdatedAt: null
   };
 }
 
-export async function saveDraftContent(content: HbicContent) {
+export async function saveDraftContent(content: HbicContent, expected: PublicationPreconditions = {}) {
   const status = getContentStoreStatus();
   const db = getDatabase();
   if (!db) throw new Error(`Firestore publishing is not configured. Missing: ${status.missing.join(", ")}`);
@@ -160,55 +145,72 @@ export async function saveDraftContent(content: HbicContent) {
   const errors = validateContent(draft);
   if (errors.length) throw new Error(errors.join(" "));
 
-  await db.collection(CMS_COLLECTION).doc(DRAFT_DOC).set({
-    content: stripUndefined(draft),
-    status: "draft",
-    updatedAt: now
+  const draftRef = db.collection(CMS_COLLECTION).doc(DRAFT_DOC);
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(draftRef);
+    const currentDraftUpdatedAt = current.data()?.updatedAt ?? current.data()?.content?.updatedAt;
+    assertPublicationPreconditions({
+      draftUpdatedAt: current.exists && currentDraftUpdatedAt ? String(currentDraftUpdatedAt) : null
+    }, { expectedDraftUpdatedAt: expected.expectedDraftUpdatedAt });
+    transaction.set(draftRef, { content: stripUndefined(draft), status: "draft", updatedAt: now });
   });
 
-  return { content: draft, status };
+  return { content: draft, status, draftUpdatedAt: now };
 }
 
-export async function publishDraftContent() {
+export async function publishDraftContent(expected: PublicationPreconditions = {}) {
   const status = getContentStoreStatus();
   const db = getDatabase();
   if (!db) throw new Error(`Firestore publishing is not configured. Missing: ${status.missing.join(", ")}`);
 
-  const draftSnapshot = await db.collection(CMS_COLLECTION).doc(DRAFT_DOC).get();
-  if (!draftSnapshot.exists) throw new Error("No saved draft exists yet. Save a draft before publishing.");
+  return db.runTransaction(async (transaction) => {
+    const draftRef = db.collection(CMS_COLLECTION).doc(DRAFT_DOC);
+    const publishedRef = db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC);
+    const publicationRef = db.collection("publicationState").doc("current");
+    const [draftSnapshot, publishedSnapshot, publicationSnapshot] = await transaction.getAll(draftRef, publishedRef, publicationRef);
+    if (!draftSnapshot.exists) throw new Error("No saved draft exists yet. Save a draft before publishing.");
 
-  const publishedSnapshot = await db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC).get();
-  const currentVersion = Number(publishedSnapshot.data()?.content?.version ?? publishedSnapshot.data()?.version ?? 0);
-  const now = new Date().toISOString();
-  const content = normalizeContent({
-    ...extractContent(draftSnapshot.data()),
-    status: "published",
-    version: currentVersion + 1,
-    updatedAt: now,
-    publishedAt: now
-  });
-  const errors = validateContent(content);
-  if (errors.length) throw new Error(errors.join(" "));
+    const currentVersion = Number(publishedSnapshot.data()?.content?.version ?? publishedSnapshot.data()?.version ?? 0);
+    const storedDraftUpdatedAt = draftSnapshot.data()?.updatedAt ?? draftSnapshot.data()?.content?.updatedAt;
+    assertPublicationPreconditions({
+      draftUpdatedAt: storedDraftUpdatedAt ? String(storedDraftUpdatedAt) : null,
+      publishedVersion: currentVersion
+    }, expected);
+    const now = new Date().toISOString();
+    const content = normalizeContent({
+      ...extractContent(draftSnapshot.data()),
+      status: "published",
+      version: currentVersion + 1,
+      updatedAt: now,
+      publishedAt: now
+    });
+    const errors = validateContent(content);
+    if (errors.length) throw new Error(errors.join(" "));
 
-  const batch = db.batch();
-  batch.set(db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC), {
-    content: stripUndefined(content),
-    status: "published",
-    version: content.version,
-    updatedAt: now,
-    publishedAt: now
+    const publication = {
+      revision: Number(publicationSnapshot.data()?.revision ?? 0) + 1,
+      updatedAt: now,
+      kind: "content" as const,
+      contentVersion: content.version
+    };
+    transaction.set(publishedRef, {
+      content: stripUndefined(content),
+      status: "published",
+      version: content.version,
+      updatedAt: now,
+      publishedAt: now
+    });
+    transaction.set(draftRef, {
+      content: stripUndefined({ ...content, status: "draft" }),
+      status: "draft",
+      updatedAt: now
+    });
+    transaction.set(db.collection(VERSION_COLLECTION).doc(String(content.version).padStart(6, "0")), {
+      content: stripUndefined(content),
+      version: content.version,
+      publishedAt: now
+    });
+    transaction.set(publicationRef, publication);
+    return { content, status, publication };
   });
-  batch.set(db.collection(CMS_COLLECTION).doc(DRAFT_DOC), {
-    content: stripUndefined({ ...content, status: "draft" }),
-    status: "draft",
-    updatedAt: now
-  });
-  batch.set(db.collection(VERSION_COLLECTION).doc(String(content.version).padStart(6, "0")), {
-    content: stripUndefined(content),
-    version: content.version,
-    publishedAt: now
-  });
-  await batch.commit();
-
-  return { content, status };
 }

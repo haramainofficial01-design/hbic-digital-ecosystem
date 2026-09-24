@@ -1,13 +1,13 @@
-# HBIC Calgary App Ecosystem
+# Masjid Bilal App Ecosystem
 
-Standalone project for **Hazrat Bilal Islamic Centre** / **HBIC Calgary**.
+Standalone project for **Masjid Bilal** and **Hazrat Bilal Islamic Centre**.
 
 This folder is intentionally separate from the Haramain Travel app and Haramain Central website.
 
 ## Structure
 
 ```text
-hbic-calgary-app/
+HBICCalgaryApp/
   apps/
     mobile/       Expo React Native app for iPhone and Android
     admin-web/    Next.js admin dashboard
@@ -20,28 +20,28 @@ hbic-calgary-app/
     firebase/     Firestore rules, indexes, storage rules
     functions/    Firebase Cloud Functions and seed script
   widgets/
-    ios/          WidgetKit scaffold notes
-    android/      Android widget scaffold notes
+    android/      preserved Android native widget source
 ```
 
 ## What Is Built
 
 - Mobile tabs: Home, Prayer, Events, Donate, More, with dedicated Media, Youth, Programs, Contact, About, Settings, Notifications, Language, and Event Detail screens
-- Mobile identity: app name is **HBIC Calgary**, with a modern crescent/masjid/calligraphic flame icon and matching splash mark
+- Mobile identity: public app name is **Masjid Bilal**, with a matching icon and splash mark
 - Mobile appearance: Light, Dark, and System theme modes are persisted locally on device
 - Prayer/iqamah system with adhan, iqamah, next prayer, countdown, Jumu'ah, Ramadan, Eid, and notification toggles
 - Admin dashboard for prayer/iqamah, Jumu'ah, announcements, events, programs, donations, media, volunteers, push notifications, settings, users/roles
 - Public website with Home, Prayer Times, Events, Media, Donate, Programs, Youth, Contact, About
-- Firebase-ready backend, security rules, storage rules, Cloud Functions, and seed data
-- Push notification architecture with Expo mobile registration and Firebase function sending scaffold
+- Firestore-backed content publishing, security rules, storage rules, Cloud Functions, and seed data
+- Opt-in, deterministic on-device prayer/Jumu'ah scheduling plus protected remote community push, token rotation, delivery receipts, diagnostics, and publication refresh signals
 - English/Urdu translation structure
-- Widget-ready data model and native next-step notes
+- Native iOS/iPadOS widgets, Watch app, Watch complications, and shared prayer snapshot bridge
+- Apple Vision Pro compatibility through the same iOS/iPadOS app and bundle ID, validated with Xcode's Designed for iPad/iPhone visionOS destination
 - Branding/photo assets from the provided HBIC images
 
 ## Install
 
 ```bash
-cd hbic-calgary-app
+cd "/Users/temporary/Documents/HBICCalgaryApp"
 npm install
 ```
 
@@ -96,7 +96,7 @@ Publishing behavior:
 
 - admin edits are saved as draft content first
 - public website and mobile app continue reading only published content
-- Publish Changes validates content, writes the published document, stores a version copy, and revalidates public pages
+- Publish Changes validates content, writes the published document, stores a version copy, advances the shared publication revision, revalidates public pages, and signals registered native clients to refresh widgets/Watch and reconcile prayer alerts
 - revalidated paths: `/`, `/prayer-times`, `/events`, `/donate`, `/programs`, `/youth`, `/media`, `/contact`, `/about`
 
 If Firebase Admin credentials are missing, the public website and mobile app fall back to bundled default content. Admin saving and publishing fail clearly until credentials are configured.
@@ -104,8 +104,9 @@ If Firebase Admin credentials are missing, the public website and mobile app fal
 Required production environment variables on the public web deployment:
 
 ```text
-NEXT_PUBLIC_API_URL=https://hbic-calgary-app.vercel.app
-ADMIN_SECRET=
+NEXT_PUBLIC_API_URL=https://hbic-calgary.vercel.app
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
@@ -120,7 +121,7 @@ GOOGLE_APPLICATION_CREDENTIALS_JSON=
 Required admin deployment variable:
 
 ```text
-NEXT_PUBLIC_API_URL=https://hbic-calgary-app.vercel.app
+NEXT_PUBLIC_API_URL=https://hbic-calgary.vercel.app
 ```
 
 For local admin testing against the local public website server, set:
@@ -129,12 +130,12 @@ For local admin testing against the local public website server, set:
 NEXT_PUBLIC_API_URL=http://localhost:3100
 ```
 
-The admin publish key is entered in the admin dashboard and sent to the public API as `X-Admin-Secret`. For a more advanced production setup, replace this simple server-side gate with Firebase Auth custom claims.
+The two admin dashboards use the same shared HBIC email/password prompt. Production credentials are stored as `ADMIN_EMAIL` and encrypted `ADMIN_PASSWORD` Vercel environment variables and are checked by every protected API. The password is kept only for the active browser session. See `docs/admin-auth-security-audit.md` for the limitations of shared credentials and the recommended individual Firebase Auth + MFA target.
 
 Required mobile build variable:
 
 ```text
-EXPO_PUBLIC_API_URL=https://hbic-calgary-app.vercel.app
+EXPO_PUBLIC_API_URL=https://hbic-calgary.vercel.app
 ```
 
 Optional future adapters are reserved in `.env.example`:
@@ -149,8 +150,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 ## Firebase Setup
 
-1. Create a Firebase project.
-2. Enable Firestore, Auth, Storage, and Cloud Messaging.
+1. Use the existing production Firebase/Google Cloud project; do not create a second project.
+2. Confirm Firestore, Auth, Storage, and Cloud Messaging are enabled for the authorized production account.
 3. Copy `.env.example` to `.env.local` in each app as needed.
 4. Add the public Firebase config values and Firebase Admin service account values.
 5. Deploy rules from `backend/firebase`.
@@ -172,13 +173,16 @@ This writes starter prayer times, iqamah times, Jumu'ah schedule, Ramadan/Eid ca
 
 ## Updating Prayer and Iqamah
 
-- Adhan/prayer times are modeled as an iqamah.ca-linked timetable source.
-- Iqamah baseline data can also come from iqamah.ca, then be reviewed by HBIC.
+- The server-side effective HBIC schedule is the single prayer source for the TV, website, iOS, Android, Watch, widgets, and complications.
+- Automatic prayer and iqamah values come from the existing HBIC Iqamah.ca adapter, with a five-minute server refresh window and last-successful Firestore fallback.
+- Active admin overrides are resolved centrally as `override ?? automatic`; clearing one returns that field to the latest Iqamah.ca value.
 - Authorized caretaker/director/admin users can manually adjust iqamah times through the admin dashboard.
-- Publishing prayer/iqamah values writes the shared published content record consumed by both the public website and mobile app.
-- Every publish should write to `auditLogs`, including the source URL, imported timestamp, manual override status, adjustment notes, and actor.
+- Mobile/native clients consume the resolved HBIC API and never fetch Iqamah.ca independently.
+- Every publish should write to `auditLogs`, including the source status, sync timestamp, manual override status, adjustment notes, and actor.
 - Jumu'ah has two khutbah/iqamah entries.
 - Ramadan and Eid cards are seasonal and admin-controlled.
+
+See `docs/prayer-master-schedule.md` for the verified flow and failure behavior.
 
 ## Donation Flow
 
@@ -243,17 +247,19 @@ Urgent announcements are intentionally separate so regular reminders do not beco
 
 Mobile notification support:
 
-- users can save local notification preferences on device
-- Expo push token registration is scaffolded in the mobile app
+- users can save notification preferences on device
+- Expo push token registration refreshes on launch and when the native token changes
 - notification taps route to the relevant screen such as Prayer, Events, Media, Donate, Youth, or Programs
 - local reminder scheduling is available for safe on-device tests
-- admin notification composer uses shared categories, default audience, tap route, schedule fields, and respectful-use guidance
+- admin notification sending records Expo ticket IDs and can check delivery receipts
+- invalid or unregistered tokens are disabled after receipt processing
 
 Before production push launch:
 
-- configure the Expo/EAS project for push credentials
-- configure APNs/FCM credentials for production builds
-- store device push tokens in Firebase/Firestore through an authenticated endpoint or Cloud Function
+- enable Firebase on the existing `hbic-calgary-prod` Google Cloud project using an owner account
+- register Android package `ca.hbic.calgary.app` and add its Firebase client configuration
+- upload a dedicated least-privilege FCM V1 service account to the existing EAS project
+- configure APNs for the existing Apple bundle identifier from a paid Apple Developer account
 - send notifications from trusted admin/server code only
 - never place push service secrets in the mobile app or public website
 
@@ -289,24 +295,36 @@ apps/public-web/public/photos/
 apps/admin-web/public/brand/
 ```
 
-## Widgets
+## Apple Widgets And Watch
 
-Native widgets are scaffolded in `widgets/ios` and `widgets/android`. Expo managed workflow needs native targets after `expo prebuild`.
+Tracked native Swift targets live in `apps/mobile/targets` and are regenerated by
+Expo prebuild. The Apple implementation includes:
 
-Planned widgets:
+- iPhone and iPad Home Screen widgets
+- Lock Screen accessory widgets
+- a native Masjid Bilal Watch app
+- Watch complications and Smart Stack content
+- next-prayer, adhan, iqamah, countdown, and Jumu'ah data from the shared published snapshot
+- validated App Group caching and WatchConnectivity updates
 
-- next prayer
-- next iqamah
-- Jumu'ah reminder
-- Ramadan iftar/suhoor
-- upcoming event
+Run `npm run native:sync:ios` followed by `npm run native:verify:targets` from
+`apps/mobile` after regenerating the native project. See
+`apps/mobile/targets/README.md` for the exact architecture and build command.
 
-## Real Data Needed From HBIC
+## Apple Vision Pro
+
+The existing Masjid Bilal iOS/iPadOS app is the visionOS-compatible version. It
+uses Apple's Designed for iPad/iPhone compatibility path so prayer times,
+published admin content, events, donations, media, settings, notification
+controls, and the licensed Adhan preview stay in the same app and bundle ID.
+
+Run the Xcode and simulator gate described in
+`docs/visionos-compatibility.md`. Apple Vision Pro availability remains a
+separate App Store Connect gate and must not be inferred from an iPhone build.
+
+## Remaining Production Content
 
 - Confirm official donation URL
-- Current monthly prayer timetable source or CSV/PDF
-- Current iqamah times
-- Jumu'ah first/second khutbah and iqamah times
 - Ramadan/Taraweeh/Qiyam timetable when seasonal
 - Eid prayer date, times, and location
 - Reviewed service descriptions

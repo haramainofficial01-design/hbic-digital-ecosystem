@@ -1,0 +1,298 @@
+.page {
+  min-height: 100vh;
+  padding: 48px clamp(22px, 5vw, 80px) 90px;
+  color: #13241d;
+  background: #f2f4ef;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1180px;
+  margin: 0 auto 28px;
+}
+
+.header h1 {
+  margin: 5px 0 8px;
+  font-family: Georgia, serif;
+  font-size: clamp(34px, 4vw, 58px);
+  line-height: 1;
+}
+
+.header p,
+.sectionTitle small {
+  margin: 0;
+  color: #607269;
+}
+
+.eyebrow,
+.sectionTitle span {
+  color: #8b6d30;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.preview {
+  padding: 12px 17px;
+  border: 1px solid #cfd8d1;
+  border-radius: 12px;
+  color: #173d2d;
+  background: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.authCard,
+.card,
+.publishBar {
+  max-width: 1180px;
+  margin-right: auto;
+  margin-left: auto;
+  border: 1px solid #dbe1dc;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 12px 35px rgba(21, 47, 36, .06);
+}
+
+.authCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  padding: 20px;
+}
+
+.authCard :global(.firebase-auth-panel) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.authCard :global(.firebase-auth-panel > strong),
+.authCard :global(.firebase-auth-panel > p),
+.authCard :global(.firebase-auth-panel > code),
+.authCard :global(.firebase-auth-actions),
+.authCard :global(.firebase-auth-shared),
+.authCard :global(.firebase-auth-ready) {
+  grid-column: 1 / -1;
+}
+
+.authCard :global(.firebase-auth-panel p) {
+  margin: 0;
+  color: #52665c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.authCard :global(.firebase-auth-panel code) {
+  overflow-wrap: anywhere;
+  border-radius: 9px;
+  padding: 10px;
+  background: #edf1ee;
+}
+
+.authCard :global(.firebase-auth-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.authCard :global(.firebase-auth-shared) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #d8e1dc;
+}
+
+.authCard :global(.firebase-auth-shared > strong),
+.authCard :global(.firebase-auth-shared > button) {
+  grid-column: 1 / -1;
+}
+
+.authCard label,
+.fullField,
+.formGrid label,
+.prayerRow label {
+  display: grid;
+  gap: 7px;
+  color: #52665c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.page input,
+.page textarea {
+  width: 100%;
+  border: 1px solid #cdd7d0;
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: #122a20;
+  background: #fbfcfa;
+  font: inherit;
+}
+
+.page input:focus,
+.page textarea:focus {
+  outline: 3px solid rgba(28, 102, 72, .13);
+  border-color: #2f7759;
+}
+
+.page button {
+  border: 0;
+  border-radius: 11px;
+  padding: 12px 18px;
+  color: white;
+  background: #16583f;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.page button:disabled,
+.editor:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.status {
+  max-width: 1180px;
+  margin: 14px auto 22px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.info { color: #38564a; background: #e6ece8; }
+.success { color: #155b3d; background: #dff2e7; }
+.error { color: #8a2d2d; background: #fae4e4; }
+
+.editor {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.card {
+  margin-bottom: 18px;
+  padding: clamp(20px, 2.5vw, 34px);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.sectionTitle h2 {
+  margin: 4px 0 0;
+  font-family: Georgia, serif;
+  font-size: 28px;
+}
+
+.prayerRows {
+  display: grid;
+  gap: 8px;
+}
+
+.prayerRow {
+  display: grid;
+  grid-template-columns: 110px repeat(4, minmax(125px, 1fr)) auto;
+  align-items: end;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid #edf0ed;
+}
+
+.clearOverride {
+  align-self: end;
+  white-space: nowrap;
+}
+
+.prayerRow > strong {
+  align-self: center;
+  font-size: 18px;
+}
+
+.prayerRow input[readonly] {
+  color: #42564d;
+  background: #edf1ee;
+}
+
+.hiddenIqamah {
+  visibility: hidden;
+}
+
+.formGrid,
+.toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.toggles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  min-height: 48px;
+  padding: 10px 13px;
+  border: 1px solid #dbe2dd;
+  border-radius: 11px;
+  color: #334a40;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: #166140;
+}
+
+.fullField {
+  margin-top: 14px;
+}
+
+.publishBar {
+  position: sticky;
+  z-index: 5;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 20px;
+  box-shadow: 0 18px 50px rgba(10, 38, 26, .18);
+}
+
+.publishBar span {
+  display: block;
+  margin-top: 3px;
+  color: #66776f;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .page { padding: 28px 14px 70px; }
+  .header { align-items: flex-start; flex-direction: column; }
+  .authCard { grid-template-columns: 1fr; }
+  .prayerRow { grid-template-columns: 1fr; }
+  .prayerRow > strong { grid-column: 1 / -1; }
+  .formGrid, .toggles { grid-template-columns: 1fr; }
+  .publishBar { align-items: stretch; flex-direction: column; }
+}

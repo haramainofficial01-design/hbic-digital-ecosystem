@@ -17,6 +17,7 @@ export const defaultNotificationPreferences: NotificationPreference = {
   livestreamAlerts: true,
   urgentAnnouncements: true,
   dailyDigest: false,
+  whiteDaysReminders: false,
   language: "en"
 };
 
@@ -39,7 +40,8 @@ export const notificationTypeLabels: Record<NotificationType, string> = {
   volunteerOpportunity: "Volunteer opportunity",
   mediaUpdate: "Media update",
   livestreamAlert: "Livestream alert",
-  iqamahChange: "Iqamah change"
+  iqamahChange: "Iqamah change",
+  whiteDaysReminder: "White Days reminder"
 };
 
 export const notificationRouteByType: Record<NotificationType, NotificationRoute> = {
@@ -61,10 +63,42 @@ export const notificationRouteByType: Record<NotificationType, NotificationRoute
   volunteerOpportunity: "/events",
   mediaUpdate: "/media",
   livestreamAlert: "/media",
-  iqamahChange: "/prayer"
+  iqamahChange: "/prayer",
+  whiteDaysReminder: "/prayer"
+};
+
+export const notificationPreferenceKeyByType: Record<NotificationType, keyof Omit<NotificationPreference, "minutesBeforeIqamah" | "language">> = {
+  prayerReminder: "prayerReminders",
+  iqamahReminder: "iqamahReminders",
+  jumuahReminder: "jumuahReminders",
+  announcement: "announcements",
+  urgentAnnouncement: "urgentAnnouncements",
+  eventReminder: "eventReminders",
+  programReminder: "programReminders",
+  quranClassReminder: "quranReminders",
+  youthProgramReminder: "youthPrograms",
+  sistersProgramReminder: "sistersPrograms",
+  ramadanSuhoorReminder: "prayerReminders",
+  ramadanIftarReminder: "prayerReminders",
+  taraweehReminder: "programReminders",
+  eidPrayerReminder: "prayerReminders",
+  donationCampaignReminder: "donationAppeals",
+  volunteerOpportunity: "volunteerOpportunities",
+  mediaUpdate: "mediaUpdates",
+  livestreamAlert: "livestreamAlerts",
+  iqamahChange: "iqamahReminders",
+  whiteDaysReminder: "whiteDaysReminders"
 };
 
 export const notificationCategories: NotificationCategoryConfig[] = [
+  {
+    type: "whiteDaysReminder",
+    label: "White Days reminder",
+    description: "An optional reminder for the 13th, 14th, and 15th of the Hijri month.",
+    route: "/prayer",
+    defaultAudience: "All",
+    respectfulUse: "Describe fasting as voluntary and send only to people who opted in."
+  },
   {
     type: "iqamahChange",
     label: "Iqamah change",

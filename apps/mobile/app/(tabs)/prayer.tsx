@@ -1,4 +1,5 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { getEffectiveJumuahDoorNotice, type AdhanPrayerName } from "@hbic/shared";
 import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../../src/components/AppButton";
 import { AppScreen } from "../../src/components/AppScreen";
@@ -12,15 +13,32 @@ import { useAppTheme } from "../../src/theme/ThemeProvider";
 
 export default function PrayerScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ prayer?: string | string[] }>();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
+  const requestedPrayer = Array.isArray(params.prayer) ? params.prayer[0] : params.prayer;
+  const highlightedPrayer = requestedPrayer && ["fajr", "dhuhr", "asr", "maghrib", "isha"].includes(requestedPrayer)
+    ? requestedPrayer as AdhanPrayerName
+    : undefined;
   const { eidSchedule, jumuahSchedule, ramadanSchedule, settings } = content;
+  const jumuahDoorNotice = getEffectiveJumuahDoorNotice(
+    jumuahSchedule,
+    new Date(),
+    content.featureFlags.jumuahDoorNoticeEnabled
+  );
+  const jumuahSupportingNotices = Array.from(
+    new Set(
+      [jumuahDoorNotice?.parkingNotice, jumuahDoorNotice?.capacityNotice, jumuahSchedule.notes].filter(
+        (notice): notice is string => Boolean(notice && notice !== jumuahDoorNotice?.body)
+      )
+    )
+  );
 
   return (
     <AppScreen>
       <SectionHeader title="Prayer & Iqamah" subtitle="Today’s adhan, iqamah, and Jumu'ah times for Masjid Bilal." />
-      <PrayerHero />
-      <PrayerTimesList />
+      <PrayerHero focusPrayer={highlightedPrayer} />
+      <PrayerTimesList highlightedPrayer={highlightedPrayer} />
 
       <GlassCard tone="gold">
         <Text style={[styles.title, { color: theme.colors.text }]}>Jumu'ah schedule</Text>
@@ -28,7 +46,14 @@ export default function PrayerScreen() {
           <ScheduleCell label="First khutbah" value={jumuahSchedule.firstKhutbahTime} />
           <ScheduleCell label="Second khutbah" value={jumuahSchedule.secondKhutbahTime} />
         </View>
-        <Text style={[styles.note, { color: theme.colors.muted }]}>{jumuahSchedule.notes}</Text>
+        {jumuahDoorNotice ? (
+          <Text accessibilityRole="text" style={[styles.doorsNotice, { color: theme.colors.text }]}>
+            {jumuahDoorNotice.body}
+          </Text>
+        ) : null}
+        {jumuahSupportingNotices.map((notice) => (
+          <Text style={[styles.note, { color: theme.colors.muted }]} key={notice}>{notice}</Text>
+        ))}
       </GlassCard>
 
       {settings.ramadanMode ? (
@@ -111,6 +136,11 @@ const styles = StyleSheet.create({
   },
   note: {
     lineHeight: 21
+  },
+  doorsNotice: {
+    fontWeight: "900",
+    lineHeight: 21,
+    marginBottom: spacing.xs
   },
   button: {
     marginTop: spacing.md

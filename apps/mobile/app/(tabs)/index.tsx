@@ -1,14 +1,15 @@
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { isVisibleItem } from "@hbic/shared";
+import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
+import { getPublicEvents, isVisibleItem } from "@hbic/shared";
 import { AppButton } from "../../src/components/AppButton";
 import { AppScreen } from "../../src/components/AppScreen";
 import { EventCard } from "../../src/components/EventCard";
 import { GlassCard } from "../../src/components/GlassCard";
 import { PrayerHero } from "../../src/components/PrayerHero";
 import { PrayerTimesList } from "../../src/components/PrayerTimesList";
+import { WhiteDaysNotice } from "../../src/components/WhiteDaysNotice";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { brandAssets, photoAssets } from "../../src/constants/assets";
 import { usePublishedContent } from "../../src/services/content";
@@ -22,7 +23,7 @@ export default function HomeScreen() {
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
   const announcements = content.announcements.filter(isVisibleItem);
-  const events = content.events.filter(isVisibleItem);
+  const events = getPublicEvents(content);
   const { donationCategories, mediaItems, settings } = content;
   const announcement = announcements.find((item) => item.pinned) ?? announcements[0];
   const summerCamp = events.find((event) => event.id === "event-summer-camp-2026") ?? events.find((event) => event.featured) ?? events[0];
@@ -31,15 +32,16 @@ export default function HomeScreen() {
 
   return (
     <AppScreen>
-      <View style={styles.hero}>
-        <Image source={photoAssets.exterior} style={styles.heroImage} />
+      <ImageBackground source={photoAssets.exterior} resizeMode="cover" style={styles.hero} imageStyle={styles.heroImage}>
         <LinearGradient colors={theme.gradients.hero} style={StyleSheet.absoluteFill} />
         <Image source={brandAssets.appMark} style={styles.logo} />
         <Text style={styles.heroTitle}>Masjid Bilal</Text>
         <Text style={styles.heroSub}>Prayer, learning, youth programs, and community services in Calgary.</Text>
-      </View>
+      </ImageBackground>
 
       <PrayerHero />
+      <WhiteDaysNotice />
+      <AppButton label="Hijri Calendar" icon="calendar-outline" variant="secondary" onPress={() => router.push("/hijri-calendar" as never)} />
 
       <SectionHeader title="Today at Masjid Bilal" subtitle="A quick glance. Open Prayer for the full adhan, iqamah, and Jumu'ah schedule." />
       <PrayerTimesList compact maxItems={3} />
@@ -115,8 +117,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   heroImage: {
-    ...StyleSheet.absoluteFillObject,
-    resizeMode: "cover"
+    width: "100%",
+    height: "100%"
   },
   logo: {
     width: 76,

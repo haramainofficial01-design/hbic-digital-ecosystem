@@ -2,6 +2,9 @@ import SwiftUI
 import WidgetKit
 
 private let complicationKind = "MasjidPrayerComplications"
+private let hijriComplicationKind = "MasjidHijriComplications"
+private let jumuahComplicationKind = "MasjidJumuahComplications"
+private let upcomingComplicationKind = "MasjidUpcomingComplications"
 
 struct ComplicationEntry: TimelineEntry {
     let date: Date
@@ -55,13 +58,17 @@ struct PrayerComplicationView: View {
         return value
     }
 
+    private var effectivePrayer: MasjidEffectivePrayer? {
+        snapshot?.effectiveNextPrayer(at: entry.date)
+    }
+
     @ViewBuilder private var circular: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             Gauge(value: snapshot.progressToNextPrayer(at: entry.date)) {
                 Image(systemName: "moon.stars.fill")
             } currentValueLabel: {
                 VStack(spacing: 0) {
-                    Text(String(snapshot.nextPrayerName.prefix(3)))
+                    Text(String(effectivePrayer.name.prefix(3)))
                         .font(.caption2.bold())
                     Text(snapshot.countdownText(at: entry.date))
                         .font(.system(size: 8, weight: .semibold, design: .rounded))
@@ -76,40 +83,65 @@ struct PrayerComplicationView: View {
     }
 
     @ViewBuilder private var rectangular: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             HStack(spacing: 7) {
                 Image(systemName: "moon.stars.fill")
                     .widgetAccentable()
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(snapshot.nextPrayerName)
+                    Text(effectivePrayer.name)
                         .font(.headline)
-                    Text("Adhan \(snapshot.nextPrayerTime)")
+                    Text("Adhan \(effectivePrayer.time)")
                         .font(.caption2)
-                    if let iqamah = snapshot.nextIqamah {
+                    if let doorsClose = snapshot.jumuahDoorsCloseDateValue,
+                       snapshot.isJumuahServiceDay(at: entry.date),
+                       doorsClose > entry.date {
+                        Text("Doors close \(snapshot.jumuahState.firstDoorsCloseTime ?? "")")
+                            .font(.caption2)
+                            .lineLimit(1)
+                    } else if let iqamah = effectivePrayer.iqamah {
                         Text("Iqamah \(iqamah)")
                             .font(.caption2)
                     }
+                    if snapshot.isWhiteDay {
+                        Text("White Day")
+                            .font(.caption2)
+                    } else if !snapshot.hijriDate.isEmpty {
+                        Text(snapshot.hijriDate)
+                            .font(.caption2)
+                            .lineLimit(1)
+                    }
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                snapshot.isWhiteDay
+                    ? "Next prayer \(effectivePrayer.name), adhan \(effectivePrayer.time), White Day, voluntary fasting reminder"
+                    : "Next prayer \(effectivePrayer.name), adhan \(effectivePrayer.time), Hijri date \(snapshot.hijriDate)"
+            )
         } else {
             Text("Open Masjid Bilal for prayer times")
         }
     }
 
     @ViewBuilder private var inline: some View {
-        if let snapshot {
-            Label("\(snapshot.nextPrayerName) \(snapshot.nextPrayerTime)", systemImage: "moon.stars.fill")
+        if let snapshot, let effectivePrayer {
+            Label(
+                snapshot.isWhiteDay
+                    ? "\(effectivePrayer.name) \(effectivePrayer.time) · White Day"
+                    : "\(effectivePrayer.name) \(effectivePrayer.time)",
+                systemImage: "moon.stars.fill"
+            )
         } else {
             Label("Prayer times unavailable", systemImage: "moon.stars")
         }
     }
 
     @ViewBuilder private var corner: some View {
-        if let snapshot {
-            Text(snapshot.nextPrayerTime)
+        if snapshot != nil, let effectivePrayer {
+            Text(effectivePrayer.time)
                 .font(.caption2.bold().monospacedDigit())
                 .widgetLabel {
-                    Text(snapshot.nextPrayerName)
+                    Text(effectivePrayer.name)
                 }
         } else {
             Image(systemName: "moon.stars")
@@ -134,10 +166,153 @@ struct MasjidPrayerComplication: Widget {
     }
 }
 
+struct HijriComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ComplicationEntry
+
+    var body: some View {
+        let snapshot = entry.snapshot
+        Group {
+            switch family {
+            case .accessoryCircular:
+                VStack(spacing: 0) {
+                    Image(systemName: snapshot?.isWhiteDay == true ? "moon.stars.fill" : "calendar")
+                        .widgetAccentable()
+                    Text(snapshot?.hijri.map { String($0.day) } ?? "—")
+                        .font(.caption.bold())
+                }
+            case .accessoryInline:
+                Label(snapshot?.hijriDate.isEmpty == false ? snapshot!.hijriDate : "Hijri date unavailable", systemImage: "moon.stars")
+            default:
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(snapshot?.isWhiteDay == true ? "White Day" : "Hijri date", systemImage: "moon.stars.fill")
+                        .font(.headline)
+                        .widgetAccentable()
+                    Text(snapshot?.hijriDate.isEmpty == false ? snapshot!.hijriDate : "Open Masjid Bilal")
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .widgetURL(URL(string: "hbiccalgary://prayer"))
+    }
+}
+
+struct MasjidHijriComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: hijriComplicationKind, provider: ComplicationProvider()) { entry in
+            HijriComplicationView(entry: entry)
+        }
+        .configurationDisplayName("Masjid Bilal Hijri Date")
+        .description("The shared Hijri date and White Day indicator.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+struct JumuahComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ComplicationEntry
+
+    private var snapshot: MasjidPrayerSnapshot? {
+        guard let value = entry.snapshot, !value.jumuah.isEmpty else { return nil }
+        return value
+    }
+
+    var body: some View {
+        Group {
+            if family == .accessoryInline {
+                Label(inlineText, systemImage: "person.3.fill")
+            } else if let snapshot {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(snapshot.isJumuahServiceDay(at: entry.date) ? "Jumu'ah Today" : "Next Jumu'ah", systemImage: "person.3.fill")
+                        .font(.headline)
+                        .widgetAccentable()
+                    if let close = snapshot.jumuahState.firstDoorsCloseTime,
+                       snapshot.isJumuahServiceDay(at: entry.date),
+                       (snapshot.jumuahDoorsCloseDateValue ?? .distantPast) > entry.date {
+                        Text("Doors close \(close)")
+                            .font(.caption)
+                    } else {
+                        Text(snapshot.jumuah.map(\.khutbah).joined(separator: " · "))
+                            .font(.caption.monospacedDigit())
+                    }
+                }
+            } else {
+                Text("Jumu'ah times unavailable")
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .widgetURL(URL(string: "hbiccalgary://prayer"))
+    }
+
+    private var inlineText: String {
+        guard let snapshot else { return "Jumu'ah times unavailable" }
+        if snapshot.isJumuahServiceDay(at: entry.date),
+           let close = snapshot.jumuahState.firstDoorsCloseTime,
+           (snapshot.jumuahDoorsCloseDateValue ?? .distantPast) > entry.date {
+            return "Jumu'ah · doors \(close)"
+        }
+        let firstKhutbah = snapshot.jumuah.first?.khutbah ?? "Open app"
+        return "Jumu'ah · \(firstKhutbah)"
+    }
+}
+
+struct MasjidJumuahComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: jumuahComplicationKind, provider: ComplicationProvider()) { entry in
+            JumuahComplicationView(entry: entry)
+        }
+        .configurationDisplayName("Masjid Bilal Jumu'ah")
+        .description("Jumu'ah sessions and the current doors-close notice.")
+        .supportedFamilies([.accessoryRectangular, .accessoryInline])
+    }
+}
+
+struct UpcomingComplicationView: View {
+    let entry: ComplicationEntry
+
+    var body: some View {
+        Group {
+            if let event = entry.snapshot?.nextEvent {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Upcoming", systemImage: "calendar.badge.clock")
+                        .font(.headline)
+                        .widgetAccentable()
+                    Text(event.title)
+                        .font(.caption.bold())
+                        .lineLimit(1)
+                    Text("\(event.date) · \(event.startTime)")
+                        .font(.caption2)
+                        .lineLimit(1)
+                }
+            } else {
+                Label("No upcoming event", systemImage: "calendar")
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .widgetURL(URL(string: "hbiccalgary://events"))
+    }
+}
+
+struct MasjidUpcomingComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: upcomingComplicationKind, provider: ComplicationProvider()) { entry in
+            UpcomingComplicationView(entry: entry)
+        }
+        .configurationDisplayName("Masjid Bilal Upcoming")
+        .description("The next confirmed published Masjid Bilal event.")
+        .supportedFamilies([.accessoryRectangular])
+    }
+}
+
 @main
 struct MasjidPrayerComplicationBundle: WidgetBundle {
     var body: some Widget {
         MasjidPrayerComplication()
+        MasjidHijriComplication()
+        MasjidJumuahComplication()
+        MasjidUpcomingComplication()
     }
 }
 

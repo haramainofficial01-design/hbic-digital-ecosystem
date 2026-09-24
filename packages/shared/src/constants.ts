@@ -2,11 +2,11 @@ import type { MasjidSettings } from "./types";
 
 export const hbicSettings: MasjidSettings = {
   masjidName: "Hazrat Bilal Islamic Centre",
-  shortName: "HBIC Calgary",
+  shortName: "Masjid Bilal",
   address: "20 Saddlestone Dr, Calgary, AB T3J 0B4, Canada",
   phone: "+1 587-917-0333",
   email: "info@hbic.ca",
-  website: "https://hbic-calgary-app.vercel.app/",
+  website: "https://hbic.ca/",
   donationUrl: "https://www.paypal.com/donate/?cmd=_donations&business=bilalislamiccentrecalgary%40gmail.com&currency_code=CAD&source=url&Z3JncnB0=&_sessionID=wlpuMex9BYhDWEdB_FC9jpwepKNXtrV5",
   social: {
     youtube: "https://www.youtube.com/@hbicyouth",

@@ -9,7 +9,7 @@ export const firebasePublicConfigKeys = [
 
 export const appConfig = {
   appName: "Hazrat Bilal Islamic Centre",
-  shortName: "HBIC Calgary",
+  shortName: "Masjid Bilal",
   bundleIdentifier: "ca.hbic.calgary.app",
-  androidPackage: "ca.hbic.calgary"
+  androidPackage: "ca.hbic.calgary.app"
 };

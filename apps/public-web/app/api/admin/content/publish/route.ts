@@ -1,7 +1,9 @@
 import { revalidatePath } from "next/cache";
-import { publicRevalidationPaths } from "@hbic/shared";
+import { createWidgetPrayerSnapshot, publicRevalidationPaths } from "@hbic/shared";
 import { publishDraftContent } from "../../../../../lib/contentStore";
+import { sendContentUpdateSignal } from "../../../../../lib/notificationStore";
 import { jsonResponse, optionsResponse, requireAdminSecret } from "../../../../../lib/api";
+import { PublicationRequestError, readPublicationPreconditions } from "../../../../../lib/publicationGuards";
 
 export const dynamic = "force-dynamic";
 
@@ -10,20 +12,43 @@ export function OPTIONS() {
 }
 
 export async function POST(request: Request) {
-  const auth = requireAdminSecret(request);
+  const auth = await requireAdminSecret(request);
   if (!auth.ok) return auth.response;
 
   try {
-    const published = await publishDraftContent();
+    const rawBody = await request.text();
+    const expected = readPublicationPreconditions(rawBody ? JSON.parse(rawBody) : {});
+    const published = await publishDraftContent(expected);
     publicRevalidationPaths.forEach((path) => revalidatePath(path));
+    const prayerSnapshot = createWidgetPrayerSnapshot(published.content, new Date());
+    const publication = published.publication;
+    let propagation;
+    try {
+      propagation = await sendContentUpdateSignal({
+        contentVersion: published.content.version,
+        publicationRevision: publication.revision,
+        scheduleRevision: prayerSnapshot.scheduleRevision,
+        publishedAt: published.content.publishedAt || published.content.updatedAt
+      });
+    } catch (error) {
+      propagation = {
+        status: "provider_error",
+        error: error instanceof Error ? error.message : "The device refresh signal could not be sent."
+      };
+    }
 
     return jsonResponse({
       ok: true,
       content: published.content,
       backend: published.status,
-      revalidated: publicRevalidationPaths
+      revalidated: publicRevalidationPaths,
+      publication,
+      propagation
     });
   } catch (error) {
-    return jsonResponse({ ok: false, error: error instanceof Error ? error.message : "Unable to publish draft." }, { status: 500 });
+    return jsonResponse(
+      { ok: false, error: error instanceof Error ? error.message : "Unable to publish draft." },
+      { status: error instanceof PublicationRequestError ? error.status : 500 }
+    );
   }
 }

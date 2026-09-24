@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { getAuth } from "firebase-admin/auth";
+import { getFirebaseApp } from "./firebaseAdmin";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Secret, X-Private-Notification-Test",
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Private-Notification-Test",
   "Access-Control-Max-Age": "86400"
 };
 
@@ -21,36 +24,88 @@ export function optionsResponse() {
   return new Response(null, { status: 204, headers: corsHeaders });
 }
 
-export function getAdminSecretFromRequest(request: Request) {
-  const authorization = request.headers.get("authorization");
-  if (authorization?.startsWith("Bearer ")) return authorization.slice("Bearer ".length);
-  return request.headers.get("x-admin-secret");
+function safeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function requireAdminSecret(request: Request) {
-  const configuredSecret = process.env.ADMIN_SECRET;
-  if (!configuredSecret) {
+function getBasicCredentials(request: Request) {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Basic ")) return null;
+  try {
+    const decoded = Buffer.from(authorization.slice("Basic ".length), "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator < 1) return null;
+    return { email: decoded.slice(0, separator).trim().toLowerCase(), password: decoded.slice(separator + 1) };
+  } catch {
+    return null;
+  }
+}
+
+function configuredSuperAdmins() {
+  return new Set(
+    (process.env.ADMIN_SUPER_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export async function requireAdminSecret(request: Request) {
+  const authorization = request.headers.get("authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const app = getFirebaseApp();
+    if (!app) {
+      return {
+        ok: false as const,
+        response: jsonResponse({ ok: false, error: "Individual administrator sign-in is not configured." }, { status: 503 })
+      };
+    }
+    try {
+      const token = await getAuth(app).verifyIdToken(authorization.slice("Bearer ".length), true);
+      const email = token.email?.trim().toLowerCase();
+      const user = await getAuth(app).getUser(token.uid);
+      const enrolledFactors = user.multiFactor?.enrolledFactors ?? [];
+      const allowlistedRole = email && configuredSuperAdmins().has(email) ? "superAdmin" : undefined;
+      const role = typeof token.adminRole === "string" ? token.adminRole : allowlistedRole;
+      if (!email || !token.email_verified || !role || enrolledFactors.length === 0) throw new Error("unauthorized");
+      return {
+        ok: true as const,
+        actor: { uid: token.uid, email, role, kind: "firebase-account" as const }
+      };
+    } catch {
+      return {
+        ok: false as const,
+        response: jsonResponse({ ok: false, error: "Administrator sign-in or MFA verification is required." }, { status: 401 })
+      };
+    }
+  }
+
+  const configuredEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const configuredPassword = process.env.ADMIN_PASSWORD;
+  if (!configuredEmail || !configuredPassword) {
     return {
       ok: false as const,
       response: jsonResponse(
         {
           ok: false,
-          error: "Admin publishing is not configured. Set ADMIN_SECRET on the public web deployment."
+          error: "Administrator sign-in is not configured on this deployment."
         },
         { status: 503 }
       )
     };
   }
 
-  const providedSecret = getAdminSecretFromRequest(request);
-  if (providedSecret !== configuredSecret) {
+  const provided = getBasicCredentials(request);
+  if (!provided || !safeEqual(provided.email, configuredEmail) || !safeEqual(provided.password, configuredPassword)) {
     return {
       ok: false as const,
-      response: jsonResponse({ ok: false, error: "Invalid admin publishing key." }, { status: 401 })
+      response: jsonResponse({ ok: false, error: "Unable to sign in. Check your credentials and try again." }, { status: 401 })
     };
   }
 
-  return { ok: true as const };
+  return { ok: true as const, actor: { email: configuredEmail, kind: "shared-account" as const } };
 }
 
 /**

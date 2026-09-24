@@ -1,3 +1,4 @@
+import { toPublicContent } from "@hbic/shared";
 import { getPublishedContent } from "../../../../lib/contentStore";
 import { jsonResponse, optionsResponse } from "../../../../lib/api";
 
@@ -9,5 +10,5 @@ export function OPTIONS() {
 
 export async function GET() {
   const { content, status } = await getPublishedContent();
-  return jsonResponse({ ok: true, content, backend: status });
+  return jsonResponse({ ok: true, content: toPublicContent(content), backend: status });
 }

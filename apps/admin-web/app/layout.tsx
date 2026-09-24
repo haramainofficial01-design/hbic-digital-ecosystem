@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "HBIC Calgary Admin",
+  title: "Masjid Bilal Admin",
   description: "Admin dashboard for Hazrat Bilal Islamic Centre prayer, iqamah, events, announcements, and notifications."
 };
 

@@ -9,7 +9,7 @@ export function OPTIONS() {
 
 export async function POST(request: Request) {
   const testAuthorization = requirePrivateNotificationTestSecret(request);
-  const adminAuthorization = testAuthorization.ok ? null : requireAdminSecret(request);
+  const adminAuthorization = testAuthorization.ok ? null : await requireAdminSecret(request);
   if (!testAuthorization.ok && !adminAuthorization?.ok) return adminAuthorization?.response ?? testAuthorization.response;
 
   try {

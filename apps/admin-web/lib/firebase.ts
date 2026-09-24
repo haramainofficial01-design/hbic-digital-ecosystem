@@ -1,7 +1,5 @@
 import { getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getAuth, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,7 +10,16 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const db = getFirestore(firebaseApp);
-export const auth = getAuth(firebaseApp);
-export const storage = getStorage(firebaseApp);
+let cachedAuth: Auth | null | undefined;
+
+export function getAdminAuth(): Auth | null {
+  if (cachedAuth !== undefined) return cachedAuth;
+  if (typeof window === "undefined" || !firebaseConfig.apiKey || !firebaseConfig.projectId) return null;
+  try {
+    const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    cachedAuth = getAuth(firebaseApp);
+  } catch {
+    cachedAuth = null;
+  }
+  return cachedAuth;
+}

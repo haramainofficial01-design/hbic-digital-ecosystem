@@ -18,6 +18,7 @@ private struct BridgePrayerSnapshot: Decodable {
   let schemaVersion: Int
   let masjidID: String
   let timezone: String
+  let masjidTimeZoneIdentifier: String?
   let nextPrayerName: String
   let nextPrayerDate: String
   let prayers: [BridgePrayerEntry]
@@ -27,9 +28,9 @@ private struct BridgePrayerSnapshot: Decodable {
   var generatedAtValue: Date? { Self.date(generatedAt) }
 
   var isValid: Bool {
-    schemaVersion == 1 &&
+    (1...2).contains(schemaVersion) &&
       masjidID == "masjid-bilal-calgary" &&
-      timezone == "America/Edmonton" &&
+      (masjidTimeZoneIdentifier ?? timezone) == "America/Edmonton" &&
       !nextPrayerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
       !prayers.isEmpty &&
       Self.date(nextPrayerDate) != nil &&
@@ -76,13 +77,13 @@ public final class MasjidAppleBridgeModule: Module {
       }
 
       if defaults?.data(forKey: MasjidAppleConstants.snapshotKey) == data {
-        MasjidWatchSession.shared.update(with: json)
+        MasjidWatchSession.shared.update(with: json, schemaVersion: snapshot.schemaVersion)
         return true
       }
 
       defaults?.set(data, forKey: MasjidAppleConstants.snapshotKey)
       WidgetCenter.shared.reloadTimelines(ofKind: MasjidAppleConstants.widgetKind)
-      MasjidWatchSession.shared.update(with: json)
+      MasjidWatchSession.shared.update(with: json, schemaVersion: snapshot.schemaVersion)
       return true
     }
 
@@ -107,10 +108,10 @@ private final class MasjidWatchSession: NSObject, WCSessionDelegate {
   private let queue = DispatchQueue(label: "ca.hbic.masjid-bilal.watch-sync")
   private var pendingContext: [String: Any]?
 
-  func update(with json: String) {
+  func update(with json: String, schemaVersion: Int) {
     guard WCSession.isSupported() else { return }
     let context: [String: Any] = [
-      "schemaVersion": 1,
+      "schemaVersion": schemaVersion,
       "prayerSnapshot": json,
       "sentAt": ISO8601DateFormatter().string(from: Date())
     ]
@@ -150,5 +151,22 @@ private final class MasjidWatchSession: NSObject, WCSessionDelegate {
 
   func sessionDidDeactivate(_ session: WCSession) {
     session.activate()
+  }
+
+  func session(
+    _ session: WCSession,
+    didReceiveMessage message: [String: Any],
+    replyHandler: @escaping ([String: Any]) -> Void
+  ) {
+    guard message["request"] as? String == "prayerSnapshot",
+          let data = UserDefaults(suiteName: MasjidAppleConstants.appGroup)?.data(forKey: MasjidAppleConstants.snapshotKey),
+          let json = String(data: data, encoding: .utf8) else {
+      replyHandler(["available": false])
+      return
+    }
+    replyHandler([
+      "available": true,
+      "prayerSnapshot": json
+    ])
   }
 }
