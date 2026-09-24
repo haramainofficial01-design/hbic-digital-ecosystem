@@ -31,22 +31,8 @@ struct MasjidPrayerWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
-        Group {
-            switch family {
-            case .accessoryCircular:
-                accessoryCircular
-            case .accessoryRectangular:
-                accessoryRectangular
-            case .accessoryInline:
-                accessoryInline
-            case .systemMedium:
-                medium
-            case .systemLarge:
-                large
-            default:
-                small
-            }
-        }
+        widgetContent
+        .padding(homeWidgetPadding)
         .widgetURL(URL(string: "hbiccalgary://prayer"))
         .containerBackground(for: .widget) {
             LinearGradient(
@@ -57,9 +43,43 @@ struct MasjidPrayerWidgetView: View {
         }
     }
 
+    @ViewBuilder private var widgetContent: some View {
+        switch family {
+        case .accessoryCircular:
+            accessoryCircular
+        case .accessoryRectangular:
+            accessoryRectangular
+        case .accessoryInline:
+            accessoryInline
+        case .systemMedium:
+            medium
+        case .systemLarge:
+            large
+        default:
+            small
+        }
+    }
+
+    private var homeWidgetPadding: CGFloat {
+        switch family {
+        case .systemSmall:
+            return 12
+        case .systemMedium:
+            return 14
+        case .systemLarge:
+            return 14
+        default:
+            return 0
+        }
+    }
+
     private var snapshot: MasjidPrayerSnapshot? {
         guard let value = entry.snapshot, value.hasUsableData else { return nil }
         return value
+    }
+
+    private var effectivePrayer: MasjidEffectivePrayer? {
+        snapshot?.effectiveNextPrayer(at: entry.date)
     }
 
     private var staleLabel: some View {
@@ -69,6 +89,24 @@ struct MasjidPrayerWidgetView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder private var hijriLabel: some View {
+        if let snapshot, !snapshot.hijriDate.isEmpty {
+            HStack(spacing: 4) {
+                Image(systemName: snapshot.isWhiteDay ? "moon.stars.fill" : "calendar")
+                    .widgetAccentable()
+                Text(snapshot.hijriDate)
+                    .lineLimit(1)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(
+                snapshot.isWhiteDay
+                    ? "Hijri date, \(snapshot.hijriDate), White Day, voluntary fasting reminder"
+                    : "Hijri date, \(snapshot.hijriDate)"
+            )
         }
     }
 
@@ -88,7 +126,7 @@ struct MasjidPrayerWidgetView: View {
     }
 
     @ViewBuilder private var small: some View {
-        if let snapshot {
+        if snapshot != nil, let effectivePrayer {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
                     Image("MasjidMark")
@@ -100,21 +138,22 @@ struct MasjidPrayerWidgetView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.teal)
                 }
-                Text(snapshot.nextPrayerName)
+                Text(effectivePrayer.name)
                     .font(.title2.bold())
                     .minimumScaleFactor(0.75)
-                Text(snapshot.nextPrayerTime)
+                Text(effectivePrayer.time)
                     .font(.headline.monospacedDigit())
-                if let iqamah = snapshot.nextIqamah {
+                if let iqamah = effectivePrayer.iqamah {
                     Text("Iqamah \(iqamah)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 2)
-                if let target = snapshot.nextPrayerDateValue, target > entry.date {
-                    Text(target, style: .timer)
+                if effectivePrayer.date > entry.date {
+                    Text(effectivePrayer.date, style: .timer)
                         .font(.caption.bold().monospacedDigit())
                 }
+                hijriLabel
                 staleLabel
             }
         } else {
@@ -123,7 +162,7 @@ struct MasjidPrayerWidgetView: View {
     }
 
     @ViewBuilder private var medium: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 5) {
@@ -136,18 +175,19 @@ struct MasjidPrayerWidgetView: View {
                             .font(.caption2.bold())
                             .foregroundStyle(.teal)
                     }
-                    Text(snapshot.nextPrayerName)
+                    Text(effectivePrayer.name)
                         .font(.title.bold())
-                    Text("Adhan \(snapshot.nextPrayerTime)")
+                    Text("Adhan \(effectivePrayer.time)")
                         .font(.subheadline.bold())
-                    if let iqamah = snapshot.nextIqamah {
+                    if let iqamah = effectivePrayer.iqamah {
                         Text("Iqamah \(iqamah)")
                             .font(.subheadline)
                     }
-                    if let target = snapshot.nextPrayerDateValue, target > entry.date {
-                        Text(target, style: .timer)
+                    if effectivePrayer.date > entry.date {
+                        Text(effectivePrayer.date, style: .timer)
                             .font(.headline.monospacedDigit())
                     }
+                    hijriLabel
                     staleLabel
                 }
                 Divider().overlay(.white.opacity(0.18))
@@ -160,7 +200,7 @@ struct MasjidPrayerWidgetView: View {
                                 .monospacedDigit()
                         }
                         .font(.caption)
-                        .foregroundStyle(prayer.key == snapshot.nextPrayerKey ? .primary : .secondary)
+                        .foregroundStyle(prayer.key == effectivePrayer.key ? .primary : .secondary)
                     }
                 }
             }
@@ -170,7 +210,7 @@ struct MasjidPrayerWidgetView: View {
     }
 
     @ViewBuilder private var large: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     HStack(spacing: 6) {
@@ -184,21 +224,24 @@ struct MasjidPrayerWidgetView: View {
                             .foregroundStyle(.teal)
                     }
                     Spacer()
-                    staleLabel
+                    VStack(alignment: .trailing, spacing: 2) {
+                        hijriLabel
+                        staleLabel
+                    }
                 }
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Next prayer")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(snapshot.nextPrayerName)
+                        Text(effectivePrayer.name)
                             .font(.title.bold())
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(snapshot.nextPrayerTime)
+                        Text(effectivePrayer.time)
                             .font(.title3.bold().monospacedDigit())
-                        if let iqamah = snapshot.nextIqamah {
+                        if let iqamah = effectivePrayer.iqamah {
                             Text("Iqamah \(iqamah)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -221,7 +264,7 @@ struct MasjidPrayerWidgetView: View {
                             Text(prayer.iqamah ?? "—").monospacedDigit()
                         }
                         .font(.caption)
-                        .fontWeight(prayer.key == snapshot.nextPrayerKey ? .bold : .regular)
+                        .fontWeight(prayer.key == effectivePrayer.key ? .bold : .regular)
                     }
                 }
                 if !snapshot.jumuah.isEmpty {
@@ -233,6 +276,12 @@ struct MasjidPrayerWidgetView: View {
                         Text(snapshot.jumuah.map(\.khutbah).joined(separator: "  •  "))
                             .font(.caption.monospacedDigit())
                     }
+                    if let notice = snapshot.jumuahState.notice, !notice.isEmpty {
+                        Text(notice)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
             }
         } else {
@@ -241,14 +290,14 @@ struct MasjidPrayerWidgetView: View {
     }
 
     @ViewBuilder private var accessoryCircular: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             Gauge(value: snapshot.progressToNextPrayer(at: entry.date)) {
                 Image(systemName: "moon.stars.fill")
             } currentValueLabel: {
                 VStack(spacing: 0) {
-                    Text(String(snapshot.nextPrayerName.prefix(3)))
+                    Text(String(effectivePrayer.name.prefix(3)))
                         .font(.caption2.bold())
-                    Text(snapshot.nextPrayerTime.replacingOccurrences(of: " ", with: ""))
+                    Text(effectivePrayer.time.replacingOccurrences(of: " ", with: ""))
                         .font(.system(size: 8, weight: .semibold, design: .rounded))
                         .minimumScaleFactor(0.6)
                 }
@@ -261,25 +310,42 @@ struct MasjidPrayerWidgetView: View {
     }
 
     @ViewBuilder private var accessoryRectangular: some View {
-        if let snapshot {
+        if let snapshot, let effectivePrayer {
             VStack(alignment: .leading, spacing: 1) {
-                Text("Next: \(snapshot.nextPrayerName)")
+                Text("Next: \(effectivePrayer.name)")
                     .font(.headline)
-                Text("Adhan \(snapshot.nextPrayerTime)")
+                Text("Adhan \(effectivePrayer.time)")
                     .font(.caption)
-                if let iqamah = snapshot.nextIqamah {
+                if let doorsClose = snapshot.jumuahDoorsCloseDateValue,
+                   snapshot.isJumuahServiceDay(at: entry.date),
+                   doorsClose > entry.date {
+                    Text("First Jumu'ah doors close \(snapshot.jumuahState.firstDoorsCloseTime ?? "")")
+                        .font(.caption2)
+                        .lineLimit(1)
+                } else if let iqamah = effectivePrayer.iqamah {
                     Text("Iqamah \(iqamah)")
                         .font(.caption2)
                 }
+                if !snapshot.hijriDate.isEmpty {
+                    Text(snapshot.isWhiteDay ? "\(snapshot.hijriDate) · White Day" : snapshot.hijriDate)
+                        .font(.caption2)
+                        .lineLimit(1)
+                }
             }
+            .accessibilityElement(children: .combine)
         } else {
             Text("Open Masjid Bilal for prayer times")
         }
     }
 
     @ViewBuilder private var accessoryInline: some View {
-        if let snapshot {
-            Label("\(snapshot.nextPrayerName) \(snapshot.nextPrayerTime)", systemImage: "moon.stars.fill")
+        if snapshot != nil, let effectivePrayer {
+            Label(
+                snapshot?.isWhiteDay == true
+                    ? "\(effectivePrayer.name) \(effectivePrayer.time) · White Day"
+                    : "\(effectivePrayer.name) \(effectivePrayer.time)",
+                systemImage: "moon.stars.fill"
+            )
         } else {
             Label("Prayer times unavailable", systemImage: "moon.stars")
         }

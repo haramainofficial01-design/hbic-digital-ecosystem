@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "npm install --legacy-peer-deps --ignore-scripts --no-audit --fund=false",
+  "buildCommand": "npm run build:admin",
+  "outputDirectory": "apps/admin-web/.next"
+}

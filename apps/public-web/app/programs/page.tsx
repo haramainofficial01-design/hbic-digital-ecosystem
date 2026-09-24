@@ -1,5 +1,6 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
+import { isVisibleItem, type ServiceItem } from "@hbic/shared";
 
 const programs = [
   {
@@ -41,16 +42,27 @@ const programs = [
 
 export const revalidate = 300;
 
+function programImagePath(program: ServiceItem) {
+  if (!program.image) return "";
+  return program.image === "quran-academy.jpeg" || program.image === "masjid-exterior.png" ? `/photos/${program.image}` : `/media/images/${program.image}`;
+}
+
 export default async function ProgramsPage() {
   const { content } = await getPublishedContent();
   const programsById = new Map(content.programs.map((program) => [program.id, program]));
-  const publishedPrograms = programs.map((program) => {
-    const published = programsById.get(program.id);
-    return published ? { ...program, title: published.title, description: published.description } : program;
-  });
+  const publishedPrograms = content.programs.filter(isVisibleItem).length
+    ? content.programs.filter(isVisibleItem).map((program) => ({
+        ...program,
+        href: program.href || (program.contactMethod === "form" ? `mailto:${content.settings.email}?subject=${encodeURIComponent(program.title)}` : "/contact"),
+        image: programImagePath(program)
+      }))
+    : programs.map((program) => {
+        const published = programsById.get(program.id);
+        return published ? { ...program, title: published.title, description: published.description } : program;
+      });
 
   return (
-    <SiteChrome settings={content.settings}>
+    <SiteChrome settings={content.settings} contentVersion={content.version}>
       <section className="section">
         <h2>Programs & Services</h2>
         <p>Core HBIC programs and services for learning, youth, sisters, volunteers, and community support.</p>

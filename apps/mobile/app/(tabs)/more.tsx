@@ -17,11 +17,12 @@ type IconName = keyof typeof Ionicons.glyphMap;
 const menuItems: { title: string; subtitle: string; icon: IconName; route: string }[] = [
   { title: "Programs", subtitle: "Qur'an, classes, sisters, and community support", icon: "book", route: "/programs" },
   { title: "HBIC Youth", subtitle: "Youth programs, socials, and summer camp", icon: "sparkles", route: "/youth" },
+  { title: "Community", subtitle: "Resources, volunteering, questions, and local support", icon: "people", route: "/community" },
   { title: "Media", subtitle: "Taraweeh clip, social media, and community moments", icon: "play-circle", route: "/media" },
   { title: "Contact", subtitle: "Call, email, directions, and masjid address", icon: "call", route: "/contact" },
   { title: "About", subtitle: "Mission, services, and community information", icon: "information-circle", route: "/about" },
   { title: "Notifications", subtitle: "Prayer, iqamah, event, and media alerts", icon: "notifications", route: "/notifications" },
-  { title: "Language", subtitle: "Preferred language for Masjid Bilal updates", icon: "language", route: "/language" },
+  { title: "Language", subtitle: "English and Urdu navigation preferences", icon: "language", route: "/language" },
   { title: "Settings", subtitle: "Theme and app preferences", icon: "settings", route: "/settings" }
 ];
 

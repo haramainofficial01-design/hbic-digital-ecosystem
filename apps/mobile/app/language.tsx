@@ -1,56 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { LanguageCode } from "@hbic/shared";
-import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
 import { SectionHeader } from "../src/components/SectionHeader";
+import { useAppLanguage } from "../src/i18n/LanguageProvider";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 
-const languageFile = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}hbic-language.txt` : "";
 const languages: { code: LanguageCode; label: string; subtitle: string }[] = [
   { code: "en", label: "English", subtitle: "Default app language" },
-  { code: "ur", label: "Urdu", subtitle: "Preferred language for future Masjid Bilal updates" }
+  { code: "ur", label: "اردو", subtitle: "ایپ کی رہنمائی اور اہم کمیونٹی معلومات" }
 ];
 
 export default function LanguageScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const [language, setLanguage] = useState<LanguageCode>("en");
-
-  useEffect(() => {
-    async function loadLanguage() {
-      if (!languageFile) return;
-      try {
-        const info = await FileSystem.getInfoAsync(languageFile);
-        if (!info.exists) return;
-        const saved = (await FileSystem.readAsStringAsync(languageFile)).trim();
-        if (saved === "en" || saved === "ur") setLanguage(saved);
-      } catch {
-        setLanguage("en");
-      }
-    }
-    loadLanguage();
-  }, []);
-
-  async function choose(code: LanguageCode) {
-    setLanguage(code);
-    if (!languageFile) return;
-    try {
-      await FileSystem.writeAsStringAsync(languageFile, code);
-    } catch {
-      // Language still changes for this session if local persistence is unavailable.
-    }
-  }
+  const { language, setLanguage, t } = useAppLanguage();
 
   return (
     <AppScreen>
-      <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
-      <SectionHeader title="Language" subtitle="Choose your preferred language for Masjid Bilal updates." />
+      <AppButton label={t("back")} icon="chevron-back" variant="ghost" onPress={() => router.back()} />
+      <SectionHeader title={t("language")} subtitle={t("languageSubtitle")} />
       <GlassCard>
         {languages.map((item) => {
           const active = language === item.code;
@@ -61,7 +34,7 @@ export default function LanguageScreen() {
               accessibilityLabel={item.label}
               accessibilityHint={item.subtitle}
               accessibilityState={{ selected: active }}
-              onPress={() => choose(item.code)}
+              onPress={() => void setLanguage(item.code)}
               style={[styles.row, { borderBottomColor: theme.colors.border }]}
             >
               <View style={[styles.iconBubble, { backgroundColor: active ? theme.colors.tintSoft : theme.colors.cardStrong }]}>
@@ -76,9 +49,9 @@ export default function LanguageScreen() {
         })}
       </GlassCard>
       <GlassCard tone="gold">
-        <Text style={[styles.title, { color: theme.colors.text }]}>Preference saved</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>{t("preferenceSaved")}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          Masjid Bilal can use this preference for future app updates and community communication options.
+          {t("englishContentFallback")}
         </Text>
       </GlassCard>
     </AppScreen>

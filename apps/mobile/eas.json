@@ -18,7 +18,26 @@
   "submit": {
     "production": {
       "android": {
-        "track": "production"
+        "track": "production",
+        "releaseStatus": "draft"
+      }
+    },
+    "androidClosed": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed",
+        "applicationId": "ca.hbic.calgary.app"
+      }
+    },
+    "store": {
+      "ios": {
+        "ascAppId": "6790937097",
+        "bundleIdentifier": "ca.hbic.calgary.app"
+      },
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed",
+        "applicationId": "ca.hbic.calgary.app"
       }
     }
   }

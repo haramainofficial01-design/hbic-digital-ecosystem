@@ -16,40 +16,52 @@ import type {
 } from "./types";
 
 export const demoPrayerTime: PrayerTime = {
-  date: "2026-07-01",
-  fajr: "3:42 AM",
-  sunrise: "5:25 AM",
-  dhuhr: "1:39 PM",
-  asr: "6:05 PM",
-  maghrib: "9:55 PM",
-  isha: "11:18 PM",
-  source: "iqamah.ca timetable for HBIC Calgary",
-  sourceUrl: "https://iqamah.ca/",
-  calculationMethod: "iqamah.ca published masjid timetable, reviewed by HBIC",
+  date: "2026-07-09",
+  fajr: "4:02 AM",
+  sunrise: "5:32 AM",
+  dhuhr: "1:41 PM",
+  asr: "6:01 PM",
+  maghrib: "9:50 PM",
+  isha: "11:20 PM",
+  source: "HBIC published timetable",
+  sourceUrl: "",
+  calculationMethod: "HBIC published masjid timetable",
   importedAt: new Date().toISOString(),
   lastUpdated: new Date().toISOString()
 };
 
 export const demoIqamahTime: IqamahTime = {
-  date: "2026-07-01",
-  fajrIqamah: "4:15 AM",
+  date: "2026-07-09",
+  fajrIqamah: "4:30 AM",
   dhuhrIqamah: "2:00 PM",
   asrIqamah: "6:30 PM",
   maghribIqamah: "10:00 PM",
-  ishaIqamah: "11:30 PM",
-  source: "HBIC reviewed iqamah timetable",
-  sourceUrl: "https://iqamah.ca/",
-  manualOverride: true,
-  adjustmentNotes: "Iqamah values are reviewed by HBIC before publishing.",
+  ishaIqamah: "11:25 PM",
+  source: "HBIC published iqamah timetable",
+  sourceUrl: "",
+  manualOverride: false,
+  overrides: {},
+  adjustmentNotes: "",
   updatedBy: "HBIC Office",
   updatedAt: new Date().toISOString()
 };
 
 export const demoJumuahSchedule: JumuahSchedule = {
-  firstKhutbahTime: "1:30 PM",
-  firstIqamahTime: "1:50 PM",
+  firstKhutbahTime: "1:45 PM",
+  firstIqamahTime: "1:45 PM",
   secondKhutbahTime: "2:30 PM",
-  secondIqamahTime: "2:50 PM",
+  secondIqamahTime: "2:30 PM",
+  firstDoorsCloseTime: "2:00 PM",
+  doorNotice: {
+    enabled: true,
+    time: "2:00 PM",
+    title: "First Jumu'ah",
+    body: "Doors close at 2:00 PM for the first Jumu'ah prayer.",
+    parkingNotice: "Please arrive early and park respectfully around the community.",
+    updatedBy: "HBIC Office",
+    updatedAt: new Date().toISOString()
+  },
+  manualOverride: false,
   notes: "Please arrive early and park respectfully around the community.",
   updatedAt: new Date().toISOString()
 };
@@ -75,6 +87,9 @@ export const demoAnnouncements: Announcement[] = [
     id: "ann-urgent-parking",
     title: "Parking reminder for Jumu'ah",
     body: "Please avoid blocking neighbouring driveways and follow volunteer directions.",
+    visible: true,
+    archived: false,
+    priority: "Urgent",
     pinned: true,
     urgent: true,
     audience: "All",
@@ -85,6 +100,9 @@ export const demoAnnouncements: Announcement[] = [
     id: "ann-quran",
     title: "Quran classes registration",
     body: "Registration interest is open for weekday Quran classes. Contact the office for placement details.",
+    visible: true,
+    archived: false,
+    priority: "Normal",
     pinned: false,
     urgent: false,
     audience: "All",
@@ -94,6 +112,33 @@ export const demoAnnouncements: Announcement[] = [
 ];
 
 export const demoEvents: EventItem[] = [
+  {
+    id: "event-history-of-fiqh",
+    title: "History of Fiqh",
+    subtitle: "The History & Development of Fiqh",
+    summary: "A focused three-week study of how Fiqh developed through different eras, its major stages, and key scholars and figures.",
+    description: "Join us for a focused three-week program exploring how Fiqh developed throughout the different eras, its major stages, and some of the key scholars and figures who shaped its history. This program will be especially beneficial for students of knowledge, but it is open to anyone who would like to attend and benefit.",
+    date: "Sundays",
+    startTime: "8:30 PM",
+    endTime: "",
+    duration: "Three weekly sessions",
+    recurringSchedule: "Sundays at 8:30 PM",
+    location: "Hazrat Bilal Islamic Centre",
+    category: "Classes",
+    image: "",
+    posterStatus: "awaiting-upload",
+    registrationLink: "",
+    audience: "Intermediate level · Open to everyone · Especially beneficial for students of knowledge",
+    speaker: "Faheem",
+    tags: ["Fiqh", "Students of Knowledge", "Weekly Class", "Adult Education", "Open to Everyone"],
+    caption: "📚 History of Fiqh\nThe History & Development of Fiqh\n\nJoin us for a focused 3-week program exploring how Fiqh developed throughout the different eras, its major stages, and some of the key scholars and figures who shaped its history.\n\n🗓 Sundays\n🕣 8:30 PM\n🎙 Speaker: Faheem\n📍 Hazrat Bilal Islamic Centre\n\nThis program will be especially beneficial for students of knowledge, but it is open to anyone who would like to attend and benefit.\n\nA simple weekly gathering for those who want to better understand the development of Islamic scholarship and the foundations behind the study of Fiqh.\n\nAll are welcome.",
+    status: "published",
+    visible: true,
+    featured: true,
+    notificationEnabled: true,
+    createdBy: "HBIC Admin",
+    updatedAt: new Date().toISOString()
+  },
   {
     id: "event-summer-camp-2026",
     title: "HBIC Summer Camp 2026",
@@ -107,6 +152,28 @@ export const demoEvents: EventItem[] = [
     registrationLink: `mailto:${hbicSettings.email}?subject=HBIC%20Summer%20Camp%202026`,
     audience: "Boys & girls, ages 7-12",
     speaker: "HBIC instructors and youth team",
+    visible: true,
+    featured: true,
+    notificationEnabled: true,
+    createdBy: "HBIC Admin",
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: "event-quran-academy",
+    title: "Kids Qur'an Classes",
+    summary: "Qur'an & Tajweed, Noorani Qa'idah, and beneficial Thursday activities.",
+    description: "Classes are running as usual Monday to Thursday. Children learn Qur'an & Tajweed, Noorani Qa'idah, and enjoy Fun Thursday activities including Prophet stories and Kahoot. Price: $50 per month.",
+    date: "Monday to Thursday",
+    startTime: "Contact HBIC for current class times",
+    endTime: "",
+    location: "Hazrat Bilal Islamic Centre",
+    category: "Classes",
+    image: "quran-academy.jpeg",
+    registrationLink: `mailto:${hbicSettings.email}?subject=Kids%20Quran%20Classes`,
+    audience: "Children",
+    speaker: "HBIC Qur'an Academy",
+    visible: true,
+    featured: true,
     notificationEnabled: true,
     createdBy: "HBIC Admin",
     updatedAt: new Date().toISOString()
@@ -124,6 +191,8 @@ export const demoEvents: EventItem[] = [
     registrationLink: "",
     audience: "Open to brothers & sisters, all ages",
     speaker: "HBIC halaqah series",
+    visible: true,
+    featured: false,
     notificationEnabled: true,
     createdBy: "HBIC Admin",
     updatedAt: new Date().toISOString()
@@ -141,6 +210,8 @@ export const demoEvents: EventItem[] = [
     registrationLink: "",
     audience: "Open to brothers & sisters, all ages",
     speaker: "HBIC halaqah series",
+    visible: true,
+    featured: false,
     notificationEnabled: true,
     createdBy: "HBIC Admin",
     updatedAt: new Date().toISOString()
@@ -158,6 +229,8 @@ export const demoEvents: EventItem[] = [
     registrationLink: "",
     audience: "Open to brothers & sisters, all ages",
     speaker: "HBIC halaqah series",
+    visible: true,
+    featured: false,
     notificationEnabled: true,
     createdBy: "HBIC Admin",
     updatedAt: new Date().toISOString()
@@ -175,6 +248,8 @@ export const demoEvents: EventItem[] = [
     registrationLink: "",
     audience: "Open to brothers & sisters, all ages",
     speaker: "HBIC halaqah series",
+    visible: true,
+    featured: false,
     notificationEnabled: true,
     createdBy: "HBIC Admin",
     updatedAt: new Date().toISOString()
@@ -216,7 +291,9 @@ export const demoVolunteerOpportunities: VolunteerOpportunity[] = [
     description: "Help direct traffic and keep the area respectful for neighbours.",
     date: "2026-07-03",
     contactEmail: hbicSettings.email,
-    audience: "All"
+    audience: "All",
+    status: "closed",
+    visible: false
   },
   {
     id: "vol-youth-events",
@@ -224,16 +301,18 @@ export const demoVolunteerOpportunities: VolunteerOpportunity[] = [
     description: "Support setup, clean up, and mentorship during youth activities.",
     date: "2026-07-05",
     contactEmail: hbicSettings.email,
-    audience: "Youth"
+    audience: "Youth",
+    status: "closed",
+    visible: false
   }
 ];
 
 export const demoServices: ServiceItem[] = [
-  { id: "quran-classes", title: "Qur'an Classes", description: "Qur'an learning opportunities for children and adults.", contactMethod: "email" },
-  { id: "youth", title: "Youth Programs", description: "Programs for youth connection, learning, service, and safe community growth.", contactMethod: "email" },
-  { id: "sisters", title: "Sisters' Programs", description: "Programs and gatherings for sisters.", contactMethod: "email" },
-  { id: "volunteer", title: "Volunteer Opportunities", description: "Help with Jumu'ah, events, youth programs, and general community support.", contactMethod: "form" },
-  { id: "community", title: "Community Support", description: "A first point of contact for community needs and referrals.", contactMethod: "email" }
+  { id: "quran-classes", title: "Kids Qur'an Classes", description: "Classes are running as usual Monday to Thursday with Qur'an & Tajweed, Noorani Qa'idah, and beneficial Thursday activities. Price: $50 per month.", image: "quran-academy.jpeg", href: "/events", visible: true, featured: true, contactMethod: "email" },
+  { id: "youth", title: "Youth Programs", description: "Programs for youth connection, learning, service, and safe community growth.", image: "youth-program.jpeg", href: "/youth", visible: true, featured: true, contactMethod: "email" },
+  { id: "sisters", title: "Sisters' Programs", description: "Programs and gatherings for sisters.", visible: true, featured: false, contactMethod: "email" },
+  { id: "volunteer", title: "Volunteer Opportunities", description: "Help with Jumu'ah, events, youth programs, and general community support.", image: "community-jumuah.jpg", visible: true, featured: false, contactMethod: "form" },
+  { id: "community", title: "Community Support", description: "A first point of contact for community needs and referrals.", image: "masjid-exterior.png", href: "/contact", visible: true, featured: false, contactMethod: "email" }
 ];
 
 export const demoPushLogs: PushNotificationLog[] = [

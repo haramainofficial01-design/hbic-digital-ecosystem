@@ -1,0 +1,2 @@
+-keep class androidx.wear.watchface.complications.** { *; }
+-keep class androidx.wear.tiles.** { *; }

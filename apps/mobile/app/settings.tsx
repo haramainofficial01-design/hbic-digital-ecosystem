@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
 import { SectionHeader } from "../src/components/SectionHeader";
+import { useOnboarding } from "../src/onboarding/OnboardingProvider";
 import { type AppThemeMode, spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 
@@ -17,6 +18,7 @@ const themeOptions: { label: string; value: AppThemeMode; icon: keyof typeof Ion
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, mode, setMode } = useAppTheme();
+  const { startReplay } = useOnboarding();
 
   return (
     <AppScreen>
@@ -54,9 +56,49 @@ export default function SettingsScreen() {
 
       <GlassCard compact>
         <SettingsRow title="Notifications" subtitle="Prayer, iqamah, events, media, and urgent notices" route="/notifications" />
-        <SettingsRow title="Language" subtitle="Preferred language for Masjid Bilal updates" route="/language" />
+        <SettingsRow title="Language" subtitle="English and Urdu navigation preferences" route="/language" />
+        <SettingsAction title="Replay introduction" subtitle="See the Masjid Bilal app introduction again" onPress={startReplay} />
+      </GlassCard>
+
+      {Platform.OS === "android" ? (
+        <>
+          <SectionHeader title="Wear OS" subtitle="Masjid Bilal on compatible Android smartwatches." />
+          <GlassCard compact>
+            <SettingsAction
+              title="Install or update the watch app"
+              subtitle="Open Google Play for the native HBIC watch app, tile, and complications"
+              icon="watch-outline"
+              onPress={() => {
+                void Linking.openURL("market://details?id=ca.hbic.calgary.app").catch(() =>
+                  Linking.openURL("https://play.google.com/store/apps/details?id=ca.hbic.calgary.app")
+                );
+              }}
+            />
+            <View style={styles.watchNote}>
+              <Text style={[styles.body, { color: theme.colors.muted }]}>The watch receives the same canonical HBIC prayer snapshot from your phone and can refresh directly over Wi-Fi or LTE. Wear OS is supported; other watch systems require their own HBIC app.</Text>
+            </View>
+          </GlassCard>
+        </>
+      ) : null}
+
+      <SectionHeader title="Privacy & Legal" />
+      <GlassCard compact>
+        <SettingsRow title="Privacy Policy" subtitle="How Masjid Bilal handles information and your choices" route="/privacy-legal" />
       </GlassCard>
     </AppScreen>
+  );
+}
+
+function SettingsAction({ title, subtitle, onPress, icon = "refresh" }: { title: string; subtitle: string; onPress: () => void; icon?: keyof typeof Ionicons.glyphMap }) {
+  const { theme } = useAppTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={subtitle} onPress={onPress} style={[styles.row, { borderBottomColor: theme.colors.border }]}>
+      <View style={styles.flex}>
+        <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{title}</Text>
+        <Text style={[styles.body, { color: theme.colors.muted }]}>{subtitle}</Text>
+      </View>
+      <Ionicons name={icon} size={20} color={theme.colors.subtle} />
+    </Pressable>
   );
 }
 
@@ -113,5 +155,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1
-  }
+  },
+  watchNote: { paddingVertical: 14 }
 });

@@ -8,12 +8,12 @@ export default async function AboutPage() {
   const { content } = await getPublishedContent();
 
   return (
-    <SiteChrome settings={content.settings}>
+    <SiteChrome settings={content.settings} contentVersion={content.version}>
       <section className="section">
         <div className="page-hero" style={{ "--hero-image": "url('/photos/masjid-exterior.png')" } as CSSProperties}>
           <span className="eyebrow">About HBIC</span>
           <h2>Hazrat Bilal Islamic Centre</h2>
-          <p>Serving the Calgary Muslim community through prayer, education, youth programs, sisters' programs, community services, reminders, and beneficial Islamic learning.</p>
+          <p>Serving the Calgary Muslim community through prayer, education, youth programs, sisters&apos; programs, community services, reminders, and beneficial Islamic learning.</p>
           <div className="stat-row">
             <span className="stat-pill">Established 2014</span>
             <span className="stat-pill">Registered Charity</span>

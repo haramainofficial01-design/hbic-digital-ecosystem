@@ -1,0 +1,15 @@
+{
+  "name": "masjid-bilal-zepp-os",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "NODE_PATH=./node_modules/@zeppos/zeus-cli/private-modules zeus build"
+  },
+  "dependencies": {
+    "@zeppos/zml": "^0.0.38"
+  },
+  "devDependencies": {
+    "@zeppos/device-types": "^3.0.0",
+    "@zeppos/zeus-cli": "^1.9.0"
+  }
+}

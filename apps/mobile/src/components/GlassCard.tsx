@@ -1,10 +1,10 @@
 import type { PropsWithChildren } from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { radii, spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 
 interface GlassCardProps extends PropsWithChildren {
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   tone?: "light" | "navy" | "gold" | "teal" | "danger";
   compact?: boolean;
 }
@@ -42,6 +42,7 @@ export function GlassCard({ children, style, tone = "light", compact = false }: 
         style
       ]}
     >
+      <View pointerEvents="none" style={[styles.innerEdge, { borderColor: theme.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.68)" }]} />
       <View style={[styles.highlight, { backgroundColor: theme.mode === "dark" ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.82)" }]} />
       {children}
     </View>
@@ -67,5 +68,11 @@ const styles = StyleSheet.create({
     top: 0,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.82)"
+  },
+  innerEdge: {
+    position: "absolute",
+    inset: 1,
+    borderRadius: radii.lg - 1,
+    borderWidth: StyleSheet.hairlineWidth
   }
 });

@@ -49,7 +49,7 @@ export default async function MediaPage() {
   ];
 
   return (
-    <SiteChrome settings={settings}>
+    <SiteChrome settings={settings} contentVersion={content.version}>
       <section className="section media-hero">
         <span className="eyebrow dark-text">HBIC Media</span>
         <h2>Taraweeh 2025 Recitation</h2>

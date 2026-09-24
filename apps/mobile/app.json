@@ -3,8 +3,8 @@
     "name": "Masjid Bilal",
     "slug": "hbic-calgary-app",
     "scheme": "hbiccalgary",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "version": "1.6.0",
+    "orientation": "default",
     "icon": "./assets/brand/hbic-app-icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -27,6 +27,7 @@
       }
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/hbic-app-icon.png",
         "backgroundColor": "#062238"
@@ -41,15 +42,12 @@
       "expo-router",
       "@bacons/apple-targets",
       "./plugins/withAppleTargetSchemes",
+      "./plugins/withIosSceneLifecycle",
       [
-        "expo-build-properties",
+        "expo-audio",
         {
-          "android": {
-            "kotlinVersion": "1.9.25",
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0"
-          }
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
@@ -57,7 +55,11 @@
         {
           "icon": "./assets/brand/hbic-splash-mark.png",
           "color": "#0C9BA8",
-          "defaultChannel": "default"
+          "defaultChannel": "community_updates_v1",
+          "enableBackgroundRemoteNotifications": true,
+          "sounds": [
+            "./assets/audio/adhan_madinah_marwan_qassas_short.wav"
+          ]
         }
       ]
     ],

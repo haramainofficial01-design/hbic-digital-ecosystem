@@ -1,12 +1,13 @@
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { isVisibleItem } from "@hbic/shared";
+import { getPublicEvents } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
+import { EmptyState } from "../src/components/EmptyState";
 import { GlassCard } from "../src/components/GlassCard";
 import { SectionHeader } from "../src/components/SectionHeader";
-import { eventPhotoAssets, photoAssets } from "../src/constants/assets";
+import { brandAssets, eventPhotoAssets } from "../src/constants/assets";
 import { usePublishedContent } from "../src/services/content";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
@@ -16,14 +17,31 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const visibleEvents = content.events.filter(isVisibleItem);
-  const event = visibleEvents.find((item) => item.id === id) ?? visibleEvents[0] ?? content.events[0];
-  const image = eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] ?? photoAssets.exterior;
+  const visibleEvents = getPublicEvents(content);
+  const event = visibleEvents.find((item) => item.id === id) ?? visibleEvents[0];
+
+  if (!event) {
+    return (
+      <AppScreen>
+        <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
+        <EmptyState title="Event unavailable" message="This event is not currently published. Check Events for the latest community programs." />
+      </AppScreen>
+    );
+  }
+
+  const image = event.image ? eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] : undefined;
 
   return (
     <AppScreen>
       <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
-      <Image source={image} style={styles.heroImage} />
+      {image ? (
+        <Image source={image} style={styles.heroImage} />
+      ) : (
+        <View style={[styles.brandHero, { backgroundColor: theme.colors.navy }]}>
+          <Image source={brandAssets.appMark} style={styles.brandLogo} resizeMode="contain" />
+          <Text style={[styles.brandName, { color: theme.colors.white }]}>Masjid Bilal</Text>
+        </View>
+      )}
       <SectionHeader title={event.title} subtitle={`${event.category} · ${event.audience}`} />
       <GlassCard>
         <Text style={[styles.title, { color: theme.colors.text }]}>Details</Text>
@@ -64,6 +82,22 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 250,
     borderRadius: 28
+  },
+  brandHero: {
+    width: "100%",
+    minHeight: 220,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm
+  },
+  brandLogo: {
+    width: 96,
+    height: 96
+  },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "900"
   },
   title: {
     fontSize: 20,

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   defaultNotificationPreferences,
   notificationPreferenceKeyByType,
@@ -7,6 +8,13 @@ import {
   type NotificationType
 } from "@hbic/shared";
 import { getDatabase } from "./contentStore";
+import {
+  assertRemoteNotificationType,
+  buildContentUpdateExpoPushMessage,
+  buildVisibleExpoPushMessage,
+  decideTokenRotation,
+  type ExpoPushMessage
+} from "./notificationPayload";
 
 type PushPlatform = "ios" | "android" | "web" | "unknown";
 
@@ -14,10 +22,14 @@ export type RegisteredPushToken = {
   token: string;
   platform: PushPlatform;
   deviceName?: string;
+  appVersion?: string;
+  environment?: "development" | "production" | "unknown";
+  installationIdHash?: string;
   preferences: NotificationPreference;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  lastSeenAt?: string;
 };
 
 type SendNotificationInput = {
@@ -26,6 +38,7 @@ type SendNotificationInput = {
   audience: NotificationAudience | "Android" | "iOS" | "Everyone";
   route?: NotificationRoute;
   type?: NotificationType;
+  data?: Record<string, unknown>;
   privateTest?: boolean;
 };
 
@@ -36,38 +49,94 @@ type ExpoPushTicket = {
   details?: { error?: string };
 };
 
-type StoredTicket = {
-  id: string;
-  tokenId: string;
-};
+type StoredTicket = { id: string; tokenId: string };
+
+export class NotificationInputError extends Error {}
+
+const expoPushTokenPattern = /^(Exponent|Expo)PushToken\[[^\]]+\]$/;
+
+function assertExpoPushToken(token: string) {
+  if (!expoPushTokenPattern.test(token)) throw new NotificationInputError("Invalid Expo push token.");
+}
 
 function tokenId(token: string) {
   return Buffer.from(token).toString("base64url");
 }
 
+function hashInstallationId(installationId?: string) {
+  const normalized = installationId?.trim();
+  return normalized ? createHash("sha256").update(normalized).digest("base64url") : undefined;
+}
+
+function normalizeEnvironment(value?: string): RegisteredPushToken["environment"] {
+  return value === "development" || value === "production" ? value : "unknown";
+}
+
 export async function registerPushToken(input: {
   token: string;
+  previousToken?: string;
+  installationId?: string;
   platform?: PushPlatform;
   deviceName?: string;
+  appVersion?: string;
+  environment?: string;
   preferences?: Partial<NotificationPreference>;
 }) {
   const db = getDatabase();
   if (!db) throw new Error("Push token storage is not configured.");
-  if (!/^(Exponent|Expo)PushToken\[[^\]]+\]$/.test(input.token)) throw new Error("Invalid Expo push token.");
+  assertExpoPushToken(input.token);
+  if (input.previousToken) assertExpoPushToken(input.previousToken);
 
   const now = new Date().toISOString();
+  const currentRef = db.collection("pushTokens").doc(tokenId(input.token));
+  const currentSnapshot = await currentRef.get();
+  const current = currentSnapshot.data() as RegisteredPushToken | undefined;
+  const installationIdHash = hashInstallationId(input.installationId);
   const token: RegisteredPushToken = {
     token: input.token,
     platform: input.platform ?? "unknown",
-    preferences: { ...defaultNotificationPreferences, ...(input.preferences ?? {}) },
+    preferences: { ...defaultNotificationPreferences, ...(current?.preferences ?? {}), ...(input.preferences ?? {}) },
     enabled: true,
-    createdAt: now,
-    updatedAt: now
+    createdAt: current?.createdAt || now,
+    updatedAt: now,
+    lastSeenAt: now
   };
-  if (input.deviceName) token.deviceName = input.deviceName;
+  if (input.deviceName?.trim()) token.deviceName = input.deviceName.trim().slice(0, 160);
+  if (input.appVersion?.trim()) token.appVersion = input.appVersion.trim().slice(0, 40);
+  token.environment = normalizeEnvironment(input.environment);
+  if (installationIdHash) token.installationIdHash = installationIdHash;
 
-  await db.collection("pushTokens").doc(tokenId(input.token)).set(token, { merge: true });
+  await currentRef.set(token, { merge: true });
+
+  if (input.previousToken && input.previousToken !== input.token) {
+    const previousRef = db.collection("pushTokens").doc(tokenId(input.previousToken));
+    const previousSnapshot = await previousRef.get();
+    const previous = previousSnapshot.data() as RegisteredPushToken | undefined;
+    if (previous) {
+      const rotationAction = decideTokenRotation(installationIdHash, previous.installationIdHash);
+      if (rotationAction === "delete") {
+        await previousRef.delete();
+      } else if (rotationAction === "disable-legacy") {
+        await previousRef.set({ enabled: false, updatedAt: now, disabledReason: "legacy_token_rotated" }, { merge: true });
+      }
+    }
+  }
+
   return token;
+}
+
+export async function unregisterPushToken(token: string, installationId?: string) {
+  const db = getDatabase();
+  if (!db) throw new Error("Push token storage is not configured.");
+  assertExpoPushToken(token);
+  const ref = db.collection("pushTokens").doc(tokenId(token));
+  const snapshot = await ref.get();
+  const stored = snapshot.data() as RegisteredPushToken | undefined;
+  const suppliedHash = hashInstallationId(installationId);
+  if (stored?.installationIdHash && stored.installationIdHash !== suppliedHash) {
+    throw new NotificationInputError("This device registration could not be verified.");
+  }
+  await ref.delete();
 }
 
 function audienceMatches(token: RegisteredPushToken, audience: SendNotificationInput["audience"]) {
@@ -83,34 +152,46 @@ function hasEnabledPreference(token: RegisteredPushToken, type: NotificationType
   return token.preferences?.[preferenceKey] ?? defaultNotificationPreferences[preferenceKey];
 }
 
-function chunk<T>(items: T[], size: number) {
-  const result: T[][] = [];
-  for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
-  return result;
+function retryDelay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-export async function sendPushNotification(input: SendNotificationInput, targetTokens?: RegisteredPushToken[]) {
+async function sendExpoMessageBatch(messages: ExpoPushMessage[]) {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(messages)
+    });
+    lastStatus = response.status;
+    const result = (await response.json().catch(() => null)) as { data?: ExpoPushTicket[] } | null;
+    if (response.ok && result?.data) return result.data;
+    if (response.status !== 429 && response.status < 500) break;
+    if (attempt < 2) await retryDelay(attempt === 0 ? 250 : 1_000);
+  }
+  throw new Error(`Expo push service returned HTTP ${lastStatus || "unknown"}.`);
+}
+
+async function deliverExpoPushMessages({
+  tokens,
+  messages,
+  logData,
+  logCollection = "pushNotificationLogs"
+}: {
+  tokens: RegisteredPushToken[];
+  messages: ExpoPushMessage[];
+  logData: Record<string, unknown>;
+  logCollection?: "pushNotificationLogs" | "contentPropagationLogs";
+}) {
   const db = getDatabase();
   if (!db) throw new Error("Notification storage is not configured.");
-
-  const tokens = targetTokens
-    ? targetTokens
-    : (await db.collection("pushTokens").where("enabled", "==", true).get()).docs
-        .map((doc) => doc.data() as RegisteredPushToken)
-        .filter((token) => audienceMatches(token, input.audience) && hasEnabledPreference(token, input.type));
-
   const now = new Date().toISOString();
-  const logRef = db.collection("pushNotificationLogs").doc();
+  const logRef = db.collection(logCollection).doc();
 
   if (!tokens.length) {
-    await logRef.set({
-      ...input,
-      sentAt: now,
-      successCount: 0,
-      failureCount: 0,
-      status: "no_tokens"
-    });
-    return { successCount: 0, failureCount: 0, tokenCount: 0, status: "no_tokens" };
+    await logRef.set({ ...logData, sentAt: now, successCount: 0, failureCount: 0, tokenCount: 0, status: "no_tokens" });
+    return { logId: logRef.id, successCount: 0, failureCount: 0, tokenCount: 0, receiptCount: 0, status: "no_tokens" };
   }
 
   let successCount = 0;
@@ -118,97 +199,113 @@ export async function sendPushNotification(input: SendNotificationInput, targetT
   const disabledTokens: string[] = [];
   const tickets: StoredTicket[] = [];
 
-  for (const tokenBatch of chunk(tokens, 100)) {
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      },
-      body: JSON.stringify(tokenBatch.map((item) => ({
-        to: item.token,
-        title: input.title,
-        body: input.body,
-        channelId: "default",
-        priority: "high",
-        data: {
-          route: input.route ?? "/",
-          type: input.type ?? "announcement"
+  try {
+    for (let batchIndex = 0; batchIndex < messages.length; batchIndex += 100) {
+      const messageBatch = messages.slice(batchIndex, batchIndex + 100);
+      const tokenBatch = tokens.slice(batchIndex, batchIndex + 100);
+      const result = await sendExpoMessageBatch(messageBatch);
+      result.forEach((ticket, index) => {
+        const target = tokenBatch[index];
+        if (!target) return;
+        if (ticket.status === "ok") {
+          successCount += 1;
+          if (ticket.id) tickets.push({ id: ticket.id, tokenId: tokenId(target.token) });
+        } else {
+          failureCount += 1;
+          if (ticket.details?.error === "DeviceNotRegistered") disabledTokens.push(target.token);
         }
-      })))
+      });
+    }
+  } catch (error) {
+    await logRef.set({
+      ...logData,
+      sentAt: now,
+      successCount,
+      failureCount: failureCount + tokens.length - successCount - failureCount,
+      tokenCount: tokens.length,
+      tickets,
+      status: "provider_error",
+      error: error instanceof Error ? error.message : "Expo push delivery failed."
     });
-    const result = (await response.json().catch(() => null)) as { data?: ExpoPushTicket[] } | null;
-    if (!response.ok || !result?.data) throw new Error(`Expo push service returned HTTP ${response.status}.`);
-
-    result.data.forEach((ticket, index) => {
-      if (ticket.status === "ok") {
-        successCount += 1;
-        if (ticket.id) tickets.push({ id: ticket.id, tokenId: tokenId(tokenBatch[index].token) });
-        return;
-      }
-      failureCount += 1;
-      if (ticket.details?.error === "DeviceNotRegistered") disabledTokens.push(tokenBatch[index].token);
-    });
+    throw error;
   }
 
   await Promise.all(
     disabledTokens.map((token) => db.collection("pushTokens").doc(tokenId(token)).set({ enabled: false, updatedAt: now }, { merge: true }))
   );
 
-  await logRef.set({
-    ...input,
-    sentAt: now,
-    successCount,
-    failureCount,
-    tokenCount: tokens.length,
-    tickets,
-    status: failureCount ? "partial" : "accepted"
-  });
+  const status = failureCount ? "partial" : "accepted";
+  await logRef.set({ ...logData, sentAt: now, successCount, failureCount, tokenCount: tokens.length, tickets, status });
+  return { logId: logRef.id, successCount, failureCount, tokenCount: tokens.length, receiptCount: tickets.length, status };
+}
 
-  return {
-    logId: logRef.id,
-    successCount,
-    failureCount,
-    tokenCount: tokens.length,
-    receiptCount: tickets.length,
-    status: failureCount ? "partial" : "accepted"
-  };
+async function allEnabledTokens() {
+  const db = getDatabase();
+  if (!db) throw new Error("Notification storage is not configured.");
+  return (await db.collection("pushTokens").where("enabled", "==", true).get()).docs
+    .map((document) => document.data() as RegisteredPushToken)
+    .filter((token) => expoPushTokenPattern.test(token.token));
+}
+
+export async function sendPushNotification(input: SendNotificationInput, targetTokens?: RegisteredPushToken[]) {
+  assertRemoteNotificationType(input.type);
+  const tokens = targetTokens ?? (await allEnabledTokens())
+    .filter((token) => audienceMatches(token, input.audience) && hasEnabledPreference(token, input.type));
+  const messages = tokens.map((token) => buildVisibleExpoPushMessage(token.token, {
+    ...input,
+    // Registrations created by the repaired app have already created the new
+    // sound channel. Legacy registrations keep their existing default channel
+    // until that installation launches and re-registers.
+    androidChannelId: token.appVersion ? undefined : "default"
+  }));
+  return deliverExpoPushMessages({ tokens, messages, logData: input });
+}
+
+export async function sendContentUpdateSignal(input: {
+  contentVersion: number;
+  publicationRevision?: number;
+  scheduleRevision?: string;
+  publishedAt: string;
+}) {
+  const tokens = await allEnabledTokens();
+  const messages = tokens.map((token) => buildContentUpdateExpoPushMessage(token.token, input));
+  return deliverExpoPushMessages({
+    tokens,
+    messages,
+    logCollection: "contentPropagationLogs",
+    logData: { signalType: "contentUpdate", ...input }
+  });
 }
 
 export async function sendPrivatePushTest(input: { token: string; platform: PushPlatform }) {
-  if (!/^(Exponent|Expo)PushToken\[[^\]]+\]$/.test(input.token)) throw new Error("Invalid Expo push token.");
-
+  assertExpoPushToken(input.token);
   return sendPushNotification(
     {
       title: "Masjid Bilal Test",
-      body: "Android notifications are connected successfully.",
+      body: "Sound, banner, and notification delivery are connected successfully.",
       audience: "All",
-      route: "/",
+      route: "/notifications",
       type: "announcement",
+      data: { test: true },
       privateTest: true
     },
-    [
-      {
-        token: input.token,
-        platform: input.platform,
-        preferences: defaultNotificationPreferences,
-        enabled: true,
-        createdAt: "",
-        updatedAt: ""
-      }
-    ]
+    [{
+      token: input.token,
+      platform: input.platform,
+      appVersion: "1.5.0",
+      preferences: defaultNotificationPreferences,
+      enabled: true,
+      createdAt: "",
+      updatedAt: ""
+    }]
   );
 }
 
 export async function sendLatestRegisteredPrivatePushTest(platform: Extract<PushPlatform, "android" | "ios">) {
-  const db = getDatabase();
-  if (!db) throw new Error("Notification storage is not configured.");
-
-  const snapshot = await db.collection("pushTokens").where("enabled", "==", true).where("platform", "==", platform).get();
-  const target = snapshot.docs
-    .map((document) => document.data() as RegisteredPushToken)
-    .sort((left, right) => Date.parse(right.updatedAt || "") - Date.parse(left.updatedAt || ""))[0];
-
+  const tokens = (await allEnabledTokens())
+    .filter((token) => token.platform === platform)
+    .sort((left, right) => Date.parse(right.lastSeenAt || right.updatedAt || "") - Date.parse(left.lastSeenAt || left.updatedAt || ""));
+  const target = tokens[0];
   if (!target) throw new Error(`No enabled ${platform} device is registered for a private notification test.`);
   return sendPrivatePushTest({ token: target.token, platform });
 }
@@ -246,11 +343,9 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
 
   tickets.forEach((ticket) => {
     const receipt = result.data?.[ticket.id];
-    if (!receipt) {
-      pendingCount += 1;
-    } else if (receipt.status === "ok") {
-      deliveredCount += 1;
-    } else {
+    if (!receipt) pendingCount += 1;
+    else if (receipt.status === "ok") deliveredCount += 1;
+    else {
       failedCount += 1;
       if (receipt.details?.error === "DeviceNotRegistered") disabledTokenIds.push(ticket.tokenId);
     }

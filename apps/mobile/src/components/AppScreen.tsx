@@ -1,14 +1,15 @@
 import type { PropsWithChildren } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 
 export function AppScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { theme } = useAppTheme();
+  const { isRtl } = useAppLanguage();
   const { width } = useWindowDimensions();
   const { lastUpdatedAt, loading, refresh, refreshError, source } = usePublishedContent();
   const isWide = width >= 768;
@@ -18,14 +19,14 @@ export function AppScreen({ children, style }: PropsWithChildren<{ style?: Style
   const showStatus = source !== "api" || Boolean(refreshError);
 
   return (
-    <LinearGradient colors={theme.gradients.screen} style={styles.gradient}>
+    <View style={[styles.gradient, { backgroundColor: theme.colors.background }]}>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView
           contentContainerStyle={[styles.content, isWide && styles.wideContent, style]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.teal} />}
         >
-          <View style={styles.inner}>
+          <View style={[styles.inner, { direction: isRtl ? "rtl" : "ltr" }]}>
             {showStatus ? (
               <View
                 accessibilityRole="alert"
@@ -56,7 +57,7 @@ export function AppScreen({ children, style }: PropsWithChildren<{ style?: Style
           </View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

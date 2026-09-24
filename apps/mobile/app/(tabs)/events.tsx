@@ -1,4 +1,4 @@
-import { isVisibleItem, type ProgramCategory } from "@hbic/shared";
+import { getPublicEvents, getPublicVolunteerOpportunities, type ProgramCategory } from "@hbic/shared";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -21,8 +21,9 @@ export default function EventsScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const { settings, volunteerOpportunities } = content;
-  const publishedEvents = content.events.filter(isVisibleItem);
+  const { settings } = content;
+  const volunteerOpportunities = getPublicVolunteerOpportunities(content.volunteerOpportunities);
+  const publishedEvents = getPublicEvents(content);
   const filters = useMemo<Filter[]>(() => (settings.ramadanMode ? [...baseFilters, "Ramadan"] : [...baseFilters]), [settings.ramadanMode]);
   const [filter, setFilter] = useState<Filter>("All");
   const events = useMemo(

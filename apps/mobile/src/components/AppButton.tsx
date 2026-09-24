@@ -49,7 +49,7 @@ export function AppButton({ label, onPress, variant = "primary", icon, style, di
     >
       <View style={styles.content}>
         {icon ? <Ionicons name={icon} size={18} color={labelColor} /> : null}
-        <Text style={[styles.label, { color: labelColor }]} numberOfLines={1} adjustsFontSizeToFit>
+        <Text style={[styles.label, { color: labelColor }]}>
           {label}
         </Text>
       </View>
@@ -64,14 +64,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.lg
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 13
   },
   content: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    maxWidth: "100%"
+    maxWidth: "100%",
+    flexWrap: "wrap"
   },
   pressed: {
     transform: [{ scale: 0.98 }],
@@ -82,6 +84,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "800",
-    fontSize: 15
+    fontSize: 15,
+    lineHeight: 20,
+    textAlign: "center",
+    flexShrink: 1
   }
 });

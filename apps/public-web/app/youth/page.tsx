@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { getPublicEvents } from "@hbic/shared";
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
 
@@ -6,7 +7,8 @@ export const revalidate = 300;
 
 export default async function YouthPage() {
   const { content } = await getPublishedContent();
-  const { events, settings } = content;
+  const { settings } = content;
+  const events = getPublicEvents(content);
   const youthEvents = events.filter((event) => event.category === "Youth");
   const summerCamp = events.find((event) => event.id === "event-summer-camp-2026");
   const socialCards = [
@@ -16,7 +18,7 @@ export default async function YouthPage() {
   ];
 
   return (
-    <SiteChrome settings={settings}>
+    <SiteChrome settings={settings} contentVersion={content.version}>
       <section className="section">
         <div className="page-hero" style={{ "--hero-image": "url('/media/images/youth-program.jpeg')" } as CSSProperties}>
           <img src="/brand/hbic-youth-logo.png" alt="HBIC Youth logo" style={{ width: 98, borderRadius: 22, background: "white" }} />

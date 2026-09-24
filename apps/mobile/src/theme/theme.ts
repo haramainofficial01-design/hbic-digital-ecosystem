@@ -1,7 +1,7 @@
 export const colors = {
   navy: "#062238",
   deepNavy: "#031827",
-  teal: "#0C9BA8",
+  teal: "#087B83",
   blue: "#1268A8",
   green: "#1E9D4E",
   gold: "#E7C66B",
@@ -10,7 +10,7 @@ export const colors = {
   ink: "#10202A",
   muted: "#64748B",
   soft: "#EDF8FA",
-  danger: "#D9534F"
+  danger: "#B93A37"
 };
 
 export type AppThemeMode = "system" | "light" | "dark";
@@ -60,10 +60,10 @@ export const lightTheme: AppTheme = {
     surface: "#FFFFFF",
     surfaceStrong: "#F4FAFB",
     text: "#10202A",
-    muted: "#5F7180",
-    subtle: "#7D8E99",
-    border: "rgba(12,155,168,0.17)",
-    borderStrong: "rgba(12,155,168,0.32)",
+    muted: "#4E6573",
+    subtle: "#5F7481",
+    border: "rgba(8,123,131,0.22)",
+    borderStrong: "rgba(8,123,131,0.42)",
     tint: colors.teal,
     tintSoft: "#E6F7F8",
     navy: colors.navy,
@@ -94,8 +94,8 @@ export const darkTheme: AppTheme = {
     surface: "#0A273D",
     surfaceStrong: "#10344A",
     text: "#F6FAFB",
-    muted: "#B6C8D2",
-    subtle: "#8FA6B4",
+    muted: "#CAD8DF",
+    subtle: "#AFC1CA",
     border: "rgba(255,255,255,0.13)",
     borderStrong: "rgba(231,198,107,0.36)",
     tint: "#28C0C8",

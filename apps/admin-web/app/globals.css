@@ -91,6 +91,10 @@ select {
   background: linear-gradient(135deg, #fff, var(--gold));
 }
 
+.mobile-page-picker {
+  display: none;
+}
+
 .content {
   padding: 34px;
   display: grid;
@@ -125,6 +129,11 @@ select {
   background: rgba(12, 155, 168, 0.12);
   color: var(--teal);
   font-weight: 900;
+}
+
+.pill-dirty {
+  background: rgba(231, 198, 107, 0.26);
+  color: #72570d;
 }
 
 .grid {
@@ -200,6 +209,62 @@ select {
   margin-top: 16px;
 }
 
+.firebase-auth-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(237, 248, 250, 0.72);
+}
+
+.firebase-auth-panel > strong,
+.firebase-auth-panel > p,
+.firebase-auth-panel > code,
+.firebase-auth-actions,
+.firebase-auth-shared {
+  grid-column: 1 / -1;
+}
+
+.firebase-auth-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.firebase-auth-panel code {
+  overflow-wrap: anywhere;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+}
+
+.firebase-auth-actions,
+.firebase-auth-ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.firebase-auth-shared {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.firebase-auth-shared > strong,
+.firebase-auth-shared > button {
+  grid-column: 1 / -1;
+}
+
 .primary,
 .secondary,
 .danger {
@@ -211,9 +276,24 @@ select {
   font-weight: 900;
 }
 
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-height: 50px;
+  border-radius: 16px;
+  padding: 0 18px;
+  font-weight: 900;
+}
+
 .primary {
   background: var(--teal);
   color: white;
+}
+
+.primary.publish {
+  background: var(--navy);
 }
 
 .secondary {
@@ -224,6 +304,34 @@ select {
 .danger {
   color: white;
   background: #d9534f;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.notice {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  padding: 16px 18px;
+}
+
+.notice-info {
+  color: var(--navy);
+  background: rgba(12, 155, 168, 0.1);
+}
+
+.notice-success {
+  color: #125e31;
+  background: rgba(30, 157, 78, 0.12);
+  border-color: rgba(30, 157, 78, 0.28);
+}
+
+.notice-error {
+  color: #8f2727;
+  background: rgba(217, 83, 79, 0.1);
+  border-color: rgba(217, 83, 79, 0.28);
 }
 
 .table {
@@ -252,6 +360,31 @@ select {
   .sidebar {
     position: relative;
     height: auto;
+    padding: 20px;
+  }
+
+  .brand {
+    margin-bottom: 18px;
+  }
+
+  .sidebar-nav {
+    display: none;
+  }
+
+  .mobile-page-picker {
+    display: grid;
+    gap: 7px;
+    font-weight: 900;
+    font-size: 13px;
+  }
+
+  .mobile-page-picker select {
+    min-height: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    padding: 0 14px;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .card,

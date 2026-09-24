@@ -78,6 +78,20 @@ service cloud.firestore {
       allow write: if signedIn() && request.auth.token.adminRole in ['superAdmin', 'director', 'editor'];
     }
 
+    match /restaurantInterestSubmissions/{docId} {
+      allow read: if hasAdminRole();
+      allow create, update, delete: if false;
+    }
+
+    match /restaurantInterestRateLimits/{docId} {
+      allow read, write: if false;
+    }
+
+    match /halalRestaurants/{docId} {
+      allow read: if hasAdminRole();
+      allow write: if false;
+    }
+
     match /pushNotificationLogs/{docId} {
       allow read: if hasAdminRole();
       allow create: if canSendNotifications();
