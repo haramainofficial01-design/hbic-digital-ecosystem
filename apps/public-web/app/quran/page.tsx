@@ -3,7 +3,9 @@ import { SiteChrome } from "../../components/SiteChrome";
 import { QuranReader } from "../../components/QuranReader";
 import { getPublishedContent } from "../../lib/contentStore";
 import { isQuranPublicEnabled } from "../../lib/quranRelease";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Quran & Qibla | Masjid Bilal",
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function QuranPage() {
-  if (!isQuranPublicEnabled()) notFound();
+  if (!isQuranPublicEnabled()) redirect("/");
   const { content } = await getPublishedContent();
   return <SiteChrome settings={content.settings} contentVersion={content.version}><QuranReader /></SiteChrome>;
 }

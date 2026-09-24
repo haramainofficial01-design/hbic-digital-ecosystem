@@ -21,3 +21,5 @@ tmp/
 .git/
 .agents/
 .codex/
+/eas.json
+/app.json
