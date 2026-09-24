@@ -6,23 +6,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
-const links = [
-  ["App", "/app"],
+const primaryLinks = [
   ["Prayer Times", "/prayer-times"],
+  ["App", "/app"],
   ["Events", "/events"],
-  ["Media", "/media"],
   ["Donate", "/donate"],
   ["Programs", "/programs"],
-  ["Youth", "/youth"],
+  ["Youth", "/youth"]
+] as const;
+
+const secondaryLinks = [
+  ["Media", "/media"],
   ["Community", "/community"],
   ["Muslim-Owned Businesses", "/halal-restaurants"],
   ["Contact", "/contact"],
   ["About", "/about"]
 ] as const;
 
+const quranLink = ["Quran", "/quran"] as const;
+
+const links = [...primaryLinks, ...secondaryLinks] as const;
+
 type SliderStyle = CSSProperties & { opacity: number };
 
-export function SiteNavigation({ settings }: { settings: MasjidSettings }) {
+export function SiteNavigation({ settings, quranEnabled }: { settings: MasjidSettings; quranEnabled: boolean }) {
   const pathname = usePathname();
   const desktopRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDetailsElement>(null);
@@ -32,7 +39,7 @@ export function SiteNavigation({ settings }: { settings: MasjidSettings }) {
   const isActive = useCallback((href: string) => pathname === href || pathname.startsWith(`${href}/`), [pathname]);
 
   const updateSlider = useCallback(() => {
-    const activeLink = links.find(([, href]) => isActive(href));
+    const activeLink = primaryLinks.find(([, href]) => isActive(href));
     const container = desktopRef.current;
     const element = activeLink ? linkRefs.current[activeLink[1]] : null;
     if (!container || !element) {
@@ -65,7 +72,7 @@ export function SiteNavigation({ settings }: { settings: MasjidSettings }) {
     if (mobileMenuRef.current) mobileMenuRef.current.open = false;
   };
 
-  const navigationLinks = (mobile = false) => links.map(([label, href]) => (
+  const navigationLinks = (mobile = false, entries: readonly (readonly [string, string])[] = links) => entries.map(([label, href]) => (
     <Link
       key={href}
       href={href}
@@ -100,23 +107,27 @@ export function SiteNavigation({ settings }: { settings: MasjidSettings }) {
       </Link>
       <div className="links desktop-links nav-links" ref={desktopRef}>
         <span className="nav-slider" style={sliderStyle} aria-hidden="true" />
-        {navigationLinks()}
+        {navigationLinks(false, primaryLinks)}
+        <details className="desktop-more-menu">
+          <summary>Explore <span aria-hidden="true">⌄</span></summary>
+          <div className="desktop-more-links">{navigationLinks(false, quranEnabled ? [quranLink, ...secondaryLinks] : secondaryLinks)}</div>
+        </details>
       </div>
       <div className="mobile-nav-actions">
         <Link
-          className={`mobile-app-link${isActive("/app") ? " active" : ""}`}
-          href="/app"
-          aria-current={isActive("/app") ? "page" : undefined}
+          className={`mobile-app-link${isActive("/prayer-times") ? " active" : ""}`}
+          href="/prayer-times"
+          aria-current={isActive("/prayer-times") ? "page" : undefined}
           onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            beginNavigation("/app");
+            beginNavigation("/prayer-times");
           }}
         >
-          App
+          Prayer Times
         </Link>
         <details className="mobile-menu" ref={mobileMenuRef}>
           <summary>Menu</summary>
-          <div className="links mobile-links">{navigationLinks(true)}</div>
+          <div className="links mobile-links">{navigationLinks(true, quranEnabled ? [...primaryLinks, quranLink, ...secondaryLinks] : links)}</div>
         </details>
       </div>
     </nav>

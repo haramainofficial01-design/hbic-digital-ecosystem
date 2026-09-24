@@ -37,4 +37,3 @@ export function StoreDownloadButtons({ showQr = false }: { showQr?: boolean }) {
     </div>
   );
 }
-

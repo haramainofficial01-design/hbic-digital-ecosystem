@@ -11,7 +11,6 @@ export interface OnboardingRecord {
   source: OnboardingCompletionSource;
   updatedAt: string;
 }
-
 export function createOnboardingRecord({
   currentStep = 0,
   source = "first-install",
@@ -50,4 +49,3 @@ export function shouldPresentOnboarding(record: OnboardingRecord | null) {
   if (!record) return true;
   return record.status !== "complete" || record.completedVersion < currentOnboardingVersion;
 }
-

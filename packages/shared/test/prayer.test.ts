@@ -6,7 +6,7 @@ import { demoIqamahTime, demoPrayerTime } from "../src/demoData";
 import { createWidgetPrayerSnapshot, type WidgetPrayerSnapshot } from "../src/widgetSnapshot";
 import { defaultContent, getPublicEvents } from "../src/content";
 import { getEffectiveJumuahDoorNotice } from "../src/jumuah";
-import { derivePrayerCelestialPosition, formatCountdown, getHijriDate, getNextPrayer, getNextPrayerFocus, getUpcomingWhiteDays, resolveHijriDate, timeToDate } from "../src/prayer";
+import { derivePrayerCelestialPosition, formatCountdown, getHijriDate, getNextPrayer, getNextPrayerFocus, getUpcomingWhiteDays, getWhiteDaysRemainingThisWeek, resolveHijriDate, timeToDate } from "../src/prayer";
 
 function requireNext(value: ReturnType<typeof getNextPrayer>) {
   assert.ok(value, "Expected a valid next prayer");
@@ -206,6 +206,16 @@ test("upcoming White Days returns the next 13th, 14th, and 15th with Gregorian e
   assert.equal(upcoming.length, 3);
   assert.deepEqual(upcoming.map((entry) => entry.hijriDate.day), [13, 14, 15]);
   assert.ok(upcoming.every((entry) => /^\d{4}-\d{2}-\d{2}$/.test(entry.gregorianDate)));
+});
+
+test("home White Days notice appears only within the same Calgary calendar week", () => {
+  const settings = { calendar: "islamic-umalqura" as const, adjustmentDays: 0, updatedAt: "2026-09-19T00:00:00.000Z", overrides: [] };
+  const dates = (instant: string) => getWhiteDaysRemainingThisWeek(new Date(instant), settings)
+    .map(({ gregorianDate }) => gregorianDate);
+  assert.deepEqual(dates("2026-09-19T18:00:00.000Z"), []); // Saturday: next week's dates stay hidden.
+  assert.deepEqual(dates("2026-09-20T18:00:00.000Z"), ["2026-09-24", "2026-09-25", "2026-09-26"]);
+  assert.deepEqual(dates("2026-09-25T18:00:00.000Z"), ["2026-09-25", "2026-09-26"]);
+  assert.deepEqual(dates("2026-09-27T18:00:00.000Z"), []);
 });
 
 test("Jumu'ah door notice respects feature, schedule, and effective dates", () => {

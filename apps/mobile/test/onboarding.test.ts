@@ -32,4 +32,3 @@ test("invalid persistence never masquerades as a completion", () => {
   assert.equal(normalizeOnboardingRecord({ status: "complete" }), null);
   assert.equal(shouldPresentOnboarding(null), true);
 });
-

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { RouteContent } from "./RouteContent";
 import { SiteNavigation } from "./SiteNavigation";
 import { getPublicationState } from "../lib/publicationStore";
+import { isQuranPublicEnabled } from "../lib/quranRelease";
 
 export async function SiteChrome({
   children,
@@ -14,24 +15,29 @@ export async function SiteChrome({
   contentVersion?: number;
 }) {
   const publication = await getPublicationState();
+  const quranEnabled = isQuranPublicEnabled();
   return (
     <div
       className="site"
       data-hbic-content-version={contentVersion}
       data-hbic-publication-revision={publication.revision}
     >
-      <SiteNavigation settings={settings} />
+      <SiteNavigation settings={settings} quranEnabled={quranEnabled} />
       <RouteContent>{children}</RouteContent>
       <footer className="footer">
         <div className="footer-inner">
-          <strong>{settings.masjidName}</strong>
-          <span>{settings.address}</span>
-          <span>{settings.phone} · {settings.email}</span>
-          <span>Prayer, programs, youth updates, donations, media, and community services from Masjid Bilal.</span>
+          <div className="footer-intro"><span className="footer-eyebrow">HAZRAT BILAL ISLAMIC CENTRE</span><strong>{settings.masjidName}</strong><p>Prayer, learning, youth and community in Calgary.</p></div>
+          <div className="footer-contact"><span>VISIT & CONNECT</span><a href={`https://maps.google.com/?q=${encodeURIComponent(settings.address)}`} target="_blank" rel="noreferrer">{settings.address}</a><a href={`tel:${settings.phone}`}>{settings.phone}</a><a href={`mailto:${settings.email}`}>{settings.email}</a></div>
           <div className="footer-links">
+            <Link href="/prayer-times">Prayer Times</Link>
+            <Link href="/events">Events</Link>
+            <Link href="/programs">Programs</Link>
+            {quranEnabled ? <Link href="/quran">Quran</Link> : null}
+            <Link href="/app">The App</Link>
             <Link href="/privacy">Privacy Policy</Link>
             <Link href="/contact">Contact</Link>
           </div>
+          <small className="footer-bottom">© {new Date().getFullYear()} Hazrat Bilal Islamic Centre · Made for our community.</small>
         </div>
       </footer>
     </div>

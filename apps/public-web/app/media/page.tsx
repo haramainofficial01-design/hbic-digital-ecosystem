@@ -1,5 +1,7 @@
 import { existsSync } from "fs";
 import { join } from "path";
+import Image from "next/image";
+import type { CSSProperties } from "react";
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
 
@@ -50,10 +52,12 @@ export default async function MediaPage() {
 
   return (
     <SiteChrome settings={settings} contentVersion={content.version}>
-      <section className="section media-hero">
-        <span className="eyebrow dark-text">HBIC Media</span>
-        <h2>Taraweeh 2025 Recitation</h2>
-        <p>A glimpse of the beautiful Qur&apos;an recitation and Ramadan moments shared with the HBIC community.</p>
+      <section className="section interior-page-section media-hero">
+        <div className="page-hero" style={{ "--hero-image": "url('/media/images/youth-iftar.jpeg')" } as CSSProperties}>
+          <span className="eyebrow">STORIES FROM OUR COMMUNITY</span>
+          <h2>Media</h2>
+          <p>Recitations, reminders, and moments from the people who make Masjid Bilal a home.</p>
+        </div>
       </section>
 
       <section className="section">
@@ -123,7 +127,7 @@ export default async function MediaPage() {
         <div className="grid">
           {youthHighlights.map((item) => (
             <article className="card image-card" key={item.title}>
-              <img src={item.image} alt={`${item.title} HBIC program highlight`} />
+              <Image src={item.image} alt={`${item.title} HBIC program highlight`} width={1200} height={800} />
               <h3>{item.title}</h3>
               <p className="muted">{item.text}</p>
             </article>
@@ -136,7 +140,7 @@ export default async function MediaPage() {
         <div className="grid">
           {communityMoments.map((item) => (
             <article className="card wide image-card" key={item.title}>
-              <img src={item.image} alt={`${item.title} at HBIC`} />
+              <Image src={item.image} alt={`${item.title} at HBIC`} width={1200} height={800} />
               <h3>{item.title}</h3>
               <p className="muted">{item.text}</p>
             </article>

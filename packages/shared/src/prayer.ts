@@ -295,6 +295,21 @@ export function getUpcomingWhiteDays(
   return results;
 }
 
+/** Upcoming White Days in the current Sunday–Saturday local calendar week. */
+export function getWhiteDaysRemainingThisWeek(
+  date = new Date(),
+  settings: HijriSettings,
+  timeZone = masjidTimeZone
+): UpcomingWhiteDay[] {
+  const today = dateStringInTimeZone(date, timeZone);
+  const todayUtc = new Date(`${today}T12:00:00Z`);
+  const daysUntilSaturday = 6 - todayUtc.getUTCDay();
+  const endOfWeek = new Date(todayUtc.getTime() + daysUntilSaturday * 86_400_000)
+    .toISOString().slice(0, 10);
+  return getUpcomingWhiteDays(date, settings, timeZone, 7)
+    .filter(({ gregorianDate }) => gregorianDate >= today && gregorianDate <= endOfWeek);
+}
+
 /**
  * Parses and validates the complete daily schedule once so every consumer uses
  * the same absolute instants. A malformed or incomplete schedule is rejected

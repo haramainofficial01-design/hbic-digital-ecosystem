@@ -9,6 +9,7 @@ import { EventCard } from "../../src/components/EventCard";
 import { GlassCard } from "../../src/components/GlassCard";
 import { PrayerHero } from "../../src/components/PrayerHero";
 import { PrayerTimesList } from "../../src/components/PrayerTimesList";
+import { WhiteDaysNotice } from "../../src/components/WhiteDaysNotice";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { brandAssets, photoAssets } from "../../src/constants/assets";
 import { usePublishedContent } from "../../src/services/content";
@@ -39,6 +40,8 @@ export default function HomeScreen() {
       </ImageBackground>
 
       <PrayerHero />
+      <WhiteDaysNotice />
+      <AppButton label="Hijri Calendar" icon="calendar-outline" variant="secondary" onPress={() => router.push("/hijri-calendar" as never)} />
 
       <SectionHeader title="Today at Masjid Bilal" subtitle="A quick glance. Open Prayer for the full adhan, iqamah, and Jumu'ah schedule." />
       <PrayerTimesList compact maxItems={3} />

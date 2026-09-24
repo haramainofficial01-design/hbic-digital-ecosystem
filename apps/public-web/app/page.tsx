@@ -4,6 +4,7 @@ import { SiteChrome } from "../components/SiteChrome";
 import { WelcomeFilm } from "../components/WelcomeFilm";
 import { AppLaunchPromotion } from "../components/AppLaunchPromotion";
 import { getEffectiveJumuahDoorNotice, getPublicEvents, isVisibleItem } from "@hbic/shared";
+import Image from "next/image";
 
 export const revalidate = 300;
 
@@ -38,19 +39,19 @@ export default async function HomePage() {
         />
       </section>
 
-      <section className="hero">
+      <section className="hero home-story-hero" aria-labelledby="home-story-heading">
         <div className="hero-panel">
-          <img className="hero-photo" src="/photos/masjid-exterior.png" alt="Hazrat Bilal Islamic Centre exterior" />
+          <Image className="hero-photo" src="/photos/masjid-exterior.png" alt="Hazrat Bilal Islamic Centre exterior in Calgary at sunset" fill sizes="(max-width: 800px) 100vw, 1440px" priority />
           <div className="hero-content">
-            <img className="hero-logo" src="/brand/hbic-logo.png" alt="HBIC logo" />
-            <span className="eyebrow">Masjid Bilal</span>
-            <h1>Hazrat Bilal Islamic Centre</h1>
-            <p className="lead">Prayer times, iqamah updates, Jumu&apos;ah, youth programs, announcements, donations, and community services for Calgary.</p>
+            <span className="eyebrow">HAZRAT BILAL ISLAMIC CENTRE · CALGARY</span>
+            <h1 id="home-story-heading">A place<br />to belong.</h1>
+            <p className="lead">Come for prayer. Stay for learning, friendship, and the life of a community built around the masjid.</p>
             <div className="actions">
-              <a className="button primary" href="/prayer-times">View prayer times</a>
-              <a className="button secondary" href={settings.donationUrl} target="_blank" rel="noreferrer">Donate</a>
+              <a className="button primary" href="/about">Discover Masjid Bilal</a>
+              <a className="button secondary" href="/events">See what&apos;s happening</a>
             </div>
           </div>
+          <span className="home-hero-caption">20 Saddlestone Drive NE · Calgary, Alberta</span>
         </div>
       </section>
 
@@ -58,20 +59,20 @@ export default async function HomePage() {
 
       <AppLaunchPromotion />
 
-      <section className="section">
-        <h2>Today at Masjid Bilal</h2>
-        <p>Prayer times, Jumu&apos;ah reminders, announcements, and current programs for the Hazrat Bilal Islamic Centre community.</p>
-        <div className="grid">
-          <div className="card dark wide">
+      <section className="section home-current-section">
+        <div className="home-section-intro"><span className="eyebrow">THE RHYTHM OF OUR WEEK</span><h2>Here for every day.</h2><p>Jumu&apos;ah, timely notices, and community life in one clear place.</p></div>
+        <div className="grid home-current-grid">
+          <div className="card dark wide home-current-jumuah">
             <span className="kicker">Jumu&apos;ah</span>
             <h3>Two khutbahs</h3>
             <p className="muted">
               First khutbah {jumuahSchedule.firstKhutbahTime}. Second khutbah {jumuahSchedule.secondKhutbahTime}.
               {jumuahDoorNotice ? ` ${jumuahDoorNotice.body}` : ""}
             </p>
+            <a className="home-text-link" href="/prayer-times">View the full schedule <span aria-hidden="true">↗</span></a>
           </div>
           {announcement ? (
-            <div className="card gold wide">
+            <div className="card gold wide home-current-announcement">
               <span className="kicker">Announcement</span>
               <h3>{announcement.title}</h3>
               <p className="muted">{announcement.body}</p>
@@ -96,29 +97,30 @@ export default async function HomePage() {
         </div>
       </section> : null}
 
-      {summerCamp ? <section className="section">
+      {summerCamp ? <section className="section home-feature-event">
         <div className="promo-card">
-          {summerCamp.image ? <img src={eventImagePath(summerCamp.image)} alt={`${summerCamp.title} flyer`} /> : null}
+          {summerCamp.image ? <Image src={eventImagePath(summerCamp.image)} alt={`${summerCamp.title} flyer`} width={920} height={680} sizes="(max-width: 800px) 100vw, 50vw" /> : null}
           <div>
-            <span className="kicker">{summerCamp.category}</span>
+            <span className="kicker">FEATURED · {summerCamp.category}</span>
             <h2>{summerCamp.title}</h2>
             <p>{summerCamp.summary ?? summerCamp.description}</p>
             <div className="actions">
-              <a className="button primary" href={summerCamp.registrationLink || "/contact"}>Contact us</a>
-              <a className="button light" href="/events">View camp details</a>
+              <a className="button primary" href={summerCamp.registrationLink || "/contact"}>Learn more</a>
+              <a className="button light" href="/events">All events</a>
             </div>
           </div>
         </div>
       </section> : null}
 
-      <section className="section">
-        <h2>Programs and giving</h2>
-        <div className="grid">
+      <section className="section home-programs-section">
+        <div className="home-section-intro"><span className="eyebrow">LEARN · GATHER · SERVE</span><h2>There is room for you here.</h2><p>Explore real programs and gatherings happening through the centre.</p></div>
+        <div className="grid home-programs-grid">
           {events.slice(0, 3).map((event) => (
             <div className="card" key={event.id}>
               <span className="kicker">{event.category}</span>
               <h3>{event.title}</h3>
               <p className="muted">{event.date} · {event.startTime} · {event.description}</p>
+              <a className="home-text-link" href="/events">Explore events <span aria-hidden="true">↗</span></a>
             </div>
           ))}
           <div className="card dark">
@@ -130,11 +132,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="section compact-section">
+      <section className="section compact-section home-media-section">
         <h2>Community Media</h2>
         <div className="grid">
           <div className="card wide media-preview">
-            <img src={featuredMedia?.posterUrl ?? "/media/videos/taraweeh-2025-recitation-poster.jpg"} alt={`${featuredMedia?.title ?? "Taraweeh 2025 Recitation"} poster`} />
+            <Image src={featuredMedia?.posterUrl ?? "/media/videos/taraweeh-2025-recitation-poster.jpg"} alt={`${featuredMedia?.title ?? "Taraweeh 2025 Recitation"} poster`} width={720} height={440} sizes="(max-width: 800px) 100vw, 50vw" />
             <div>
               <span className="kicker">Featured clip</span>
               <h3>{featuredMedia?.title ?? "Taraweeh 2025 Recitation"}</h3>
@@ -142,6 +144,16 @@ export default async function HomePage() {
               <div className="actions"><a className="button primary" href="/media">Watch on Media Page</a></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="section home-final-invitation">
+        <div className="home-final-image" role="img" aria-label="Prayer hall at Hazrat Bilal Islamic Centre" />
+        <div className="home-final-copy">
+          <span className="eyebrow">YOUR MASJID IN CALGARY</span>
+          <h2>Come as you are.<br />Be part of what grows here.</h2>
+          <p>Visit for prayer, meet your community, and find a place to contribute.</p>
+          <div className="actions"><a className="button primary" href="/contact">Plan your visit</a><a className="button secondary" href="/programs">Explore programs</a></div>
         </div>
       </section>
     </SiteChrome>

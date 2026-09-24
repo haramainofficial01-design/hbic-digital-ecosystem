@@ -29,7 +29,6 @@ interface OnboardingContextValue {
   startReplay: () => void;
   cancelReplay: () => void;
 }
-
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
 
 async function writeRecord(record: OnboardingRecord) {
@@ -152,4 +151,3 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   }
 });
-

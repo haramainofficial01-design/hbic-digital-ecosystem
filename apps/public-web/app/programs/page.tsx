@@ -1,6 +1,8 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
 import { isVisibleItem, type ServiceItem } from "@hbic/shared";
+import Image from "next/image";
+import type { CSSProperties } from "react";
 
 const programs = [
   {
@@ -63,13 +65,17 @@ export default async function ProgramsPage() {
 
   return (
     <SiteChrome settings={content.settings} contentVersion={content.version}>
-      <section className="section">
-        <h2>Programs & Services</h2>
-        <p>Core HBIC programs and services for learning, youth, sisters, volunteers, and community support.</p>
+      <section className="section interior-page-section">
+        <div className="page-hero" style={{ "--hero-image": "url('/photos/prayer-hall.png')" } as CSSProperties}>
+          <span className="eyebrow">GROW TOGETHER</span>
+          <h2>Programs &amp; Services</h2>
+          <p>Explore learning, youth, sisters&apos; gatherings, volunteering, and community support at Masjid Bilal.</p>
+        </div>
+        <div className="interior-section-intro"><span className="eyebrow">THERE IS ROOM FOR YOU HERE</span><h3>Choose your place to begin.</h3><p>Every program connects back to our community and its everyday needs.</p></div>
         <div className="grid">
           {publishedPrograms.map((program) => (
             <a className={`card ${program.image ? "image-card" : "dark"}`} href={program.href} key={program.title}>
-              {program.image ? <img src={program.image} alt={`${program.title} at HBIC`} /> : null}
+              {program.image ? <Image src={program.image} alt={`${program.title} at HBIC`} width={1200} height={800} /> : null}
               <span className="kicker">Program</span>
               <h3>{program.title}</h3>
               <p className="muted">{program.description}</p>
