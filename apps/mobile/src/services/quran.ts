@@ -16,6 +16,8 @@ export interface QuranVerse {
   id: number;
   verseKey: string;
   verseNumber: number;
+  pageNumber: number;
+  juzNumber: number;
   textUthmani: string;
   translation: string;
   translationName: string;
@@ -34,6 +36,15 @@ export async function listChapters() {
 }
 export async function readChapter(id: number, page = 1) {
   return request<{ chapter: QuranChapter; verses: QuranVerse[]; page: number; hasMore: boolean; availability: { note: string } }>(`mode=chapter&chapter=${id}&page=${page}`);
+}
+export async function readJuz(id: number, page = 1) {
+  return request<{ juz: number; verses: QuranVerse[]; page: number; hasMore: boolean }>(`mode=juz&juz=${id}&page=${page}`);
+}
+export async function readMushafPage(id: number) {
+  return request<{ mushafPage: number; verses: QuranVerse[]; hasMore: false }>(`mode=mushaf-page&page=${id}`);
+}
+export async function readAyah(key: string) {
+  return (await request<{ verse: QuranVerse }>(`mode=ayah&key=${encodeURIComponent(key)}`)).verse;
 }
 export async function searchVerses(query: string) {
   return (await request<{ verses: QuranVerse[] }>(`mode=search&q=${encodeURIComponent(query.trim())}`)).verses;

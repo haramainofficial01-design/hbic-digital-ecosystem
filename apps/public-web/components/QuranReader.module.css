@@ -31,6 +31,10 @@
 .toolbar form button{color:white;background:#0b7c82}
 .toolbar button:disabled{opacity:.4;cursor:default}
 .controls{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.browseControls{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;padding:24px 18px 0;color:#40575d;font-weight:800}
+.browseControls button,.browseControls label{min-height:42px;display:flex;align-items:center;gap:8px;padding:0 14px;border:1px solid rgba(9,77,81,.18);border-radius:999px;background:#fff;color:#174551;font:inherit}
+.browseControls button{cursor:pointer}.browseControls button[aria-pressed="true"]{background:#e7f1ee;border-color:#0b7c82}
+.browseControls select,.browseControls input{width:64px;border:0;background:transparent;color:#174551;font:inherit;outline-color:#0b7c82}.browseControls input{width:58px}
 .chapterHeader{text-align:center;padding:54px 20px 31px}
 .chapterHeader small{font-size:10px;letter-spacing:.16em;color:#ac8441;font-weight:900}
 .chapterHeader h2{font:500 clamp(38px,5vw,64px)/1 Georgia,serif;letter-spacing:-.05em;margin:8px 0 6px}

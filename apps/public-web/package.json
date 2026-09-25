@@ -6,6 +6,7 @@
     "dev": "next dev --port 3100",
     "build": "next build",
     "start": "next start --port 3100",
+    "verify:quran-production": "tsx scripts/verifyQuranProduction.ts",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
   },

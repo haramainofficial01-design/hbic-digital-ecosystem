@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { availability, chapter, chapters, search } from "../../../lib/quranFoundation";
+import { availability, ayah, chapter, chapters, juz, mushafPage, search } from "../../../lib/quranFoundation";
 import { isQuranPublicEnabled } from "../../../lib/quranRelease";
 
 export const runtime = "nodejs";
@@ -18,6 +18,28 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ ok: false, message: "Invalid surah or page." }, { status: 400 });
       }
       return NextResponse.json({ ok: true, ...(await chapter(id, page)), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
+    }
+    if (mode === "juz") {
+      const id = Number(request.nextUrl.searchParams.get("juz"));
+      const page = Number(request.nextUrl.searchParams.get("page") ?? 1);
+      if (!Number.isInteger(id) || id < 1 || id > 30 || !Number.isInteger(page) || page < 1 || page > 20) {
+        return NextResponse.json({ ok: false, message: "Invalid juz or page." }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, ...(await juz(id, page)), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
+    }
+    if (mode === "mushaf-page") {
+      const id = Number(request.nextUrl.searchParams.get("page"));
+      if (!Number.isInteger(id) || id < 1 || id > 604) {
+        return NextResponse.json({ ok: false, message: "Invalid Quran page." }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, ...(await mushafPage(id)), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
+    }
+    if (mode === "ayah") {
+      const key = request.nextUrl.searchParams.get("key") ?? "";
+      if (!/^\d{1,3}:\d{1,3}$/.test(key) || Number(key.split(":")[0]) > 114) {
+        return NextResponse.json({ ok: false, message: "Invalid ayah reference." }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, ...(await ayah(key)), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
     }
     if (mode === "search") {
       const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";

@@ -6,15 +6,18 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import styles from "./QuranReader.module.css";
 
 interface Chapter { id: number; nameSimple: string; nameArabic: string; translatedName: { name: string }; versesCount: number; revelationPlace: string }
-interface Verse { id: number; verseKey: string; verseNumber: number; textUthmani: string; translation: string; translationName: string; audioUrl: string | null }
-interface ChapterPayload { chapter: Chapter; verses: Verse[]; page: number; hasMore: boolean; availability: { note: string } }
+interface Verse { id: number; verseKey: string; verseNumber: number; pageNumber: number; juzNumber: number; textUthmani: string; translation: string; translationName: string; audioUrl: string | null }
+interface ReaderPayload { chapter?: Chapter; juz?: number; mushafPage?: number; verses: Verse[]; page?: number; hasMore: boolean; availability: { note: string } }
 const bookmarksKey = "hbic:quran:bookmarks:v1";
 const lastReadKey = "hbic:quran:last-read:v1";
 
 export function QuranReader() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [chapterId, setChapterId] = useState(1);
-  const [data, setData] = useState<ChapterPayload | null>(null);
+  const [browseMode, setBrowseMode] = useState<"surah" | "juz" | "page">("surah");
+  const [juzNumber, setJuzNumber] = useState(1);
+  const [mushafPage, setMushafPage] = useState(1);
+  const [data, setData] = useState<ReaderPayload | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -45,23 +48,28 @@ export function QuranReader() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void fetch(`/api/quran?mode=chapter&chapter=${chapterId}`).then(async (response) => {
+    setData(null);
+    setVerses([]);
+    const path = browseMode === "surah" ? `mode=chapter&chapter=${chapterId}`
+      : browseMode === "juz" ? `mode=juz&juz=${juzNumber}` : `mode=mushaf-page&page=${mushafPage}`;
+    void fetch(`/api/quran?${path}`).then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body.message);
       if (!cancelled) {
         setData(body); setVerses(body.verses); setSearchMode(false);
-        localStorage.setItem(lastReadKey, String(chapterId));
+        if (browseMode === "surah") localStorage.setItem(lastReadKey, String(chapterId));
       }
     }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "This surah is unavailable."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [chapterId]);
+  }, [browseMode, chapterId, juzNumber, mushafPage]);
 
   async function loadMore() {
     if (!data?.hasMore || loading) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/quran?mode=chapter&chapter=${chapterId}&page=${data.page + 1}`);
+      const path = browseMode === "surah" ? `mode=chapter&chapter=${chapterId}` : `mode=juz&juz=${juzNumber}`;
+      const response = await fetch(`/api/quran?${path}&page=${(data.page ?? 1) + 1}`);
       const body = await response.json();
       if (!response.ok) throw new Error(body.message);
       setData(body); setVerses((current) => [...current, ...body.verses]);
@@ -105,13 +113,18 @@ export function QuranReader() {
     </section>
     <div className={styles.quick}><a href="#reader"><BookOpen />Read</a><a href="#qibla"><Compass />Qibla</a><a href="https://sunnah.com" target="_blank" rel="noreferrer"><ExternalLink />Hadith Library</a></div>
     <section className={`${styles.reader}${error && !verses.length ? ` ${styles.readerUnavailable}` : ""}`} id="reader">
-      <aside><h2>Surahs</h2><div className={styles.chapterList}>{chapters.map((item) => <button key={item.id} className={item.id === chapterId ? styles.selected : undefined} onClick={() => { setChapterId(item.id); setQuery(""); }}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}</div></aside>
+      <aside><h2>Surahs</h2><div className={styles.chapterList}>{chapters.map((item) => <button key={item.id} className={browseMode === "surah" && item.id === chapterId ? styles.selected : undefined} onClick={() => { setBrowseMode("surah"); setChapterId(item.id); setQuery(""); }}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}</div></aside>
       <div className={styles.reading}>
         <div className={styles.toolbar}>
           <form onSubmit={search}><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Arabic, English, or 2:255" aria-label="Search the Quran" /><button disabled={query.trim().length < 2 || loading}>Search</button></form>
           <div className={styles.controls}><button aria-label="Decrease Arabic size" onClick={() => setArabicSize((size) => Math.max(28, size - 2))}>A−</button><button aria-label="Increase Arabic size" onClick={() => setArabicSize((size) => Math.min(58, size + 2))}>A+</button><button onClick={() => setTranslationVisible((shown) => !shown)}>{translationVisible ? "Translation on" : "Translation off"}</button></div>
         </div>
-        <header className={styles.chapterHeader}><small>{searchMode ? `SEARCH RESULTS FOR “${query}”` : data?.chapter.revelationPlace ?? "QURAN FOUNDATION"}</small><h2>{searchMode ? "Verified results" : data?.chapter.nameSimple ?? "Quran Reader"}</h2><p>{searchMode ? "" : data ? `${data.chapter.translatedName?.name} · ${data.chapter.versesCount} ayahs` : ""}</p></header>
+        <nav className={styles.browseControls} aria-label="Quran navigation">
+          <button aria-pressed={browseMode === "surah"} onClick={() => setBrowseMode("surah")}>Surah</button>
+          <label>Juz <select value={juzNumber} onChange={(event) => { setJuzNumber(Number(event.target.value)); setBrowseMode("juz"); }} aria-label="Choose Juz">{Array.from({ length: 30 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label>
+          <label>Page <input type="number" min="1" max="604" value={mushafPage} onChange={(event) => { const value = Number(event.target.value); if (value >= 1 && value <= 604) { setMushafPage(value); setBrowseMode("page"); } }} aria-label="Choose Mushaf page" /></label>
+        </nav>
+        <header className={styles.chapterHeader}><small>{searchMode ? `SEARCH RESULTS FOR “${query}”` : browseMode === "surah" ? data?.chapter?.revelationPlace ?? "QURAN FOUNDATION" : "QURAN FOUNDATION"}</small><h2>{searchMode ? "Verified results" : browseMode === "surah" ? data?.chapter?.nameSimple ?? "Quran Reader" : browseMode === "juz" ? `Juz ${juzNumber}` : `Page ${mushafPage}`}</h2><p>{searchMode ? "" : browseMode === "surah" && data?.chapter ? `${data.chapter.translatedName?.name} · ${data.chapter.versesCount} ayahs` : ""}</p></header>
         {data?.availability?.note ? <p className={styles.sourceNote}>{data.availability.note} Quran and translation supplied by Quran Foundation / Quran.com.</p> : null}
         {error ? <div className={styles.empty} role="status"><BookOpen /><b>Reader connection needed</b><p>{error}</p><small>Quran text is never generated or substituted.</small></div> : null}
         {loading && !verses.length ? <div className={styles.empty}>Loading Quran…</div> : null}

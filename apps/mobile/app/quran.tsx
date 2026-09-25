@@ -8,7 +8,7 @@ import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
 import { SectionHeader } from "../src/components/SectionHeader";
-import { listChapters, loadBookmarks, loadLastRead, readChapter, saveBookmarks, saveLastRead, searchVerses, type QuranChapter, type QuranVerse } from "../src/services/quran";
+import { listChapters, loadBookmarks, loadLastRead, readChapter, readJuz, readMushafPage, saveBookmarks, saveLastRead, searchVerses, type QuranChapter, type QuranVerse } from "../src/services/quran";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 import { quranEnabled } from "../src/config/releaseFeatures";
@@ -22,6 +22,10 @@ function QuranReaderScreen() {
   const { theme } = useAppTheme();
   const [chapters, setChapters] = useState<QuranChapter[]>([]);
   const [chapterId, setChapterId] = useState(1);
+  const [readerMode, setReaderMode] = useState<"surah" | "juz" | "page">("surah");
+  const [juzId, setJuzId] = useState(1);
+  const [mushafPageId, setMushafPageId] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [chapter, setChapter] = useState<QuranChapter | null>(null);
   const [verses, setVerses] = useState<QuranVerse[]>([]);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
@@ -42,18 +46,25 @@ function QuranReaderScreen() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    void readChapter(chapterId).then((result) => {
-      setChapter(result.chapter);
+    setChapter(null);
+    setVerses([]);
+    const operation = readerMode === "surah" ? readChapter(chapterId)
+      : readerMode === "juz" ? readJuz(juzId) : readMushafPage(mushafPageId);
+    void operation.then((result) => {
+      if (cancelled) return;
+      setChapter("chapter" in result ? result.chapter : null);
       setVerses(result.verses);
       setPage(1);
       setHasMore(result.hasMore);
       setSearchMode(false);
-      void saveLastRead(chapterId);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : "This surah is unavailable."))
-      .finally(() => setLoading(false));
-  }, [chapterId]);
+      if (readerMode === "surah") void saveLastRead(chapterId);
+    }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "This passage is unavailable."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [chapterId, readerMode, juzId, mushafPageId]);
 
   useEffect(() => { if (audioStatus.didJustFinish) setPlayingKey(null); }, [audioStatus.didJustFinish]);
 
@@ -70,7 +81,7 @@ function QuranReaderScreen() {
     if (!hasMore || loading) return;
     setLoading(true);
     try {
-      const result = await readChapter(chapterId, page + 1);
+      const result = readerMode === "surah" ? await readChapter(chapterId, page + 1) : await readJuz(juzId, page + 1);
       setVerses((current) => [...current, ...result.verses]);
       setPage(result.page);
       setHasMore(result.hasMore);
@@ -109,20 +120,24 @@ function QuranReaderScreen() {
         <TextInput value={query} onChangeText={setQuery} onSubmitEditing={search} returnKeyType="search" placeholder="Search Arabic, English, or 2:255" placeholderTextColor={theme.colors.subtle} style={[styles.input, { color: theme.colors.text }]} accessibilityLabel="Search the Quran" />
         <Pressable onPress={search} disabled={query.trim().length < 2 || loading} style={[styles.searchButton, { backgroundColor: theme.colors.teal }]}><Text style={styles.searchText}>Search</Text></Pressable>
       </View>
+      <View style={styles.readerModes} accessibilityRole="tablist">
+        {(["surah", "juz", "page"] as const).map((mode) => <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected: readerMode === mode }} onPress={() => setReaderMode(mode)} style={[styles.readerMode, { backgroundColor: readerMode === mode ? theme.colors.teal : theme.colors.card, borderColor: theme.colors.border }]}><Text style={{ color: readerMode === mode ? "#fff" : theme.colors.text, fontWeight: "800" }}>{mode === "surah" ? "Surahs" : mode === "juz" ? "Juz" : "Page"}</Text></Pressable>)}
+      </View>
       {!searchMode ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chapterStrip}>
+        readerMode === "surah" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chapterStrip}>
           {chapters.map((item) => <Pressable key={item.id} onPress={() => setChapterId(item.id)} style={[styles.chapterPill, { borderColor: item.id === chapterId ? theme.colors.gold : theme.colors.border, backgroundColor: theme.colors.card }]}>
             <Text style={[styles.chapterArabic, { color: theme.colors.gold }]}>{item.nameArabic}</Text>
             <Text style={[styles.chapterName, { color: theme.colors.text }]}>{item.id}. {item.nameSimple}</Text>
             <Text style={[styles.chapterMeta, { color: theme.colors.muted }]}>{item.versesCount} ayahs</Text>
           </Pressable>)}
-        </ScrollView>
-      ) : <AppButton label="Return to surah" icon="arrow-back" variant="secondary" onPress={() => { setSearchMode(false); setQuery(""); void readChapter(chapterId).then((result) => setVerses(result.verses)); }} />}
+        </ScrollView> : readerMode === "juz" ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chapterStrip}>{Array.from({ length: 30 }, (_, index) => <Pressable key={index + 1} onPress={() => setJuzId(index + 1)} style={[styles.readerMode, { backgroundColor: juzId === index + 1 ? theme.colors.teal : theme.colors.card, borderColor: theme.colors.border }]}><Text style={{ color: juzId === index + 1 ? "#fff" : theme.colors.text, fontWeight: "800" }}>{index + 1}</Text></Pressable>)}</ScrollView>
+          : <View style={styles.pageJump}><TextInput keyboardType="number-pad" value={pageInput} onChangeText={setPageInput} accessibilityLabel="Mushaf page number from 1 to 604" style={[styles.pageField, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.card }]} /><AppButton label="Go to page" icon="arrow-forward" disabled={!(Number(pageInput) >= 1 && Number(pageInput) <= 604 && Number.isInteger(Number(pageInput)))} onPress={() => setMushafPageId(Number(pageInput))} /></View>
+      ) : <AppButton label="Return to reading" icon="arrow-back" variant="secondary" onPress={() => { setSearchMode(false); setQuery(""); const operation = readerMode === "surah" ? readChapter(chapterId) : readerMode === "juz" ? readJuz(juzId) : readMushafPage(mushafPageId); void operation.then((result) => setVerses(result.verses)); }} />}
       {!searchMode && chapter ? <GlassCard tone="gold" style={styles.chapterHeader}>
         <Text style={[styles.chapterMeta, { color: theme.colors.muted }]}>{chapter.revelationPlace} · {chapter.versesCount} ayahs</Text>
         <Text style={[styles.currentChapter, { color: theme.colors.text }]}>{chapter.nameSimple}</Text>
         <Text style={[styles.chapterArabic, { color: theme.colors.gold }]}>{chapter.nameArabic}</Text>
-      </GlassCard> : null}
+      </GlassCard> : !searchMode && readerMode !== "surah" ? <GlassCard tone="gold" style={styles.chapterHeader}><Text style={[styles.currentChapter, { color: theme.colors.text }]}>{readerMode === "juz" ? `Juz ${juzId}` : `Page ${mushafPageId}`}</Text></GlassCard> : null}
       {error ? <GlassCard tone="teal"><Text style={[styles.error, { color: theme.colors.text }]}>{error}</Text><Text style={[styles.errorNote, { color: theme.colors.muted }]}>Prayer and iqamah remain available. Quran text is never generated or substituted.</Text></GlassCard> : null}
       {!error && verses.map((verse) => <GlassCard key={verse.verseKey}>
         <View style={styles.verseTop}>
@@ -138,7 +153,7 @@ function QuranReaderScreen() {
         <Text style={[styles.source, { color: theme.colors.subtle }]}>{verse.translationName}</Text>
       </GlassCard>)}
       {loading ? <ActivityIndicator size="large" color={theme.colors.teal} style={styles.loader} /> : null}
-      {!searchMode && hasMore && !error ? <AppButton label="Continue this surah" icon="chevron-down" variant="secondary" disabled={loading} onPress={more} /> : null}
+      {!searchMode && hasMore && !error ? <AppButton label={readerMode === "juz" ? "Continue this juz" : "Continue this surah"} icon="chevron-down" variant="secondary" disabled={loading} onPress={more} /> : null}
     </AppScreen>
   );
 }
@@ -147,6 +162,10 @@ const styles = StyleSheet.create({
   arabicTitle: { color: "#E7C66B", fontSize: 36, lineHeight: 58, fontWeight: "700", textAlign: "right" },
   heroBody: { color: "rgba(255,255,255,.75)", fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
+  readerModes: { flexDirection: "row", gap: 8, marginVertical: spacing.md },
+  readerMode: { minHeight: 44, minWidth: 56, justifyContent: "center", alignItems: "center", borderWidth: 1, borderRadius: 22, paddingHorizontal: 16 },
+  pageJump: { flexDirection: "row", gap: 10, alignItems: "center", marginBottom: spacing.md },
+  pageField: { minHeight: 48, width: 90, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 18 },
   action: { flexGrow: 1 },
   search: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 28, paddingLeft: 16, paddingRight: 6 },
   input: { flex: 1, minWidth: 0, fontSize: 14 },
