@@ -151,7 +151,7 @@ export function AcademyParent() {
   return <main className={styles.shell}>
     <div className={styles.hero}>
       <div className={styles.academySeal} aria-label="HBIC Qur’an Academy · Masjid Bilal">
-        <svg viewBox="0 0 220 220" aria-hidden="true"><defs><path id="academy-seal-top" d="M 19,110 A 91,91 0 0,1 201,110" /><path id="academy-seal-bottom" d="M 201,110 A 91,91 0 0,1 19,110" /></defs>
+        <svg viewBox="0 0 220 220" aria-hidden="true"><defs><path id="academy-seal-top" d="M 19,110 A 91,91 0 0,1 201,110" /><path id="academy-seal-bottom" d="M 19,110 A 91,91 0 0,0 201,110" /></defs>
           <text><textPath href="#academy-seal-top" startOffset="50%" textAnchor="middle">HBIC QUR’AN ACADEMY</textPath></text>
           <text><textPath href="#academy-seal-bottom" startOffset="50%" textAnchor="middle">MASJID BILAL · CALGARY</textPath></text></svg>
         <img src="/brand/hbic-logo.png" alt="Masjid Bilal logo" />

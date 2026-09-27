@@ -248,9 +248,14 @@ export async function getAcademyPaymentHistory(uid: string) {
 
 export async function getAcademyPricing() {
   const data = (await academyDb().collection(settings).doc("config").get()).data();
-  return { tuitionMode: data?.tuitionMode === "per_family" ? "per_family" : "per_child",
-    monthlyCents: Number.isSafeInteger(data?.monthlyCents) ? Number(data?.monthlyCents) : ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD,
-    stripePriceId: typeof data?.stripePriceId === "string" && data.stripePriceId ? data.stripePriceId : process.env.ACADEMY_STRIPE_PRICE_ID ?? "" };
+  const approvedLivePrice = process.env.ACADEMY_STRIPE_BILLING_MODE === "live" ? process.env.ACADEMY_STRIPE_PRICE_ID ?? "" : "";
+  return { tuitionMode: approvedLivePrice ? "per_child" as const : data?.tuitionMode === "per_family" ? "per_family" as const : "per_child" as const,
+    monthlyCents: approvedLivePrice ? ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD : Number.isSafeInteger(data?.monthlyCents) ? Number(data?.monthlyCents) : ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD,
+    // The deployment's approved live Price ID takes precedence over an older
+    // admin draft so a stale Firestore setting cannot silently bill families
+    // against a superseded Stripe product.
+    stripePriceId: approvedLivePrice ||
+      (typeof data?.stripePriceId === "string" && data.stripePriceId ? data.stripePriceId : process.env.ACADEMY_STRIPE_PRICE_ID ?? "") };
 }
 
 export async function setAcademyPricing(mode: unknown, cents: unknown, stripePriceId: unknown, actorUid: string) {
@@ -259,6 +264,10 @@ export async function setAcademyPricing(mode: unknown, cents: unknown, stripePri
   if (!Number.isSafeInteger(amount) || amount < 100 || amount > 100_000) throw new AcademyError("Enter monthly tuition between $1 and $1,000.");
   const priceId = String(stripePriceId ?? "").trim();
   if (priceId && !/^price_[A-Za-z0-9]+$/.test(priceId)) throw new AcademyError("Enter a valid Stripe recurring Price ID or leave it blank.");
+  if (process.env.ACADEMY_STRIPE_BILLING_MODE === "live" && process.env.ACADEMY_STRIPE_PRICE_ID &&
+      (mode !== "per_child" || amount !== ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD || priceId !== process.env.ACADEMY_STRIPE_PRICE_ID)) {
+    throw new AcademyError("Live Academy tuition is fixed at $50 per child with the approved Stripe price. Update the release configuration before changing it.", 409);
+  }
   await academyDb().collection(settings).doc("config").set({ tuitionMode: mode, monthlyCents: amount, stripePriceId: priceId,
     updatedBy: actorUid, updatedAt: new Date().toISOString() }, { merge: true });
   return getAcademyPricing();

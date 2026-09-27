@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
+import { academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 
 function academyBillingMode(): "test" | "live" {
@@ -48,6 +48,9 @@ export async function academyCardConfig() {
 }
 
 export async function startAcademyCheckout(uid: string) {
+  if (process.env.ACADEMY_REGISTRATION_READY !== "true" || !academyRegistrationOpen()) {
+    throw new AcademyError("Academy card enrollment is not open yet.", 403);
+  }
   const family = await getAcademyFamily(uid);
   if (!family || family.paymentChoice !== "card") throw new AcademyError("Register with card billing first.", 409);
   if (family.amountCents === null) throw new AcademyError("Tuition must be confirmed before card setup.", 409);
