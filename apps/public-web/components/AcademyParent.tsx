@@ -2,7 +2,7 @@
 
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { useEffect, useState } from "react";
-import { academyCashReminderStage, dateStringInTimeZone, isCalgaryFirstOfMonth, masjidTimeZone, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, dateStringInTimeZone, isCalgaryFirstOfMonth, masjidTimeZone, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getAcademyClientAuth } from "../lib/academyFirebaseClient";
 import styles from "./AcademyParent.module.css";
 
@@ -20,9 +20,9 @@ export function AcademyParent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [registerAccount, setRegisterAccount] = useState(false);
-  const [form, setForm] = useState<AcademyRegistrationInput>({ guardianName: "", phone: "", email: "", whatsappConsent: false, children: [blankChild()], paymentChoice: "cash" });
+  const [form, setForm] = useState<AcademyRegistrationInput>({ guardianName: "", phone: "", email: "", whatsappConsent: false, children: [blankChild()], paymentChoice: "cash", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false });
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [receipts, setReceipts] = useState<{ number: string; period: string; amountCents: number; receivedAt: string }[]>([]);
+  const [receipts, setReceipts] = useState<{ number: string; period: string; amountCents: number; receivedAt: string; billingMode: "test" | "live" }[]>([]);
   const [payments, setPayments] = useState<AcademyPayment[]>([]);
   const [content, setContent] = useState<AcademyContent | null>(null);
   const [status, setStatus] = useState("");
@@ -183,8 +183,11 @@ export function AcademyParent() {
           </div>)}
           <button className={styles.textButton} disabled={form.children.length >= 8} onClick={() => setForm({ ...form, children: [...form.children, blankChild()] })}>+ Add another child</button>
           <h3>How would you like to pay?</h3><div className={styles.choice}><button className={form.paymentChoice === "cash" ? styles.selected : ""} type="button" onClick={() => setForm({ ...form, paymentChoice: "cash" })}>Pay cash at HBIC</button><button className={form.paymentChoice === "card" ? styles.selected : ""} disabled={!cardAvailable} title={cardAvailable ? "Secure Stripe Checkout" : "Card billing opens after HBIC approves tuition and sandbox testing"} onClick={() => setForm({ ...form, paymentChoice: "card" })}>Pay by card{cardAvailable ? "" : " · not ready"}</button></div>
-          <p className={styles.terms}>Tuition is $50 CAD per child each month. Card enrollment charges {isCalgaryFirstOfMonth(new Date()) ? "the full monthly amount" : "a prorated first amount"} today, then renews automatically on the 1st. Cash is due in person on the 1st. You can cancel a child&apos;s future enrollment at any time; current paid-period access continues to its end.</p>
-          <button className={styles.primary} disabled={busy} onClick={() => void submit()}>Send registration</button>
+          <p className={styles.terms}>Tuition is $50 CAD per child each month. Card enrollment charges {isCalgaryFirstOfMonth(new Date()) ? "the full monthly amount" : "a prorated first amount"} today, then renews automatically on the 1st. Cash is due in person on the 1st.</p>
+          <details className={styles.policy} open><summary>Quran Academy Tuition &amp; Payment Policy</summary>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Policy version {ACADEMY_TUITION_POLICY_VERSION}</small></details>
+          <label className={styles.check}><input type="checkbox" checked={form.policyAccepted} onChange={(e) => setForm({ ...form, policyAccepted: e.target.checked })} /> I have read and agree to the HBIC Quran Academy Tuition &amp; Payment Policy.</label>
+          {form.paymentChoice === "card" ? <label className={styles.check}><input type="checkbox" checked={form.recurringAuthorized} onChange={(e) => setForm({ ...form, recurringAuthorized: e.target.checked })} /> I authorize recurring monthly tuition charges for my enrolled children until cancelled under this policy.</label> : null}
+          <button className={styles.primary} disabled={busy || !form.policyAccepted || (form.paymentChoice === "card" && !form.recurringAuthorized)} onClick={() => void submit()}>Send registration</button>
         </> : <><div className={styles.familyHeading}><div><span className={styles.eyebrow}>YOUR ACADEMY HOME</span><h2>{family.guardianName}</h2><p>{family.reference} · {family.enrollmentState}</p></div><button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Sign out</button></div>
           {cashReminder ? <p className={styles.terms} role="status">{cashReminder === "due" ? "Academy cash tuition is due today, the 1st. Please pay at HBIC; staff will record your receipt." : "Academy cash tuition for next month is due on the 1st. Please plan to pay in person at HBIC."}</p> : null}
           {nextClass ? <div className={styles.summary}><div><small>NEXT CLASS</small><strong>{nextClass.title}</strong><span>{nextClass.date} · 6:00–7:30 p.m.</span></div>
@@ -195,17 +198,19 @@ export function AcademyParent() {
           <h3>Enrollment</h3><ul>{family.children.map((child) => <li key={child.id}>{child.name}{child.cancelEffectiveAt ? ` · Ends ${new Date(child.cancelEffectiveAt).toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })}` : <button className={styles.textButton} disabled={busy} onClick={() => void cancelChild(child.id, child.name)}>Cancel this child&apos;s enrollment</button>}</li>)}</ul>
           {family.paymentChoice === "card" && cardAvailable ? <button className={styles.primary} onClick={() => void beginBilling(family.paymentState === "paid" ? "portal" : "checkout").catch((error) => setStatus(error instanceof Error ? error.message : "Billing unavailable."))}>{family.paymentState === "paid" ? "Update payment card" : "Complete secure card setup"}</button> : null}
           {payments.length ? <><h3>Payment history</h3><ul>{payments.map((payment) => <li key={payment.period}>{payment.period} · {money(payment.amountCents)} · {payment.method === "card" ? "Card" : "Cash"} · {payment.status.replaceAll("_", " ")}{payment.invoiceUrl ? <> · <a href={payment.invoiceUrl} target="_blank" rel="noopener noreferrer">View Stripe invoice</a></> : null}</li>)}</ul></> : null}
+          <details className={styles.policy}><summary>Tuition &amp; Payment Policy</summary>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Accepted {family.policyVersion ?? "earlier terms"}{family.policyAcceptedAt ? ` · ${new Date(family.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</small></details>
           {content?.classes.length ? <><h3>My classes</h3><ul>{content.classes.map((item) => <li key={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime} · {item.room}</li>)}</ul></> : null}
           {content?.announcements.length ? <><h3>Announcements</h3><ul>{content.announcements.slice(0, 3).map((item) => <li key={item.id}><strong>{item.title}</strong> — {item.message}</li>)}</ul></> : null}
           {content?.calendar.length ? <><h3>Calendar</h3><ul>{content.calendar.filter((item) => item.date >= new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })).slice(0, 5).map((item) => <li key={item.id}>{item.date} · {item.title} ({item.type.replace("_", " ")})</li>)}</ul></> : null}
           <h3>Academy pass</h3><p>Show this code at the desk. Staff scan the live record; a screenshot&apos;s printed payment status is never proof of payment.</p>
           {family.passToken ? qrUrl ? <img className={styles.qr} src={qrUrl} alt="Private Academy pass QR code for HBIC staff scanning" /> : <p>Preparing your pass…</p> : <p>This pass is inactive. Please contact HBIC.</p>}
           <p className={styles.reference}>Registration {family.reference}</p>
-          {receipts.length ? <><h3>Cash receipts</h3><ul>{receipts.map((receipt) => <li key={receipt.number}>{receipt.period} · {money(receipt.amountCents)} · Paid {new Date(receipt.receivedAt).toLocaleDateString("en-CA")} · {receipt.number}</li>)}</ul></> : null}
+          {receipts.length ? <><h3>Cash receipts</h3><ul>{receipts.map((receipt) => <li key={receipt.number}>{receipt.billingMode === "test" ? "TEST PAYMENT RECEIPT · " : ""}{receipt.period} · {money(receipt.amountCents)} · Paid {new Date(receipt.receivedAt).toLocaleDateString("en-CA")} · {receipt.number}</li>)}</ul></> : null}
         </>}
         {status ? <p className={styles.status} role="status">{status}</p> : null}
       </section>
       <aside className={styles.side}><span className={styles.eyebrow}>MADE FOR FAMILIES</span><h2>Learning with clarity.</h2><p>Registration, class updates, and current payments live in one calm place. Prayer times remain at the heart of the Masjid Bilal app.</p><div className={styles.sideItem}>01 <span>One form for all your children</span></div><div className={styles.sideItem}>02 <span>A current, scannable Academy pass</span></div><div className={styles.sideItem}>03 <span>Class information from HBIC</span></div></aside>
     </div>
+    <section className={styles.publicPolicy} id="tuition-policy" aria-label="Quran Academy Tuition and Payment Policy"><h2>Tuition &amp; Payment Policy</h2><p>Clear terms for every family, before registration.</p>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Version {ACADEMY_TUITION_POLICY_VERSION}</small></section>
   </main>;
 }

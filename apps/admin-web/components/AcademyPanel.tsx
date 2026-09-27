@@ -30,6 +30,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
   const [tuitionMode, setTuitionMode] = useState<"per_child" | "per_family">("per_child");
   const [monthlyDollars, setMonthlyDollars] = useState("");
   const [stripePriceId, setStripePriceId] = useState("");
+  const [billingMode, setBillingMode] = useState<"test" | "live" | null>(null);
   const [classes, setClasses] = useState<AcademyClass[]>([]);
   const [calendar, setCalendar] = useState<AcademyCalendar[]>([]);
   const [announcements, setAnnouncements] = useState<AcademyAnnouncement[]>([]);
@@ -59,6 +60,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
       if (pricing.pricing.tuitionMode) setTuitionMode(pricing.pricing.tuitionMode);
       if (pricing.pricing.monthlyCents) setMonthlyDollars(String(pricing.pricing.monthlyCents / 100));
       setStripePriceId(pricing.pricing.stripePriceId ?? "");
+      setBillingMode(pricing.billingMode === "live" ? "live" : "test");
     }
     catch (error) { setMessage(error instanceof Error ? error.message : "Unable to load Academy records."); }
     finally { setBusy(false); }
@@ -102,7 +104,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
     setBusy(true);
     try {
       const data = await adminRequest("/api/admin/academy/cash", { method: "POST", body: JSON.stringify({ familyId: scanned.id, period: scanned.billingPeriod }) });
-      setMessage(`Cash received. Receipt ${data.receipt.number} was recorded.`);
+      setMessage(`${data.receipt.billingMode === "test" ? "TEST PAYMENT RECEIPT" : "Cash received"}. Receipt ${data.receipt.number} was recorded.`);
       await scan(scanned.passToken);
       await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not record cash."); }
@@ -166,7 +168,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
   const outstandingCents = families.reduce((total, family) => total + (["cash_due", "card_attention"].includes(family.paymentState) ? family.amountCents ?? 0 : 0), 0);
 
   return <section className="academy-admin">
-    <div className="academy-admin-head"><div><h2>Quran Academy</h2><p>Child records require a personal administrator account with MFA.</p></div><button className="secondary" onClick={() => void load()} disabled={busy}>Load Academy records</button></div>
+    <div className="academy-admin-head"><div><h2>Quran Academy</h2>{billingMode === "test" ? <strong className="academy-admin-test-mode">SANDBOX · TEST PAYMENTS ONLY</strong> : null}<p>Child records require a personal administrator account with MFA.</p></div><button className="secondary" onClick={() => void load()} disabled={busy}>Load Academy records</button></div>
     <div className="academy-admin-stats"><div><strong>{families.length}</strong><span>Families loaded</span></div><div><strong>{families.reduce((total, item) => total + item.children.length, 0)}</strong><span>Children</span></div><div><strong>{cashDue}</strong><span>Cash due</span></div><div><strong>{paid}</strong><span>Paid this month</span></div><div><strong>{amount(collectedCents)}</strong><span>Collected · loaded families</span></div><div><strong>{amount(outstandingCents)}</strong><span>Outstanding · loaded families</span></div></div>
     <div className="academy-admin-grid"><div className="academy-admin-card"><h3>Scan Academy pass</h3><p>Live payment status always comes from the server, never from text on a screenshot.</p>
       <label>QR link or token<input value={scanInput} onChange={(event) => setScanInput(event.target.value)} placeholder="https://hbic.ca/a/…" /></label>
@@ -176,7 +178,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
         <ul>{scanned.children.map((child) => <li key={child.id}>{child.name} · Age {child.age} · {child.level.replace("_", " ")}
           <select aria-label={`Class for ${child.name}`} value={child.classId ?? ""} onChange={(event) => void assignChild(child.id, event.target.value)}><option value="">Awaiting class</option>{classes.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}</option>)}</select>
         </li>)}</ul>
-        <div className="academy-admin-payment"><strong>{scanned.paymentState === "paid" ? "✓ PAID" : scanned.paymentState === "cash_due" ? "CASH DUE" : "TUITION PENDING"}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.paymentChoice}</span></div>
+        <div className="academy-admin-payment"><strong>{scanned.paymentState === "paid" ? "✓ PAID" : scanned.paymentState === "cash_due" ? "CASH DUE" : "TUITION PENDING"}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.paymentChoice}</span><span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div>
         {scanned.paymentChoice === "cash" && scanned.paymentState === "cash_due" ? <button className="primary" onClick={() => void receiveCash()} disabled={busy}>Mark cash received</button> : null}
         <button className="secondary" onClick={() => void replacePass()} disabled={busy}>Replace lost pass</button>
       </div> : null}

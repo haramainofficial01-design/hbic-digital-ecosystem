@@ -63,6 +63,9 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     whatsappConsent: data.whatsappConsent === true,
     children,
     paymentChoice: data.paymentChoice as AcademyPublicFamily["paymentChoice"],
+    policyVersion: typeof data.policyVersion === "string" ? data.policyVersion : undefined,
+    policyAcceptedAt: typeof data.policyAcceptedAt === "string" ? data.policyAcceptedAt : undefined,
+    recurringAuthorizedAt: typeof data.recurringAuthorizedAt === "string" ? data.recurringAuthorizedAt : null,
     enrollmentState: hasCurrentChild ? data.enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
     billingPeriod: String(month?.period ?? calgaryBillingPeriod(new Date())),
     amountCents: typeof month?.amountCents === "number" ? month.amountCents : null,
@@ -124,6 +127,8 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   const now = new Date().toISOString();
   const family = {
     ...input,
+    policyAcceptedAt: now,
+    recurringAuthorizedAt: input.paymentChoice === "card" ? now : null,
     children: input.children.map((child) => ({ ...child, id: randomBytes(8).toString("hex"), classId: null, cancelEffectiveAt: null })),
     reference: reference(),
     enrollmentState: "submitted",
@@ -191,6 +196,7 @@ export async function receiveAcademyCash(uid: string, period: string, actor: { u
     const receipt = {
       number: `QA-R-${randomBytes(6).toString("hex").toUpperCase()}`,
       familyId: uid, period, amountCents, method: "cash", receivedAt: now,
+      billingMode: process.env.ACADEMY_STRIPE_BILLING_MODE === "live" ? "live" : "test",
       receivedBy: actor.uid, receivedByEmail: actor.email
     };
     tx.update(monthRef, { status: "paid", paidAt: now, receiptId: receiptRef.id });
@@ -214,7 +220,7 @@ export async function getAcademyReceipts(uid: string) {
   return snapshot.docs.map((doc) => {
     const data = doc.data();
     return { number: String(data.number), period: String(data.period), amountCents: Number(data.amountCents),
-      method: "cash" as const, receivedAt: String(data.receivedAt) };
+      method: "cash" as const, receivedAt: String(data.receivedAt), billingMode: data.billingMode === "live" ? "live" as const : "test" as const };
   }).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
 }
 

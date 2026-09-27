@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export function OPTIONS() { return optionsResponse(); }
 
 export async function GET(request: Request) {
-  try { await academyAdmin(request); return jsonResponse({ ok: true, pricing: await getAcademyPricing() }); }
+  try { await academyAdmin(request); return jsonResponse({ ok: true, pricing: await getAcademyPricing(), billingMode: process.env.ACADEMY_STRIPE_BILLING_MODE === "live" ? "live" : "test" }); }
   catch (error) { return jsonResponse({ ok: false, error: error instanceof Error ? error.message : "Unavailable." }, { status: error instanceof AcademyError ? error.status : 500 }); }
 }
 

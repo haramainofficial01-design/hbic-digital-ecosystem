@@ -9,6 +9,16 @@ export const ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD = 5_000;
 export const ACADEMY_REGISTRATION_OPEN_DATE = "2026-10-01";
 export const ACADEMY_FIRST_CLASS_DATE = "2026-10-05";
 export const ACADEMY_FIRST_FUN_CLASS_DATE = "2026-10-15";
+/** Immutable copy: increment the version and retain this text if terms change. */
+export const ACADEMY_TUITION_POLICY_VERSION = "academy-payment-policy-v1";
+export const ACADEMY_TUITION_POLICY = [
+  { title: "Monthly tuition", body: "Tuition is CAD $50 total per enrolled child each month. HBIC does not add GST or another tax on top. The amount due is shown before card checkout or cash payment." },
+  { title: "Card payments", body: "Card enrollment charges the prorated first amount immediately when registration is mid-month, then renews on the 1st. You authorize recurring monthly charges until that child's enrollment is cancelled. Stripe processes card details; HBIC does not store full card numbers or CVV." },
+  { title: "Cash payments", body: "Cash is paid in person at HBIC on the 1st. Bring your Academy pass. Payment is recorded only after authorized staff receive and confirm the cash; a receipt follows confirmation." },
+  { title: "Payment standing", body: "Each child's tuition is tracked separately. If a card charge fails or cash is overdue, HBIC will contact you to resolve it. A payment-success screen or pass screenshot is not proof of payment; the current Academy record is authoritative." },
+  { title: "Cancellation and refunds", body: "You can cancel an individual child's future enrollment at any time. Future renewals for that child stop; access already paid for continues through the current period. Refund requests require HBIC administrative review; no automatic refund is promised." },
+  { title: "Classes and changes", body: "Class participation depends on placement, availability and payment standing. HBIC may adjust schedules or terms and will communicate material changes. Any new terms require a new policy version and acceptance." }
+] as const;
 
 export function academyRegistrationOpen(now = new Date()): boolean {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
@@ -45,6 +55,9 @@ export interface AcademyRegistrationInput {
   whatsappConsent: boolean;
   children: AcademyChildInput[];
   paymentChoice: AcademyPaymentChoice;
+  policyVersion: typeof ACADEMY_TUITION_POLICY_VERSION;
+  policyAccepted: boolean;
+  recurringAuthorized: boolean;
 }
 
 export interface AcademyPublicFamily {
@@ -56,6 +69,9 @@ export interface AcademyPublicFamily {
   whatsappConsent: boolean;
   children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null })[];
   paymentChoice: AcademyPaymentChoice;
+  policyVersion?: string;
+  policyAcceptedAt?: string;
+  recurringAuthorizedAt?: string | null;
   enrollmentState: AcademyEnrollmentState;
   billingPeriod: string;
   amountCents: number | null;
@@ -106,6 +122,8 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid email address.");
   if (typeof value.whatsappConsent !== "boolean") throw new Error("Choose whether to receive WhatsApp updates.");
   if (value.paymentChoice !== "cash" && value.paymentChoice !== "card") throw new Error("Choose card or cash.");
+  if (value.policyVersion !== ACADEMY_TUITION_POLICY_VERSION || value.policyAccepted !== true) throw new Error("Read and accept the current Academy tuition policy.");
+  if (value.paymentChoice === "card" && value.recurringAuthorized !== true) throw new Error("Authorize recurring card tuition before continuing.");
   if (!Array.isArray(value.children) || value.children.length < 1 || value.children.length > 8) {
     throw new Error("Add between one and eight children.");
   }
@@ -119,5 +137,6 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
     if (level !== "qaida" && level !== "quran" && level !== "not_sure") throw new Error("Choose each child's Quran level.");
     return { name, age, level: level as AcademyLevel };
   });
-  return { guardianName, phone, email, whatsappConsent: value.whatsappConsent, children, paymentChoice: value.paymentChoice };
+  return { guardianName, phone, email, whatsappConsent: value.whatsappConsent, children, paymentChoice: value.paymentChoice,
+    policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
 }

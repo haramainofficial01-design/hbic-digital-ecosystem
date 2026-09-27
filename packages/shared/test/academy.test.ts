@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -8,6 +8,9 @@ const valid = {
   email: "Parent@example.com",
   whatsappConsent: false,
   paymentChoice: "cash",
+  policyVersion: ACADEMY_TUITION_POLICY_VERSION,
+  policyAccepted: true,
+  recurringAuthorized: false,
   children: [{ name: "Ahmed Shafiq", age: 8, level: "qaida" }, { name: "Maryam Shafiq", age: 11, level: "not_sure" }]
 };
 
@@ -22,6 +25,14 @@ test("Academy rejects missing consent choice, invalid ages and excess children",
   assert.throws(() => parseAcademyRegistration({ ...valid, whatsappConsent: undefined }), /WhatsApp/);
   assert.throws(() => parseAcademyRegistration({ ...valid, children: [{ ...valid.children[0], age: 2 }] }), /age/);
   assert.throws(() => parseAcademyRegistration({ ...valid, children: Array(9).fill(valid.children[0]) }), /eight/);
+});
+
+test("Academy requires current policy acceptance and distinct recurring card authorization", () => {
+  assert.throws(() => parseAcademyRegistration({ ...valid, policyAccepted: false }), /policy/);
+  assert.throws(() => parseAcademyRegistration({ ...valid, policyVersion: "outdated" }), /policy/);
+  assert.throws(() => parseAcademyRegistration({ ...valid, paymentChoice: "card" }), /Authorize/);
+  assert.equal(parseAcademyRegistration({ ...valid, paymentChoice: "card", recurringAuthorized: true }).recurringAuthorized, true);
+  assert.equal(parseAcademyRegistration(valid).recurringAuthorized, false);
 });
 
 test("Billing periods follow Calgary, including UTC month rollover and DST", () => {
