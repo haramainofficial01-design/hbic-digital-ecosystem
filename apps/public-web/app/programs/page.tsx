@@ -51,6 +51,7 @@ function programImagePath(program: ServiceItem) {
 
 export default async function ProgramsPage() {
   const { content } = await getPublishedContent();
+  const academyEnabled = process.env.ACADEMY_PREVIEW_ENABLED === "true";
   const programsById = new Map(content.programs.map((program) => [program.id, program]));
   const publishedPrograms = content.programs.filter(isVisibleItem).length
     ? content.programs.filter(isVisibleItem).map((program) => ({
@@ -62,6 +63,11 @@ export default async function ProgramsPage() {
         const published = programsById.get(program.id);
         return published ? { ...program, title: published.title, description: published.description } : program;
       });
+  const visiblePrograms = academyEnabled ? [
+    { id: "quran-academy", title: "HBIC Qur’an Academy", description: "Register your children, see classes and holidays, and manage Academy tuition in one calm place.",
+      image: "/photos/quran-academy.jpeg", href: "/quran-academy" },
+    ...publishedPrograms.filter((program) => program.id !== "quran-classes" && program.id !== "quran-academy")
+  ] : publishedPrograms;
 
   return (
     <SiteChrome settings={content.settings} contentVersion={content.version}>
@@ -73,7 +79,7 @@ export default async function ProgramsPage() {
         </div>
         <div className="interior-section-intro"><span className="eyebrow">THERE IS ROOM FOR YOU HERE</span><h3>Choose your place to begin.</h3><p>Every program connects back to our community and its everyday needs.</p></div>
         <div className="grid">
-          {publishedPrograms.map((program) => (
+          {visiblePrograms.map((program) => (
             <a className={`card ${program.image ? "image-card" : "dark"}`} href={program.href} key={program.title}>
               {program.image ? <Image src={program.image} alt={`${program.title} at HBIC`} width={1200} height={800} /> : null}
               <span className="kicker">Program</span>

@@ -24,12 +24,13 @@ const secondaryLinks = [
 ] as const;
 
 const quranLink = ["Quran", "/quran"] as const;
+const academyLink = ["Qur’an Academy", "/quran-academy"] as const;
 
 const links = [...primaryLinks, ...secondaryLinks] as const;
 
 type SliderStyle = CSSProperties & { opacity: number };
 
-export function SiteNavigation({ settings, quranEnabled }: { settings: MasjidSettings; quranEnabled: boolean }) {
+export function SiteNavigation({ settings, quranEnabled, academyEnabled }: { settings: MasjidSettings; quranEnabled: boolean; academyEnabled: boolean }) {
   const pathname = usePathname();
   const desktopRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDetailsElement>(null);
@@ -110,7 +111,7 @@ export function SiteNavigation({ settings, quranEnabled }: { settings: MasjidSet
         {navigationLinks(false, primaryLinks)}
         <details className="desktop-more-menu">
           <summary>Explore <span aria-hidden="true">⌄</span></summary>
-          <div className="desktop-more-links">{navigationLinks(false, quranEnabled ? [quranLink, ...secondaryLinks] : secondaryLinks)}</div>
+          <div className="desktop-more-links">{navigationLinks(false, [...(academyEnabled ? [academyLink] : []), ...(quranEnabled ? [quranLink] : []), ...secondaryLinks])}</div>
         </details>
       </div>
       <div className="mobile-nav-actions">
@@ -127,7 +128,7 @@ export function SiteNavigation({ settings, quranEnabled }: { settings: MasjidSet
         </Link>
         <details className="mobile-menu" ref={mobileMenuRef}>
           <summary>Menu</summary>
-          <div className="links mobile-links">{navigationLinks(true, quranEnabled ? [...primaryLinks, quranLink, ...secondaryLinks] : links)}</div>
+          <div className="links mobile-links">{navigationLinks(true, [...primaryLinks, ...(academyEnabled ? [academyLink] : []), ...(quranEnabled ? [quranLink] : []), ...secondaryLinks])}</div>
         </details>
       </div>
     </nav>

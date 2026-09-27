@@ -16,13 +16,14 @@ export async function SiteChrome({
 }) {
   const publication = await getPublicationState();
   const quranEnabled = isQuranPublicEnabled();
+  const academyEnabled = process.env.ACADEMY_PREVIEW_ENABLED === "true";
   return (
     <div
       className="site"
       data-hbic-content-version={contentVersion}
       data-hbic-publication-revision={publication.revision}
     >
-      <SiteNavigation settings={settings} quranEnabled={quranEnabled} />
+      <SiteNavigation settings={settings} quranEnabled={quranEnabled} academyEnabled={academyEnabled} />
       <RouteContent>{children}</RouteContent>
       <footer className="footer">
         <div className="footer-inner">
@@ -32,6 +33,7 @@ export async function SiteChrome({
             <Link href="/prayer-times">Prayer Times</Link>
             <Link href="/events">Events</Link>
             <Link href="/programs">Programs</Link>
+            {academyEnabled ? <Link href="/quran-academy">Qur’an Academy</Link> : null}
             {quranEnabled ? <Link href="/quran">Quran</Link> : null}
             <Link href="/app">The App</Link>
             <Link href="/privacy">Privacy Policy</Link>
