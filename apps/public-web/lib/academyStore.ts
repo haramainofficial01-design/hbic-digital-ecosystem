@@ -108,6 +108,7 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
 }
 
 export async function registerAcademyFamily(uid: string, verifiedEmail: string, raw: unknown) {
+  if (process.env.ACADEMY_REGISTRATION_READY !== "true") throw new AcademyError("Quran Academy registration is not open yet.", 403);
   if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration opens October 1, 2026.", 403);
   const db = academyDb();
   const input: AcademyRegistrationInput = parseAcademyRegistration(raw);
