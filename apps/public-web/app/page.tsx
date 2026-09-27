@@ -5,6 +5,7 @@ import { WelcomeFilm } from "../components/WelcomeFilm";
 import { AppLaunchPromotion } from "../components/AppLaunchPromotion";
 import { getEffectiveJumuahDoorNotice, getPublicEvents, isVisibleItem } from "@hbic/shared";
 import Image from "next/image";
+import Link from "next/link";
 
 export const revalidate = 300;
 
@@ -26,6 +27,7 @@ export default async function HomePage() {
     new Date(),
     content.featureFlags.jumuahDoorNoticeEnabled
   );
+  const academyEnabled = process.env.ACADEMY_PREVIEW_ENABLED === "true";
 
   return (
     <SiteChrome settings={settings} contentVersion={content.version}>
@@ -38,6 +40,20 @@ export default async function HomePage() {
           initialNow={renderedAt}
         />
       </section>
+
+      {academyEnabled ? (
+        <section className="section home-academy-intro" aria-labelledby="home-academy-heading">
+          <div className="home-academy-card">
+            <div className="home-academy-copy">
+              <span className="eyebrow">FOR OUR YOUNG LEARNERS</span>
+              <h2 id="home-academy-heading">HBIC Qur’an Academy</h2>
+              <p>Quran learning, class updates and one simple place for your family’s Academy information. Classes meet Mondays and Thursdays, 6:00–7:30 p.m. Registration opens October 1; classes begin October 5.</p>
+              <Link className="button primary" href="/quran-academy">Explore the Academy <span aria-hidden="true">↗</span></Link>
+            </div>
+            <Image src="/photos/prayer-hall.png" alt="Prayer hall at Masjid Bilal" width={720} height={480} sizes="(max-width: 700px) 100vw, 35vw" />
+          </div>
+        </section>
+      ) : null}
 
       <section className="hero home-story-hero" aria-labelledby="home-story-heading">
         <div className="hero-panel">

@@ -2951,6 +2951,29 @@ body:not(.tv-display-active) { background: #f8f8f4; }
 .interior-section-intro h3 { margin: 10px 0 12px; color: var(--navy); font-family: Georgia,"Times New Roman",serif; font-size: clamp(34px,4vw,58px); line-height: 1.04; }
 .interior-section-intro p { margin: 0; color: var(--muted); font-size: clamp(16px,1.4vw,19px); line-height: 1.6; }
 .home-prayer-first { padding-top: 22px; }
+.home-academy-intro { padding-top: 20px; padding-bottom: 20px; }
+.home-academy-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, .75fr);
+  align-items: center;
+  gap: clamp(20px, 4vw, 64px);
+  overflow: hidden;
+  border: 1px solid #cadad8;
+  border-radius: 32px;
+  background: #f7faf8;
+  box-shadow: 0 18px 48px rgba(13, 50, 57, .08);
+}
+.home-academy-copy { padding: clamp(28px, 5vw, 62px); }
+.home-academy-copy h2 { font: 500 clamp(36px, 4vw, 62px)/1.06 Georgia, serif; letter-spacing: -.04em; color: #0d3142; margin: 14px 0; }
+.home-academy-copy p { max-width: 55ch; color: #496b6b; font-size: clamp(16px, 1.3vw, 19px); line-height: 1.55; margin-bottom: 24px; }
+.home-academy-card img { width: 100%; height: 100%; min-height: 280px; object-fit: cover; object-position: center; }
+.home-academy-copy .button { display: inline-flex; align-items: center; gap: 12px; }
+@media (max-width: 700px) {
+  .home-academy-card { grid-template-columns: 1fr; }
+  .home-academy-card img { height: 230px; min-height: 0; order: -1; }
+  .home-academy-copy { padding: 28px; }
+  .home-academy-copy h2 { font-size: 38px; }
+}
 .home-story-hero { margin-top: 20px; }
 .home-story-hero .hero-panel { min-height: clamp(560px,65vw,760px); border-radius: 38px; padding: clamp(30px,6vw,85px); }
 .home-story-hero .hero-panel::after { background: linear-gradient(90deg,rgba(3,24,39,.85) 0%,rgba(3,24,39,.44) 57%,rgba(3,24,39,.04) 100%),linear-gradient(0deg,rgba(3,24,39,.26),transparent 48%); }

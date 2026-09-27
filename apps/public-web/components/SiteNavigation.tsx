@@ -25,6 +25,8 @@ const secondaryLinks = [
 
 const quranLink = ["Quran", "/quran"] as const;
 const academyLink = ["Qur’an Academy", "/quran-academy"] as const;
+const academyPrimaryLinks = [primaryLinks[0], academyLink, ...primaryLinks.slice(1, -1)] as const;
+const academySecondaryLinks = [primaryLinks[primaryLinks.length - 1], ...secondaryLinks] as const;
 
 const links = [...primaryLinks, ...secondaryLinks] as const;
 
@@ -40,7 +42,7 @@ export function SiteNavigation({ settings, quranEnabled, academyEnabled }: { set
   const isActive = useCallback((href: string) => pathname === href || pathname.startsWith(`${href}/`), [pathname]);
 
   const updateSlider = useCallback(() => {
-    const activeLink = primaryLinks.find(([, href]) => isActive(href));
+    const activeLink = (academyEnabled ? academyPrimaryLinks : primaryLinks).find(([, href]) => isActive(href));
     const container = desktopRef.current;
     const element = activeLink ? linkRefs.current[activeLink[1]] : null;
     if (!container || !element) {
@@ -55,7 +57,7 @@ export function SiteNavigation({ settings, quranEnabled, academyEnabled }: { set
       width: element.offsetWidth,
       height: element.offsetHeight
     });
-  }, [isActive]);
+  }, [academyEnabled, isActive]);
 
   useLayoutEffect(() => {
     updateSlider();
@@ -108,10 +110,10 @@ export function SiteNavigation({ settings, quranEnabled, academyEnabled }: { set
       </Link>
       <div className="links desktop-links nav-links" ref={desktopRef}>
         <span className="nav-slider" style={sliderStyle} aria-hidden="true" />
-        {navigationLinks(false, primaryLinks)}
+        {navigationLinks(false, academyEnabled ? academyPrimaryLinks : primaryLinks)}
         <details className="desktop-more-menu">
           <summary>Explore <span aria-hidden="true">⌄</span></summary>
-          <div className="desktop-more-links">{navigationLinks(false, [...(academyEnabled ? [academyLink] : []), ...(quranEnabled ? [quranLink] : []), ...secondaryLinks])}</div>
+          <div className="desktop-more-links">{navigationLinks(false, [...(quranEnabled ? [quranLink] : []), ...(academyEnabled ? academySecondaryLinks : secondaryLinks)])}</div>
         </details>
       </div>
       <div className="mobile-nav-actions">
@@ -128,7 +130,7 @@ export function SiteNavigation({ settings, quranEnabled, academyEnabled }: { set
         </Link>
         <details className="mobile-menu" ref={mobileMenuRef}>
           <summary>Menu</summary>
-          <div className="links mobile-links">{navigationLinks(true, [...primaryLinks, ...(academyEnabled ? [academyLink] : []), ...(quranEnabled ? [quranLink] : []), ...secondaryLinks])}</div>
+          <div className="links mobile-links">{navigationLinks(true, [...(academyEnabled ? academyPrimaryLinks : primaryLinks), ...(quranEnabled ? [quranLink] : []), ...(academyEnabled ? academySecondaryLinks : secondaryLinks)])}</div>
         </details>
       </div>
     </nav>
