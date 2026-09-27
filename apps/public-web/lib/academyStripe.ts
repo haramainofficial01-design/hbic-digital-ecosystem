@@ -24,9 +24,27 @@ export function cardBillingConfigured() {
     /^whsec_/.test(process.env.ACADEMY_STRIPE_WEBHOOK_SECRET ?? "");
 }
 
+let verifiedPrice: { id: string; monthlyCents: number; mode: "test" | "live"; checkedAt: number; valid: boolean } | null = null;
+
 export async function academyCardConfig() {
   const pricing = await getAcademyPricing();
-  return { cardAvailable: cardBillingConfigured() && /^price_[A-Za-z0-9]+$/.test(pricing.stripePriceId), ...pricing };
+  if (!cardBillingConfigured() || !/^price_[A-Za-z0-9]+$/.test(pricing.stripePriceId)) {
+    return { cardAvailable: false, ...pricing };
+  }
+  const mode = academyBillingMode();
+  const cached = verifiedPrice;
+  if (cached?.id === pricing.stripePriceId && cached.monthlyCents === pricing.monthlyCents && cached.mode === mode &&
+      Date.now() - cached.checkedAt < (cached.valid ? 300_000 : 30_000)) {
+    return { cardAvailable: cached.valid, ...pricing };
+  }
+  let valid = false;
+  try {
+    const price = await academyStripe().prices.retrieve(pricing.stripePriceId);
+    valid = price.active === true && price.livemode === (mode === "live") && price.currency === "cad" &&
+      price.unit_amount === pricing.monthlyCents && price.recurring?.interval === "month";
+  } catch { /* Keep card registration closed when Stripe credentials or pricing cannot be verified. */ }
+  verifiedPrice = { id: pricing.stripePriceId, monthlyCents: pricing.monthlyCents, mode, checkedAt: Date.now(), valid };
+  return { cardAvailable: valid, ...pricing };
 }
 
 export async function startAcademyCheckout(uid: string) {
