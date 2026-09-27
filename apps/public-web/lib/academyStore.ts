@@ -167,6 +167,7 @@ export async function scanAcademyPass(token: string, actorUid: string) {
   const family = await getAcademyFamily(String(pass.data()?.uid));
   if (!family || family.passToken !== token) throw new AcademyError("This Academy pass is no longer current.", 410);
   if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);
+  await db.collection("academyAudit").add({ action: "pass_scanned", familyId: family.id, actorUid, at: new Date().toISOString() });
   return family;
 }
 

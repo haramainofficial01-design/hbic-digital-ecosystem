@@ -166,7 +166,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
   const outstandingCents = families.reduce((total, family) => total + (["cash_due", "card_attention"].includes(family.paymentState) ? family.amountCents ?? 0 : 0), 0);
 
   return <section className="academy-admin">
-    <div className="academy-admin-head"><div><h2>Quran Academy</h2><p>Private preview · child records require a personal administrator account with MFA.</p></div><button className="secondary" onClick={() => void load()} disabled={busy}>Load Academy records</button></div>
+    <div className="academy-admin-head"><div><h2>Quran Academy</h2><p>Child records require a personal administrator account with MFA.</p></div><button className="secondary" onClick={() => void load()} disabled={busy}>Load Academy records</button></div>
     <div className="academy-admin-stats"><div><strong>{families.length}</strong><span>Families loaded</span></div><div><strong>{families.reduce((total, item) => total + item.children.length, 0)}</strong><span>Children</span></div><div><strong>{cashDue}</strong><span>Cash due</span></div><div><strong>{paid}</strong><span>Paid this month</span></div><div><strong>{amount(collectedCents)}</strong><span>Collected · loaded families</span></div><div><strong>{amount(outstandingCents)}</strong><span>Outstanding · loaded families</span></div></div>
     <div className="academy-admin-grid"><div className="academy-admin-card"><h3>Scan Academy pass</h3><p>Live payment status always comes from the server, never from text on a screenshot.</p>
       <label>QR link or token<input value={scanInput} onChange={(event) => setScanInput(event.target.value)} placeholder="https://hbic.ca/a/…" /></label>
