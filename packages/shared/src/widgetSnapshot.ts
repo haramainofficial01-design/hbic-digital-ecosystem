@@ -4,6 +4,7 @@ import {
   addDays,
   dateStringInTimeZone,
   getIqamahForPrayer,
+  getIqamahForPrayerDate,
   getNextPrayerFocus,
   getPrayerScheduleState,
   getUpcomingWhiteDays,
@@ -91,6 +92,7 @@ export interface WidgetPrayerSnapshot {
   nextPrayerTime: string;
   nextPrayerDate: string;
   tomorrowFajrDate?: string;
+  tomorrowFajrIqamah?: string;
   nextIqamah?: string;
   nextIqamahDate?: string;
   prayers: WidgetPrayerEntry[];
@@ -162,9 +164,6 @@ export function createWidgetPrayerSnapshot(
   });
 
   const nextPrayerState = getNextPrayerFocus(content.prayerTime, content.iqamahTime, now);
-  const nextPrayer = nextPrayerState
-    ? prayers.find((entry) => entry.key === nextPrayerState.name)
-    : undefined;
   const nextIqamahDateValue = nextPrayerState?.iqamahDate ?? null;
   const currentPrayer = [...prayers]
     .filter((entry) => entry.key !== "sunrise")
@@ -234,6 +233,9 @@ export function createWidgetPrayerSnapshot(
     content.updatedAt
   );
   const tomorrowFajr = timeToDate(addDays(scheduleDate, 1), content.prayerTime.fajr);
+  const tomorrowFajrIqamah = tomorrowFajr
+    ? getIqamahForPrayerDate("fajr", content.iqamahTime, addDays(scheduleDate, 1), tomorrowFajr, now)
+    : undefined;
   const expiresAt = timeToDate(addDays(scheduleDate, 1), "12:00 AM");
   const availability = nextPrayerState && prayers.length ? "available" : "unavailable";
   const stale = options.cached === true || availability === "unavailable";
@@ -295,7 +297,8 @@ export function createWidgetPrayerSnapshot(
     nextPrayerTime: nextPrayerState?.time ?? "Unavailable",
     nextPrayerDate: nextPrayerState?.date.toISOString() ?? "",
     tomorrowFajrDate: tomorrowFajr?.toISOString(),
-    nextIqamah: nextPrayer?.iqamah,
+    tomorrowFajrIqamah,
+    nextIqamah: nextPrayerState?.iqamahTime,
     nextIqamahDate: nextIqamahDateValue?.toISOString(),
     prayers,
     jumuah,

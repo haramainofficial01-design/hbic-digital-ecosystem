@@ -257,7 +257,9 @@ export function createPrayerNotificationPlan(
       const todayFajr = snapshot.prayers.find((entry) => entry.key === "fajr");
       if (todayFajr) {
         append(
-          { ...todayFajr, adhanDate: snapshot.tomorrowFajrDate },
+          { ...todayFajr, adhanDate: snapshot.tomorrowFajrDate,
+            iqamah: snapshot.tomorrowFajrIqamah ?? todayFajr.iqamah,
+            iqamahDate: snapshot.nextPrayerKey === "fajr" ? snapshot.nextIqamahDate : undefined },
           "fajr",
           nextServiceDate
         );

@@ -24,6 +24,24 @@ export function getIqamahForPrayer(prayer: PrayerName, iqamah: IqamahTime): stri
   return iqamah[key] as string;
 }
 
+/** Sunday uses the feed's next-week iqamah when Saturday's final prayer has passed. */
+export function getIqamahForPrayerDate(
+  prayer: PrayerName, iqamah: IqamahTime, targetDate: string, targetInstant: Date, now = new Date(), timeZone = masjidTimeZone
+): string | undefined {
+  const today = dateStringInTimeZone(now, timeZone);
+  const targetDay = new Date(`${targetDate}T12:00:00Z`).getUTCDay();
+  const todayDay = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (prayer === "sunrise" || todayDay !== 6 || targetDay !== 0 || targetDate !== addDays(today, 1)) {
+    return getIqamahForPrayer(prayer, iqamah);
+  }
+  const override = iqamah.overrides?.[prayer];
+  const time = targetInstant.getTime();
+  if (override?.enabled && override.value?.trim() &&
+      (!override.startsAt || Date.parse(override.startsAt) <= time) &&
+      (!override.endsAt || Date.parse(override.endsAt) > time)) return override.value.trim();
+  return iqamah.upcomingWeekIqamah?.[prayer] || getIqamahForPrayer(prayer, iqamah);
+}
+
 export function parseClock(time: string): ClockTime | null {
   const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return null;
@@ -388,7 +406,7 @@ export function getNextPrayerFocus(
     entry: { name: Exclude<PrayerName, "sunrise">; label: string; time: string; date: Date },
     scheduleDate: string
   ): NextPrayerFocus | null => {
-    const iqamahTime = getIqamahForPrayer(entry.name, iqamah);
+    const iqamahTime = getIqamahForPrayerDate(entry.name, iqamah, scheduleDate, entry.date, now, timeZone);
     const iqamahDate = iqamahTime ? timeToDate(scheduleDate, iqamahTime, timeZone) : null;
     const validIqamah = Boolean(iqamahDate && iqamahDate.getTime() > entry.date.getTime());
     if (now.getTime() < entry.date.getTime()) {

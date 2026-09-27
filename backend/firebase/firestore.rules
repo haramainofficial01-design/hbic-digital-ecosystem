@@ -113,6 +113,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Academy family and child records are accessed only through authenticated
+    // server routes, which enforce parent ownership or personal admin MFA.
+    match /academyFamilies/{uid}/{document=**} { allow read, write: if false; }
+    match /academyPasses/{document=**} { allow read, write: if false; }
+    match /academySettings/{document=**} { allow read, write: if false; }
+    match /academyReceipts/{document=**} { allow read, write: if false; }
+    match /academyAudit/{document=**} { allow read, write: if false; }
+    match /academyScanRates/{document=**} { allow read, write: if false; }
+    match /academyClasses/{document=**} { allow read, write: if false; }
+    match /academyCalendar/{document=**} { allow read, write: if false; }
+    match /academyAnnouncements/{document=**} { allow read, write: if false; }
+    match /academyDeviceOwners/{document=**} { allow read, write: if false; }
+    match /academyBillingLocks/{document=**} { allow read, write: if false; }
+    match /academyStripeEvents/{document=**} { allow read, write: if false; }
+    match /academyReminderRuns/{document=**} { allow read, write: if false; }
+
     match /notificationTokens/{tokenId} {
       allow create: if signedIn();
       allow read, update, delete: if signedIn() && resource.data.uid == request.auth.uid;

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { createWidgetPrayerSnapshot } from "@hbic/shared";
 import { getDraftContent, getDatabase, getPublishedContentVersion } from "../../../../lib/contentStore";
-import { forcePrayerSync, getPrayerSyncStatus } from "../../../../lib/prayerSync";
+import { applyPrayerSync, forcePrayerSync } from "../../../../lib/prayerSync";
 import { sendContentUpdateSignal } from "../../../../lib/notificationStore";
 import { recordPublicationUpdate } from "../../../../lib/publicationStore";
 import { jsonResponse, optionsResponse, requireAdminSecret } from "../../../../lib/api";
@@ -18,7 +18,9 @@ export async function GET(request: Request) {
 
   const db = getDatabase();
   const { content, status } = await getDraftContent();
-  const prayerSync = await getPrayerSyncStatus(content, db);
+  // The panel must describe the same resolved feed used by the public display,
+  // even when the diagnostic cache document has not been populated yet.
+  const prayerSync = (await applyPrayerSync(content, db)).status;
   return jsonResponse({ ok: true, backend: status, prayerSync });
 }
 

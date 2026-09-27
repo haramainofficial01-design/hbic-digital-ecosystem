@@ -241,8 +241,9 @@ export function deriveNextDisplayPrayer(snapshot: WidgetPrayerSnapshot, now: Dat
   const tomorrowFajr = snapshot.tomorrowFajrDate ? new Date(snapshot.tomorrowFajrDate) : null;
   if (!fajr || !tomorrowFajr || !Number.isFinite(tomorrowFajr.getTime())) return null;
   const tomorrowDate = addDays(snapshot.serviceDate, 1);
-  const iqamahDate = fajr.iqamah ? timeToDate(tomorrowDate, fajr.iqamah, masjidTimeZone) ?? undefined : undefined;
-  return { entry: fajr, date: tomorrowFajr, iqamahDate };
+  const iqamah = snapshot.tomorrowFajrIqamah ?? fajr.iqamah;
+  const iqamahDate = iqamah ? timeToDate(tomorrowDate, iqamah, masjidTimeZone) ?? undefined : undefined;
+  return { entry: { ...fajr, iqamah }, date: tomorrowFajr, iqamahDate };
 }
 
 /**

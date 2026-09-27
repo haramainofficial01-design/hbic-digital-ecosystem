@@ -3,6 +3,9 @@
   "installCommand": "npm install --legacy-peer-deps --ignore-scripts --no-audit --fund=false",
   "buildCommand": "npm run build:web",
   "outputDirectory": "apps/public-web/.next",
+  "crons": [
+    { "path": "/api/academy/cash-reminders", "schedule": "0 15 * * *" }
+  ],
   "alias": [
     "hbic-calgary.vercel.app",
     "hbic-calgary-app.vercel.app",

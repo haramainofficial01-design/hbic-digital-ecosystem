@@ -27,7 +27,8 @@ const allowedRoutes = new Set<NotificationRoute>([
   "/more",
   "/community",
   "/halal-restaurants",
-  "/notifications"
+  "/notifications",
+  "/quran-academy"
 ]);
 
 export function isNotificationPermissionAuthorized(permission: RuntimeNotificationPermission) {

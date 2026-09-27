@@ -31,6 +31,7 @@ import {
 } from "@hbic/shared";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FirebaseAdminAuth } from "./FirebaseAdminAuth";
+import { AcademyPanel } from "./AcademyPanel";
 
 const pages = [
   "Dashboard",
@@ -40,6 +41,7 @@ const pages = [
   "Announcements",
   "Events",
   "Programs",
+  "Quran Academy",
   "Donations",
   "Media",
   "Halal Directory",
@@ -429,6 +431,7 @@ export function AdminDashboard() {
         {page === "Announcements" && <AnnouncementsPanel content={content} updateContent={updateContent} />}
         {page === "Events" && <EventsPanel content={content} updateContent={updateContent} />}
         {page === "Programs" && <ProgramsPanel content={content} updateContent={updateContent} />}
+        {page === "Quran Academy" && <AcademyPanel adminRequest={adminRequest} />}
         {page === "Donations" && <DonationsPanel content={content} updateContent={updateContent} />}
         {page === "Media" && <MediaPanel content={content} updateContent={updateContent} />}
         {page === "Halal Directory" && (
@@ -515,12 +518,16 @@ function PrayerPanel({
   const { iqamahTime, prayerTime } = content;
   const [syncStatus, setSyncStatus] = useState<PrayerSyncStatus | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
+  const [livePrayer, setLivePrayer] = useState<Pick<HbicContent, "prayerTime" | "iqamahTime"> | null>(null);
 
   const loadSyncStatus = useCallback(async (force = false) => {
     setSyncMessage("");
     try {
       const data = await adminRequest("/api/admin/prayer-sync", { method: force ? "POST" : "GET" });
       setSyncStatus(data.prayerSync as PrayerSyncStatus);
+      const liveResponse = await fetch(`${apiBase}/api/content/published?prayerPanel=${Date.now()}`, { cache: "no-store" });
+      const live = await liveResponse.json();
+      if (liveResponse.ok && live?.content) setLivePrayer({ prayerTime: live.content.prayerTime, iqamahTime: live.content.iqamahTime });
       setSyncMessage(force
         ? data.propagation?.status === "provider_error"
           ? `Prayer data refreshed, but device propagation needs attention: ${data.propagation.error}`
@@ -637,13 +644,14 @@ function PrayerPanel({
       </div>
 
       <div className="card full">
-        <h2>Current effective adhan</h2>
+        <h2>Live public adhan</h2>
+        <p className="muted">This section reads the published schedule directly. Protected draft edits are separate until published.</p>
         <div className="form-grid">
           {(["fajr", "dhuhr", "asr", "maghrib", "isha", "sunrise"] as const).map((key) => (
             <Field
               key={key}
               label={`${prayerLabels[key]} adhan`}
-              value={prayerTime[key]}
+              value={livePrayer?.prayerTime[key] ?? (syncStatus?.schedule?.effective.adhan[key] || "Live schedule not loaded")}
               onChange={() => undefined}
               disabled
             />
@@ -674,13 +682,9 @@ function PrayerPanel({
         <p className="muted">Enable an override only when HBIC changes a specific iqamah time. Clearing it returns that prayer to the current live timetable value.</p>
         {iqamahOverridePrayers.map((prayer) => {
           const override = iqamahTime.overrides?.[prayer] ?? { enabled: false, value: "" };
-          const effectiveField = `${prayer}Iqamah` as keyof typeof iqamahTime;
-          const automatic = syncStatus?.schedule?.automatic.iqamah[prayer] ?? "Load status to view";
-          const effective = isOverrideCurrentlyActive(override)
-            ? override.value
-            : syncStatus?.schedule?.effective.iqamah[prayer] ?? (automatic === "Load status to view"
-              ? String(iqamahTime[effectiveField] ?? "")
-              : automatic);
+          const effectiveField = `${prayer}Iqamah` as "fajrIqamah" | "dhuhrIqamah" | "asrIqamah" | "maghribIqamah" | "ishaIqamah";
+          const automatic = syncStatus?.schedule?.automatic.iqamah[prayer] || "Live source value unavailable";
+          const effective = livePrayer?.iqamahTime[effectiveField] || syncStatus?.schedule?.effective.iqamah[prayer] || "Live schedule not loaded";
           return (
             <div className="card full" key={prayer}>
               <h3>{prayerLabels[prayer]}</h3>

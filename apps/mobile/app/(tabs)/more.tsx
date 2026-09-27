@@ -11,7 +11,7 @@ import { brandAssets } from "../../src/constants/assets";
 import { usePublishedContent } from "../../src/services/content";
 import { spacing } from "../../src/theme/theme";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
-import { quranEnabled } from "../../src/config/releaseFeatures";
+import { academyEnabled, quranEnabled } from "../../src/config/releaseFeatures";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -54,7 +54,7 @@ export default function MoreScreen() {
       </GlassCard>
 
       <AdaptiveGrid>
-        {(quranEnabled ? [{ title: "Quran", subtitle: "Read, listen, search, and bookmark", icon: "book-outline" as IconName, route: "/quran" }, ...menuItems] : menuItems).map((item) => (
+        {[...(academyEnabled ? [{ title: "Quran Academy", subtitle: "Classes, registration, and your Academy pass", icon: "school-outline" as IconName, route: "/quran-academy" }] : []), ...(quranEnabled ? [{ title: "Quran", subtitle: "Read, listen, search, and bookmark", icon: "book-outline" as IconName, route: "/quran" }] : []), ...menuItems].map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"

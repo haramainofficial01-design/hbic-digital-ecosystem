@@ -7,6 +7,7 @@ import {
   retainPrayerScheduleDuringOutage,
   type PrayerFeed
 } from "../lib/prayerSync";
+import { deriveDisplayFocus } from "../lib/tvDisplay";
 
 const now = new Date("2026-09-08T18:00:00.000Z");
 const sourceUpdatedAt = "2026-09-08T17:59:00.000Z";
@@ -115,4 +116,35 @@ test("G: public content and TV/mobile/Watch/widget snapshot share identical valu
   assert.equal(publicContent.iqamahTime.asrIqamah, resolved.schedule.effective.iqamah.asr);
   assert.equal(asr?.adhan, resolved.schedule.effective.adhan.asr);
   assert.equal(asr?.iqamah, resolved.schedule.effective.iqamah.asr);
+});
+
+test("Saturday after Isha promotes next-week Fajr and Asr across the public schedule", () => {
+  const lateSaturday = new Date("2026-09-27T04:30:00.000Z");
+  const feed = { ...baseFeed, salah_fajr: "5:59 AM", salah_isha: "8:55 PM", iqamah_fajr: "6:20 AM", nw_i_fajr: "6:30 AM", nw_i_asr: "5:15 PM" };
+  const resolved = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-26", lateSaturday.toISOString(), lateSaturday);
+  const snapshot = createWidgetPrayerSnapshot(resolved.content, lateSaturday);
+  assert.equal(resolved.schedule.upcomingWeekEffective, true);
+  assert.equal(resolved.schedule.automatic.iqamah.fajr, "6:30 AM");
+  assert.equal(resolved.content.iqamahTime.asrIqamah, "5:15 PM");
+  assert.equal(snapshot.serviceDate, "2026-09-26");
+  assert.equal(snapshot.prayers.find((entry) => entry.key === "fajr")?.iqamah, "6:30 AM");
+  assert.equal(snapshot.nextPrayerKey, "fajr");
+  assert.equal(snapshot.nextIqamah, "6:30 AM");
+  assert.equal(snapshot.nextIqamahDate, "2026-09-27T12:30:00.000Z");
+  assert.equal(deriveDisplayFocus(snapshot, lateSaturday)?.iqamahDate?.toISOString(), "2026-09-27T12:30:00.000Z");
+});
+
+test("Sunday keeps Saturday's published rollover if the source has not switched yet", () => {
+  const lateSaturday = new Date("2026-09-27T04:30:00.000Z");
+  const sunday = new Date("2026-09-27T13:00:00.000Z");
+  const feed = { ...baseFeed, salah_fajr: "5:59 AM", salah_isha: "8:55 PM", iqamah_fajr: "6:20 AM", iqamah_asr: "5:30 PM", nw_i_fajr: "6:30 AM", nw_i_asr: "5:15 PM" };
+  const saturday = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-26", lateSaturday.toISOString(), lateSaturday);
+  assert.equal(saturday.rollover?.weekStart, "2026-09-27");
+  const staleSunday = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-27", sunday.toISOString(), sunday, saturday.rollover);
+  assert.equal(staleSunday.content.iqamahTime.fajrIqamah, "6:30 AM");
+  assert.equal(staleSunday.content.iqamahTime.asrIqamah, "5:15 PM");
+  const updatedSunday = resolveEffectivePrayerSchedule(defaultContent,
+    { ...feed, iqamah_fajr: "6:35 AM", iqamah_asr: "5:10 PM" }, "live", "2026-09-27", sunday.toISOString(), sunday, saturday.rollover);
+  assert.equal(updatedSunday.content.iqamahTime.fajrIqamah, "6:35 AM");
+  assert.equal(updatedSunday.content.iqamahTime.asrIqamah, "5:10 PM");
 });

@@ -14,3 +14,4 @@ export * from "./i18n";
 export * from "./jumuah";
 export * from "./widgetSnapshot";
 export * from "./qibla";
+export * from "./academy";

@@ -1,10 +1,12 @@
 import type { Firestore } from "firebase-admin/firestore";
 import {
+  addDays,
   dateStringInTimeZone,
   masjidTimeZone,
   normalizeContent,
   parseClock,
   prayerOrder,
+  timeToDate,
   type HbicContent,
   type IqamahOverride,
   type IqamahPrayerName,
@@ -62,6 +64,7 @@ export type IqamahScheduleValues = Record<IqamahPrayerName, string>;
 export interface ResolvedPrayerScheduleView {
   provider: typeof providerName;
   serviceDate: string;
+  upcomingWeekEffective?: boolean;
   automatic: {
     adhan: AdhanScheduleValues;
     iqamah: IqamahScheduleValues;
@@ -98,6 +101,13 @@ type CachedPrayerSync = {
   lastSuccessfulSync?: string;
   lastAttemptedSync?: string;
   lastError?: string | null;
+  rollover?: WeekRollover;
+};
+
+type WeekRollover = {
+  weekStart: string;
+  previous: IqamahScheduleValues;
+  next: IqamahScheduleValues;
 };
 
 const iqamahFieldByPrayer: Record<IqamahPrayerName, keyof HbicContent["iqamahTime"]> = {
@@ -250,7 +260,8 @@ export function resolveEffectivePrayerSchedule(
   sourceState: PrayerSyncStatus["sourceState"],
   serviceDate = dateStringInTimeZone(new Date(), masjidTimeZone),
   sourceUpdatedAt = new Date().toISOString(),
-  now = new Date()
+  now = new Date(),
+  carriedRollover?: WeekRollover
 ) {
   const updatedAt = sourceUpdatedAt;
   const prayerTime = {
@@ -277,16 +288,40 @@ export function resolveEffectivePrayerSchedule(
     isha: resolveIqamahValue(feed.iqamah_isha, prayerTime.isha)
   };
 
+  const resolvedUpcomingWeekIqamah: IqamahScheduleValues = {
+    fajr: resolveIqamahValue(feed.nw_i_fajr, prayerTime.fajr),
+    dhuhr: resolveIqamahValue(feed.nw_i_zuhr, prayerTime.dhuhr),
+    asr: resolveIqamahValue(feed.nw_i_asr, prayerTime.asr),
+    maghrib: resolveIqamahValue(feed.nw_i_maghrib, prayerTime.maghrib),
+    isha: resolveIqamahValue(feed.nw_i_isha, prayerTime.isha)
+  };
+  const weekday = new Date(`${serviceDate}T12:00:00Z`).getUTCDay();
+  const ishaInstant = timeToDate(serviceDate, prayerTime.isha, masjidTimeZone);
+  const saturdayAfterIsha = weekday === 6 && Boolean(ishaInstant && now.getTime() >= ishaInstant.getTime());
+  const newRollover: WeekRollover | undefined = saturdayAfterIsha && Object.values(resolvedUpcomingWeekIqamah).some(Boolean)
+    ? { weekStart: addDays(serviceDate, 1), previous: baseIqamah, next: resolvedUpcomingWeekIqamah }
+    : undefined;
+  const rollover = newRollover ?? carriedRollover;
+  const carryApplies = Boolean(rollover && serviceDate >= rollover.weekStart && serviceDate <= addDays(rollover.weekStart, 6));
+  const upcomingWeekEffective = saturdayAfterIsha || carryApplies;
+  const automaticIqamah: IqamahScheduleValues = Object.fromEntries(
+    (Object.keys(baseIqamah) as IqamahPrayerName[]).map((prayer) => [prayer,
+      saturdayAfterIsha ? resolvedUpcomingWeekIqamah[prayer] || baseIqamah[prayer]
+        : carryApplies && rollover && baseIqamah[prayer] === rollover.previous[prayer]
+          ? rollover.next[prayer] || baseIqamah[prayer] : baseIqamah[prayer]])
+  ) as IqamahScheduleValues;
+
   const overrides = content.iqamahTime.overrides ?? {};
   const activeOverrides = (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[]).filter((prayer) => isOverrideActive(overrides[prayer], now));
   const iqamahTime = {
     ...content.iqamahTime,
     date: serviceDate,
-    fajrIqamah: activeOverrides.includes("fajr") ? normalizeTime(overrides.fajr?.value ?? "") : baseIqamah.fajr || content.iqamahTime.fajrIqamah,
-    dhuhrIqamah: activeOverrides.includes("dhuhr") ? normalizeTime(overrides.dhuhr?.value ?? "") : baseIqamah.dhuhr || content.iqamahTime.dhuhrIqamah,
-    asrIqamah: activeOverrides.includes("asr") ? normalizeTime(overrides.asr?.value ?? "") : baseIqamah.asr || content.iqamahTime.asrIqamah,
-    maghribIqamah: activeOverrides.includes("maghrib") ? normalizeTime(overrides.maghrib?.value ?? "") : baseIqamah.maghrib || content.iqamahTime.maghribIqamah,
-    ishaIqamah: activeOverrides.includes("isha") ? normalizeTime(overrides.isha?.value ?? "") : baseIqamah.isha || content.iqamahTime.ishaIqamah,
+    upcomingWeekIqamah: resolvedUpcomingWeekIqamah,
+    fajrIqamah: activeOverrides.includes("fajr") ? normalizeTime(overrides.fajr?.value ?? "") : automaticIqamah.fajr || content.iqamahTime.fajrIqamah,
+    dhuhrIqamah: activeOverrides.includes("dhuhr") ? normalizeTime(overrides.dhuhr?.value ?? "") : automaticIqamah.dhuhr || content.iqamahTime.dhuhrIqamah,
+    asrIqamah: activeOverrides.includes("asr") ? normalizeTime(overrides.asr?.value ?? "") : automaticIqamah.asr || content.iqamahTime.asrIqamah,
+    maghribIqamah: activeOverrides.includes("maghrib") ? normalizeTime(overrides.maghrib?.value ?? "") : automaticIqamah.maghrib || content.iqamahTime.maghribIqamah,
+    ishaIqamah: activeOverrides.includes("isha") ? normalizeTime(overrides.isha?.value ?? "") : automaticIqamah.isha || content.iqamahTime.ishaIqamah,
     source: sourceState === "live" ? "Iqamah.ca" : "Iqamah.ca (last confirmed)",
     sourceUrl: "",
     manualOverride: activeOverrides.length > 0,
@@ -315,7 +350,6 @@ export function resolveEffectivePrayerSchedule(
     maghrib: prayerTime.maghrib,
     isha: prayerTime.isha
   };
-  const automaticIqamah: IqamahScheduleValues = baseIqamah;
   const upcomingWeekIqamah: IqamahScheduleValues = {
     fajr: normalizeTime(feed.nw_i_fajr ?? ""),
     dhuhr: normalizeTime(feed.nw_i_zuhr ?? ""),
@@ -334,9 +368,11 @@ export function resolveEffectivePrayerSchedule(
   return {
     content: resolvedContent,
     activeOverrides,
+    rollover: newRollover,
     schedule: {
       provider: providerName,
       serviceDate,
+      upcomingWeekEffective,
       automatic: { adhan: automaticAdhan, iqamah: automaticIqamah, ...(jumuah ? { jumuah } : {}) },
       effective: {
         adhan: automaticAdhan,
@@ -427,14 +463,18 @@ export async function applyPrayerSync(
       sourceState,
       serviceDate,
       cached!.lastSuccessfulSync ?? cached!.lastAttemptedSync ?? now,
-      nowDate
+      nowDate,
+      cached?.rollover
     );
     synced = resolution.content;
+    if (resolution.rollover) {
+      try { await writeCache(db, { rollover: resolution.rollover }); } catch { /* Public response still uses the confirmed feed. */ }
+    }
   } else {
     try {
       const feed = await fetchOfficialFeed();
       sourceState = "live";
-      resolution = resolveEffectivePrayerSchedule(content, feed, sourceState, serviceDate, now, nowDate);
+      resolution = resolveEffectivePrayerSchedule(content, feed, sourceState, serviceDate, now, nowDate, cached?.rollover);
       synced = resolution.content;
       lastError = undefined;
       lastSuccessfulSync = now;
@@ -450,7 +490,8 @@ export async function applyPrayerSync(
           },
           lastSuccessfulSync,
           lastAttemptedSync,
-          lastError: null
+          lastError: null,
+          ...(resolution.rollover ? { rollover: resolution.rollover } : {})
         });
       } catch {
         // Live values are still authoritative for this response; cache persistence can recover later.
@@ -467,7 +508,8 @@ export async function applyPrayerSync(
           sourceState,
           cached.serviceDate ?? cached.normalizedContent?.prayerTime.date ?? serviceDate,
           cached.lastSuccessfulSync ?? cached.lastAttemptedSync ?? now,
-          nowDate
+          nowDate,
+          cached.rollover
         );
         synced = resolution.content;
       } else if (cached?.normalizedContent) {
@@ -524,7 +566,8 @@ export async function getPrayerSyncStatus(content: HbicContent, db: Firestore | 
         "cached",
         cached.serviceDate ?? dateStringInTimeZone(now, masjidTimeZone),
         cached.lastSuccessfulSync ?? cached.lastAttemptedSync ?? now.toISOString(),
-        now
+        now,
+        cached.rollover
       )
     : null;
 

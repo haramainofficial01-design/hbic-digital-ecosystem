@@ -78,6 +78,8 @@ export interface IqamahTime {
   sourceUrl?: string;
   manualOverride: boolean;
   overrides?: Partial<Record<IqamahPrayerName, IqamahOverride>>;
+  /** Feed-provided next-week values, used for Saturday-to-Sunday rollover only. */
+  upcomingWeekIqamah?: Partial<Record<IqamahPrayerName, string>>;
   adjustmentNotes: string;
   updatedBy: string;
   updatedAt: string;
@@ -614,7 +616,8 @@ export type NotificationRoute =
   | "/more"
   | "/community"
   | "/halal-restaurants"
-  | "/notifications";
+  | "/notifications"
+  | "/quran-academy";
 
 export interface NotificationCategoryConfig {
   type: NotificationType;
