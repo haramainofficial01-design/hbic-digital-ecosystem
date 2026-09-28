@@ -3,3 +3,7 @@
 .terms{border-left:3px solid #cba965;padding:12px 16px;background:#f8f7f0;border-radius:0 12px 12px 0}.panel li{margin:8px 0;line-height:1.5}
 .policy{margin:22px 0;padding:18px 22px;border:1px solid #d7dfd9;border-radius:18px;background:#f8faf8}.policy summary{cursor:pointer;font-weight:800;color:#174439;font-size:18px}.policy p{margin:14px 0}.policy small{color:#64817d}.panel .check{line-height:1.45}
 .publicPolicy{margin-top:24px;padding:clamp(24px,3.5vw,48px);border-radius:30px;background:#fff;border:1px solid #d9e4df}.publicPolicy h2{font:500 clamp(30px,3vw,42px)/1.1 Georgia,serif;margin:0 0 12px}.publicPolicy p{max-width:85ch;line-height:1.6;color:#58716f}.publicPolicy strong{color:#174439}.publicPolicy small{color:#64817d}
+.verificationPrimary{font-weight:800;color:#174439;margin:18px 0 4px;font-size:17px}
+.verificationSecondary{font-size:14px;color:#64817d;margin:0 0 8px}
+.secondary{border:1px solid #9dbdae;border-radius:14px;background:#f4f7f5;color:#174439;font:800 16px inherit;padding:15px 24px;min-height:52px;cursor:pointer;margin-top:10px}
+.secondary:disabled{opacity:.55;cursor:wait}

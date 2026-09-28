@@ -11,6 +11,9 @@ const money = (cents: number | null) => cents === null ? "Tuition pending" : new
 type AcademyContent = { classes: { id: string; name: string; dayOfWeek: number; startTime: string; room: string }[]; calendar: { id: string; title: string; date: string; type: string }[]; announcements: { id: string; title: string; message: string; priority: string }[] };
 type AcademyPayment = { period: string; method: "cash" | "card"; status: string; amountCents: number | null; paidAt: string | null; invoiceUrl: string | null };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Cooldown between verification-email resends: long enough to stop accidental
+// double-taps, short enough that a parent missing the email is not stuck.
+const VERIFY_RESEND_COOLDOWN_SECONDS = 60;
 
 export function AcademyParent() {
   const academyAuth = getAcademyClientAuth();
@@ -27,6 +30,8 @@ export function AcademyParent() {
   const [content, setContent] = useState<AcademyContent | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [cardAvailable, setCardAvailable] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const familyId = family?.id;
@@ -39,33 +44,97 @@ export function AcademyParent() {
     setCardAvailable(data.cardAvailable === true); setRegistrationOpen(data.registrationOpen === true);
   }).catch(() => { setCardAvailable(false); setRegistrationOpen(false); }); }, []);
 
+  // Reloads the Firebase user and force-refreshes the ID token, then publishes
+  // the refreshed state. Reads auth.currentUser fresh AFTER the reload — never
+  // a captured user object — so the UI cannot keep showing a pre-reload
+  // emailVerified=false after verification succeeded.
+  async function refreshVerification(): Promise<boolean> {
+    const target = academyAuth?.currentUser;
+    if (!target) { setUser(null); setVerified(false); return false; }
+    try {
+      await target.reload();
+      await target.getIdToken(true);
+    } catch {
+      // A network failure here must not sign the parent out; fall through and
+      // report whatever verified state Firebase currently has.
+    }
+    const fresh = academyAuth?.currentUser ?? target;
+    setUser(fresh);
+    const ok = fresh.emailVerified === true;
+    setVerified(ok);
+    return ok;
+  }
+
   useEffect(() => academyAuth ? onAuthStateChanged(academyAuth, (next) => {
     setUser(next);
     setVerified(Boolean(next?.emailVerified));
     setFamily(null);
-    if (next) setForm((current) => ({ ...current, email: next.email ?? "" }));
+    setVerificationEmailSent(false);
+    setResendCooldown(0);
+    if (next) {
+      setForm((current) => ({ ...current, email: next.email ?? "" }));
+      // The auth event can deliver a cached user whose emailVerified predates
+      // verification — refresh once so a verified parent is never blocked.
+      if (!next.emailVerified) void refreshVerification();
+    }
   }) : undefined, [academyAuth]);
+
+  // When the parent returns to this tab after opening the verification link in
+  // another tab or their mail app, pick up the verified flag automatically.
+  useEffect(() => {
+    if (!user || verified) return;
+    const refresh = () => { void refreshVerification(); };
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [academyAuth, user, verified]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setTimeout(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (!user || !verified) return;
     let cancelled = false;
     const refresh = async () => {
       try {
-        const response = await fetch("/api/academy/family", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+        const idToken = await user.getIdToken(true);
+        const response = await fetch("/api/academy/family", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
+        if (response.status === 401) {
+          // The cached session may predate verification (or have lapsed).
+          // Reconcile against freshly reloaded auth before showing anything —
+          // never flash a stale "not verified" warning at a verified parent.
+          const wasVerified = verified;
+          const ok = await refreshVerification();
+          if (cancelled) return;
+          if (!academyAuth?.currentUser) { setStatus("Sign in to continue your Quran Academy registration."); return; }
+          if (!ok) { setStatus(""); return; } // the verify screen (not a warning banner) guides the parent
+          if (!wasVerified) return; // flipped to verified — the effect re-runs via `verified` and retries with a fresh token
+          // Verified per Firebase, yet the server still rejects the fresh
+          // token: surface it instead of spinning silently (server config issue).
+          setStatus("Academy sign-in could not be confirmed. Please sign in again.");
+          return;
+        }
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load Academy details.");
-        if (!cancelled) setFamily(data.family);
-        const receiptResponse = await fetch("/api/academy/receipts", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+        if (!cancelled) { setFamily(data.family); setStatus(""); }
+        const receiptResponse = await fetch("/api/academy/receipts", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
         if (receiptResponse.ok) {
           const receiptData = await receiptResponse.json();
           if (!cancelled) setReceipts(receiptData.receipts ?? []);
         }
-        const paymentsResponse = await fetch("/api/academy/payments", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+        const paymentsResponse = await fetch("/api/academy/payments", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
         if (paymentsResponse.ok) {
           const paymentData = await paymentsResponse.json();
           if (!cancelled) setPayments(paymentData.payments ?? []);
         }
-        const contentResponse = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+        const contentResponse = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
         if (contentResponse.ok) {
           const contentData = await contentResponse.json();
           if (!cancelled) setContent(contentData.content);
@@ -82,7 +151,7 @@ export function AcademyParent() {
     let objectUrl: string | null = null;
     let cancelled = false;
     const load = async () => {
-      const response = await fetch("/api/academy/pass/qr", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+      const response = await fetch("/api/academy/pass/qr", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
       if (!response.ok) return;
       objectUrl = URL.createObjectURL(await response.blob());
       if (!cancelled) setQrUrl(objectUrl);
@@ -99,11 +168,39 @@ export function AcademyParent() {
         if (password.length < 12) throw new Error("Use a password of at least 12 characters.");
         const result = await createUserWithEmailAndPassword(academyAuth, email.trim().toLowerCase(), password);
         await sendEmailVerification(result.user);
-        setStatus("Verification email sent. Open the link, then return and choose ‘I verified my email’. ");
-      } else await signInWithEmailAndPassword(academyAuth, email.trim().toLowerCase(), password);
+        // The verify screen renders the confirmation copy from this flag —
+        // nothing is sent automatically beyond this one email.
+        setVerificationEmailSent(true);
+        setResendCooldown(VERIFY_RESEND_COOLDOWN_SECONDS);
+        setStatus("");
+      } else {
+        const result = await signInWithEmailAndPassword(academyAuth, email.trim().toLowerCase(), password);
+        await refreshVerification();
+      }
       setPassword("");
     } catch (error) { setStatus(error instanceof Error ? error.message : "Sign-in failed."); }
     finally { setBusy(false); }
+  }
+
+  // Sends exactly one verification email per tap, then starts the cooldown so
+  // repeated taps cannot spam the parent's inbox.
+  async function resendVerificationEmail() {
+    const current = academyAuth?.currentUser ?? user;
+    if (!current || resendCooldown > 0) return;
+    setBusy(true);
+    try {
+      await sendEmailVerification(current);
+      setVerificationEmailSent(true);
+      setResendCooldown(VERIFY_RESEND_COOLDOWN_SECONDS);
+      setStatus("");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Could not resend the verification email."); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmVerifiedEmail() {
+    const ok = await refreshVerification();
+    if (ok) setStatus("");
+    else setStatus("We still don't see a verified email for this address. Open the verification link — check your spam or junk folder — then try again.");
   }
 
   async function submit() {
@@ -160,15 +257,17 @@ export function AcademyParent() {
     </div>
     <div className={styles.layout}>
       <section className={styles.panel}>
-        {!user ? <><h2>{registerAccount && registrationOpen ? "Create your parent account" : "Parent sign in"}</h2><p>Only you and authorized HBIC staff can see your family&apos;s details.</p>
+        {!user ? <><h2>{registerAccount && registrationOpen ? "Create your parent account" : "Sign in to continue your Quran Academy registration."}</h2><p>Only you and authorized HBIC staff can see your family&apos;s details.</p>
           <label>Email<input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <label>Password<input type="password" autoComplete={registerAccount ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           <button className={styles.primary} disabled={busy || !academyAuth} onClick={() => void authenticate()}>{registerAccount ? "Create account" : "Sign in"}</button>
           {!academyAuth ? <p className={styles.status}>Parent sign-in is temporarily unavailable. Please contact HBIC.</p> : null}
           {registrationOpen ? <button className={styles.textButton} onClick={() => setRegisterAccount(!registerAccount)}>{registerAccount ? "I already have an account" : "Create a parent account"}</button> : null}
         </> : !verified ? <><h2>Verify your email</h2><p>Open the verification link sent to {user.email}. We need a verified address before saving children&apos;s information.</p>
-          <button className={styles.primary} onClick={() => void user.reload().then(() => user.getIdToken(true)).then(() => setVerified(user.emailVerified))}>I verified my email</button>
-          <button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Sign out</button>
+          {verificationEmailSent ? <><p className={styles.verificationPrimary}>Verification email sent.</p><p className={styles.verificationSecondary}>Didn’t see it? Check your spam or junk folder.</p></> : null}
+          <button className={styles.primary} onClick={() => void confirmVerifiedEmail()}>I verified my email</button>
+          <button className={styles.secondary} disabled={busy || resendCooldown > 0} onClick={() => void resendVerificationEmail()}>{resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : "Resend verification email"}</button>
+          <button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Use a different email</button>
         </> : !family && !registrationOpen ? <><h2>Registration is temporarily unavailable</h2><p>Classes begin Monday, October 5. Please check back shortly.</p></> : !family ? <><h2>Register your family</h2><p>One short form for all your children. Class placement and tuition are confirmed by HBIC. There is no class October 1; the first class is October 5.</p>
           <div className={styles.fields}><label>Parent or guardian full name<input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label>
             <label>Phone<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>

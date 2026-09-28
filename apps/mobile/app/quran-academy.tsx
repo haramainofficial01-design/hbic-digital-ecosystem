@@ -1,7 +1,7 @@
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Image, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, dateStringInTimeZone, isCalgaryFirstOfMonth, masjidTimeZone, type AcademyChildInput, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { AppScreen } from "../src/components/AppScreen";
 import { AppButton } from "../src/components/AppButton";
@@ -17,6 +17,9 @@ const child = (): AcademyChildInput => ({ name: "", age: 8, level: "not_sure" })
 type AcademyContent = { classes: { id: string; name: string; dayOfWeek: number; startTime: string; room: string }[]; calendar: { id: string; title: string; date: string; type: string }[]; announcements: { id: string; title: string; message: string }[] };
 type AcademyPayment = { period: string; method: "cash" | "card"; status: string; amountCents: number | null; invoiceUrl: string | null };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Cooldown between verification-email resends: long enough to stop accidental
+// double-taps, short enough that a parent missing the email is not stuck.
+const VERIFY_RESEND_COOLDOWN_SECONDS = 60;
 
 export default function QuranAcademyScreen() {
   const { theme } = useAppTheme();
@@ -33,6 +36,8 @@ export default function QuranAcademyScreen() {
   const [token, setToken] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [cardAvailable, setCardAvailable] = useState(false);
   const [serverCashReminders, setServerCashReminders] = useState(false);
   const [serverDeviceRegistered, setServerDeviceRegistered] = useState(false);
@@ -48,17 +53,72 @@ export default function QuranAcademyScreen() {
     setServerCashReminders(data.serverCashRemindersAvailable === true);
   }).catch(() => { setCardAvailable(false); setRegistrationOpen(false); }); }, []);
 
+  // Reloads the Firebase user and force-refreshes the ID token, then publishes
+  // the refreshed state. Reads auth.currentUser fresh AFTER the reload — never
+  // a captured user object — so the UI cannot keep showing a pre-reload
+  // emailVerified=false after verification succeeded.
+  async function refreshVerification(): Promise<boolean> {
+    const target = auth.currentUser;
+    if (!target) { setUser(null); setVerified(false); return false; }
+    try {
+      await target.reload();
+      await target.getIdToken(true);
+    } catch {
+      // A network failure here must not sign the parent out; fall through and
+      // report whatever verified state Firebase currently has.
+    }
+    const fresh = auth.currentUser ?? target;
+    setUser(fresh);
+    const ok = fresh.emailVerified === true;
+    setVerified(ok);
+    return ok;
+  }
+
   useEffect(() => onAuthStateChanged(auth, (next) => {
     setUser(next); setVerified(Boolean(next?.emailVerified)); setFamily(null);
+    setVerificationEmailSent(false); setResendCooldown(0);
     setServerDeviceRegistered(false);
     if (next?.email) setForm((current) => ({ ...current, email: next.email! }));
+    // The auth event can deliver a cached user whose emailVerified predates
+    // verification — refresh once so a verified parent is never blocked.
+    if (next && !next.emailVerified) void refreshVerification();
   }), []);
+
+  // When the app returns to the foreground after the parent opened the
+  // verification link in their mail app or browser, pick up the verified flag
+  // automatically — no sign-out/sign-in required.
+  useEffect(() => {
+    if (!user || verified) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshVerification();
+    });
+    return () => subscription.remove();
+  }, [user, verified]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const refresh = useCallback(async () => {
     if (!user || !verified) return;
     try {
       const idToken = await user.getIdToken(true);
       const response = await fetch(`${api}/api/academy/family`, { headers: { Authorization: `Bearer ${idToken}` } });
+      if (response.status === 401) {
+        // The cached session may predate verification (or have lapsed).
+        // Reconcile against freshly reloaded auth before showing anything.
+        const wasVerified = verified;
+        const ok = await refreshVerification();
+        if (!auth.currentUser) { setStatus("Sign in to continue your Quran Academy registration."); return; }
+        if (!ok) { setStatus(""); return; } // the verify screen (not a warning banner) guides the parent
+        if (!wasVerified) return; // flipped to verified — refresh re-runs via `verified` and retries with a fresh token
+        // Verified per Firebase, yet the server still rejects the fresh
+        // token: surface it instead of spinning silently (server config issue).
+        setStatus("Academy sign-in could not be confirmed. Please sign in again.");
+        return;
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Academy details are unavailable.");
       setFamily(data.family);
@@ -90,7 +150,7 @@ export default function QuranAcademyScreen() {
     if (!user || !family) return;
     const pushToken = await registerForPushNotificationsAsync({ requestPermission });
     if (!pushToken) { if (requestPermission) setStatus("Enable notifications in your device settings to receive Academy updates."); return; }
-    const response = await fetch(`${api}/api/academy/device`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken()}` },
+    const response = await fetch(`${api}/api/academy/device`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken(true)}` },
       body: JSON.stringify({ token: pushToken, platform: Platform.OS, reminderDelivery: serverCashReminders ? "server" : "local" }) });
     if (!response.ok) throw new Error("Academy update registration could not be completed.");
     academyPushToken.current = pushToken;
@@ -100,7 +160,7 @@ export default function QuranAcademyScreen() {
 
   async function signOutAcademy() {
     if (user && academyPushToken.current) {
-      await fetch(`${api}/api/academy/device`, { method: "DELETE", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken()}` },
+      await fetch(`${api}/api/academy/device`, { method: "DELETE", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken(true)}` },
         body: JSON.stringify({ token: academyPushToken.current }) }).catch(() => undefined);
     }
     academyPushToken.current = null;
@@ -116,11 +176,39 @@ export default function QuranAcademyScreen() {
         if (password.length < 12) throw new Error("Use a password of at least 12 characters.");
         const result = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
         await sendEmailVerification(result.user);
-        setStatus("Check your email for a verification link, then return here.");
-      } else await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+        // The verify screen renders the confirmation copy from this flag —
+        // nothing is sent automatically beyond this one email.
+        setVerificationEmailSent(true);
+        setResendCooldown(VERIFY_RESEND_COOLDOWN_SECONDS);
+        setStatus("");
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+        await refreshVerification();
+      }
       setPassword("");
     } catch (error) { setStatus(error instanceof Error ? error.message : "Sign-in failed."); }
     finally { setBusy(false); }
+  }
+
+  // Sends exactly one verification email per tap, then starts the cooldown so
+  // repeated taps cannot spam the parent's inbox.
+  async function resendVerificationEmail() {
+    const current = auth.currentUser ?? user;
+    if (!current || resendCooldown > 0) return;
+    setBusy(true);
+    try {
+      await sendEmailVerification(current);
+      setVerificationEmailSent(true);
+      setResendCooldown(VERIFY_RESEND_COOLDOWN_SECONDS);
+      setStatus("");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Could not resend the verification email."); }
+    finally { setBusy(false); }
+  }
+
+  async function confirmVerifiedEmail() {
+    const ok = await refreshVerification();
+    if (ok) setStatus("");
+    else setStatus("We still don't see a verified email for this address. Open the verification link — check your spam or junk folder — then try again.");
   }
 
   async function register() {
@@ -172,11 +260,11 @@ export default function QuranAcademyScreen() {
 
   if (!academyEnabled) return <AppScreen><Text>Quran Academy is not available in this build.</Text></AppScreen>;
   return <AppScreen><GlassCard tone="navy"><View style={styles.seal}><Text style={styles.sealTitle}>HBIC QUR’AN ACADEMY</Text><Image source={require("../assets/brand/hbic-logo.png")} style={styles.sealLogo} accessibilityLabel="Masjid Bilal logo" /><Text style={styles.sealFoot}>MASJID BILAL · CALGARY</Text></View><Text style={styles.eyebrow}>MASJID BILAL · CALGARY</Text><Text style={styles.hero}>HBIC Qur’an Academy</Text><Text style={styles.heroBody}>A calm home for your children&apos;s Quran learning, classes, and Academy pass.</Text></GlassCard>
-    {!user ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>{newAccount && registrationOpen ? "Create parent account" : "Parent sign in"}</Text>
+    {!user ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>{newAccount && registrationOpen ? "Create parent account" : "Sign in to continue your Quran Academy registration."}</Text>
       {field("Email", email, setEmail, "email-address")}{field("Password", password, setPassword, "default", true)}
       <AppButton label={newAccount ? "Create account" : "Sign in"} disabled={busy} onPress={() => void authenticate()} />
       {registrationOpen ? <AppButton label={newAccount ? "I already have an account" : "Create a parent account"} variant="ghost" onPress={() => setNewAccount(!newAccount)} /> : null}
-    </GlassCard> : !verified ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>Verify your email</Text><Text style={{ color: theme.colors.muted, marginBottom: 16 }}>Open the verification link sent to {user.email}, then tap below.</Text><AppButton label="I verified my email" onPress={() => void user.reload().then(() => user.getIdToken(true)).then(() => setVerified(user.emailVerified))} /><AppButton label="Sign out" variant="ghost" onPress={() => void signOutAcademy()} /></GlassCard>
+    </GlassCard> : !verified ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>Verify your email</Text><Text style={{ color: theme.colors.muted, marginBottom: 16 }}>Open the verification link sent to {user.email}. We need a verified address before saving your children’s information.</Text>{verificationEmailSent ? <><Text style={styles.verificationPrimary}>Verification email sent.</Text><Text style={styles.verificationSecondary}>Didn’t see it? Check your spam or junk folder.</Text></> : null}<AppButton label="I verified my email" onPress={() => void confirmVerifiedEmail()} /><AppButton label={resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : "Resend verification email"} variant="secondary" disabled={busy || resendCooldown > 0} onPress={() => void resendVerificationEmail()} /><AppButton label="Use a different email" variant="ghost" onPress={() => void signOutAcademy()} /></GlassCard>
       : !family && !registrationOpen ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>Registration is temporarily unavailable</Text><Text style={{ color: theme.colors.muted }}>Classes begin Monday, October 5. Please check back shortly.</Text></GlassCard>
       : !family ? <GlassCard><Text style={[styles.heading, { color: theme.colors.text }]}>Register your family</Text><Text style={{ color: theme.colors.muted }}>One short form for all your children. HBIC confirms class placement and tuition.</Text>
         {field("Parent or guardian full name", form.guardianName, (value) => setForm({ ...form, guardianName: value }))}
@@ -220,4 +308,4 @@ export default function QuranAcademyScreen() {
   </AppScreen>;
 }
 
-const styles = StyleSheet.create({ seal: { width: 176, height: 176, borderRadius: 88, borderWidth: 1.5, borderColor: "#cfad68", alignItems: "center", justifyContent: "space-around", alignSelf: "center", marginBottom: 20, paddingVertical: 12, backgroundColor: "#12384b" }, sealTitle: { color: "#e5c781", fontSize: 10, fontWeight: "800", letterSpacing: 1.4 }, sealLogo: { width: 86, height: 86, borderRadius: 43, borderWidth: 4, borderColor: "#fff8e9", backgroundColor: "white" }, sealFoot: { color: "#e5c781", fontSize: 8, fontWeight: "800", letterSpacing: .7 }, hero: { color: "#fff8e9", fontFamily: "Georgia", fontSize: 40, marginTop: 8 }, heroBody: { color: "#d6e5e4", fontSize: 16, lineHeight: 24, marginTop: 8 }, eyebrow: { color: "#e5c06b", fontSize: 11, fontWeight: "900", letterSpacing: 2 }, heading: { fontSize: 24, fontWeight: "800", marginBottom: 10 }, label: { fontSize: 14, fontWeight: "700" }, field: { gap: 5, marginVertical: 9 }, input: { borderWidth: 1, borderRadius: 12, minHeight: 48, paddingHorizontal: 14, fontSize: 16 }, row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginVertical: 9 }, child: { borderWidth: 1, borderRadius: 18, padding: 14, marginVertical: 10 }, level: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }, qr: { width: 260, height: 260, alignSelf: "center", marginTop: 20, borderRadius: 16, backgroundColor: "white" } });
+const styles = StyleSheet.create({ seal: { width: 176, height: 176, borderRadius: 88, borderWidth: 1.5, borderColor: "#cfad68", alignItems: "center", justifyContent: "space-around", alignSelf: "center", marginBottom: 20, paddingVertical: 12, backgroundColor: "#12384b" }, sealTitle: { color: "#e5c781", fontSize: 10, fontWeight: "800", letterSpacing: 1.4 }, sealLogo: { width: 86, height: 86, borderRadius: 43, borderWidth: 4, borderColor: "#fff8e9", backgroundColor: "white" }, sealFoot: { color: "#e5c781", fontSize: 8, fontWeight: "800", letterSpacing: .7 }, hero: { color: "#fff8e9", fontFamily: "Georgia", fontSize: 40, marginTop: 8 }, heroBody: { color: "#d6e5e4", fontSize: 16, lineHeight: 24, marginTop: 8 }, eyebrow: { color: "#e5c06b", fontSize: 11, fontWeight: "900", letterSpacing: 2 }, heading: { fontSize: 24, fontWeight: "800", marginBottom: 10 }, label: { fontSize: 14, fontWeight: "700" }, field: { gap: 5, marginVertical: 9 }, input: { borderWidth: 1, borderRadius: 12, minHeight: 48, paddingHorizontal: 14, fontSize: 16 }, row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginVertical: 9 }, child: { borderWidth: 1, borderRadius: 18, padding: 14, marginVertical: 10 }, level: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }, verificationPrimary: { fontSize: 16, fontWeight: "800", color: "#12384b", marginTop: 4 }, verificationSecondary: { fontSize: 13, color: "#5f7a78", marginTop: 2, marginBottom: 10 }, qr: { width: 260, height: 260, alignSelf: "center", marginTop: 20, borderRadius: 16, backgroundColor: "white" } });

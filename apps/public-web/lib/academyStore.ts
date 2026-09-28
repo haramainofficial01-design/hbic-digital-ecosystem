@@ -28,11 +28,21 @@ export async function academyParent(request: Request) {
   const app = getFirebaseApp();
   if (!app) throw new AcademyError("Academy sign-in is not configured.", 503);
   try {
-    const token = await getAuth(app).verifyIdToken(bearer, true);
-    if (!token.email || !token.email_verified) throw new Error("email unverified");
+    // Verify Firebase's signature, issuer, audience and expiry. The deployed
+    // service account cannot perform the additional revocation lookup
+    // (auth/insufficient-permission); requiring that lookup would reject every
+    // valid parent. Short-lived ID tokens are refreshed by the client.
+    const token = await getAuth(app).verifyIdToken(bearer);
+    if (!token.email || !token.email_verified) throw new AcademyError("This Academy account's email is not verified yet. Open the verification link, then try again.", 401);
     return { uid: token.uid, email: token.email.trim().toLowerCase() };
-  } catch {
-    throw new AcademyError("Sign in with a verified email address.", 401);
+  } catch (error) {
+    if (error instanceof AcademyError) throw error;
+    console.error("Academy Firebase ID token verification failed:",
+      error && typeof error === "object" && "code" in error ? String(error.code) : "unknown");
+    // Invalid, expired, revoked, or wrong-project tokens land here — never
+    // reported as "unverified", so a configuration problem cannot masquerade
+    // as an unverified email.
+    throw new AcademyError("Academy sign-in could not be confirmed. Please sign in again.", 401);
   }
 }
 
