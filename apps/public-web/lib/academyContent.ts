@@ -1,7 +1,7 @@
 import "server-only";
 
 import { FieldValue } from "firebase-admin/firestore";
-import { academyRecurringClasses } from "@hbic/shared";
+import { ACADEMY_ALBERTA_GENERAL_HOLIDAYS, ACADEMY_TERM_END_DATE, academyRecurringClasses } from "@hbic/shared";
 import { academyDb, AcademyError } from "./academyStore";
 
 export type AcademyClass = { id: string; name: string; teacher: string; dayOfWeek: number; startTime: string; endTime: string; room: string; level: "qaida" | "quran" | "mixed"; capacity: number; active: boolean };
@@ -80,15 +80,26 @@ export async function listAcademyContent(admin = false, classFilter: string[] = 
     calendar: (() => {
       const explicit = calendarDocs.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AcademyCalendarItem))
         .filter((item) => admin || targeted(item.classIds ?? []));
-      if (admin) return explicit.sort((a, b) => String(a.date).localeCompare(String(b.date)));
       const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
       const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
       const today = `${pick("year")}-${pick("month")}-${pick("day")}`;
+      const defaults: AcademyCalendarItem[] = ([
+        { id: "academy-preparation-2026-10-01", date: "2026-10-01", title: "No class — Academy preparation day", type: "no_class", classIds: [],
+          note: "There is no class October 1. The first regular class is Monday, October 5." },
+        ...ACADEMY_ALBERTA_GENERAL_HOLIDAYS.map((holiday) => ({ id: `alberta-holiday-${holiday.date}`, date: holiday.date,
+          title: holiday.title, type: "holiday" as const, classIds: [],
+          note: holiday.date === "2026-10-12" ? "No Academy class on this Alberta general holiday." : "Alberta general holiday; no regular Academy class is scheduled on this date." })),
+        { id: "academy-term-end-2027-02-01", date: ACADEMY_TERM_END_DATE, title: "Academy term ends", type: "event", classIds: [],
+          note: "Final scheduled class of the term, 6:00–7:00 p.m. No classes afterward through Ramadan and Eid al-Fitr; resumption after Eid is to be announced." },
+        { id: "academy-ramadan-eid-break-2027", date: "2027-02-02", title: "Ramadan & Eid al-Fitr break — no classes", type: "no_class", classIds: [],
+          note: "The term ended February 1. No classes during the Ramadan and Eid al-Fitr break. HBIC will announce the resumption date after Eid." }
+      ] as AcademyCalendarItem[]).filter((item) => item.date >= today && !explicit.some((existing) => existing.date === item.date));
+      if (admin) return [...explicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
       const changedDates = new Set(explicit.filter((item) => ["no_class", "holiday", "time_changed"].includes(item.type)).map((item) => item.date));
       const recurring = academyRecurringClasses(today).filter((item) => !changedDates.has(item.date))
         .map((item) => ({ id: `recurring-${item.date}`, date: item.date, title: item.title, type: item.type,
           classIds: [] as string[], note: item.note }));
-      return [...recurring, ...explicit].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      return [...recurring, ...explicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     })() as AcademyCalendarItem[],
     announcements: announcementDocs.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AcademyAnnouncement))
       .filter((item) => admin || targeted(item.classIds ?? []) && Date.parse(String(item.publishedAt)) <= now && (!item.expiresAt || Date.parse(String(item.expiresAt)) >= now))

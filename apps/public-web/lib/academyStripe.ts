@@ -2,8 +2,12 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
+import { ACADEMY_FIRST_BILLING_MONTH, academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
+
+// 00:00 Calgary on February 1, before Stripe's February renewal. The final
+// February 1 class remains included in January tuition after billing stops.
+const academyTermBillingStop = Math.floor(Date.parse("2027-02-01T07:00:00Z") / 1000);
 
 function academyBillingMode(): "test" | "live" {
   return process.env.ACADEMY_STRIPE_BILLING_MODE === "live" ? "live" : "test";
@@ -74,8 +78,10 @@ export async function startAcademyCheckout(uid: string) {
   }
   if ((await familyRef.get()).data()?.stripeSubscriptionId) throw new AcademyError("This family already has a subscription. Use billing management instead.", 409);
   const firstOfMonth = isCalgaryFirstOfMonth(new Date());
+  const beforeFirstBillingMonth = calgaryBillingPeriod(new Date()) < ACADEMY_FIRST_BILLING_MONTH;
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
+    payment_method_collection: "always",
     integration_identifier: `hbic-academy-${Array.from(randomBytes(8), (byte) => String.fromCharCode(97 + byte % 26)).join("")}`,
     line_items: [{ price: price.id, quantity }],
     customer_email: family.email,
@@ -83,7 +89,9 @@ export async function startAcademyCheckout(uid: string) {
     metadata: { academyFamilyUid: uid },
     subscription_data: {
       metadata: { academyFamilyUid: uid },
-      ...(firstOfMonth ? {} : { billing_cycle_anchor: nextCalgaryFirstBillingAnchor(new Date()), proration_behavior: "create_prorations" as const })
+      ...(beforeFirstBillingMonth
+        ? { billing_cycle_anchor: nextCalgaryFirstBillingAnchor(new Date()), proration_behavior: "none" as const }
+        : firstOfMonth ? {} : { billing_cycle_anchor: nextCalgaryFirstBillingAnchor(new Date()), proration_behavior: "create_prorations" as const })
     },
     success_url: `${academyPreviewOrigin()}/quran-academy?checkout=success`,
     cancel_url: `${academyPreviewOrigin()}/quran-academy?checkout=cancelled`
@@ -187,6 +195,18 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
     uid = String((data.metadata as Record<string, unknown> | null)?.academyFamilyUid ?? data.client_reference_id ?? "");
     subscriptionId = objectId(data.subscription);
     customerId = objectId(data.customer);
+    if (!subscriptionId || !customerId) throw new AcademyError("Checkout subscription is incomplete; Stripe should retry.", 503);
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (subscription.livemode !== (academyBillingMode() === "live") ||
+        subscription.metadata.academyFamilyUid !== uid || objectId(subscription.customer) !== customerId) {
+      throw new AcademyError("Checkout subscription does not match this Academy family.", 409);
+    }
+    // Scheduling this before acknowledging Checkout makes the stop durable even
+    // if a later webhook is delayed. A failure here asks Stripe to retry.
+    if (subscription.cancel_at !== academyTermBillingStop) {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at: academyTermBillingStop },
+        { idempotencyKey: `academy-term-stop-${subscriptionId}` });
+    }
     // Checkout establishes the family mapping. A signed invoice event settles payment.
   } else if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
     invoiceId = String(data.id ?? "");
@@ -231,8 +251,16 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
       const stripeStatus = event.type === "checkout.session.completed" ? "incomplete" :
         event.type === "invoice.paid" ? "active" : event.type === "invoice.payment_failed" ? "past_due" : String(data.status ?? "unknown");
       tx.update(familyRef, { stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
-        stripeStatus, lastStripeEventCreated: event.created, lastStripeEventRank: rank, updatedAt: now });
+        stripeStatus, ...(event.type === "checkout.session.completed" ? { termBillingStopAt: academyTermBillingStop } : {}),
+        lastStripeEventCreated: event.created, lastStripeEventRank: rank, updatedAt: now });
       if (event.type === "customer.subscription.deleted") {
+        const termBreak = Number(familyData.termBillingStopAt) === academyTermBillingStop &&
+          Number(data.cancel_at) === academyTermBillingStop && event.created >= academyTermBillingStop - 600;
+        if (termBreak) {
+          // The term break is not a withdrawal. Keep the family and pass for
+          // the final February 1 class; no new term auto-resumes billing.
+          tx.update(familyRef, { enrollmentState: "paused", termBreakStartedAt: now });
+        } else {
         // A subscription can also be ended directly in Stripe. Never leave
         // active child enrollment displayed after billing has ended.
         const endedAt = new Date(event.created * 1000).toISOString();
@@ -240,8 +268,9 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
         tx.update(familyRef, { enrollmentState: "withdrawn", children: children.map((child) => ({
           ...child, cancelEffectiveAt: child.cancelEffectiveAt && child.cancelEffectiveAt < endedAt ? child.cancelEffectiveAt : endedAt
         })) });
+        }
       }
-      if (event.type === "invoice.paid" && familyData.enrollmentState === "submitted") {
+      if (event.type === "invoice.paid" && amountCents > 0 && familyData.enrollmentState === "submitted") {
         tx.update(familyRef, { enrollmentState: "approved" });
       }
     } else if (!familyData.stripeSubscriptionId && subscriptionId) {
@@ -252,7 +281,7 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
     const monthData = month?.data();
     const monthCreated = Number(monthData?.lastStripeEventCreated ?? 0);
     const monthRank = Number(monthData?.lastStripeEventRank ?? -1);
-    if (monthRef && (event.created > monthCreated || event.created === monthCreated && rank >= monthRank)) {
+    if (monthRef && !(event.type === "invoice.paid" && amountCents === 0) && (event.created > monthCreated || event.created === monthCreated && rank >= monthRank)) {
       tx.set(monthRef, { period, method: "card", status: event.type === "invoice.paid" ? "paid" : "card_attention", amountCents,
         invoiceId, invoiceUrl, lastStripeEventCreated: event.created, lastStripeEventRank: rank,
         ...(event.type === "invoice.paid" ? { paidAt: now } : {}), updatedAt: now }, { merge: true });

@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, academyRegistrationOpen, calgaryBillingPeriod, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 
@@ -67,9 +67,10 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     policyAcceptedAt: typeof data.policyAcceptedAt === "string" ? data.policyAcceptedAt : undefined,
     recurringAuthorizedAt: typeof data.recurringAuthorizedAt === "string" ? data.recurringAuthorizedAt : null,
     enrollmentState: hasCurrentChild ? data.enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
-    billingPeriod: String(month?.period ?? calgaryBillingPeriod(new Date())),
+    billingPeriod: String(month?.period ?? academyTuitionPeriod(new Date())),
     amountCents: typeof month?.amountCents === "number" ? month.amountCents : null,
     paymentState: (month?.status ?? "awaiting_tuition") as AcademyPublicFamily["paymentState"],
+    cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
     createdAt: String(data.createdAt)
@@ -77,27 +78,31 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
 }
 
 async function currentMonth(db: Firestore, uid: string, family: Record<string, unknown>) {
-  const period = calgaryBillingPeriod(new Date());
+  const period = academyTuitionPeriod(new Date());
   const ref = db.collection(families).doc(uid).collection("months").doc(period);
   const existing = await ref.get();
-  const pricing = (await db.collection(settings).doc("config").get()).data();
+  const pricing = await getAcademyPricing();
   const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
   const childCount = Array.isArray(family.children) ? family.children.filter((child: { cancelEffectiveAt?: string | null }) =>
     !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length : 0;
-  const mode = pricing?.tuitionMode ?? "per_child";
-  const unit = pricing?.monthlyCents ?? ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD;
-  const amountCents = childCount === 0 ? 0 : Number.isSafeInteger(unit) && unit > 0 && (mode === "per_child" || mode === "per_family")
+  const mode = pricing.tuitionMode;
+  const unit = pricing.monthlyCents;
+  const amountCents = childCount === 0 || period > ACADEMY_LAST_BILLING_MONTH ? 0 : Number.isSafeInteger(unit) && unit > 0 && (mode === "per_child" || mode === "per_family")
     ? unit * (mode === "per_child" ? childCount : 1) : null;
   if (existing.exists) {
+    if (existing.data()?.status === "scheduled" && calgaryBillingPeriod(new Date()) >= "2026-10") {
+      await ref.update({ status: "card_attention", updatedAt: new Date().toISOString() });
+      return (await ref.get()).data();
+    }
     if (existing.data()?.status === "awaiting_tuition" && amountCents !== null) {
-      await ref.update({ amountCents, status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : "card_attention", pricedAt: new Date().toISOString() });
+      await ref.update({ amountCents, status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : period === "2026-10" && calgaryBillingPeriod(new Date()) < "2026-10" ? "scheduled" : "card_attention", pricedAt: new Date().toISOString() });
       return (await ref.get()).data();
     }
     return existing.data();
   }
   const month = {
     period, amountCents,
-    status: amountCents === null ? "awaiting_tuition" : amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : "card_attention",
+    status: amountCents === null ? "awaiting_tuition" : amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : period === "2026-10" && calgaryBillingPeriod(new Date()) < "2026-10" ? "scheduled" : "card_attention",
     method: family.paymentChoice,
     createdAt: new Date().toISOString()
   };
@@ -109,17 +114,14 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
 
 export async function registerAcademyFamily(uid: string, verifiedEmail: string, raw: unknown) {
   if (process.env.ACADEMY_REGISTRATION_READY !== "true") throw new AcademyError("Quran Academy registration is not open yet.", 403);
-  if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration opens October 1, 2026.", 403);
+  if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration is not open yet.", 403);
   const db = academyDb();
   const input: AcademyRegistrationInput = parseAcademyRegistration(raw);
   if (input.paymentChoice === "card") {
-    const config = (await db.collection(settings).doc("config").get()).data();
-    const prefix = process.env.ACADEMY_STRIPE_BILLING_MODE === "live" ? /^(rk|sk)_live_/ : /^(rk|sk)_test_/;
-    const ready = process.env.ACADEMY_STRIPE_BILLING_READY === "true" &&
-      prefix.test(process.env.ACADEMY_STRIPE_RESTRICTED_KEY ?? "") &&
-      /^whsec_/.test(process.env.ACADEMY_STRIPE_WEBHOOK_SECRET ?? "") &&
-      /^price_[A-Za-z0-9]+$/.test(String(config?.stripePriceId ?? process.env.ACADEMY_STRIPE_PRICE_ID ?? ""));
-    if (!ready) throw new AcademyError("Card billing is not yet enabled. Choose cash at HBIC for now.", 409);
+    // Import lazily because Stripe billing also uses Academy storage. A card
+    // family must not be created unless the exact live price has been checked.
+    const { academyCardConfig } = await import("./academyStripe");
+    if (!(await academyCardConfig()).cardAvailable) throw new AcademyError("Card billing is not yet enabled. Choose cash at HBIC for now.", 409);
   }
   if (input.email !== verifiedEmail) throw new AcademyError("Use the email address verified on this account.", 403);
   const familyRef = db.collection(families).doc(uid);
@@ -179,8 +181,8 @@ export async function scanAcademyPass(token: string, actorUid: string) {
 
 export async function receiveAcademyCash(uid: string, period: string, actor: { uid: string; email: string }) {
   const db = academyDb();
-  if (!/^\d{4}-\d{2}$/.test(period) || period !== calgaryBillingPeriod(new Date())) {
-    throw new AcademyError("Only the current billing month can be received from this screen.");
+  if (!/^\d{4}-\d{2}$/.test(period) || period !== academyTuitionPeriod(new Date())) {
+    throw new AcademyError("Only the active Academy tuition month can be received from this screen.");
   }
   const familyRef = db.collection(families).doc(uid);
   const monthRef = familyRef.collection("months").doc(period);

@@ -47,7 +47,7 @@ export default async function HomePage() {
             <div className="home-academy-copy">
               <span className="eyebrow">FOR OUR YOUNG LEARNERS</span>
               <h2 id="home-academy-heading">HBIC Qur’an Academy</h2>
-              <p>Quran learning, class updates and one simple place for your family’s Academy information. Classes meet Mondays and Thursdays, 6:00–7:30 p.m. Registration opens October 1; classes begin October 5.</p>
+              <p>Registration is open for October. Classes begin Monday, October 5, then meet Mondays and Thursdays, 6:00–7:00 p.m. There is no class October 1. The term ends February 1, followed by a Ramadan and Eid break.</p>
               <Link className="button primary" href="/quran-academy">Explore the Academy <span aria-hidden="true">↗</span></Link>
             </div>
             <Image src="/photos/prayer-hall.png" alt="Prayer hall at Masjid Bilal" width={720} height={480} sizes="(max-width: 700px) 100vw, 35vw" />

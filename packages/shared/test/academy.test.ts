@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -40,6 +40,9 @@ test("Billing periods follow Calgary, including UTC month rollover and DST", () 
   assert.equal(calgaryBillingPeriod(new Date("2026-10-01T06:30:00Z")), "2026-10");
   assert.equal(calgaryBillingPeriod(new Date("2026-03-01T04:30:00Z")), "2026-02");
   assert.equal(calgaryBillingPeriod(new Date("2026-03-01T08:30:00Z")), "2026-03");
+  assert.equal(academyTuitionPeriod(new Date("2026-09-27T18:00:00Z")), "2026-10");
+  assert.equal(academyTuitionPeriod(new Date("2026-10-01T05:59:59Z")), "2026-10");
+  assert.equal(academyTuitionPeriod(new Date("2026-11-01T06:30:00Z")), "2026-11");
 });
 
 test("monthly card anchor is the next first within Calgary in both DST seasons", () => {
@@ -48,20 +51,22 @@ test("monthly card anchor is the next first within Calgary in both DST seasons",
 });
 
 test("registration and full first-day billing follow Calgary, not UTC", () => {
-  assert.equal(academyRegistrationOpen(new Date("2026-10-01T05:59:59Z")), false);
-  assert.equal(academyRegistrationOpen(new Date("2026-10-01T06:00:00Z")), true);
+  assert.equal(academyRegistrationOpen(new Date("2026-09-27T05:59:59Z")), false);
+  assert.equal(academyRegistrationOpen(new Date("2026-09-27T06:00:00Z")), true);
+  assert.equal(academyRegistrationOpen(new Date("2027-02-01T06:59:59Z")), true);
+  assert.equal(academyRegistrationOpen(new Date("2027-02-01T07:00:00Z")), false);
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-01T05:59:59Z")), false);
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-01T06:00:00Z")), true);
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-02T06:00:00Z")), false);
 });
 
 test("cash reminders appear three Calgary days before the first and on unpaid due day", () => {
-  assert.equal(academyCashReminderStage(new Date("2026-09-28T16:00:00Z"), true, "paid"), "upcoming");
+  assert.equal(academyCashReminderStage(new Date("2026-09-28T16:00:00Z"), true, "cash_due"), "upcoming");
   assert.equal(academyCashReminderStage(new Date("2026-10-01T16:00:00Z"), true, "cash_due"), "due");
   assert.equal(academyCashReminderStage(new Date("2026-10-01T16:00:00Z"), true, "paid"), null);
   assert.equal(academyCashReminderStage(new Date("2026-09-28T16:00:00Z"), false, "paid"), null);
-  assert.equal(academyCashReminderStage(new Date("2026-02-26T16:00:00Z"), true, "paid"), "upcoming");
-  assert.equal(academyCashReminderStage(new Date("2026-02-25T16:00:00Z"), true, "paid"), null);
+  assert.equal(academyCashReminderStage(new Date("2026-02-26T16:00:00Z"), true, "cash_due"), "upcoming");
+  assert.equal(academyCashReminderStage(new Date("2026-02-25T16:00:00Z"), true, "cash_due"), null);
 });
 
 test("Academy classes start October 5 and first alternate fun Thursday is October 15", () => {
@@ -70,4 +75,9 @@ test("Academy classes start October 5 and first alternate fun Thursday is Octobe
   assert.equal(classes[1]?.date, "2026-10-08");
   assert.equal(classes.find((entry) => entry.fun)?.date, "2026-10-15");
   assert.equal(classes.filter((entry) => entry.fun)[1]?.date, "2026-10-29");
+  assert.equal(classes.some((entry) => entry.date === "2026-10-12"), false);
+  assert.equal(classes[0]?.note.includes("6:00–7:00 p.m."), true);
+  const term = academyRecurringClasses("2027-01-30", 20);
+  assert.equal(term.at(-1)?.date, "2027-02-01");
+  assert.equal(term.some((entry) => entry.date === "2027-02-04"), false);
 });
