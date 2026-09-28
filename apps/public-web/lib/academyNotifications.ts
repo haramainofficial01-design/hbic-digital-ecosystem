@@ -1,6 +1,6 @@
 import "server-only";
 
-import { academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
+import { ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { academyDb, getAcademyFamily } from "./academyStore";
 import { sendPushNotification, type RegisteredPushToken } from "./notificationStore";
@@ -54,9 +54,14 @@ export async function runAcademyCashReminders(now = new Date()) {
       if (record.paymentChoice !== "cash" || !record.firstCashPaidAt) continue;
       const family = await getAcademyFamily(document.id);
       if (!family || family.enrollmentState === "withdrawn") continue;
-      const stage = academyCashReminderStage(now, family.cashReminderEligible, family.paymentState);
+      // Upcoming reminders concern the *next* month's ledger. A paid current
+      // month must not suppress them, while a prepaid next month must.
+      const stage = academyCashReminderStage(now, family.cashReminderEligible, "cash_due");
       if (!stage) continue;
       const period = stage === "upcoming" ? dueMonth : currentMonth;
+      if (period > ACADEMY_LAST_BILLING_MONTH) continue;
+      const month = await document.ref.collection("months").doc(period).get();
+      if (month.data()?.status === "paid" || month.data()?.status === "not_due") continue;
       const dueTime = stage === "upcoming" ? nextCalgaryFirstBillingAnchor(now) * 1000 : now.getTime();
       if (!family.children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > dueTime)) continue;
       const devices = await document.ref.collection("devices").where("enabled", "==", true).limit(20).get();
