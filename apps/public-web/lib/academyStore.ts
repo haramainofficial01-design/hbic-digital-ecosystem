@@ -126,7 +126,9 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   if (process.env.ACADEMY_REGISTRATION_READY !== "true") throw new AcademyError("Quran Academy registration is not open yet.", 403);
   if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration is not open yet.", 403);
   const db = academyDb();
-  const input: AcademyRegistrationInput = parseAcademyRegistration(raw);
+  let input: AcademyRegistrationInput;
+  try { input = parseAcademyRegistration(raw); }
+  catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Check the registration details.", 400); }
   if (input.paymentChoice === "card") {
     // Import lazily because Stripe billing also uses Academy storage. A card
     // family must not be created unless the exact live price has been checked.
