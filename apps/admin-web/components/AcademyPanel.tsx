@@ -43,14 +43,13 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const [editingCalendarId, setEditingCalendarId] = useState<string | null>(null);
   const [announcementDraft, setAnnouncementDraft] = useState({ title: "", message: "", priority: "normal", classIds: [] as string[], publishedAt: new Date().toISOString(), expiresAt: null as string | null });
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const scannerRef = useRef<{ stop: () => void } | null>(null);
+  const cameraSessionRef = useRef(0);
 
   const stopCamera = () => {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    cameraRef.current?.getTracks().forEach((track) => track.stop());
-    cameraRef.current = null;
-    timerRef.current = null;
+    cameraSessionRef.current += 1;
+    scannerRef.current?.stop();
+    scannerRef.current = null;
   };
   useEffect(() => () => stopCamera(), []);
 
@@ -86,22 +85,25 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   }
 
   async function startCamera() {
-    const Detector = (window as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-    if (!Detector || !navigator.mediaDevices?.getUserMedia) return setMessage("Camera scanning is not supported in this browser. Paste the Academy pass link instead.");
+    if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) return setMessage("Camera scanning is unavailable. Paste the Academy pass link instead.");
+    stopCamera();
+    const session = cameraSessionRef.current;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-      cameraRef.current = stream;
-      if (!videoRef.current) { stopCamera(); return; }
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-      const detector = new Detector({ formats: ["qr_code"] });
-      timerRef.current = window.setInterval(async () => {
-        if (!videoRef.current || !cameraRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes[0]) void scan(codes[0].rawValue);
-        } catch { /* A frame can fail while the camera focuses. */ }
-      }, 500);
+      // ZXing supports browsers without the experimental BarcodeDetector API,
+      // including the iOS Safari devices used at the Academy desk.
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      const controls = await new BrowserQRCodeReader().decodeFromConstraints(
+        { video: { facingMode: "environment" }, audio: false }, videoRef.current,
+        (result, _error, activeControls) => {
+          if (!result || session !== cameraSessionRef.current) return;
+          activeControls.stop();
+          scannerRef.current = null;
+          cameraSessionRef.current += 1;
+          void scan(result.getText());
+        }
+      );
+      if (session === cameraSessionRef.current) scannerRef.current = controls;
+      else controls.stop();
     } catch { stopCamera(); setMessage("Camera access was unavailable. Paste the Academy pass link instead."); }
   }
 
