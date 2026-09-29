@@ -5,7 +5,7 @@ import type { AcademyPublicFamily } from "@hbic/shared";
 
 type AdminRequest = (path: string, init?: RequestInit) => Promise<Record<string, any>>;
 type AcademyClass = { id: string; name: string; dayOfWeek: number; startTime: string; room: string; active: boolean };
-type AcademyCalendar = { id: string; title: string; date: string; type: string };
+type AcademyCalendar = { id: string; title: string; date: string; type: string; note?: string; classIds?: string[] };
 type AcademyAnnouncement = { id: string; title: string; message: string; priority: string };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -36,6 +36,7 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
   const [announcements, setAnnouncements] = useState<AcademyAnnouncement[]>([]);
   const [classDraft, setClassDraft] = useState({ name: "", teacher: "", dayOfWeek: 1, startTime: "17:30", endTime: "19:00", room: "", level: "qaida", capacity: 20, active: true });
   const [calendarDraft, setCalendarDraft] = useState({ title: "", date: "", type: "no_class", classIds: [] as string[], note: "" });
+  const [editingCalendarId, setEditingCalendarId] = useState<string | null>(null);
   const [announcementDraft, setAnnouncementDraft] = useState({ title: "", message: "", priority: "normal", classIds: [] as string[], publishedAt: new Date().toISOString(), expiresAt: null as string | null });
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraRef = useRef<MediaStream | null>(null);
@@ -134,10 +135,10 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
     finally { setBusy(false); }
   }
 
-  async function saveItem(kind: "class" | "calendar" | "announcement", item: unknown) {
+  async function saveItem(kind: "class" | "calendar" | "announcement", item: unknown, id?: string) {
     setBusy(true);
     try {
-      const result = await adminRequest("/api/admin/academy/content", { method: "POST", body: JSON.stringify({ kind, item }) });
+      const result = await adminRequest("/api/admin/academy/content", { method: "POST", body: JSON.stringify({ kind, item, id }) });
       await load();
       const saved = `${kind === "class" ? "Class" : kind === "calendar" ? "Calendar item" : "Announcement"} saved.`;
       setMessage(result.notification?.status === "provider_error" ? `${saved} Parent push notification needs attention: ${result.notification.error}` :
@@ -197,10 +198,10 @@ export function AcademyPanel({ adminRequest }: { adminRequest: AdminRequest }) {
           <label>Level<select value={classDraft.level} onChange={(e) => setClassDraft({ ...classDraft, level: e.target.value })}><option value="qaida">Qaida</option><option value="quran">Quran</option><option value="mixed">Mixed</option></select></label>
           <label>Capacity<input type="number" min="1" max="100" value={classDraft.capacity} onChange={(e) => setClassDraft({ ...classDraft, capacity: Number(e.target.value) })} /></label></div>
         <button className="secondary" disabled={busy} onClick={() => void saveItem("class", classDraft)}>Add class</button></div>
-      <div className="academy-admin-card"><h3>Calendar and closures</h3><p>Classes are 5:30–7:00 p.m. Create one “Monthly special Thursday” item for the exact Thursday each month; it replaces the default special date. Closures are explicit admin entries.</p>{calendar.slice(0, 8).map((item) => <p key={item.id}>{item.date} · {item.title} ({item.type.replace("_", " ")})</p>)}
+      <div className="academy-admin-card"><h3>Calendar and closures</h3><p>Classes are 5:30–7:00 p.m. Create one “Monthly special Thursday” item for the exact Thursday each month; it replaces the default special date. Closures are explicit admin entries.</p>{calendar.slice(0, 8).map((item) => <p key={item.id}>{item.date} · {item.title} ({item.type.replace("_", " ")}) <button className="text-button" type="button" onClick={() => { setEditingCalendarId(item.id); setCalendarDraft({ title: item.title, date: item.date, type: item.type, classIds: item.classIds ?? [], note: item.note ?? "" }); }}>Edit</button></p>)}
         <label>Title<input value={calendarDraft.title} onChange={(e) => setCalendarDraft({ ...calendarDraft, title: e.target.value })} /></label>
         <div className="academy-admin-actions"><label>Date<input type="date" value={calendarDraft.date} onChange={(e) => setCalendarDraft({ ...calendarDraft, date: e.target.value })} /></label><label>Type<select value={calendarDraft.type} onChange={(e) => setCalendarDraft({ ...calendarDraft, type: e.target.value })}><option value="special_class">Monthly special Thursday</option><option value="no_class">No class</option><option value="holiday">Holiday</option><option value="time_changed">Time changed</option><option value="event">Event</option><option value="class">Class</option></select></label></div>
-        <label>Note<input value={calendarDraft.note} onChange={(e) => setCalendarDraft({ ...calendarDraft, note: e.target.value })} /></label><button className="secondary" disabled={busy} onClick={() => void saveItem("calendar", calendarDraft)}>Add calendar item</button></div>
+        <label>Note<input value={calendarDraft.note} onChange={(e) => setCalendarDraft({ ...calendarDraft, note: e.target.value })} /></label><button className="secondary" disabled={busy} onClick={() => void saveItem("calendar", calendarDraft, editingCalendarId ?? undefined)}>{editingCalendarId ? "Save calendar item" : "Add calendar item"}</button>{editingCalendarId ? <button className="text-button" type="button" onClick={() => { setEditingCalendarId(null); setCalendarDraft({ title: "", date: "", type: "no_class", classIds: [], note: "" }); }}>Cancel edit</button> : null}</div>
     </div>
     <div className="academy-admin-card"><h3>Academy announcements</h3>{announcements.slice(0, 8).map((item) => <p key={item.id}>{item.priority === "high" ? "Important · " : ""}{item.title}</p>)}<label>Title<input value={announcementDraft.title} onChange={(e) => setAnnouncementDraft({ ...announcementDraft, title: e.target.value })} /></label><label>Message<textarea value={announcementDraft.message} onChange={(e) => setAnnouncementDraft({ ...announcementDraft, message: e.target.value })} /></label><label>Priority<select value={announcementDraft.priority} onChange={(e) => setAnnouncementDraft({ ...announcementDraft, priority: e.target.value })}><option value="normal">Normal</option><option value="high">Important</option></select></label><button className="secondary" disabled={busy} onClick={() => void saveItem("announcement", { ...announcementDraft, publishedAt: new Date().toISOString() })}>Publish to Academy parents</button></div>
     {message ? <p role="status">{message}</p> : null}
