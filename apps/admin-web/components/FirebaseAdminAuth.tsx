@@ -78,7 +78,14 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       }
       return;
     }
-    onSession(`Bearer ${await user.getIdToken()}`, user.email ?? undefined);
+    const idToken = await user.getIdTokenResult();
+    const firebaseClaims = idToken.claims.firebase as { sign_in_second_factor?: string } | undefined;
+    if (!firebaseClaims?.sign_in_second_factor) {
+      onSession(null);
+      setStatus("MFA is enrolled, but this session has not completed its challenge. Sign out and sign in again.");
+      return;
+    }
+    onSession(`Bearer ${idToken.token}`, user.email ?? undefined);
     setStatus(`Signed in securely as ${user.email}. MFA is active.`);
     });
   }, [onSession, secret]);
@@ -124,8 +131,11 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code.trim()), "HBIC Authenticator");
       setSecret(null);
       setCode("");
-      onSession(`Bearer ${await user.getIdToken(true)}`, user.email ?? undefined);
-      setStatus(`Signed in securely as ${user.email}. MFA is active.`);
+      // Enrollment is not an MFA-authenticated sign-in. Require a fresh login
+      // so the resulting ID token carries the second-factor claim.
+      await signOut(auth);
+      onSession(null);
+      setStatus("Authenticator activated. Sign in again and enter its code to open Academy records.");
     } catch {
       setStatus("That enrollment code was invalid or expired. Enter the newest authenticator code.");
     } finally {

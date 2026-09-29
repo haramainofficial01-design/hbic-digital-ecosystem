@@ -42,7 +42,11 @@ export function validateAcademyItem(kind: "class" | "calendar" | "announcement",
   }
   if (kind === "calendar") {
     if (!["class", "special_class", "no_class", "holiday", "time_changed", "event"].includes(String(value.type))) throw new AcademyError("Choose a calendar type.");
-    return { title: text(value.title, "calendar title"), date: date(value.date), type: value.type,
+    const calendarDate = date(value.date);
+    if (value.type === "special_class" && new Date(`${calendarDate}T12:00:00Z`).getUTCDay() !== 4) {
+      throw new AcademyError("The monthly special activity must be on a Thursday.");
+    }
+    return { title: text(value.title, "calendar title"), date: calendarDate, type: value.type,
       classIds: classIds(value.classIds ?? []), note: String(value.note ?? "").trim().slice(0, 500) };
   }
   if (value.priority !== "normal" && value.priority !== "high") throw new AcademyError("Choose announcement priority.");
@@ -61,6 +65,12 @@ export async function saveAcademyItem(kind: keyof typeof collection, input: unkn
   const ref = id ? db.collection(collection[kind]).doc(id) : db.collection(collection[kind]).doc();
   if (id && !/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw new AcademyError("Invalid record ID.");
   if (id && !(await ref.get()).exists) throw new AcademyError("Record not found.", 404);
+  if (kind === "calendar" && "type" in data && data.type === "special_class") {
+    const existing = await db.collection(collection.calendar).where("type", "==", "special_class").get();
+    if (existing.docs.some((doc) => doc.id !== id && String(doc.data().date).slice(0, 7) === data.date.slice(0, 7))) {
+      throw new AcademyError("This month already has a special Thursday. Edit its date instead.", 409);
+    }
+  }
   await ref.set({ ...data, updatedBy: actorUid, updatedAt: new Date().toISOString() }, { merge: true });
   return { id: ref.id, ...data };
 }
@@ -94,7 +104,6 @@ export async function listAcademyContent(admin = false, classFilter: string[] = 
         { id: "academy-ramadan-eid-break-2027", date: "2027-02-02", title: "Ramadan & Eid al-Fitr break — no classes", type: "no_class", classIds: [],
           note: "The term ended February 1. No classes during the Ramadan and Eid al-Fitr break. HBIC will announce the resumption date after Eid." }
       ] as AcademyCalendarItem[]).filter((item) => item.date >= today && !explicit.some((existing) => existing.date === item.date));
-      if (admin) return [...explicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
       const changedDates = new Set(explicit.filter((item) => ["no_class", "holiday", "time_changed", "special_class"].includes(item.type)).map((item) => item.date));
       const specialDates = explicit.filter((item) => item.type === "special_class").map((item) => item.date);
       const recurring = academyRecurringClasses(today, 150, specialDates).filter((item) => !changedDates.has(item.date))

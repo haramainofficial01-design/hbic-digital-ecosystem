@@ -63,13 +63,16 @@ export async function requireAdminSecret(request: Request) {
       };
     }
     try {
-      const token = await getAuth(app).verifyIdToken(authorization.slice("Bearer ".length), true);
+      // Verify the signed token locally. The production service account does not
+      // have permission to look up Auth users, so getUser/checkRevoked blocks
+      // otherwise-valid personal admin sessions.
+      const token = await getAuth(app).verifyIdToken(authorization.slice("Bearer ".length));
       const email = token.email?.trim().toLowerCase();
-      const user = await getAuth(app).getUser(token.uid);
-      const enrolledFactors = user.multiFactor?.enrolledFactors ?? [];
       const allowlistedRole = email && configuredSuperAdmins().has(email) ? "superAdmin" : undefined;
       const role = typeof token.adminRole === "string" ? token.adminRole : allowlistedRole;
-      if (!email || !token.email_verified || !role || enrolledFactors.length === 0) throw new Error("unauthorized");
+      // Enrollment alone is insufficient: this claim is issued only after an
+      // actual MFA sign-in challenge. Keep Academy child records MFA-protected.
+      if (!email || !token.email_verified || !role || !token.firebase?.sign_in_second_factor) throw new Error("unauthorized");
       return {
         ok: true as const,
         actor: { uid: token.uid, email, role, kind: "firebase-account" as const }

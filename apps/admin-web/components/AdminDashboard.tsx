@@ -431,7 +431,7 @@ export function AdminDashboard() {
         {page === "Announcements" && <AnnouncementsPanel content={content} updateContent={updateContent} />}
         {page === "Events" && <EventsPanel content={content} updateContent={updateContent} />}
         {page === "Programs" && <ProgramsPanel content={content} updateContent={updateContent} />}
-        {page === "Quran Academy" && <AcademyPanel adminRequest={adminRequest} />}
+        {page === "Quran Academy" && <AcademyPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
         {page === "Donations" && <DonationsPanel content={content} updateContent={updateContent} />}
         {page === "Media" && <MediaPanel content={content} updateContent={updateContent} />}
         {page === "Halal Directory" && (
