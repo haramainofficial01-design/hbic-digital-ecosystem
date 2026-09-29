@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AcademyPublicFamily } from "@hbic/shared";
 
 type AdminRequest = (path: string, init?: RequestInit) => Promise<Record<string, any>>;
-type AcademyClass = { id: string; name: string; dayOfWeek: number; startTime: string; room: string; active: boolean };
+type AcademyClass = { id: string; name: string; teacher: string; dayOfWeek: number; startTime: string; endTime: string; room: string; level: "qaida" | "quran" | "mixed"; capacity: number; enrolledCount?: number; active: boolean };
 type AcademyCalendar = { id: string; title: string; date: string; type: string; note?: string; classIds?: string[] };
 type AcademyAnnouncement = { id: string; title: string; message: string; priority: string };
+type FamilyHistory = { payments: { period: string; method: string; status: string; amountCents: number | null; paidAt: string | null }[]; receipts: { number: string; period: string; amountCents: number; receivedAt: string }[]; audit: { id: string; action: string; at: string }[] };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const sections = ["Overview", "Families", "Students", "Registrations", "Classes", "Calendar", "Announcements", "Payments", "Scan Pass", "Programs", "Settings"] as const;
 type AcademySection = typeof sections[number];
@@ -29,6 +30,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "cash_due" | "card_attention">("all");
   const [scanInput, setScanInput] = useState("");
   const [scanned, setScanned] = useState<AcademyPublicFamily | null>(null);
+  const [history, setHistory] = useState<FamilyHistory | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [tuitionMode, setTuitionMode] = useState<"per_child" | "per_family">("per_child");
@@ -39,6 +41,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const [calendar, setCalendar] = useState<AcademyCalendar[]>([]);
   const [announcements, setAnnouncements] = useState<AcademyAnnouncement[]>([]);
   const [classDraft, setClassDraft] = useState({ name: "", teacher: "", dayOfWeek: 1, startTime: "17:30", endTime: "19:00", room: "", level: "qaida", capacity: 20, active: true });
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [calendarDraft, setCalendarDraft] = useState({ title: "", date: "", type: "no_class", classIds: [] as string[], note: "" });
   const [editingCalendarId, setEditingCalendarId] = useState<string | null>(null);
   const [announcementDraft, setAnnouncementDraft] = useState({ title: "", message: "", priority: "normal", classIds: [] as string[], publishedAt: new Date().toISOString(), expiresAt: null as string | null });
@@ -79,8 +82,13 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     try {
       const data = await adminRequest("/api/admin/academy/scan", { method: "POST", body: JSON.stringify({ token }) });
       setScanned(data.family);
+      setHistory(null);
       stopCamera();
-    } catch (error) { setScanned(null); setMessage(error instanceof Error ? error.message : "Pass scan failed."); }
+      try {
+        const detail = await adminRequest(`/api/admin/academy/family?familyId=${encodeURIComponent(data.family.id)}`);
+        setHistory(detail as FamilyHistory);
+      } catch { setMessage("Pass verified, but payment history could not be loaded. Refresh the record before recording cash."); }
+    } catch (error) { setScanned(null); setHistory(null); setMessage(error instanceof Error ? error.message : "Pass scan failed."); }
     finally { setBusy(false); }
   }
 
@@ -175,7 +183,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const paid = families.filter((family) => family.paymentState === "paid").length;
   const collectedCents = families.reduce((total, family) => total + (family.paymentState === "paid" ? family.amountCents ?? 0 : 0), 0);
   const outstandingCents = families.reduce((total, family) => total + (["cash_due", "card_attention"].includes(family.paymentState) ? family.amountCents ?? 0 : 0), 0);
-  const activeChildren = families.flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).map((child) => ({ family, child })));
+  const activeChildren = families.filter((family) => ["approved", "active"].includes(family.enrollmentState)).flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).map((child) => ({ family, child })));
   const pendingFamilies = families.filter((family) => ["submitted", "waitlisted"].includes(family.enrollmentState));
   const paymentLabel = (family: AcademyPublicFamily) => family.paymentState === "paid" ? family.paymentChoice === "card" ? "Paid online" : "Paid cash" :
     family.paymentState === "cash_due" ? "Cash due" : family.paymentState === "card_attention" ? "Card needs attention" :
@@ -190,11 +198,12 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
       <label>QR link or token<input value={scanInput} onChange={(event) => setScanInput(event.target.value)} placeholder="https://hbic.ca/a/…" /></label>
       <div className="academy-admin-actions"><button className="primary" onClick={() => void scan()} disabled={busy}>Look up pass</button><button className="secondary" onClick={() => void startCamera()} disabled={busy}>Use camera</button><button className="secondary" onClick={stopCamera}>Stop camera</button></div>
       <video ref={videoRef} muted playsInline className="academy-admin-video" aria-label="Academy QR scanner camera" />
-      {scanned ? <div className="academy-admin-result"><span className="pill">{scanned.reference}</span><h3>{scanned.guardianName}</h3><p>{scanned.phone} · {scanned.email}</p><div className="academy-admin-actions"><a href={`tel:${scanned.phone.replace(/[^\d+]/g, "")}`}>Call parent</a><a href={`mailto:${encodeURIComponent(scanned.email)}`}>Email parent</a>{scanned.whatsappConsent ? <a href={`https://wa.me/${scanned.phone.replace(/\D/g, "").replace(/^(\d{10})$/, "1$1")}`} target="_blank" rel="noopener noreferrer">Open WhatsApp</a> : null}</div><p>WhatsApp consent: {scanned.whatsappConsent ? "Yes" : "No"}</p>
+      {scanned ? <div className="academy-admin-result"><span className="pill">{scanned.reference}</span><h3>{scanned.guardianName}</h3><p>{scanned.phone} · {scanned.email}</p><p>Registered {new Date(scanned.createdAt).toLocaleString("en-CA")} · Enrollment: {scanned.enrollmentState.replace("_", " ")}</p><div className="academy-admin-actions"><a href={`tel:${scanned.phone.replace(/[^\d+]/g, "")}`}>Call parent</a><a href={`mailto:${encodeURIComponent(scanned.email)}`}>Email parent</a><button className="secondary" type="button" onClick={() => void navigator.clipboard.writeText(scanned.phone).then(() => setMessage("Phone number copied.")).catch(() => setMessage("Could not copy this phone number."))}>Copy phone</button>{scanned.whatsappConsent ? <a href={`https://wa.me/${scanned.phone.replace(/\D/g, "").replace(/^(\d{10})$/, "1$1")}`} target="_blank" rel="noopener noreferrer">Open WhatsApp</a> : null}</div><p>WhatsApp consent: {scanned.whatsappConsent ? "Yes" : "No"}</p>
         <ul>{scanned.children.map((child) => <li key={child.id}>{child.name} · Age {child.age} · {child.level.replace("_", " ")}
           <select aria-label={`Class for ${child.name}`} value={child.classId ?? ""} onChange={(event) => void assignChild(child.id, event.target.value)}><option value="">Awaiting class</option>{classes.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}</option>)}</select>
         </li>)}</ul>
         <div className="academy-admin-payment"><strong>{paymentLabel(scanned)}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.paymentChoice === "card" ? "Online payment / card" : "Cash"}</span><span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div>
+        {history ? <><h4>Payment history</h4>{history.payments.length ? history.payments.map((payment) => <p key={payment.period}>{payment.period} · {payment.method} · {payment.status.replaceAll("_", " ")} · {amount(payment.amountCents)}{payment.paidAt ? ` · paid ${new Date(payment.paidAt).toLocaleDateString("en-CA")}` : ""}</p>) : <p>No payment months recorded yet.</p>}{history.receipts.length ? <><h4>Cash receipts</h4>{history.receipts.map((receipt) => <p key={receipt.number}>{receipt.number} · {receipt.period} · {amount(receipt.amountCents)}</p>)}</> : null}{history.audit.length ? <><h4>Recent record activity</h4>{history.audit.slice(0, 10).map((entry) => <p key={entry.id}>{entry.at ? new Date(entry.at).toLocaleString("en-CA") : "Date unavailable"} · {entry.action.replaceAll("_", " ")}</p>)}</> : null}</> : null}
         {scanned.paymentChoice === "cash" && scanned.paymentState === "cash_due" ? <button className="primary" onClick={() => void receiveCash()} disabled={busy}>Mark cash received</button> : null}
         <button className="secondary" onClick={() => void replacePass()} disabled={busy}>Replace lost pass</button>
       </div> : null}
@@ -205,15 +214,15 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     {section === "Payments" ? <div className="academy-admin-card"><h3>Payments</h3><p>Current-month status comes from the server ledger. Card payment confirmation is set by Stripe webhooks, not by scanning a pass.</p><div className="academy-admin-family-list">{families.map((family) => <button key={family.id} type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{family.guardianName} · {amount(family.amountCents)}</strong><span>{family.billingPeriod} · {family.children.length} child(ren) · {family.paymentChoice === "card" ? "Online card" : "Cash"}</span><em>{paymentLabel(family)}</em></button>)}</div></div> : null}
     {section === "Settings" ? <div className="academy-admin-card"><h3>Tuition setup</h3><p>{billingMode === "live" ? "Live billing uses the approved $50-per-child Stripe price. Existing paid months are unchanged." : "Sandbox billing is active. Existing paid months are unchanged."}</p><div className="academy-admin-actions"><label>Model<select value={tuitionMode} onChange={(event) => setTuitionMode(event.target.value as typeof tuitionMode)}><option value="per_child">Per child</option><option value="per_family">Per family</option></select></label><label>Monthly amount (CAD)<input type="number" min="1" max="1000" step="0.01" value={monthlyDollars} onChange={(event) => setMonthlyDollars(event.target.value)} /></label><label>{billingMode === "live" ? "Approved live recurring Price ID" : "Sandbox recurring Price ID"}<input value={stripePriceId} onChange={(event) => setStripePriceId(event.target.value)} placeholder="price_…" /></label><button className="secondary" disabled={busy} onClick={() => void savePricing()}>Save tuition</button></div></div> : null}
     {section === "Classes" || section === "Calendar" ? <div className="academy-admin-grid">
-      {section === "Classes" ? <div className="academy-admin-card"><h3>Classes</h3><p>{classes.length} class(es) configured.</p>{classes.map((item) => <p key={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime} · {item.room}</p>)}
+      {section === "Classes" ? <div className="academy-admin-card"><h3>Classes</h3><p>{classes.length} class(es) configured. Regular class time is 5:30–7:00 p.m.; monthly special activities are managed in Calendar.</p>{classes.map((item) => <p key={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}–{item.endTime} · {item.room} · {item.enrolledCount ?? 0}/{item.capacity} students · {item.active ? "Active" : "Inactive"} <button className="text-button" type="button" onClick={() => { setEditingClassId(item.id); setClassDraft({ name: item.name, teacher: item.teacher, dayOfWeek: item.dayOfWeek, startTime: item.startTime, endTime: item.endTime, room: item.room, level: item.level, capacity: item.capacity, active: item.active }); }}>Edit</button></p>)}
         <label>Class name<input value={classDraft.name} onChange={(e) => setClassDraft({ ...classDraft, name: e.target.value })} /></label>
         <label>Teacher<input value={classDraft.teacher} onChange={(e) => setClassDraft({ ...classDraft, teacher: e.target.value })} /></label>
         <label>Room<input value={classDraft.room} onChange={(e) => setClassDraft({ ...classDraft, room: e.target.value })} /></label>
         <div className="academy-admin-actions"><label>Day<select value={classDraft.dayOfWeek} onChange={(e) => setClassDraft({ ...classDraft, dayOfWeek: Number(e.target.value) })}>{days.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
           <label>Start<input type="time" value={classDraft.startTime} onChange={(e) => setClassDraft({ ...classDraft, startTime: e.target.value })} /></label><label>End<input type="time" value={classDraft.endTime} onChange={(e) => setClassDraft({ ...classDraft, endTime: e.target.value })} /></label>
           <label>Level<select value={classDraft.level} onChange={(e) => setClassDraft({ ...classDraft, level: e.target.value })}><option value="qaida">Qaida</option><option value="quran">Quran</option><option value="mixed">Mixed</option></select></label>
-          <label>Capacity<input type="number" min="1" max="100" value={classDraft.capacity} onChange={(e) => setClassDraft({ ...classDraft, capacity: Number(e.target.value) })} /></label></div>
-        <button className="secondary" disabled={busy} onClick={() => void saveItem("class", classDraft)}>Add class</button></div> : null}
+          <label>Capacity<input type="number" min="1" max="100" value={classDraft.capacity} onChange={(e) => setClassDraft({ ...classDraft, capacity: Number(e.target.value) })} /></label><label>Status<select value={classDraft.active ? "active" : "inactive"} onChange={(e) => setClassDraft({ ...classDraft, active: e.target.value === "active" })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div>
+        <button className="secondary" disabled={busy} onClick={() => void saveItem("class", classDraft, editingClassId ?? undefined)}>{editingClassId ? "Save class" : "Add class"}</button>{editingClassId ? <button className="text-button" type="button" onClick={() => { setEditingClassId(null); setClassDraft({ name: "", teacher: "", dayOfWeek: 1, startTime: "17:30", endTime: "19:00", room: "", level: "qaida", capacity: 20, active: true }); }}>Cancel edit</button> : null}</div> : null}
       {section === "Calendar" ? <div className="academy-admin-card"><h3>Calendar and closures</h3><p>Classes are 5:30–7:00 p.m. One Thursday per month is a special activity. To move a default special, add one “Monthly special Thursday” entry in that month; edit that entry to move it again. Closures are explicit admin entries.</p>{calendar.slice(0, 80).map((item) => <p key={item.id}>{item.date} · {item.title} ({item.type.replace("_", " ")}) {!item.id.startsWith("academy-") && !item.id.startsWith("alberta-") && !item.id.startsWith("recurring-") ? <button className="text-button" type="button" onClick={() => { setEditingCalendarId(item.id); setCalendarDraft({ title: item.title, date: item.date, type: item.type, classIds: item.classIds ?? [], note: item.note ?? "" }); }}>Edit</button> : null}</p>)}
         <label>Title<input value={calendarDraft.title} onChange={(e) => setCalendarDraft({ ...calendarDraft, title: e.target.value })} /></label>
         <div className="academy-admin-actions"><label>Date<input type="date" value={calendarDraft.date} onChange={(e) => setCalendarDraft({ ...calendarDraft, date: e.target.value })} /></label><label>Type<select value={calendarDraft.type} onChange={(e) => setCalendarDraft({ ...calendarDraft, type: e.target.value })}><option value="special_class">Monthly special Thursday</option><option value="no_class">No class</option><option value="holiday">Holiday</option><option value="time_changed">Time changed</option><option value="event">Event</option><option value="class">Class</option></select></label></div>

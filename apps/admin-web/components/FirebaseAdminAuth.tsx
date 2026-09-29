@@ -58,6 +58,13 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       onSession(null);
       return;
     }
+    try {
+      await user.reload();
+    } catch {
+      onSession(null);
+      setStatus("Could not refresh administrator sign-in. Sign out and try again.");
+      return;
+    }
     if (!user.emailVerified) {
       onSession(null);
       setStatus("Verify the email address before administrator access can continue.");
@@ -78,7 +85,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       }
       return;
     }
-    const idToken = await user.getIdTokenResult();
+    const idToken = await user.getIdTokenResult(true);
     const firebaseClaims = idToken.claims.firebase as { sign_in_second_factor?: string } | undefined;
     if (!firebaseClaims?.sign_in_second_factor) {
       onSession(null);
