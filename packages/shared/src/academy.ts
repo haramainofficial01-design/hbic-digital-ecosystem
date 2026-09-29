@@ -8,6 +8,7 @@ export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "ca
 export const ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD = 5_000;
 export const ACADEMY_REGISTRATION_OPEN_DATE = "2026-09-27";
 export const ACADEMY_FIRST_CLASS_DATE = "2026-10-05";
+/** The initial special activity is October 15. One Thursday is special each month; staff can override it in the Academy calendar. */
 export const ACADEMY_FIRST_FUN_CLASS_DATE = "2026-10-15";
 export const ACADEMY_FIRST_BILLING_MONTH = "2026-10";
 export const ACADEMY_LAST_BILLING_MONTH = "2027-01";
@@ -27,7 +28,7 @@ export const ACADEMY_TUITION_POLICY = [
   { title: "Cash payments", body: "September registrations owe no September tuition. October cash tuition is due in person at HBIC on October 1, even though there is no class that day; tuition is monthly, not per class. The final cash tuition due for this term is January 1, 2027; the February 1 class is included without February tuition. No cash tuition is due during the Ramadan and Eid al-Fitr break. Bring your Academy pass. Payment is recorded only after authorized staff receive and confirm the cash; a receipt follows confirmation." },
   { title: "Payment standing", body: "Each child's tuition is tracked separately. If a card charge fails or cash is overdue, HBIC will contact you to resolve it. A payment-success screen or pass screenshot is not proof of payment; the current Academy record is authoritative." },
   { title: "Cancellation and refunds", body: "You can cancel an individual child's future enrollment at any time. Future renewals for that child stop; access already paid for continues through the current period. Refund requests require HBIC administrative review; no automatic refund is promised." },
-  { title: "Classes and changes", body: "This term begins October 5, 2026 and ends February 1, 2027. Classes meet Mondays and Thursdays, 6:00–7:00 p.m., except published holidays and closures; there is no class October 1. There are no classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid is to be announced. Tuition is monthly, not per class. Participation depends on placement, availability and payment standing. HBIC will communicate material schedule changes. Any new terms require a new policy version and acceptance." }
+  { title: "Classes and changes", body: "This term begins October 5, 2026 and ends February 1, 2027. Classes meet Mondays and Thursdays, 5:30–7:00 p.m., except published holidays and closures; there is no class October 1. One Thursday each month is a special activity with games and an Islamic presentation; HBIC publishes the exact date and may change it. There are no classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid is to be announced. Tuition is monthly, not per class. Participation depends on placement, availability and payment standing. HBIC will communicate material schedule changes. Any new terms require a new policy version and acceptance." }
 ] as const;
 
 export function academyRegistrationOpen(now = new Date()): boolean {
@@ -37,10 +38,12 @@ export function academyRegistrationOpen(now = new Date()): boolean {
   return date >= ACADEMY_REGISTRATION_OPEN_DATE && date <= "2027-01-31";
 }
 
-export function academyRecurringClasses(fromDate: string, days = 150) {
+/** Default monthly special Thursday: third Thursday. An explicit `special_class` calendar entry replaces it. */
+export function academyRecurringClasses(fromDate: string, days = 150, specialDates: readonly string[] = []) {
   const start = Math.max(Date.parse(`${fromDate}T12:00:00Z`), Date.parse(`${ACADEMY_FIRST_CLASS_DATE}T12:00:00Z`));
   if (!Number.isFinite(start)) return [];
-  const funAnchor = Date.parse(`${ACADEMY_FIRST_FUN_CLASS_DATE}T12:00:00Z`);
+  const configuredSpecialDates = new Set(specialDates);
+  const configuredSpecialMonths = new Set(specialDates.map((date) => date.slice(0, 7)));
   const result: { date: string; type: "class"; title: string; note: string; fun: boolean }[] = [];
   for (let index = 0; index < days; index += 1) {
     const day = new Date(start + index * 86_400_000);
@@ -48,9 +51,11 @@ export function academyRecurringClasses(fromDate: string, days = 150) {
     const weekday = day.getUTCDay();
     if (weekday !== 1 && weekday !== 4) continue;
     if (ACADEMY_ALBERTA_GENERAL_HOLIDAYS.some((holiday) => holiday.date === day.toISOString().slice(0, 10))) continue;
-    const fun = weekday === 4 && day.getTime() >= funAnchor && (day.getTime() - funAnchor) % (14 * 86_400_000) === 0;
+    const date = day.toISOString().slice(0, 10);
+    const thursdayInMonth = Math.floor((day.getUTCDate() - 1) / 7) + 1;
+    const fun = weekday === 4 && (configuredSpecialDates.has(date) || (thursdayInMonth === 3 && !configuredSpecialMonths.has(date.slice(0, 7))));
     result.push({ date: day.toISOString().slice(0, 10), type: "class", title: fun ? "Fun Thursday class" : "Quran Academy class",
-      note: fun ? "6:00–7:00 p.m. · games and Islamic presentation; food or prizes may be offered occasionally" : "6:00–7:00 p.m.", fun });
+      note: fun ? "5:30–7:00 p.m. · monthly special activity with games and an Islamic presentation; food or prizes may be offered occasionally" : "5:30–7:00 p.m.", fun });
   }
   return result;
 }

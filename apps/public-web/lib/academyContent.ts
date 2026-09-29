@@ -5,7 +5,7 @@ import { ACADEMY_ALBERTA_GENERAL_HOLIDAYS, ACADEMY_TERM_END_DATE, academyRecurri
 import { academyDb, AcademyError } from "./academyStore";
 
 export type AcademyClass = { id: string; name: string; teacher: string; dayOfWeek: number; startTime: string; endTime: string; room: string; level: "qaida" | "quran" | "mixed"; capacity: number; active: boolean };
-export type AcademyCalendarItem = { id: string; title: string; date: string; type: "class" | "no_class" | "holiday" | "time_changed" | "event"; classIds: string[]; note: string };
+export type AcademyCalendarItem = { id: string; title: string; date: string; type: "class" | "special_class" | "no_class" | "holiday" | "time_changed" | "event"; classIds: string[]; note: string };
 export type AcademyAnnouncement = { id: string; title: string; message: string; priority: "normal" | "high"; classIds: string[]; publishedAt: string; expiresAt: string | null };
 
 function text(value: unknown, label: string, max = 120) {
@@ -41,7 +41,7 @@ export function validateAcademyItem(kind: "class" | "calendar" | "announcement",
       room: text(value.room, "room", 70), level: value.level, capacity, active: value.active !== false };
   }
   if (kind === "calendar") {
-    if (!["class", "no_class", "holiday", "time_changed", "event"].includes(String(value.type))) throw new AcademyError("Choose a calendar type.");
+    if (!["class", "special_class", "no_class", "holiday", "time_changed", "event"].includes(String(value.type))) throw new AcademyError("Choose a calendar type.");
     return { title: text(value.title, "calendar title"), date: date(value.date), type: value.type,
       classIds: classIds(value.classIds ?? []), note: String(value.note ?? "").trim().slice(0, 500) };
   }
@@ -90,13 +90,14 @@ export async function listAcademyContent(admin = false, classFilter: string[] = 
           title: holiday.title, type: "holiday" as const, classIds: [],
           note: holiday.date === "2026-10-12" ? "No Academy class on this Alberta general holiday." : "Alberta general holiday; no regular Academy class is scheduled on this date." })),
         { id: "academy-term-end-2027-02-01", date: ACADEMY_TERM_END_DATE, title: "Academy term ends", type: "event", classIds: [],
-          note: "Final scheduled class of the term, 6:00–7:00 p.m. No classes afterward through Ramadan and Eid al-Fitr; resumption after Eid is to be announced." },
+          note: "Final scheduled class of the term, 5:30–7:00 p.m. No classes afterward through Ramadan and Eid al-Fitr; resumption after Eid is to be announced." },
         { id: "academy-ramadan-eid-break-2027", date: "2027-02-02", title: "Ramadan & Eid al-Fitr break — no classes", type: "no_class", classIds: [],
           note: "The term ended February 1. No classes during the Ramadan and Eid al-Fitr break. HBIC will announce the resumption date after Eid." }
       ] as AcademyCalendarItem[]).filter((item) => item.date >= today && !explicit.some((existing) => existing.date === item.date));
       if (admin) return [...explicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-      const changedDates = new Set(explicit.filter((item) => ["no_class", "holiday", "time_changed"].includes(item.type)).map((item) => item.date));
-      const recurring = academyRecurringClasses(today).filter((item) => !changedDates.has(item.date))
+      const changedDates = new Set(explicit.filter((item) => ["no_class", "holiday", "time_changed", "special_class"].includes(item.type)).map((item) => item.date));
+      const specialDates = explicit.filter((item) => item.type === "special_class").map((item) => item.date);
+      const recurring = academyRecurringClasses(today, 150, specialDates).filter((item) => !changedDates.has(item.date))
         .map((item) => ({ id: `recurring-${item.date}`, date: item.date, title: item.title, type: item.type,
           classIds: [] as string[], note: item.note }));
       return [...recurring, ...explicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));

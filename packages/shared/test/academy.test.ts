@@ -69,14 +69,15 @@ test("cash reminders appear three Calgary days before the first and on unpaid du
   assert.equal(academyCashReminderStage(new Date("2026-02-25T16:00:00Z"), true, "cash_due"), null);
 });
 
-test("Academy classes start October 5 and first alternate fun Thursday is October 15", () => {
+test("Academy classes start October 5 and the special activity is monthly", () => {
   const classes = academyRecurringClasses("2026-10-01", 32);
   assert.equal(classes[0]?.date, "2026-10-05");
   assert.equal(classes[1]?.date, "2026-10-08");
   assert.equal(classes.find((entry) => entry.fun)?.date, "2026-10-15");
-  assert.equal(classes.filter((entry) => entry.fun)[1]?.date, "2026-10-29");
+  assert.equal(classes.filter((entry) => entry.fun).length, 1);
+  assert.equal(academyRecurringClasses("2026-10-01", 32, ["2026-10-22"]).find((entry) => entry.fun)?.date, "2026-10-22");
   assert.equal(classes.some((entry) => entry.date === "2026-10-12"), false);
-  assert.equal(classes[0]?.note.includes("6:00–7:00 p.m."), true);
+  assert.equal(classes[0]?.note.includes("5:30–7:00 p.m."), true);
   const term = academyRecurringClasses("2027-01-30", 20);
   assert.equal(term.at(-1)?.date, "2027-02-01");
   assert.equal(term.some((entry) => entry.date === "2027-02-04"), false);
