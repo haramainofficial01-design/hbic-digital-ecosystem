@@ -4,8 +4,6 @@ import { getAuth, initializeAuth, type Auth } from "firebase/auth";
 // the package's browser-oriented TypeScript declaration.
 // @ts-expect-error React Native-only Firebase Auth export
 import { getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
@@ -31,5 +29,3 @@ try {
   auth = getAuth(firebaseApp);
 }
 export { auth };
-export const db = getFirestore(firebaseApp);
-export const storage = getStorage(firebaseApp);
