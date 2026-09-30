@@ -33,9 +33,10 @@ export default function AdminDashboardScreen() {
     </View>
     <Text style={[styles.note, { color: theme.colors.muted }]}>Authorized HBIC staff only. Sign in securely on the admin page; your password is not shared with the app.</Text>
     {error ? <View style={styles.fallback}><Text style={{ color: theme.colors.text }}>The admin dashboard could not load here.</Text><AppButton label="Open secure admin website" onPress={() => void Linking.openURL(adminOrigin)} /></View> :
-      <WebView ref={webView} source={{ uri: adminOrigin }} originWhitelist={[adminOrigin]}
-        javaScriptEnabled domStorageEnabled sharedCookiesEnabled
-        onShouldStartLoadWithRequest={(request) => allowNavigation(request.url)}
+      <WebView ref={webView} source={{ uri: adminOrigin }} originWhitelist={["https://*"]}
+        javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled
+        onShouldStartLoadWithRequest={(request) => request.isTopFrame === false || allowNavigation(request.url)}
+        onOpenWindow={(event) => { const url = event.nativeEvent.targetUrl; if (url) void Linking.openURL(url); }}
         onError={() => setError(true)}
         startInLoadingState renderLoading={() => <ActivityIndicator size="large" color={theme.colors.teal} style={styles.loader} />}
         style={styles.webview} />}

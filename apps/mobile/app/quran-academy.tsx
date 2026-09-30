@@ -51,7 +51,10 @@ export default function QuranAcademyScreen() {
     {error ? <View style={styles.fallback}><Text style={{ color: theme.colors.text }}>The Academy page could not load here.</Text><AppButton label="Try again" onPress={() => { setError(false); webView.current?.reload(); }} /><AppButton label="Open hbic.ca" variant="ghost" onPress={() => void Linking.openURL(academyUrl)} /></View> :
       <WebView ref={webView} source={{ uri: academyUrl }} originWhitelist={["https://*"]}
         javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled
-        onShouldStartLoadWithRequest={(request) => allowNavigation(request.url)}
+        // Firebase Auth loads a background iframe on its own auth domain.
+        // Only route top-frame links; opening that iframe in Safari shows a
+        // blank page and interrupts the parent registration flow.
+        onShouldStartLoadWithRequest={(request) => request.isTopFrame === false || allowNavigation(request.url)}
         onOpenWindow={(event) => { const url = event.nativeEvent.targetUrl; if (url) void Linking.openURL(url); }}
         onError={() => setError(true)}
         startInLoadingState renderLoading={() => <ActivityIndicator size="large" color={theme.colors.teal} style={styles.loader} />}
