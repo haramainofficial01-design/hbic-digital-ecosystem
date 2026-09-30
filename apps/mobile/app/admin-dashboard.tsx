@@ -9,7 +9,7 @@ import { useAppTheme } from "../src/theme/ThemeProvider";
 
 const adminOrigin = "https://hbic-calgary-admin.vercel.app";
 
-/** Reuse the responsive, MFA-protected admin product without sharing app credentials. */
+/** Reuse the responsive, approved-account admin product without sharing app credentials. */
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const webView = useRef<WebView>(null);
