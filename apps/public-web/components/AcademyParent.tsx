@@ -15,6 +15,12 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 // double-taps, short enough that a parent missing the email is not stuck.
 const VERIFY_RESEND_COOLDOWN_SECONDS = 60;
 
+declare global {
+  interface Window {
+    ReactNativeWebView?: { postMessage: (message: string) => void };
+  }
+}
+
 function verificationReturnSettings() {
   // Firebase's hosted verification page can return parents to the exact
   // Academy form after they confirm their address on a phone or another tab.
@@ -42,11 +48,51 @@ export function AcademyParent() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [cardAvailable, setCardAvailable] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [insideApp, setInsideApp] = useState(false);
   const familyId = family?.id;
   const cashReminder = family?.paymentChoice === "cash" ? academyCashReminderStage(new Date(), family.cashReminderEligible, family.paymentState) : null;
   const calgaryToday = dateStringInTimeZone(new Date(), masjidTimeZone);
   const nextClass = content?.calendar.find((item) => item.date >= calgaryToday && item.type === "class");
   const nextClosure = content?.calendar.find((item) => item.date >= calgaryToday && (item.type === "holiday" || item.type === "no_class"));
+
+  useEffect(() => {
+    setInsideApp(Boolean(window.ReactNativeWebView));
+    const onPushResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      if (detail?.message) setStatus(detail.message);
+    };
+    window.addEventListener("hbicAcademyPushResult", onPushResult);
+    return () => window.removeEventListener("hbicAcademyPushResult", onPushResult);
+  }, []);
+
+  useEffect(() => {
+    if (!insideApp || !user || !verified || !familyId) return;
+    let cancelled = false;
+    void user.getIdToken(true).then((token) => {
+      if (!cancelled) window.ReactNativeWebView?.postMessage(JSON.stringify({ type: "academy-session", token }));
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [insideApp, user, verified, familyId]);
+
+  async function enableAppUpdates() {
+    if (!user || !window.ReactNativeWebView) return;
+    try {
+      const token = await user.getIdToken(true);
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: "academy-enable-updates", token }));
+      setStatus("Check your device’s notification permission prompt.");
+    } catch { setStatus("Sign in again before enabling app updates."); }
+  }
+
+  async function signOutAcademy() {
+    if (!academyAuth) return;
+    if (user && window.ReactNativeWebView) {
+      try {
+        const token = await user.getIdToken(true);
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: "academy-sign-out", token }));
+      } catch { /* Firebase sign-out still proceeds if token refresh fails. */ }
+    }
+    await signOut(academyAuth);
+  }
 
   useEffect(() => { void fetch("/api/academy/billing", { cache: "no-store" }).then((response) => response.json()).then((data) => {
     setCardAvailable(data.cardAvailable === true); setRegistrationOpen(data.registrationOpen === true);
@@ -294,8 +340,9 @@ export function AcademyParent() {
           <label className={styles.check}><input type="checkbox" checked={form.policyAccepted} onChange={(e) => setForm({ ...form, policyAccepted: e.target.checked })} /> I have read and agree to the HBIC Quran Academy Tuition &amp; Payment Policy.</label>
           {form.paymentChoice === "card" ? <label className={styles.check}><input type="checkbox" checked={form.recurringAuthorized} onChange={(e) => setForm({ ...form, recurringAuthorized: e.target.checked })} /> I authorize recurring monthly tuition charges for my enrolled children until cancelled under this policy.</label> : null}
           <button className={styles.primary} disabled={busy || !form.policyAccepted || (form.paymentChoice === "card" && !form.recurringAuthorized)} onClick={() => void submit()}>Send registration</button>
-        </> : <><div className={styles.familyHeading}><div><span className={styles.eyebrow}>YOUR ACADEMY HOME</span><h2>{family.guardianName}</h2><p>{family.reference} · {family.enrollmentState === "submitted" ? "Conditional enrollment — payment or placement pending" : family.enrollmentState}</p></div><button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Sign out</button></div>
+        </> : <><div className={styles.familyHeading}><div><span className={styles.eyebrow}>YOUR ACADEMY HOME</span><h2>{family.guardianName}</h2><p>{family.reference} · {family.enrollmentState === "submitted" ? "Conditional enrollment — payment or placement pending" : family.enrollmentState}</p></div><button className={styles.textButton} onClick={() => void signOutAcademy()}>Sign out</button></div>
           <div className={styles.summary}><div><small>ACADEMY UPDATES</small><strong>Join the parent WhatsApp group</strong><span>Join now for class and holiday announcements, including while your enrollment is conditional.</span><a href="https://chat.whatsapp.com/IZhuemIDjR10DTluYIiSQq?mode=gi_t" target="_blank" rel="noopener noreferrer">Join the HBIC Quran Academy WhatsApp group ↗</a></div></div>
+          {insideApp ? <div className={styles.summary}><div><small>APP UPDATES</small><strong>Class changes on your phone</strong><span>Opt in for Academy announcements, closures, and cash tuition reminders on this device.</span><button className={styles.secondary} type="button" onClick={() => void enableAppUpdates()}>Enable Academy app notifications</button></div></div> : null}
           {cashReminder ? <p className={styles.terms} role="status">{cashReminder === "due" ? "Academy cash tuition is due today, the 1st. Please pay at HBIC; staff will record your receipt." : "Academy cash tuition for next month is due on the 1st. Please plan to pay in person at HBIC."}</p> : null}
           {nextClass ? <div className={styles.summary}><div><small>NEXT CLASS</small><strong>{nextClass.title}</strong><span>{nextClass.date} · 5:30–7:00 p.m.</span></div>
             {nextClosure ? <div><small>UPCOMING CLOSURE</small><strong>{nextClosure.title}</strong><span>{nextClosure.date}</span></div> : null}</div> : null}
