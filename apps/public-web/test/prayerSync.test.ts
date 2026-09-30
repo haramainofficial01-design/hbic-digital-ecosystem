@@ -36,8 +36,8 @@ test("visible change alerts include only changed iqamah prayers", () => {
   const before = structuredClone(defaultContent.iqamahTime);
   const after = { ...before, fajrIqamah: "6:20 AM", asrIqamah: "5:30 PM" };
   assert.deepEqual(changedIqamahTimes(before, after), [
-    { prayer: "fajr", time: "6:20 AM" },
-    { prayer: "asr", time: "5:30 PM" }
+    { prayer: "fajr", oldTime: before.fajrIqamah, newTime: "6:20 AM" },
+    { prayer: "asr", oldTime: before.asrIqamah, newTime: "5:30 PM" }
   ]);
   assert.deepEqual(changedIqamahTimes(undefined, after), []);
 });
