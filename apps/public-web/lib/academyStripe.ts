@@ -1,8 +1,8 @@
 import "server-only";
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_FIRST_BILLING_MONTH, academyRegistrationOpen, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
+import { ACADEMY_FIRST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 
 // 00:00 Calgary on February 1, before Stripe's February renewal. The final
@@ -57,18 +57,24 @@ export async function startAcademyCheckout(uid: string) {
   }
   const family = await getAcademyFamily(uid);
   if (!family || family.paymentChoice !== "card") throw new AcademyError("Register with card billing first.", 409);
+  if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy enrollment has been withdrawn.", 409);
   if (family.amountCents === null) throw new AcademyError("Tuition must be confirmed before card setup.", 409);
   const config = await academyCardConfig();
   if (!config.cardAvailable) throw new AcademyError("Card setup is not ready.", 503);
   const stripe = academyStripe();
   const price = await stripe.prices.retrieve(config.stripePriceId);
-  const quantity = config.tuitionMode === "per_child" ? family.children.length : 1;
+  const quantity = config.tuitionMode === "per_child" ? family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).length : 1;
   if (price.livemode !== (academyBillingMode() === "live") || price.currency !== "cad" || price.recurring?.interval !== "month" ||
       price.unit_amount !== config.monthlyCents || price.active !== true || quantity < 1) {
     throw new AcademyError("The approved tuition and Stripe monthly price do not match.", 409);
   }
   const db = academyDb();
   const familyRef = db.collection("academyFamilies").doc(uid);
+  const lockRef = db.collection("academyBillingLocks").doc(uid);
+  const pending = (await familyRef.get()).data();
+  if (pending?.withdrawalPendingAt || pending?.enrollmentState === "withdrawn") throw new AcademyError("This Academy enrollment is being withdrawn.", 409);
+  const lock = await lockRef.get();
+  if (lock.exists && Number(lock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("A billing change is in progress. Try again shortly.", 409);
   const existingId = (await familyRef.get()).data()?.stripeCheckoutSessionId;
   if (typeof existingId === "string") {
     try {
@@ -97,7 +103,19 @@ export async function startAcademyCheckout(uid: string) {
     cancel_url: `${academyPreviewOrigin()}/quran-academy?checkout=cancelled`
   });
   if (!session.url || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Stripe returned an unexpected Checkout session.", 502);
-  await familyRef.update({ stripeCheckoutSessionId: session.id, stripeTuitionMode: config.tuitionMode, updatedAt: new Date().toISOString() });
+  try {
+    await db.runTransaction(async (tx) => {
+      const [latest, currentLock] = await Promise.all([tx.get(familyRef), tx.get(lockRef)]);
+      if (!latest.exists || latest.data()?.withdrawalPendingAt || latest.data()?.enrollmentState === "withdrawn") {
+        throw new AcademyError("This Academy enrollment is being withdrawn.", 409);
+      }
+      if (currentLock.exists && Number(currentLock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("A billing change is in progress. Try again shortly.", 409);
+      tx.update(familyRef, { stripeCheckoutSessionId: session.id, stripeTuitionMode: config.tuitionMode, updatedAt: new Date().toISOString() });
+    });
+  } catch (error) {
+    await stripe.checkout.sessions.expire(session.id);
+    throw error;
+  }
   return session.url;
 }
 
@@ -131,12 +149,24 @@ export async function cancelAcademyChild(uid: string, childId: string) {
   });
   try {
     const activeRenewals = (family.children as { cancelEffectiveAt?: string | null }[]).filter((child) => !child.cancelEffectiveAt).length;
+    const pricing = await getAcademyPricing();
     let effectiveAt = new Date(nextCalgaryFirstBillingAnchor(new Date()) * 1000).toISOString();
+    let pendingCardSetup = false;
     if (family.paymentChoice === "card") {
       if (!cardBillingConfigured()) throw new AcademyError("Card billing must be available before changing a subscription.", 503);
-      if (typeof family.stripeSubscriptionId !== "string") throw new AcademyError("Card setup is not complete. Contact HBIC to cancel the pending registration.", 409);
       const stripe = academyStripe();
-      const subscription = await stripe.subscriptions.retrieve(family.stripeSubscriptionId);
+      let subscriptionId = typeof family.stripeSubscriptionId === "string" ? family.stripeSubscriptionId : "";
+      if (!subscriptionId && typeof family.stripeCheckoutSessionId === "string") {
+        const session = await stripe.checkout.sessions.retrieve(family.stripeCheckoutSessionId);
+        if (session.client_reference_id !== uid || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Card setup needs staff review before cancellation.", 409);
+        if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+        else if (session.status === "complete") subscriptionId = objectId(session.subscription);
+      }
+      if (!subscriptionId) {
+        pendingCardSetup = true;
+        effectiveAt = new Date().toISOString();
+      } else {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const item = subscription.items.data[0];
       const perChild = family.stripeTuitionMode !== "per_family";
       if (subscription.livemode !== (academyBillingMode() === "live") || subscription.metadata.academyFamilyUid !== uid || !item || subscription.items.data.length !== 1 ||
@@ -150,20 +180,104 @@ export async function cancelAcademyChild(uid: string, childId: string) {
         await stripe.subscriptions.update(subscription.id, { items: [{ id: item.id, quantity: activeRenewals - 1 }], proration_behavior: "none" },
           { idempotencyKey: `academy-cancel-${uid}-${childId}` });
       }
+      }
     }
     await db.runTransaction(async (tx) => {
-      const [snapshot, lock] = await Promise.all([tx.get(familyRef), tx.get(lockRef)]);
+      const monthRef = familyRef.collection("months").doc(academyTuitionPeriod(new Date()));
+      const [snapshot, lock, month] = await Promise.all([tx.get(familyRef), tx.get(lockRef), tx.get(monthRef)]);
       if (lock.data()?.id !== lockId) throw new AcademyError("Billing change expired. Contact HBIC before trying again.", 409);
       const children = snapshot.data()?.children as { id: string; cancelEffectiveAt?: string | null }[];
       if (!children.some((child) => child.id === childId && !child.cancelEffectiveAt)) throw new AcademyError("Child cancellation was already recorded.", 409);
+      const lastChildNow = pendingCardSetup && activeRenewals === 1;
+      const passToken = String(snapshot.data()?.passToken ?? "");
+      if (lastChildNow && passToken) tx.set(db.collection("academyPasses").doc(createHash("sha256").update(passToken).digest("hex")), { uid, state: "revoked", updatedAt: new Date().toISOString() }, { merge: true });
       tx.update(familyRef, { children: children.map((child) => child.id === childId ? { ...child, cancelEffectiveAt: effectiveAt } : child),
+        ...(pendingCardSetup ? { stripeCheckoutSessionId: null } : {}),
+        ...(lastChildNow ? { enrollmentState: "withdrawn", passState: "revoked", passToken: "" } : {}),
         // Keep class access through the already-paid period. Renewal quantity
         // changes immediately, but the child's attendance ends at effectiveAt.
         updatedAt: new Date().toISOString() });
+      if (pendingCardSetup && month.exists && month.data()?.status !== "paid") {
+        const remaining = activeRenewals - 1;
+        tx.update(monthRef, { amountCents: remaining === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? remaining : 1),
+          status: remaining === 0 ? "not_due" : "scheduled", updatedAt: new Date().toISOString() });
+      }
       tx.create(db.collection("academyAudit").doc(), { action: "child_cancellation", familyId: uid, childId, effectiveAt, method: family.paymentChoice, at: new Date().toISOString() });
       tx.delete(lockRef);
     });
     return { effectiveAt, family: await getAcademyFamily(uid) };
+  } catch (error) {
+    await db.runTransaction(async (tx) => { if ((await tx.get(lockRef)).data()?.id === lockId) tx.delete(lockRef); });
+    throw error;
+  }
+}
+
+/** Staff withdrawal is not a payment or refund. Stop future billing first, then retain the registration as history. */
+export async function withdrawConditionalAcademyFamily(uid: string, reason: string, actor: { uid: string; email: string }) {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) throw new AcademyError("Invalid family reference.");
+  const cleanReason = reason.trim();
+  if (cleanReason.length < 8 || cleanReason.length > 300) throw new AcademyError("Enter a short reason (8–300 characters).");
+  const db = academyDb();
+  const familyRef = db.collection("academyFamilies").doc(uid);
+  const lockRef = db.collection("academyBillingLocks").doc(uid);
+  const lockId = randomBytes(12).toString("hex");
+  const family = await db.runTransaction(async (tx) => {
+    const [snapshot, lock] = await Promise.all([tx.get(familyRef), tx.get(lockRef)]);
+    if (!snapshot.exists) throw new AcademyError("Academy registration was not found.", 404);
+    if (!["conditional", "submitted", "approved"].includes(String(snapshot.data()?.enrollmentState))) {
+      throw new AcademyError("Only a Conditional enrollment can be withdrawn here.", 409);
+    }
+    if (lock.exists && Number(lock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("Another billing change is in progress. Try again shortly.", 409);
+    tx.set(lockRef, { id: lockId, expiresAt: Date.now() + 120_000 });
+    tx.update(familyRef, { withdrawalPendingAt: new Date().toISOString() });
+    return snapshot.data()!;
+  });
+  try {
+    if (family.paymentChoice === "card") {
+      if (!cardBillingConfigured()) throw new AcademyError("Card billing access is required to safely stop future charges.", 503);
+      const stripe = academyStripe();
+      const subscriptions = new Set<string>();
+      if (typeof family.stripeSubscriptionId === "string") subscriptions.add(family.stripeSubscriptionId);
+      if (typeof family.stripeCheckoutSessionId === "string") {
+        const session = await stripe.checkout.sessions.retrieve(family.stripeCheckoutSessionId);
+        if (session.client_reference_id !== uid || session.livemode !== (academyBillingMode() === "live")) {
+          throw new AcademyError("Checkout does not match this family. Billing needs staff review.", 409);
+        }
+        if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+        else if (session.status === "complete") {
+          const id = objectId(session.subscription);
+          if (!id) throw new AcademyError("Completed card setup needs staff review before withdrawal.", 409);
+          subscriptions.add(id);
+        }
+      }
+      for (const id of subscriptions) {
+        const subscription = await stripe.subscriptions.retrieve(id);
+        if (subscription.metadata.academyFamilyUid !== uid || subscription.livemode !== (academyBillingMode() === "live")) {
+          throw new AcademyError("Subscription does not match this family. Billing needs staff review.", 409);
+        }
+        if (subscription.status !== "canceled") await stripe.subscriptions.cancel(id, { invoice_now: false, prorate: false });
+      }
+    }
+    const now = new Date().toISOString();
+    const monthRef = familyRef.collection("months").doc(academyTuitionPeriod(new Date()));
+    await db.runTransaction(async (tx) => {
+      const [snapshot, lock, month] = await Promise.all([tx.get(familyRef), tx.get(lockRef), tx.get(monthRef)]);
+      if (lock.data()?.id !== lockId) throw new AcademyError("Billing change expired. Contact HBIC before trying again.", 409);
+      if (!["conditional", "submitted", "approved", "withdrawn"].includes(String(snapshot.data()?.enrollmentState))) {
+        throw new AcademyError("Enrollment changed during withdrawal. Refresh before continuing.", 409);
+      }
+      const saved = snapshot.data()!;
+      const children = Array.isArray(saved.children) ? saved.children as { cancelEffectiveAt?: string | null }[] : [];
+      const passToken = String(saved.passToken ?? "");
+      if (passToken) tx.set(db.collection("academyPasses").doc(createHash("sha256").update(passToken).digest("hex")), { uid, state: "revoked", updatedAt: now }, { merge: true });
+      tx.update(familyRef, { enrollmentState: "withdrawn", children: children.map((child) => ({ ...child, cancelEffectiveAt: now })),
+        passState: "revoked", passToken: "", withdrawalPendingAt: null, withdrawnAt: now, withdrawnBy: actor.uid, withdrawalReason: cleanReason, updatedAt: now });
+      if (month.exists && month.data()?.status !== "paid") tx.update(monthRef, { status: "not_due", amountCents: 0, updatedAt: now });
+      tx.create(db.collection("academyAudit").doc(), { action: "conditional_enrollment_withdrawn", familyId: uid,
+        reason: cleanReason, actorUid: actor.uid, actorEmail: actor.email, at: now });
+      tx.delete(lockRef);
+    });
+    return getAcademyFamily(uid);
   } catch (error) {
     await db.runTransaction(async (tx) => { if ((await tx.get(lockRef)).data()?.id === lockId) tx.delete(lockRef); });
     throw error;
@@ -201,9 +315,12 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
         subscription.metadata.academyFamilyUid !== uid || objectId(subscription.customer) !== customerId) {
       throw new AcademyError("Checkout subscription does not match this Academy family.", 409);
     }
-    // Scheduling this before acknowledging Checkout makes the stop durable even
-    // if a later webhook is delayed. A failure here asks Stripe to retry.
-    if (subscription.cancel_at !== academyTermBillingStop) {
+    const registered = await db.collection("academyFamilies").doc(uid).get();
+    if (registered.data()?.enrollmentState === "withdrawn" || registered.data()?.withdrawalPendingAt) {
+      if (subscription.status !== "canceled") await stripe.subscriptions.cancel(subscriptionId, { invoice_now: false, prorate: false });
+    } else if (subscription.cancel_at !== academyTermBillingStop) {
+      // Scheduling this before acknowledging Checkout makes the stop durable
+      // even if a later webhook is delayed. A failure asks Stripe to retry.
       await stripe.subscriptions.update(subscriptionId, { cancel_at: academyTermBillingStop },
         { idempotencyKey: `academy-term-stop-${subscriptionId}` });
     }

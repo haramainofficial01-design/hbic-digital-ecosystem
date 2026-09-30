@@ -10,7 +10,7 @@ type AcademyCalendar = { id: string; title: string; date: string; type: string; 
 type AcademyAnnouncement = { id: string; title: string; message: string; priority: string };
 type FamilyHistory = { payments: { period: string; method: string; status: string; amountCents: number | null; paidAt: string | null }[]; receipts: { number: string; period: string; amountCents: number; receivedAt: string }[]; audit: { id: string; action: string; at: string }[] };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const sections = ["Overview", "Families", "Students", "Registrations", "Classes", "Calendar", "Announcements", "Payments", "Scan Pass", "Programs", "Settings"] as const;
+const sections = ["Overview", "Families", "Students", "Attendance", "Registrations", "Classes", "Calendar", "Announcements", "Payments", "Scan Pass", "Programs", "Settings"] as const;
 type AcademySection = typeof sections[number];
 
 function amount(cents: number | null) {
@@ -21,6 +21,13 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const [section, setSection] = useState<AcademySection>("Overview");
   const [loaded, setLoaded] = useState(false);
   const [families, setFamilies] = useState<AcademyPublicFamily[]>([]);
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    return today < "2026-10-05" ? "2026-10-05" : today > "2027-02-01" ? "2027-02-01" : today;
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, string>>({});
+  const [attendanceClass, setAttendanceClass] = useState("all");
+  const [attendanceBusy, setAttendanceBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "cash_due" | "past_due" | "card_attention">("all");
   const [scanInput, setScanInput] = useState("");
@@ -76,6 +83,28 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     window.addEventListener("focus", refresh);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [personalSession, load]);
+
+  useEffect(() => {
+    if (!personalSession || section !== "Attendance") return;
+    let live = true;
+    setAttendanceRecords({});
+    setAttendanceBusy(true);
+    void adminRequest(`/api/admin/academy/attendance?date=${encodeURIComponent(attendanceDate)}`)
+      .then((data) => { if (live) setAttendanceRecords(Object.fromEntries((data.records ?? []).map((item: { id: string; status: string }) => [item.id, item.status]))); })
+      .catch((error) => { if (live) setMessage(error instanceof Error ? error.message : "Could not load attendance."); })
+      .finally(() => { if (live) setAttendanceBusy(false); });
+    return () => { live = false; };
+  }, [adminRequest, attendanceDate, personalSession, section]);
+
+  async function markAttendance(familyId: string, childId: string, status: "present" | "absent" | "excused") {
+    setAttendanceBusy(true); setMessage("");
+    try {
+      await adminRequest("/api/admin/academy/attendance", { method: "POST", body: JSON.stringify({ date: attendanceDate, familyId, childId, status }) });
+      setAttendanceRecords((current) => ({ ...current, [`${familyId}_${childId}`]: status }));
+      setMessage(`Attendance saved for ${attendanceDate}.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not save attendance."); }
+    finally { setAttendanceBusy(false); }
+  }
 
   async function scan(value = scanInput) {
     const lookup = parseAcademyPassLookup(value);
@@ -143,6 +172,22 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     finally { setBusy(false); }
   }
 
+  async function withdrawRegistration(family: AcademyPublicFamily) {
+    if (family.enrollmentState !== "conditional") return;
+    const reason = window.prompt(`Why should ${family.guardianName}'s Conditional registration be withdrawn? This reason is saved in the audit history.`, "Registration entered by mistake")?.trim();
+    if (!reason) return;
+    if (reason.length < 8 || reason.length > 300) return setMessage("Enter a reason between 8 and 300 characters.");
+    if (!window.confirm(`Withdraw ${family.reference}? Their pass will be disabled and future card billing stopped. Existing payments are not refunded. This cannot be undone from this screen.`)) return;
+    setBusy(true); setMessage("");
+    try {
+      await adminRequest("/api/admin/academy/withdraw", { method: "POST", body: JSON.stringify({ familyId: family.id, reason }) });
+      setScanned(null); setHistory(null);
+      await load();
+      setMessage(`${family.reference} withdrawn. The registration and payment history were retained; future card billing was stopped.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not withdraw the registration. No change was confirmed."); }
+    finally { setBusy(false); }
+  }
+
   async function savePricing() {
     const monthlyCents = Math.round(Number(monthlyDollars) * 100);
     if (!Number.isSafeInteger(monthlyCents) || monthlyCents < 100 || !window.confirm(`Set Academy tuition to ${amount(monthlyCents)} per month, ${tuitionMode.replace("_", " ")}? This will affect unpriced current/future months.`)) return;
@@ -198,7 +243,8 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const paid = families.filter((family) => family.paymentState === "paid").length;
   const collectedCents = families.reduce((total, family) => total + (family.paymentState === "paid" ? family.amountCents ?? 0 : 0), 0);
   const outstandingCents = families.reduce((total, family) => total + (["cash_due", "past_due", "card_attention"].includes(family.paymentState) ? family.amountCents ?? 0 : 0), 0);
-  const activeChildren = families.filter((family) => family.enrollmentState === "active" && ["paid", "scheduled", "not_due"].includes(family.paymentState)).flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).map((child) => ({ family, child })));
+  const activeChildren = families.filter((family) => family.enrollmentState === "active").flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).map((child) => ({ family, child })));
+  const attendanceStudents = families.filter((family) => family.enrollmentState === "active").flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || child.cancelEffectiveAt.slice(0, 10) > attendanceDate).map((child) => ({ family, child }))).filter(({ child }) => attendanceClass === "all" || child.classId === attendanceClass).sort((a, b) => a.child.name.localeCompare(b.child.name));
   const pendingFamilies = families.filter((family) => ["conditional", "submitted", "approved", "waitlisted"].includes(family.enrollmentState));
   const paymentLabel = (family: AcademyPublicFamily) => family.paymentState === "paid" ? family.paymentChoice === "card" ? "Paid online" : "Paid cash" :
     family.paymentState === "cash_due" ? "Cash due" : family.paymentState === "past_due" ? "Past due" : family.paymentState === "card_attention" ? "Payment needs attention" :
@@ -223,12 +269,14 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
         {history ? <><h4>Payment history</h4>{history.payments.length ? history.payments.map((payment) => <p key={payment.period}>{payment.period} · {payment.method} · {payment.status.replaceAll("_", " ")} · {amount(payment.amountCents)}{payment.paidAt ? ` · paid ${new Date(payment.paidAt).toLocaleDateString("en-CA")}` : ""}</p>) : <p>No payment months recorded yet.</p>}{history.receipts.length ? <><h4>Cash receipts</h4>{history.receipts.map((receipt) => <p key={receipt.number}>{receipt.number} · {receipt.period} · {amount(receipt.amountCents)}</p>)}</> : null}{history.audit.length ? <><h4>Recent record activity</h4>{history.audit.slice(0, 10).map((entry) => <p key={entry.id}>{entry.at ? new Date(entry.at).toLocaleString("en-CA") : "Date unavailable"} · {entry.action.replaceAll("_", " ")}</p>)}</> : null}</> : null}
         {scanned.paymentChoice === "cash" && ["cash_due", "past_due"].includes(scanned.paymentState) ? <button className="primary" onClick={() => void receiveCash()} disabled={busy}>Mark cash received</button> : null}
         {scanned.enrollmentState === "conditional" ? <button className="secondary" onClick={() => void confirmEnrollment()} disabled={busy}>Confirm enrollment / check in</button> : null}
+        {scanned.enrollmentState === "conditional" ? <button className="secondary" onClick={() => void withdrawRegistration(scanned)} disabled={busy}>Withdraw Conditional enrollment</button> : null}
         <button className="secondary" onClick={() => void replacePass()} disabled={busy}>Replace lost pass</button>
       </div> : null}
     </div></div> : null}
     {section === "Families" ? <div className="academy-admin-card"><h3>Families</h3><label>Search parent, child, phone, email or reference<input value={query} onChange={(event) => setQuery(event.target.value)} /></label><label>Payment status<select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value as typeof paymentFilter)}><option value="all">All</option><option value="paid">Paid</option><option value="cash_due">Cash due</option><option value="past_due">Past due</option><option value="card_attention">Payment needs attention</option></select></label><div className="academy-admin-family-list">{filtered.map(familyRow)}</div></div> : null}
-    {section === "Students" ? <div className="academy-admin-card"><h3>Students</h3><p>Active students in good standing. Conditional, ended, and payment-due records remain in Registrations and Families.</p><div className="academy-admin-family-list">{activeChildren.map(({ family, child }) => <button key={`${family.id}-${child.id}`} type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{child.name}</strong><span>Age {child.age} · {child.level.replace("_", " ")} · {classes.find((item) => item.id === child.classId)?.name ?? "Awaiting class"}</span><em>{family.guardianName} · {paymentLabel(family)}</em></button>)}</div></div> : null}
-    {section === "Registrations" ? <div className="academy-admin-card"><h3>Registrations</h3><p>New registrations appear here as soon as the parent submits, for both card and cash.</p><div className="academy-admin-family-list">{families.map((family) => <button key={family.id} type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{family.reference} · {family.guardianName}</strong><span>{new Date(family.createdAt).toLocaleString("en-CA")} · {family.children.length} child(ren) · {family.enrollmentState}</span><em>{family.paymentChoice === "card" ? "Card" : "Cash"} · {paymentLabel(family)}</em></button>)}</div></div> : null}
+    {section === "Students" ? <div className="academy-admin-card"><h3>Students</h3><p>Every confirmed ACTIVE student appears here, with payment status shown separately. Conditional and withdrawn records remain in Registrations and Families.</p><div className="academy-admin-family-list">{activeChildren.map(({ family, child }) => <button key={`${family.id}-${child.id}`} type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{child.name}</strong><span>Age {child.age} · {child.level.replace("_", " ")} · {classes.find((item) => item.id === child.classId)?.name ?? "Awaiting class"}</span><em>{family.guardianName} · {paymentLabel(family)}</em></button>)}</div></div> : null}
+    {section === "Attendance" ? <div className="academy-admin-card"><h3>Class attendance</h3><p>Only confirmed ACTIVE students appear here. Attendance is separate from tuition and check-in; every change is saved with the staff member and time.</p><div className="academy-admin-actions"><label>Class date<input type="date" min="2026-10-05" max="2027-02-01" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></label><label>Class<select value={attendanceClass} onChange={(event) => setAttendanceClass(event.target.value)}><option value="all">All confirmed students</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div><p>{attendanceBusy ? "Loading attendance…" : `${attendanceStudents.length} confirmed student(s) · ${attendanceStudents.filter(({ family, child }) => attendanceRecords[`${family.id}_${child.id}`] === "present").length} present`}</p><div className="academy-admin-family-list">{attendanceStudents.map(({ family, child }) => <div key={`${family.id}_${child.id}`}><strong>{child.name}</strong><span>{family.guardianName} · {classes.find((item) => item.id === child.classId)?.name ?? "Awaiting class"} · {paymentLabel(family)}</span><em>{attendanceRecords[`${family.id}_${child.id}`] ?? "Not marked"}</em><div className="academy-admin-actions">{(["present", "absent", "excused"] as const).map((status) => <button key={status} className={attendanceRecords[`${family.id}_${child.id}`] === status ? "primary" : "secondary"} type="button" disabled={attendanceBusy} aria-pressed={attendanceRecords[`${family.id}_${child.id}`] === status} onClick={() => void markAttendance(family.id, child.id, status)}>{status[0].toUpperCase() + status.slice(1)}</button>)}</div></div>)}</div></div> : null}
+    {section === "Registrations" ? <div className="academy-admin-card"><h3>Registrations</h3><p>New registrations appear here as Conditional as soon as the parent submits. Withdraw an accidental or unpaid Conditional registration without deleting its audit or payment history.</p><div className="academy-admin-family-list">{families.filter((family) => family.enrollmentState !== "withdrawn").map((family) => <div key={family.id}><button type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{family.reference} · {family.guardianName}</strong><span>{new Date(family.createdAt).toLocaleString("en-CA")} · {family.children.length} child(ren) · {family.enrollmentState}</span><em>{family.paymentChoice === "card" ? "Card" : "Cash"} · {paymentLabel(family)}</em></button>{family.enrollmentState === "conditional" ? <button className="text-button" type="button" disabled={busy} onClick={() => void withdrawRegistration(family)}>Withdraw Conditional enrollment</button> : null}</div>)}</div>{families.some((family) => family.enrollmentState === "withdrawn") ? <><h4>Withdrawn history</h4><p>These records remain for audit and payment history; their passes and future tuition are inactive.</p><div className="academy-admin-family-list">{families.filter((family) => family.enrollmentState === "withdrawn").map((family) => <p key={family.id}>{family.reference} · {family.guardianName} · {new Date(family.createdAt).toLocaleDateString("en-CA")}</p>)}</div></> : null}</div> : null}
     {section === "Payments" ? <div className="academy-admin-card"><h3>Payments</h3><p>Current-month status comes from the server ledger. Card payment confirmation is set by Stripe webhooks, not by scanning a pass.</p><div className="academy-admin-family-list">{families.map((family) => <button key={family.id} type="button" onClick={() => { setSection("Scan Pass"); void scan(family.passToken); }}><strong>{family.guardianName} · {amount(family.amountCents)}</strong><span>{family.billingPeriod} · {family.children.length} child(ren) · {family.paymentChoice === "card" ? "Online card" : "Cash"}</span><em>{paymentLabel(family)}</em></button>)}</div></div> : null}
     {section === "Settings" ? <div className="academy-admin-card"><h3>Tuition setup</h3><p>{billingMode === "live" ? "Live billing uses the approved $50-per-child Stripe price. Existing paid months are unchanged." : "Sandbox billing is active. Existing paid months are unchanged."}</p><div className="academy-admin-actions"><label>Model<select value={tuitionMode} onChange={(event) => setTuitionMode(event.target.value as typeof tuitionMode)}><option value="per_child">Per child</option><option value="per_family">Per family</option></select></label><label>Monthly amount (CAD)<input type="number" min="1" max="1000" step="0.01" value={monthlyDollars} onChange={(event) => setMonthlyDollars(event.target.value)} /></label><label>{billingMode === "live" ? "Approved live recurring Price ID" : "Sandbox recurring Price ID"}<input value={stripePriceId} onChange={(event) => setStripePriceId(event.target.value)} placeholder="price_…" /></label><button className="secondary" disabled={busy} onClick={() => void savePricing()}>Save tuition</button></div></div> : null}
     {section === "Classes" || section === "Calendar" ? <div className="academy-admin-grid">
