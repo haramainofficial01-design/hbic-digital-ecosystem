@@ -12,9 +12,17 @@
       "distribution": "internal"
     },
     "qaSimulator": {
+      "environment": "production",
       "distribution": "internal",
       "ios": {
         "simulator": true
+      }
+    },
+    "qaAndroid": {
+      "environment": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
