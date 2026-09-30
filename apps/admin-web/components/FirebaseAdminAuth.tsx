@@ -50,6 +50,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null);
   const generating = useRef(false);
+  const handlingAuth = useRef(false);
   const sharedSession = useRef(false);
   const sharedToken = useRef<string | null>(null);
   const [sharedReady, setSharedReady] = useState(false);
@@ -62,7 +63,12 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       return;
     }
     return onIdTokenChanged(clientAuth, async (user) => {
-    if (sharedSession.current) return;
+    // A forced token refresh can emit another onIdTokenChanged event. Ignore
+    // that nested event while this sign-in is being reconciled; otherwise MFA
+    // completion can repeatedly reload and never hand a stable token to admin.
+    if (sharedSession.current || handlingAuth.current) return;
+    handlingAuth.current = true;
+    try {
     if (!user) {
       onSession(null);
       return;
@@ -119,7 +125,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       }
       return;
     }
-    const idToken = await user.getIdTokenResult(true);
+    const idToken = await user.getIdTokenResult();
     if (sharedSession.current) return;
     const firebaseClaims = idToken.claims.firebase as { sign_in_second_factor?: string } | undefined;
     if (!firebaseClaims?.sign_in_second_factor) {
@@ -129,6 +135,12 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
     onSession(`Bearer ${idToken.token}`, user.email ?? undefined);
     setStatus(`Signed in securely as ${user.email}. MFA is active.`);
+    } catch {
+      onSession(null);
+      setStatus("Could not finish administrator sign-in. Sign out and try again.");
+    } finally {
+      handlingAuth.current = false;
+    }
     });
   }, [onSession, secret]);
 
