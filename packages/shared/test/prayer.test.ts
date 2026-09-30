@@ -196,6 +196,24 @@ test("Hijri positive and negative adjustments follow the adjacent Calgary date",
   assert.equal(getHijriDate(instant, 1)?.label, next?.label);
 });
 
+test("Hijri overrides follow Calgary midnight across the autumn DST change", () => {
+  const settings = {
+    calendar: "islamic-umalqura" as const,
+    adjustmentDays: 0,
+    updatedAt: "2026-10-31T12:00:00.000Z",
+    overrides: [
+      { id: "oct31", gregorianDate: "2026-10-31", day: 20, month: "Rabi II", year: 1448, updatedAt: "2026-10-31T12:00:00.000Z" },
+      { id: "nov1", gregorianDate: "2026-11-01", day: 21, month: "Rabi II", year: 1448, updatedAt: "2026-10-31T12:00:00.000Z" },
+      { id: "nov2", gregorianDate: "2026-11-02", day: 22, month: "Rabi II", year: 1448, updatedAt: "2026-10-31T12:00:00.000Z" }
+    ]
+  };
+  const day = (instant: string) => resolveHijriDate(new Date(instant), settings)?.day;
+  assert.equal(day("2026-11-01T05:59:00.000Z"), 20);
+  assert.equal(day("2026-11-01T06:00:00.000Z"), 21);
+  assert.equal(day("2026-11-02T06:59:00.000Z"), 21);
+  assert.equal(day("2026-11-02T07:00:00.000Z"), 22);
+});
+
 test("upcoming White Days returns the next 13th, 14th, and 15th with Gregorian equivalents", () => {
   const upcoming = getUpcomingWhiteDays(new Date("2026-07-20T18:00:00.000Z"), {
     calendar: "islamic-umalqura",
