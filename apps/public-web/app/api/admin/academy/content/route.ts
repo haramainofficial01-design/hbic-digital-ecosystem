@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (body.kind !== "class" && body.kind !== "calendar" && body.kind !== "announcement") throw new AcademyError("Invalid Academy item type.");
     const item = await saveAcademyItem(body.kind, body.item, actor.uid, typeof body.id === "string" ? body.id : undefined);
     let notification: unknown = null;
-    if (body.kind === "announcement" || body.kind === "calendar" && "type" in item && ["no_class", "holiday", "time_changed"].includes(String(item.type))) {
+    if (body.kind === "announcement" || body.kind === "calendar" && "type" in item && ["no_class", "holiday", "time_changed", "special_class"].includes(String(item.type))) {
       try {
         notification = await sendAcademyUpdate({ title: body.kind === "announcement" ? String(item.title ?? "Academy update") : `Academy schedule: ${item.title}`,
           body: "message" in item ? String(item.message ?? "") : `${"date" in item ? item.date : ""} · ${"note" in item ? item.note || item.title : item.title}`,
