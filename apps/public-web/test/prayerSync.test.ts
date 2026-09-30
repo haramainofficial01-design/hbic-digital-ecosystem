@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent } from "@hbic/shared";
 import {
+  changedIqamahTimes,
   isOverrideActive,
   resolveEffectivePrayerSchedule,
   retainPrayerScheduleDuringOutage,
@@ -30,6 +31,16 @@ const baseFeed: PrayerFeed = {
   nw_i_isha: "+5 MINS",
   jummah: "1:45/2:30PM"
 };
+
+test("visible change alerts include only changed iqamah prayers", () => {
+  const before = structuredClone(defaultContent.iqamahTime);
+  const after = { ...before, fajrIqamah: "6:20 AM", asrIqamah: "5:30 PM" };
+  assert.deepEqual(changedIqamahTimes(before, after), [
+    { prayer: "fajr", time: "6:20 AM" },
+    { prayer: "asr", time: "5:30 PM" }
+  ]);
+  assert.deepEqual(changedIqamahTimes(undefined, after), []);
+});
 
 function contentWithAsrOverride(value = "6:15 PM") {
   return normalizeContent({

@@ -270,9 +270,8 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
         })) });
         }
       }
-      if (event.type === "invoice.paid" && amountCents > 0 && familyData.enrollmentState === "submitted") {
-        tx.update(familyRef, { enrollmentState: "approved" });
-      }
+      // Invoice events update only payment standing. Staff check-in controls
+      // conditional → active enrollment independently.
     } else if (!familyData.stripeSubscriptionId && subscriptionId) {
       // A paid invoice may be delivered before Checkout completion. Never let
       // that older completion event demote the already-paid subscription.

@@ -31,30 +31,6 @@ export default async function HomePage() {
 
   return (
     <SiteChrome settings={settings} contentVersion={content.version}>
-      <section className="section home-prayer-first" aria-label="Today’s prayer times at Masjid Bilal">
-        <PrayerTable
-          prayerTime={prayerTime}
-          iqamahTime={iqamahTime}
-          hijriSettings={content.hijriSettings}
-          showWhiteDays={content.featureFlags.whiteDaysEnabled}
-          initialNow={renderedAt}
-        />
-      </section>
-
-      {academyEnabled ? (
-        <section className="section home-academy-intro" aria-labelledby="home-academy-heading">
-          <div className="home-academy-card">
-            <div className="home-academy-copy">
-              <span className="eyebrow">FOR OUR YOUNG LEARNERS</span>
-              <h2 id="home-academy-heading">HBIC Qur’an Academy</h2>
-              <p>Registration is open for October. Classes begin Monday, October 5, then meet Mondays and Thursdays, 5:30–7:00 p.m. There is no class October 1. One Thursday each month is a special activity. The term ends February 1, followed by a Ramadan and Eid break.</p>
-              <Link className="button primary" href="/quran-academy">Explore the Academy <span aria-hidden="true">↗</span></Link>
-            </div>
-            <Image src="/photos/prayer-hall.png" alt="Prayer hall at Masjid Bilal" width={720} height={480} sizes="(max-width: 700px) 100vw, 35vw" />
-          </div>
-        </section>
-      ) : null}
-
       <section className="hero home-story-hero" aria-labelledby="home-story-heading">
         <div className="hero-panel">
           <Image className="hero-photo" src="/photos/masjid-exterior.png" alt="Hazrat Bilal Islamic Centre exterior in Calgary at sunset" fill sizes="(max-width: 800px) 100vw, 1440px" priority />
@@ -71,9 +47,33 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {academyEnabled ? (
+        <section className="section home-academy-intro" aria-labelledby="home-academy-heading">
+          <div className="home-academy-card">
+            <div className="home-academy-copy">
+              <span className="eyebrow">FOR OUR YOUNG LEARNERS</span>
+              <h2 id="home-academy-heading">HBIC Qur’an Academy</h2>
+              <p>Registration is open for October. Classes begin Monday, October 5, then meet Mondays and Thursdays, 5:30–7:00 p.m. There is no class October 1. One Thursday each month is a special activity. The term ends February 1, followed by a Ramadan and Eid break.</p>
+              <Link className="button primary" href="/quran-academy">Explore the Academy <span aria-hidden="true">↗</span></Link>
+            </div>
+            <Image src="/photos/prayer-hall.png" alt="Prayer hall at Masjid Bilal" width={720} height={480} sizes="(max-width: 700px) 100vw, 35vw" />
+          </div>
+        </section>
+      ) : null}
+
       <WelcomeFilm />
 
       <AppLaunchPromotion />
+
+      <section className="section home-prayer-first" aria-label="Today’s prayer times at Masjid Bilal">
+        <PrayerTable
+          prayerTime={prayerTime}
+          iqamahTime={iqamahTime}
+          hijriSettings={content.hijriSettings}
+          showWhiteDays={content.featureFlags.whiteDaysEnabled}
+          initialNow={renderedAt}
+        />
+      </section>
 
       <section className="section home-current-section">
         <div className="home-section-intro"><span className="eyebrow">THE RHYTHM OF OUR WEEK</span><h2>Here for every day.</h2><p>Jumu&apos;ah, timely notices, and community life in one clear place.</p></div>

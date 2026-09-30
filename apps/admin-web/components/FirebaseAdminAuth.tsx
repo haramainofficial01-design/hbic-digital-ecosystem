@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { getAdminAuth } from "../lib/firebase";
 
 const initialEmail = "haramain.official01@gmail.com";
+const apiBase = (process.env.NEXT_PUBLIC_API_URL || "https://hbic.ca").replace(/\/$/, "");
 
 function basicAuthorization(email: string, password: string) {
   const bytes = new TextEncoder().encode(`${email.trim().toLowerCase()}:${password}`);
@@ -45,6 +46,9 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null);
   const generating = useRef(false);
+  const sharedSession = useRef(false);
+  const sharedToken = useRef<string | null>(null);
+  const [sharedReady, setSharedReady] = useState(false);
 
   useEffect(() => {
     const clientAuth = getAdminAuth();
@@ -54,6 +58,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       return;
     }
     return onIdTokenChanged(clientAuth, async (user) => {
+    if (sharedSession.current) return;
     if (!user) {
       onSession(null);
       return;
@@ -61,10 +66,11 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     try {
       await user.reload();
     } catch {
-      onSession(null);
+      if (!sharedSession.current) onSession(null);
       setStatus("Could not refresh administrator sign-in. Sign out and try again.");
       return;
     }
+    if (sharedSession.current) return;
     if (!user.emailVerified) {
       onSession(null);
       setStatus("Verify the email address before administrator access can continue.");
@@ -86,6 +92,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       return;
     }
     const idToken = await user.getIdTokenResult(true);
+    if (sharedSession.current) return;
     const firebaseClaims = idToken.claims.firebase as { sign_in_second_factor?: string } | undefined;
     if (!firebaseClaims?.sign_in_second_factor) {
       onSession(null);
@@ -101,6 +108,10 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     if (!auth) return setStatus("Personal administrator sign-in is not configured in this build.");
     setBusy(true);
     try {
+      sharedSession.current = false;
+      sharedToken.current = null;
+      setSharedReady(false);
+      onSession(null);
       await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       setPassword("");
     } catch (error) {
@@ -163,10 +174,50 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  function useSharedAccess() {
-    onSession(basicAuthorization(sharedEmail, sharedPassword), sharedEmail.trim().toLowerCase());
-    setSharedPassword("");
-    setStatus("Shared HBIC access is ready. Load the protected draft to verify it.");
+  async function verifySharedAccess() {
+    setBusy(true);
+    setSharedReady(false);
+    try {
+      const token = basicAuthorization(sharedEmail, sharedPassword);
+      const response = await fetch(`${apiBase}/api/admin/content/draft`, {
+        headers: { Authorization: token },
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error("Shared access was not accepted by the publishing server.");
+      sharedSession.current = true;
+      sharedToken.current = token;
+      onSession(token, sharedEmail.trim().toLowerCase());
+      setSharedReady(true);
+      setSharedPassword("");
+      setStatus("Shared HBIC access verified. Publishing is available; private Academy family records require personal MFA.");
+    } catch {
+      sharedSession.current = false;
+      sharedToken.current = null;
+      onSession(null);
+      setStatus("Shared access could not be verified. Check the email and password, then try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function activatePersonalAccount() {
+    if (!auth || !sharedToken.current) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`${apiBase}/api/admin/auth/bootstrap`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: sharedToken.current },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error ?? "Personal account activation failed.");
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      setStatus("Approved personal account activated. Check its inbox for the private password setup link, then sign in and complete MFA.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Personal account activation failed. Contact the HBIC administrator.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (secret || resolver) return (
@@ -198,7 +249,8 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <strong>Existing shared HBIC access</strong>
         <AuthField label="Shared administrator email" value={sharedEmail} type="email" onChange={setSharedEmail} />
         <AuthField label="Shared administrator password" value={sharedPassword} type="password" onChange={setSharedPassword} />
-        <button className="secondary" type="button" onClick={useSharedAccess} disabled={!sharedEmail.trim() || !sharedPassword}>Use shared access</button>
+        <button className="secondary" type="button" onClick={() => void verifySharedAccess()} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
+        {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require a personal administrator account with MFA.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
       </div>
       <p role="status">{status}</p>
     </div>

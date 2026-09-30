@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 
@@ -64,6 +64,12 @@ function reference() { return `QA-${randomBytes(5).toString("hex").toUpperCase()
 function publicFamily(id: string, data: Record<string, unknown>, month: Record<string, unknown> | undefined): AcademyPublicFamily {
   const children = data.children as AcademyPublicFamily["children"];
   const hasCurrentChild = children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now());
+  const rawEnrollment = String(data.enrollmentState ?? "conditional");
+  const enrollmentState = rawEnrollment === "submitted" || rawEnrollment === "approved" ? "conditional" : rawEnrollment;
+  const period = String(month?.period ?? academyTuitionPeriod(new Date()));
+  const today = dateStringInTimeZone(new Date(), masjidTimeZone);
+  const rawPayment = String(month?.status ?? "awaiting_tuition");
+  const paymentState = rawPayment === "cash_due" && today > `${period}-01` ? "past_due" : rawPayment;
   return {
     id,
     reference: String(data.reference),
@@ -76,10 +82,10 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     policyVersion: typeof data.policyVersion === "string" ? data.policyVersion : undefined,
     policyAcceptedAt: typeof data.policyAcceptedAt === "string" ? data.policyAcceptedAt : undefined,
     recurringAuthorizedAt: typeof data.recurringAuthorizedAt === "string" ? data.recurringAuthorizedAt : null,
-    enrollmentState: hasCurrentChild ? data.enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
-    billingPeriod: String(month?.period ?? academyTuitionPeriod(new Date())),
+    enrollmentState: hasCurrentChild ? enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
+    billingPeriod: period,
     amountCents: typeof month?.amountCents === "number" ? month.amountCents : null,
-    paymentState: (month?.status ?? "awaiting_tuition") as AcademyPublicFamily["paymentState"],
+    paymentState: paymentState as AcademyPublicFamily["paymentState"],
     cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
@@ -146,7 +152,7 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     recurringAuthorizedAt: input.paymentChoice === "card" ? now : null,
     children: input.children.map((child) => ({ ...child, id: randomBytes(8).toString("hex"), classId: null, cancelEffectiveAt: null })),
     reference: reference(),
-    enrollmentState: "submitted",
+    enrollmentState: "conditional",
     passToken,
     passState: "active",
     createdAt: now,
@@ -173,6 +179,18 @@ export async function getAcademyFamily(uid: string) {
 export async function scanAcademyPass(token: string, actorUid: string) {
   const db = academyDb();
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new AcademyError("This Academy pass is invalid.", 400);
+  await limitAcademyLookups(db, actorUid);
+  const pass = await db.collection(passes).doc(tokenHash(token)).get();
+  if (!pass.exists) throw new AcademyError("This Academy pass was not found.", 404);
+  if (pass.data()?.state !== "active") throw new AcademyError("This Academy pass is inactive or replaced.", 410);
+  const family = await getAcademyFamily(String(pass.data()?.uid));
+  if (!family || family.passToken !== token) throw new AcademyError("This Academy pass is no longer current.", 410);
+  if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);
+  await db.collection("academyAudit").add({ action: "pass_scanned", familyId: family.id, actorUid, at: new Date().toISOString() });
+  return family;
+}
+
+async function limitAcademyLookups(db: Firestore, actorUid: string) {
   const bucket = Math.floor(Date.now() / 60_000);
   const rateRef = db.collection("academyScanRates").doc(`${actorUid}_${bucket}`);
   await db.runTransaction(async (tx) => {
@@ -181,13 +199,19 @@ export async function scanAcademyPass(token: string, actorUid: string) {
     if (count >= 60) throw new AcademyError("Too many scans. Try again in a minute.", 429);
     tx.set(rateRef, { count: count + 1, expiresAt: new Date(Date.now() + 120_000).toISOString() });
   });
-  const pass = await db.collection(passes).doc(tokenHash(token)).get();
-  if (!pass.exists) throw new AcademyError("This Academy pass was not found.", 404);
-  if (pass.data()?.state !== "active") throw new AcademyError("This Academy pass is inactive or replaced.", 410);
-  const family = await getAcademyFamily(String(pass.data()?.uid));
-  if (!family || family.passToken !== token) throw new AcademyError("This Academy pass is no longer current.", 410);
-  if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);
-  await db.collection("academyAudit").add({ action: "pass_scanned", familyId: family.id, actorUid, at: new Date().toISOString() });
+}
+
+/** Staff may type the public QA reference when a camera or QR is unavailable. */
+export async function lookupAcademyReference(reference: string, actorUid: string) {
+  if (!/^QA-[A-F0-9]{10}$/.test(reference)) throw new AcademyError("Enter the full QA- reference shown on the Academy pass.", 400);
+  const db = academyDb();
+  await limitAcademyLookups(db, actorUid);
+  const matches = await db.collection(families).where("reference", "==", reference).limit(2).get();
+  if (matches.empty) throw new AcademyError("No Academy registration matches that reference.", 404);
+  if (matches.size !== 1) throw new AcademyError("This reference needs administrator review.", 409);
+  const family = await getAcademyFamily(matches.docs[0].id);
+  if (!family) throw new AcademyError("This Academy registration was not found.", 404);
+  await db.collection("academyAudit").add({ action: "reference_looked_up", familyId: family.id, actorUid, at: new Date().toISOString() });
   return family;
 }
 
@@ -215,13 +239,30 @@ export async function receiveAcademyCash(uid: string, period: string, actor: { u
       receivedBy: actor.uid, receivedByEmail: actor.email
     };
     tx.update(monthRef, { status: "paid", paidAt: now, receiptId: receiptRef.id });
-    tx.update(familyRef, { firstCashPaidAt: family.data()?.firstCashPaidAt ?? now,
-      enrollmentState: family.data()?.enrollmentState === "submitted" ? "approved" : family.data()?.enrollmentState,
-      updatedAt: now });
+    tx.update(familyRef, { firstCashPaidAt: family.data()?.firstCashPaidAt ?? now, updatedAt: now });
     tx.create(receiptRef, receipt);
     tx.create(auditRef, { action: "cash_received", familyId: uid, period, amountCents, actorUid: actor.uid, at: now });
     return receipt;
   });
+}
+
+/** Physical check-in is an explicit staff decision and never changes tuition. */
+export async function confirmAcademyEnrollment(uid: string, actor: { uid: string; email: string }) {
+  const db = academyDb();
+  const ref = db.collection(families).doc(uid);
+  const now = new Date().toISOString();
+  await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) throw new AcademyError("Academy registration was not found.", 404);
+    const data = snapshot.data() ?? {};
+    if (!["conditional", "submitted", "approved", "active"].includes(String(data.enrollmentState))) {
+      throw new AcademyError("This enrollment cannot be checked in from its current state.", 409);
+    }
+    if (data.enrollmentState === "active") return;
+    tx.update(ref, { enrollmentState: "active", checkedInAt: now, checkedInBy: actor.uid, updatedAt: now });
+    tx.create(db.collection("academyAudit").doc(), { action: "enrollment_checked_in", familyId: uid, actorUid: actor.uid, actorEmail: actor.email, at: now });
+  });
+  return getAcademyFamily(uid);
 }
 
 export async function listAcademyFamilies() {

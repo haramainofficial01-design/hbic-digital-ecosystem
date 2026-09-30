@@ -16,7 +16,8 @@ export async function sendAcademyUpdate(input: { title: string; body: string; cl
     const batch = await query.get();
     for (const family of batch.docs) {
       const data = family.data();
-      if (!["approved", "active"].includes(String(data.enrollmentState))) continue;
+      // Conditional registrations need schedule changes before payment clears.
+      if (!["conditional", "submitted", "waitlisted", "approved", "active"].includes(String(data.enrollmentState))) continue;
       const children = Array.isArray(data.children) ? data.children as { classId?: string | null; cancelEffectiveAt?: string | null }[] : [];
       if (!children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now())) continue;
       if (input.classIds.length && !children.some((child) => child.classId && input.classIds.includes(child.classId))) continue;

@@ -4,6 +4,7 @@ import { RouteContent } from "./RouteContent";
 import { SiteNavigation } from "./SiteNavigation";
 import { getPublicationState } from "../lib/publicationStore";
 import { isQuranPublicEnabled } from "../lib/quranRelease";
+import { PrayerRail } from "./PrayerRail";
 
 export async function SiteChrome({
   children,
@@ -24,6 +25,7 @@ export async function SiteChrome({
       data-hbic-publication-revision={publication.revision}
     >
       <SiteNavigation settings={settings} quranEnabled={quranEnabled} academyEnabled={academyEnabled} />
+      <PrayerRail />
       <RouteContent>{children}</RouteContent>
       <footer className="footer">
         <div className="footer-inner">

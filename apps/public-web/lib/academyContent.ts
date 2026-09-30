@@ -132,13 +132,8 @@ export async function assignAcademyChild(familyId: string, childId: string, clas
     if (Number(academyClass.data()?.enrolledCount ?? 0) >= Number(academyClass.data()?.capacity ?? 0)) throw new AcademyError("This class is full.", 409);
     const previousRef = selected.classId ? db.collection(collection.class).doc(selected.classId) : null;
     const previous = previousRef ? await tx.get(previousRef) : null;
-    const familyData = family.data() ?? {};
-    const cardReady = familyData.paymentChoice === "card" && typeof familyData.stripeSubscriptionId === "string" && typeof familyData.stripeCustomerId === "string";
-    const cashReady = familyData.paymentChoice === "cash" && typeof familyData.firstCashPaidAt === "string";
-    // Class placement must not silently turn an unpaid conditional registration
-    // into a confirmed active student. Preserve pending/waitlisted history.
-    const enrollmentState = familyData.enrollmentState === "submitted" && (cardReady || cashReady) ? "active" : familyData.enrollmentState;
-    tx.update(familyRef, { children: children.map((child) => child.id === childId ? { ...child, classId } : child), enrollmentState, updatedAt: new Date().toISOString() });
+    // Placement is independent of both payment and physical check-in.
+    tx.update(familyRef, { children: children.map((child) => child.id === childId ? { ...child, classId } : child), updatedAt: new Date().toISOString() });
     tx.update(classRef, { enrolledCount: FieldValue.increment(1) });
     if (previousRef && previous?.exists) tx.update(previousRef, { enrolledCount: FieldValue.increment(-1) });
     tx.create(db.collection("academyAudit").doc(), { action: "class_assigned", familyId, childId, classId, actorUid, at: new Date().toISOString() });

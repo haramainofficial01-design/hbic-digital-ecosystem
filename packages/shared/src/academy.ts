@@ -1,8 +1,8 @@
 /** Academy records are private. Only server routes may read/write them. */
 export type AcademyLevel = "qaida" | "quran" | "not_sure";
 export type AcademyPaymentChoice = "cash" | "card";
-export type AcademyEnrollmentState = "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
-export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "card_attention" | "scheduled" | "not_due";
+export type AcademyEnrollmentState = "conditional" | "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
+export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "card_attention" | "past_due" | "scheduled" | "not_due";
 
 /** HBIC's approved starting tuition; administrators can change future pricing. */
 export const ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD = 5_000;

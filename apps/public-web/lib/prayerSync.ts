@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
 import {
   addDays,
   dateStringInTimeZone,
@@ -117,6 +118,37 @@ const iqamahFieldByPrayer: Record<IqamahPrayerName, keyof HbicContent["iqamahTim
   maghrib: "maghribIqamah",
   isha: "ishaIqamah"
 };
+
+/** Only material iqamah changes are announced; daily adhan drift is not a change alert. */
+export function changedIqamahTimes(previous: HbicContent["iqamahTime"] | undefined, current: HbicContent["iqamahTime"]) {
+  if (!previous) return [] as { prayer: IqamahPrayerName; time: string }[];
+  return (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[])
+    .filter((prayer) => previous[iqamahFieldByPrayer[prayer]] !== current[iqamahFieldByPrayer[prayer]])
+    .map((prayer) => ({ prayer, time: String(current[iqamahFieldByPrayer[prayer]]) }));
+}
+
+async function announceIqamahChange(db: Firestore | null, serviceDate: string, previous: HbicContent["iqamahTime"] | undefined, current: HbicContent["iqamahTime"]) {
+  if (!db) return;
+  const changes = changedIqamahTimes(previous, current);
+  if (!changes.length) return;
+  try {
+    const fingerprint = createHash("sha256").update(JSON.stringify({ serviceDate, changes })).digest("hex");
+    const claim = db.collection("prayerChangeNotifications").doc(fingerprint);
+    const shouldSend = await db.runTransaction(async (tx) => {
+      if ((await tx.get(claim)).exists) return false;
+      tx.create(claim, { serviceDate, changes, createdAt: new Date().toISOString(), status: "claimed" });
+      return true;
+    });
+    if (!shouldSend) return;
+    const { sendPushNotification } = await import("./notificationStore");
+    const body = changes.map(({ prayer, time }) => `${prayer[0].toUpperCase()}${prayer.slice(1)} ${time}`).join(" · ");
+    const result = await sendPushNotification({ title: "Masjid Bilal iqamah update", body: `Updated iqamah: ${body}`.slice(0, 220), audience: "All", route: "/prayer", type: "iqamahChange" });
+    await claim.update({ status: "sent", result, sentAt: new Date().toISOString() });
+  } catch (error) {
+    // A notification failure must never break the canonical prayer response.
+    console.error("Iqamah change notification failed", error);
+  }
+}
 
 function endpointHost() {
   try {
@@ -496,6 +528,8 @@ export async function applyPrayerSync(
       } catch {
         // Live values are still authoritative for this response; cache persistence can recover later.
       }
+      // A confirmed upstream change is user-visible; opt-in device preferences are applied by the push store.
+      await announceIqamahChange(db, serviceDate, cached?.normalizedContent?.iqamahTime, synced.iqamahTime);
     } catch (error) {
       if (isNextDynamicServerUsage(error)) throw error;
       lastError = error instanceof Error ? error.message : "Unable to refresh prayer data.";

@@ -16,6 +16,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "ca.hbic.calgary.app",
       "appleTeamId": "ZJ58VWNTX3",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Authorized HBIC staff can scan Quran Academy passes for check-in. You can enter the QA reference instead."
+      },
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.ca.hbic.calgary.app"
@@ -27,6 +30,7 @@
     },
     "android": {
       "googleServicesFile": "./google-services.json",
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/hbic-app-icon.png",
         "backgroundColor": "#062238"

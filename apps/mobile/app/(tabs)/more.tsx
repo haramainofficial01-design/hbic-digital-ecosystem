@@ -11,7 +11,7 @@ import { brandAssets } from "../../src/constants/assets";
 import { usePublishedContent } from "../../src/services/content";
 import { spacing } from "../../src/theme/theme";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
-import { academyEnabled, quranEnabled } from "../../src/config/releaseFeatures";
+import { academyEnabled, quranReaderAvailable } from "../../src/config/releaseFeatures";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -26,7 +26,8 @@ const menuItems: { title: string; subtitle: string; icon: IconName; route: strin
   { title: "About", subtitle: "Mission, services, and community information", icon: "information-circle", route: "/about" },
   { title: "Notifications", subtitle: "Prayer, iqamah, event, and media alerts", icon: "notifications", route: "/notifications" },
   { title: "Language", subtitle: "English and Urdu navigation preferences", icon: "language", route: "/language" },
-  { title: "Settings", subtitle: "Theme and app preferences", icon: "settings", route: "/settings" }
+  { title: "Settings", subtitle: "Theme and app preferences", icon: "settings", route: "/settings" },
+  { title: "Staff Admin", subtitle: "Secure HBIC dashboard for authorized staff", icon: "shield-checkmark-outline", route: "/admin-dashboard" }
 ];
 
 export default function MoreScreen() {
@@ -54,13 +55,13 @@ export default function MoreScreen() {
       </GlassCard>
 
       <AdaptiveGrid>
-        {[...(academyEnabled ? [{ title: "Quran Academy", subtitle: "Classes, registration, and your Academy pass", icon: "school-outline" as IconName, route: "/quran-academy" }] : []), ...(quranEnabled ? [{ title: "Quran", subtitle: "Read, listen, search, and bookmark", icon: "book-outline" as IconName, route: "/quran" }] : []), ...menuItems].map((item) => (
+        {[...(academyEnabled ? [{ title: "Quran Academy", subtitle: "Classes, registration, and your Academy pass", icon: "school-outline" as IconName, route: "/quran-academy" }] : []), { title: quranReaderAvailable ? "Quran" : "Quran & Recite", subtitle: quranReaderAvailable ? "Read, listen, search, and bookmark" : "Under maintenance — please check back soon", icon: "book-outline" as IconName, route: "/quran" }, { title: "Hadith Library", subtitle: "Explore hadith collections on Sunnah.com", icon: "open-outline" as IconName, route: "https://sunnah.com" }, ...menuItems].map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
             accessibilityLabel={item.title}
             accessibilityHint={item.subtitle}
-            onPress={() => router.push(item.route as never)}
+            onPress={() => item.route.startsWith("https://") ? void Linking.openURL(item.route) : router.push(item.route as never)}
           >
             <GlassCard compact>
               <View style={styles.menuRow}>

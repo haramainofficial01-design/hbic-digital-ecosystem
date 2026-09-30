@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Linking from "expo-linking";
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../src/components/AppButton";
@@ -11,10 +11,29 @@ import { SectionHeader } from "../src/components/SectionHeader";
 import { listChapters, loadBookmarks, loadLastRead, readChapter, saveBookmarks, saveLastRead, searchVerses, type QuranChapter, type QuranVerse } from "../src/services/quran";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
-import { quranEnabled } from "../src/config/releaseFeatures";
+import { quranReaderAvailable } from "../src/config/releaseFeatures";
 
 export default function QuranScreen() {
-  return quranEnabled ? <QuranReaderScreen /> : <Redirect href="/(tabs)/more" />;
+  return quranReaderAvailable ? <QuranReaderScreen /> : <QuranMaintenanceScreen />;
+}
+
+function QuranMaintenanceScreen() {
+  const router = useRouter();
+  const { theme } = useAppTheme();
+  return (
+    <AppScreen>
+      <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
+      <GlassCard tone="navy">
+        <Text style={styles.arabicTitle}>ٱلْقُرْآنُ ٱلْكَرِيمُ</Text>
+        <Text style={[styles.maintenanceTitle, { color: theme.colors.white }]}>Quran &amp; Recite</Text>
+        <Text style={styles.heroBody}>Under maintenance — please check back soon.</Text>
+      </GlassCard>
+      <GlassCard>
+        <Text style={[styles.maintenanceBody, { color: theme.colors.text }]}>This is temporary. Prayer and iqamah times remain available as usual.</Text>
+        <AppButton label="Hadith Library on Sunnah.com" icon="open-outline" variant="secondary" accessibilityHint="Opens the external Sunnah.com website" onPress={() => void Linking.openURL("https://sunnah.com")} />
+      </GlassCard>
+    </AppScreen>
+  );
 }
 
 function QuranReaderScreen() {
@@ -144,6 +163,8 @@ function QuranReaderScreen() {
 }
 
 const styles = StyleSheet.create({
+  maintenanceTitle: { fontSize: 30, fontWeight: "800", marginTop: 12, marginBottom: 8 },
+  maintenanceBody: { fontSize: 16, lineHeight: 24, marginBottom: 16 },
   arabicTitle: { color: "#E7C66B", fontSize: 36, lineHeight: 58, fontWeight: "700", textAlign: "right" },
   heroBody: { color: "rgba(255,255,255,.75)", fontSize: 14, lineHeight: 21, marginTop: spacing.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
