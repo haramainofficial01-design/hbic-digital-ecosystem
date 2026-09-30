@@ -235,17 +235,27 @@ export interface UpcomingWhiteDay {
   hijriDate: HijriDate;
 }
 
+// Hermes does not ship every ICU calendar. Mobile registers a verified
+// Umm al-Qura formatter at startup; web/server continue using native Intl.
+let mobileHijriParts: ((date: Date, timeZone: string) => Intl.DateTimeFormatPart[]) | null = null;
+export function registerHijriDateFormatter(formatter: typeof mobileHijriParts) {
+  mobileHijriParts = formatter;
+}
+
 /** Returns the local Hijri calendar date with the approved masjid adjustment applied. */
 export function getHijriDate(date = new Date(), adjustmentDays = 0, timeZone = masjidTimeZone): HijriDate | null {
   if (!Number.isInteger(adjustmentDays) || adjustmentDays < -2 || adjustmentDays > 2) return null;
   const adjustedDate = new Date(date.getTime() + adjustmentDays * 86_400_000);
   try {
-    const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
+    const options: Intl.DateTimeFormatOptions = {
       timeZone,
       day: "numeric",
       month: "long",
       year: "numeric"
-    }).formatToParts(adjustedDate);
+    };
+    const parts = mobileHijriParts
+      ? mobileHijriParts(adjustedDate, timeZone)
+      : new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", options).formatToParts(adjustedDate);
     const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
     const day = Number(read("day"));
     const year = Number(read("year"));
