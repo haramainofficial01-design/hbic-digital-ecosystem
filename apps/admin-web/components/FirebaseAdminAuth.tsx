@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- This QR is generated locally as a data URI and is never network-fetched. */
 
 import {
   TotpMultiFactorGenerator,
@@ -42,6 +43,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [code, setCode] = useState("");
   const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
   const [secret, setSecret] = useState<TotpSecret | null>(null);
+  const [totpQr, setTotpQr] = useState<string | null>(null);
   const [status, setStatus] = useState("Sign in with your personal administrator account.");
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null);
@@ -81,8 +83,17 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       if (!generating.current && !secret) {
         generating.current = true;
         try {
-          setSecret(await TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession()));
-          setStatus("MFA is required. Add this setup key to your authenticator, then enter its six-digit code.");
+          const generated = await TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession());
+          setSecret(generated);
+          try {
+            const { toDataURL } = await import("qrcode");
+            setTotpQr(await toDataURL(generated.generateQrCodeUrl(user.email ?? "HBIC admin", "HBIC Admin"), {
+              width: 240, margin: 2, errorCorrectionLevel: "M"
+            }));
+          } catch {
+            setTotpQr(null);
+          }
+          setStatus("Scan the QR with an authenticator or add the setup key manually, then enter its six-digit code.");
         } catch {
           setStatus("Unable to start MFA enrollment. Sign out and try again.");
         } finally {
@@ -148,6 +159,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     try {
       await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code.trim()), "HBIC Authenticator");
       setSecret(null);
+      setTotpQr(null);
       setCode("");
       // Enrollment is not an MFA-authenticated sign-in. Require a fresh login
       // so the resulting ID token carries the second-factor claim.
@@ -221,9 +233,9 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   }
 
   if (secret || resolver) return (
-    <div className="firebase-auth-panel">
+    <div className="firebase-auth-panel" id="admin-auth">
       <strong>{secret ? "Set up authenticator MFA" : "MFA verification"}</strong>
-      {secret ? <><p>Add this setup key to your authenticator app:</p><code>{secret.secretKey}</code></> : null}
+      {secret ? <><p>Scan this with your phone’s Passwords app or an authenticator. Face ID or fingerprint can unlock that app; the six-digit code is still required for HBIC sign-in.</p>{totpQr ? <img src={totpQr} width={240} height={240} alt="HBIC administrator authenticator setup QR code" /> : null}<p>If you are setting this up on the same phone, enter this key manually in your authenticator:</p><code>{secret.secretKey}</code></> : null}
       <AuthField label="Six-digit authenticator code" value={code} onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))} />
       <button className="primary" type="button" onClick={secret ? enrollMfa : verifyMfa} disabled={busy || code.length !== 6}>{secret ? "Activate MFA" : "Verify & sign in"}</button>
       <p role="status">{status}</p>
@@ -231,19 +243,19 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   );
 
   if (auth?.currentUser && multiFactor(auth.currentUser).enrolledFactors.length > 0) return (
-    <div className="firebase-auth-panel firebase-auth-ready">
+    <div className="firebase-auth-panel firebase-auth-ready" id="admin-auth">
       <div><strong>{auth.currentUser.email}</strong><p role="status">{status}</p></div>
         <button className="secondary" type="button" onClick={() => void signOut(auth)}>Sign out</button>
     </div>
   );
 
   return (
-    <div className="firebase-auth-panel">
+    <div className="firebase-auth-panel" id="admin-auth">
       <AuthField label="Personal administrator email" value={email} type="email" onChange={setEmail} />
       <AuthField label="Private password" value={password} type="password" onChange={setPassword} />
       <div className="firebase-auth-actions">
         <button className="secondary" type="button" onClick={login} disabled={busy || !auth || !email.trim() || !password}>Sign in</button>
-        <button className="secondary" type="button" onClick={sendSetupEmail} disabled={busy || !auth || !email.trim()}>Email password setup link</button>
+        <button className="secondary" type="button" onClick={sendSetupEmail} disabled={busy || !auth || !email.trim()}>Set or reset approved admin password</button>
       </div>
       <div className="firebase-auth-shared">
         <strong>Existing shared HBIC access</strong>
@@ -252,6 +264,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <button className="secondary" type="button" onClick={() => void verifySharedAccess()} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
         {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require a personal administrator account with MFA.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
       </div>
+      <p>To open private Academy records: use shared access once to activate your approved personal admin email, set its password from that inbox, scan the authenticator QR, then sign in again with its six-digit code. A password-reset email alone never grants Academy access.</p>
       <p role="status">{status}</p>
     </div>
   );
