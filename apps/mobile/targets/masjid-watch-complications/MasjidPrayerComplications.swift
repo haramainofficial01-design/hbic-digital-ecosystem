@@ -43,8 +43,10 @@ struct PrayerComplicationView: View {
                 rectangular
             case .accessoryInline:
                 inline
+            #if os(watchOS)
             case .accessoryCorner:
                 corner
+            #endif
             default:
                 rectangular
             }
@@ -151,18 +153,21 @@ struct PrayerComplicationView: View {
 }
 
 struct MasjidPrayerComplication: Widget {
+    private var supportedComplicationFamilies: [WidgetFamily] {
+        #if os(watchOS)
+        return [.accessoryCircular, .accessoryRectangular, .accessoryInline, .accessoryCorner]
+        #else
+        return [.accessoryCircular, .accessoryRectangular, .accessoryInline]
+        #endif
+    }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: complicationKind, provider: ComplicationProvider()) { entry in
             PrayerComplicationView(entry: entry)
         }
         .configurationDisplayName("Masjid Bilal Prayer")
         .description("See the next prayer and iqamah at a glance.")
-        .supportedFamilies([
-            .accessoryCircular,
-            .accessoryRectangular,
-            .accessoryInline,
-            .accessoryCorner
-        ])
+        .supportedFamilies(supportedComplicationFamilies)
     }
 }
 
