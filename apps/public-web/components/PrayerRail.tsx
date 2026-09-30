@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CloudMoon, CloudSun, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { deriveDisplayFocus, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
 
 const names = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+const prayerIcons: Record<string, LucideIcon> = { fajr: CloudMoon, dhuhr: Sun, asr: CloudSun, maghrib: Sunset, isha: MoonStar };
 
 function countdown(target: Date, now: Date) {
   const minutes = Math.max(0, Math.ceil((target.getTime() - now.getTime()) / 60_000));
@@ -41,6 +43,7 @@ export function PrayerRail() {
   if (hidden || !payload || !snapshotMatchesCalgaryDate(payload.snapshot, now) || payload.snapshot.availability !== "available") return null;
   const focus = deriveDisplayFocus(payload.snapshot, now);
   if (!focus) return null;
+  const CurrentPrayerIcon = prayerIcons[focus.entry.key] ?? MoonStar;
   const entries = payload.snapshot.prayers.filter((entry) => names.includes(entry.key));
   const nextLabel = `${focus.entry.name} ${focus.primaryKind === "iqamah" ? "iqamah" : "adhan"}`;
   return <>
@@ -51,7 +54,7 @@ export function PrayerRail() {
     </div>
     <div className={`prayer-mobile-rail${open ? " is-open" : ""}`} role="region" aria-label="Live prayer times">
       <button type="button" className="prayer-mobile-toggle" aria-expanded={open} aria-controls="prayer-mobile-panel" onClick={() => setOpen(!open)}>
-        <span aria-hidden="true">☪</span><small>{open ? "Close" : focus.entry.name}</small>
+        <CurrentPrayerIcon size={23} strokeWidth={1.8} aria-hidden="true" /><small>{open ? "Close" : focus.entry.name}</small>
       </button>
       {open ? <div id="prayer-mobile-panel" className="prayer-mobile-panel">
         <strong>Next {nextLabel}</strong><span>{countdown(focus.date, now)} remaining</span>
