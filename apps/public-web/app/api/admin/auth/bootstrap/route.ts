@@ -35,22 +35,6 @@ export async function POST(request: Request) {
   }
 
   const auth = getAuth(app);
-  let totpProjectConfig = "enabled";
-  try {
-    await auth.projectConfigManager().updateProjectConfig({
-      multiFactorConfig: {
-        state: "ENABLED",
-        providerConfigs: [{
-          state: "ENABLED",
-          totpProviderConfig: { adjacentIntervals: 2 }
-        }]
-      }
-    });
-  } catch (error) {
-    if ((error as { code?: string }).code !== "auth/internal-error") throw error;
-    totpProjectConfig = "requires-firebase-console-permission";
-  }
-
   let created = false;
   let user;
   try {
@@ -89,8 +73,6 @@ export async function POST(request: Request) {
     uid: user.uid,
     created,
     role: "superAdmin",
-    totpEnabled: totpProjectConfig === "enabled",
-    totpProjectConfig,
     passwordResetRequired: true
   });
 }

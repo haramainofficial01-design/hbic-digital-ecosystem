@@ -130,7 +130,7 @@ For local admin testing against the local public website server, set:
 NEXT_PUBLIC_API_URL=http://localhost:3100
 ```
 
-The two admin dashboards use the same shared HBIC email/password prompt. Production credentials are stored as `ADMIN_EMAIL` and encrypted `ADMIN_PASSWORD` Vercel environment variables and are checked by every protected API. The password is kept only for the active browser session. See `docs/admin-auth-security-audit.md` for the limitations of shared credentials and the recommended individual Firebase Auth + MFA target.
+The shared HBIC email/password remains available for content publishing. Private Quran Academy family and payment records require a verified, approved personal Firebase email/password account; shared credentials never unlock them. See `docs/admin-auth-security-audit.md` for the current security boundaries and tradeoffs.
 
 Required mobile build variable:
 

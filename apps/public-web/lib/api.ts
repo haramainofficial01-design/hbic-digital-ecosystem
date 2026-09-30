@@ -69,10 +69,12 @@ export async function requireAdminSecret(request: Request) {
       const token = await getAuth(app).verifyIdToken(authorization.slice("Bearer ".length));
       const email = token.email?.trim().toLowerCase();
       const allowlistedRole = email && configuredSuperAdmins().has(email) ? "superAdmin" : undefined;
-      const role = typeof token.adminRole === "string" ? token.adminRole : allowlistedRole;
-      // Enrollment alone is insufficient: this claim is issued only after an
-      // actual MFA sign-in challenge. Keep Academy child records MFA-protected.
-      if (!email || !token.email_verified || !role || !token.firebase?.sign_in_second_factor) throw new Error("unauthorized");
+      const claimedRole = typeof token.adminRole === "string" ? token.adminRole : undefined;
+      const role = allowlistedRole ?? (claimedRole && ["superAdmin", "director", "caretaker", "editor"].includes(claimedRole) ? claimedRole : undefined);
+      // Personal Firebase credentials are individually attributable. The
+      // approved-email list or an explicitly granted admin role is still
+      // required; a shared publishing password never grants Academy access.
+      if (!email || !token.email_verified || !role) throw new Error("unauthorized");
       return {
         ok: true as const,
         actor: { uid: token.uid, email, role, kind: "firebase-account" as const }
@@ -80,7 +82,7 @@ export async function requireAdminSecret(request: Request) {
     } catch {
       return {
         ok: false as const,
-        response: jsonResponse({ ok: false, error: "Administrator sign-in or MFA verification is required." }, { status: 401 })
+        response: jsonResponse({ ok: false, error: "Sign in with a verified, approved administrator email and password." }, { status: 401 })
       };
     }
   }

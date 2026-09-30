@@ -48,9 +48,9 @@ export async function academyParent(request: Request) {
 
 export async function academyAdmin(request: Request) {
   const result = await requireAdminSecret(request);
-  // Child records require an individually identifiable, MFA-protected account.
+  // Child records require an individually identifiable, approved account.
   if (!result.ok || result.actor.kind !== "firebase-account") {
-    throw new AcademyError("Personal administrator sign-in with MFA is required for Academy records.", 401);
+    throw new AcademyError("Sign in with your approved personal administrator account for Academy records.", 401);
   }
   if (!["superAdmin", "director", "caretaker"].includes(result.actor.role)) {
     throw new AcademyError("This administrator cannot access Academy records.", 403);

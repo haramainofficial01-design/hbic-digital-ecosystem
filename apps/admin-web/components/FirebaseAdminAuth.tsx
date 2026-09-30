@@ -1,19 +1,14 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- This QR is generated locally as a data URI and is never network-fetched. */
-
 import {
   TotpMultiFactorGenerator,
-  createUserWithEmailAndPassword,
   getMultiFactorResolver,
-  multiFactor,
   onIdTokenChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   type Auth,
-  type MultiFactorResolver,
-  type TotpSecret
+  type MultiFactorResolver
 } from "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import { getAdminAuth } from "../lib/firebase";
@@ -44,12 +39,9 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [sharedPassword, setSharedPassword] = useState("");
   const [code, setCode] = useState("");
   const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
-  const [secret, setSecret] = useState<TotpSecret | null>(null);
-  const [totpQr, setTotpQr] = useState<string | null>(null);
   const [status, setStatus] = useState("Sign in with your personal administrator account.");
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null);
-  const generating = useRef(false);
   const handlingAuth = useRef(false);
   const sharedSession = useRef(false);
   const sharedToken = useRef<string | null>(null);
@@ -64,8 +56,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
     return onIdTokenChanged(clientAuth, async (user) => {
     // A forced token refresh can emit another onIdTokenChanged event. Ignore
-    // that nested event while this sign-in is being reconciled; otherwise MFA
-    // completion can repeatedly reload and never hand a stable token to admin.
+    // that nested event while this sign-in is being reconciled.
     if (sharedSession.current || handlingAuth.current) return;
     handlingAuth.current = true;
     try {
@@ -86,55 +77,19 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       setStatus("Verify the email address before administrator access can continue.");
       return;
     }
-    if (multiFactor(user).enrolledFactors.length === 0) {
-      onSession(null);
-      if (!generating.current && !secret) {
-        generating.current = true;
-        try {
-          let generated: TotpSecret;
-          try {
-            generated = await TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession());
-          } catch {
-            // Existing TOTP configuration needs no server-side change. Only
-            // attempt project preparation when Firebase rejects enrollment.
-            const prepared = await fetch(`${apiBase}/api/admin/auth/prepare`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }
-            });
-            if (!prepared.ok) {
-              const result = await prepared.json().catch(() => null) as { error?: string } | null;
-              throw new Error(result?.error ?? "Authenticator setup is unavailable.");
-            }
-            generated = await TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession());
-          }
-          setSecret(generated);
-          try {
-            const { toDataURL } = await import("qrcode");
-            setTotpQr(await toDataURL(generated.generateQrCodeUrl(user.email ?? "HBIC admin", "HBIC Admin"), {
-              width: 240, margin: 2, errorCorrectionLevel: "M"
-            }));
-          } catch {
-            setTotpQr(null);
-          }
-          setStatus("Scan the QR with an authenticator or add the setup key manually, then enter its six-digit code.");
-        } catch (error) {
-          setStatus(error instanceof Error ? error.message : "Unable to start MFA enrollment. Sign out and try again.");
-        } finally {
-          generating.current = false;
-        }
-      }
-      return;
-    }
-    const idToken = await user.getIdTokenResult();
+    const idToken = await user.getIdToken(true);
     if (sharedSession.current) return;
-    const firebaseClaims = idToken.claims.firebase as { sign_in_second_factor?: string } | undefined;
-    if (!firebaseClaims?.sign_in_second_factor) {
+    const approved = await fetch(`${apiBase}/api/admin/auth/session`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+      cache: "no-store"
+    });
+    if (!approved.ok || clientAuth.currentUser?.uid !== user.uid) {
       onSession(null);
-      setStatus("MFA is enrolled, but this session has not completed its challenge. Sign out and sign in again.");
+      setStatus("This email is not approved for administrator access, or the session expired. Contact an HBIC administrator if you believe this is a mistake.");
       return;
     }
-    onSession(`Bearer ${idToken.token}`, user.email ?? undefined);
-    setStatus(`Signed in securely as ${user.email}. MFA is active.`);
+    onSession(`Bearer ${idToken}`, user.email ?? undefined);
+    setStatus(`Signed in as ${user.email}. You can load the protected draft and Academy records.`);
     } catch {
       onSession(null);
       setStatus("Could not finish administrator sign-in. Sign out and try again.");
@@ -142,7 +97,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       handlingAuth.current = false;
     }
     });
-  }, [onSession, secret]);
+  }, [onSession]);
 
   async function login() {
     if (!auth) return setStatus("Personal administrator sign-in is not configured in this build.");
@@ -180,28 +135,6 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  async function enrollMfa() {
-    if (!auth) return;
-    const user = auth.currentUser;
-    if (!user || !secret) return;
-    setBusy(true);
-    try {
-      await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code.trim()), "HBIC Authenticator");
-      setSecret(null);
-      setTotpQr(null);
-      setCode("");
-      // Enrollment is not an MFA-authenticated sign-in. Require a fresh login
-      // so the resulting ID token carries the second-factor claim.
-      await signOut(auth);
-      onSession(null);
-      setStatus("Authenticator activated. Sign in again and enter its code to open Academy records.");
-    } catch {
-      setStatus("That enrollment code was invalid or expired. Enter the newest authenticator code.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function sendSetupEmail() {
     if (!auth) return setStatus("Personal administrator sign-in is not configured in this build.");
     setBusy(true);
@@ -215,27 +148,6 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  async function createPersonalAccount() {
-    if (!auth) return setStatus("Personal administrator sign-in is not configured in this build.");
-    if (password.length < 12) return setStatus("Choose a private password of at least 12 characters.");
-    setBusy(true);
-    try {
-      sharedSession.current = false;
-      onSession(null);
-      const user = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-      await sendEmailVerification(user.user);
-      setPassword("");
-      setStatus("Account created. Verify this email from your inbox, then return here. Academy records stay locked until authenticator MFA is complete.");
-    } catch (error) {
-      const code = (error as { code?: string }).code;
-      setStatus(code === "auth/email-already-in-use"
-        ? "This email already has a Firebase account. Use 'Set or reset approved admin password' and then sign in."
-        : "Could not create the account. Check the email and password, then try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function refreshVerifiedEmail() {
     if (!auth?.currentUser) return;
     setBusy(true);
@@ -244,7 +156,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       if (!auth.currentUser.emailVerified) return setStatus("Email is not verified yet. Open the verification link, then try again.");
       await auth.currentUser.getIdToken(true);
       await signOut(auth);
-      setStatus("Email verified. Sign in with your private password to set up the authenticator.");
+      setStatus("Email verified. Sign in with your private password.");
     } catch {
       setStatus("Could not refresh email verification. Please try again.");
     } finally {
@@ -267,7 +179,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       onSession(token, sharedEmail.trim().toLowerCase());
       setSharedReady(true);
       setSharedPassword("");
-      setStatus("Shared HBIC access verified. Publishing is available; private Academy family records require personal MFA.");
+      setStatus("Shared HBIC access verified for publishing. Private Academy family records require an approved personal account.");
     } catch {
       sharedSession.current = false;
       sharedToken.current = null;
@@ -290,7 +202,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Personal account activation failed.");
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      setStatus("Approved personal account activated. Check its inbox for the private password setup link, then sign in and complete MFA.");
+      setStatus("Approved personal account activated. Check its inbox for the private password setup link, then sign in.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Personal account activation failed. Contact the HBIC administrator.");
     } finally {
@@ -298,17 +210,17 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  if (secret || resolver) return (
+  if (resolver) return (
     <div className="firebase-auth-panel" id="admin-auth">
-      <strong>{secret ? "Set up authenticator MFA" : "MFA verification"}</strong>
-      {secret ? <><p>Scan this with your phone’s Passwords app or an authenticator. Face ID or fingerprint can unlock that app; the six-digit code is still required for HBIC sign-in.</p>{totpQr ? <img src={totpQr} width={240} height={240} alt="HBIC administrator authenticator setup QR code" /> : null}<p>If you are setting this up on the same phone, enter this key manually in your authenticator:</p><code>{secret.secretKey}</code></> : null}
+      <strong>Existing authenticator on this account</strong>
+      <p>New approved accounts need only their email and password. This account already has an authenticator enrolled, so Firebase still requires its code until that factor is removed.</p>
       <AuthField label="Six-digit authenticator code" value={code} onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))} />
-      <button className="primary" type="button" onClick={secret ? enrollMfa : verifyMfa} disabled={busy || code.length !== 6}>{secret ? "Activate MFA" : "Verify & sign in"}</button>
+      <button className="primary" type="button" onClick={verifyMfa} disabled={busy || code.length !== 6}>Verify & sign in</button>
       <p role="status">{status}</p>
     </div>
   );
 
-  if (auth?.currentUser && multiFactor(auth.currentUser).enrolledFactors.length > 0) return (
+  if (auth?.currentUser && auth.currentUser.emailVerified) return (
     <div className="firebase-auth-panel firebase-auth-ready" id="admin-auth">
       <div><strong>{auth.currentUser.email}</strong><p role="status">{status}</p></div>
         <button className="secondary" type="button" onClick={() => void signOut(auth)}>Sign out</button>
@@ -318,7 +230,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   if (auth?.currentUser && !auth.currentUser.emailVerified) return (
     <div className="firebase-auth-panel" id="admin-auth">
       <strong>Verify your personal email</strong>
-      <p>Open the Firebase verification email for {auth.currentUser.email}. Your personal password alone does not unlock Academy records.</p>
+      <p>Open the Firebase verification email for {auth.currentUser.email}. An approved, verified email and private password are required for Academy records.</p>
       <div className="firebase-auth-actions">
         <button className="primary" type="button" onClick={() => void refreshVerifiedEmail()} disabled={busy}>I verified my email</button>
         <button className="secondary" type="button" onClick={() => void sendEmailVerification(auth.currentUser!)} disabled={busy}>Resend verification</button>
@@ -334,7 +246,6 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       <AuthField label="Private password" value={password} type="password" onChange={setPassword} />
       <div className="firebase-auth-actions">
         <button className="secondary" type="button" onClick={login} disabled={busy || !auth || !email.trim() || !password}>Sign in</button>
-        <button className="secondary" type="button" onClick={() => void createPersonalAccount()} disabled={busy || !auth || !email.trim() || !password}>Create approved personal account</button>
         <button className="secondary" type="button" onClick={sendSetupEmail} disabled={busy || !auth || !email.trim()}>Set or reset approved admin password</button>
       </div>
       <div className="firebase-auth-shared">
@@ -342,9 +253,9 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <AuthField label="Shared administrator email" value={sharedEmail} type="email" onChange={setSharedEmail} />
         <AuthField label="Shared administrator password" value={sharedPassword} type="password" onChange={setSharedPassword} />
         <button className="secondary" type="button" onClick={() => void verifySharedAccess()} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
-        {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require a personal administrator account with MFA.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
+        {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require an approved personal administrator account.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
       </div>
-      <p>To open private Academy records: create or sign in to your approved personal email, verify it, scan the authenticator QR, then sign in again with its six-digit code. Shared access is optional for publishing only; a password-reset email alone never grants Academy access.</p>
+      <p>To open private Academy records, sign in with a verified, approved personal email and private password. New personal accounts must first be approved by HBIC; shared access is for publishing only.</p>
       <p role="status">{status}</p>
     </div>
   );

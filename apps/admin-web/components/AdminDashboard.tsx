@@ -212,7 +212,7 @@ export function AdminDashboard() {
 
   const adminRequest = useCallback(
     async (path: string, init?: RequestInit) => {
-      if (!adminToken) throw new Error("Complete personal administrator sign-in and MFA first.");
+      if (!adminToken) throw new Error("Sign in with your approved administrator email and password first.");
 
       const response = await fetch(`${apiBase}${path}`, {
         ...init,
@@ -420,7 +420,7 @@ export function AdminDashboard() {
             <button className="primary" onClick={handleSaveDraft} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Save Draft"}</button>
             <button className="primary publish" onClick={handlePublish} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Publish Changes"}</button>
           </div>
-          {!draftLoaded ? <p className="muted">Complete personal sign-in and MFA, then load the protected draft before editing or publishing.</p> : null}
+          {!draftLoaded ? <p className="muted">Sign in with your approved personal email and password, then load the protected draft before editing or publishing.</p> : null}
         </div>
 
         {savedMessage ? <div role="status" className={`notice notice-${messageTone}`}><strong>{savedMessage}</strong></div> : null}

@@ -2,38 +2,43 @@
 
 ## Current model
 
-The two administrative web interfaces call mutation APIs hosted by the public
-Next.js deployment. The protected routes all invoke the same server-side
-authorization helper. The shared HBIC sign-in uses HTTP Basic authorization over
-HTTPS with production credentials stored only as encrypted Vercel environment
-variables. The email may persist locally; the password is kept in browser
-`sessionStorage` and is cleared when that browser session ends.
+The administrative web interface calls protected APIs hosted by the public
+Next.js deployment. For private Quran Academy records, an administrator signs in
+with a personal Firebase email and password. The email must be verified and
+approved through `ADMIN_SUPER_EMAILS` or an explicitly granted admin role; the
+server verifies the signed ID token on every protected request. A separate
+session endpoint confirms approval before the UI enables private records.
+
+The older shared HBIC email/password remains available for content publishing
+only. It uses HTTP Basic over HTTPS with credentials stored in Vercel environment
+variables. It does not unlock private Academy family or payment records. MFA is
+not required: HBIC opted for approved personal password sign-in because Firebase
+TOTP project-configuration access was unavailable and the extra step was
+operationally burdensome.
 
 The legacy `X-Admin-Secret` and bearer-key authorization paths have been removed.
 
 ## Risks
 
-The requested shared account is operationally simple, but it cannot identify
-which person performed an action. Anyone holding the credentials has the same
-permissions, selective revocation is impossible, and it does not satisfy the
-individual-account, MFA, RBAC, or attributable-audit objectives in the security
-handoff. Basic credentials are replayable until rotated, even though transport is
-protected by HTTPS and the password is not embedded in client bundles.
+The shared publishing account cannot identify which person performed an action;
+rotate it if disclosed. Personal Academy accounts are attributable and can be
+revoked individually, but password-only access is less resistant to phishing or
+credential reuse than MFA. Use strong unique passwords and promptly remove
+departing staff from the approved list/roles. A password-reset email by itself
+does not grant an unapproved account Academy access.
 
-## Implemented migration
+## Implemented boundaries
 
-1. Both admin prompts now request the same HBIC email and password.
-2. All protected APIs validate both fields server-side with timing-safe
-   comparisons and a non-enumerating error message.
-3. The old publish-key code path and production variable were removed.
-4. Public routes, including `/display`, remain unauthenticated and read-only.
-5. Existing draft concurrency, atomic publication, canonical prayer propagation,
-   and notification paths are unchanged.
+1. Shared publishing credentials are checked server-side with timing-safe
+   comparisons and non-enumerating errors.
+2. Academy endpoints reject shared credentials and require a signed, verified,
+   approved personal Firebase account with an Academy role.
+3. The old publish-key path remains removed. Public `/display` is read-only.
+4. Draft concurrency, atomic publication, prayer propagation, and notifications
+   remain unchanged.
 
-## Recommended target model
+## Future hardening
 
-The long-term security target remains individual Firebase Authentication
-accounts, required MFA for privileged roles, server-side role checks, revocable
-sessions, and append-only audit events containing the authenticated actor UID.
-That migration requires named administrator identities and MFA enrollment; a
-single shared account cannot provide those properties.
+HBIC can later add passkeys/MFA if its Firebase project and staff workflow
+support them. That would require a deliberate migration for existing admins;
+do not silently turn it on during a live Academy term.
