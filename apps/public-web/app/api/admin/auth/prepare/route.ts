@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: false, error: "Sign in with your personal account first." }, { status: 401 });
   }
   const auth = getAuth(app);
+  let stage = "verify-token";
   try {
     const token = await auth.verifyIdToken(bearer.slice(7));
     const email = token.email?.trim().toLowerCase();
@@ -23,17 +24,21 @@ export async function POST(request: Request) {
     if (!email || !token.email_verified || !allowed.has(email)) {
       return jsonResponse({ ok: false, error: "This verified email is not approved for administrator access." }, { status: 403 });
     }
+    stage = "read-project-config";
     const config = await auth.projectConfigManager().getProjectConfig();
     const active = config.multiFactorConfig?.state === "ENABLED" &&
       config.multiFactorConfig.providerConfigs?.some((provider) => provider.state === "ENABLED" && Boolean(provider.totpProviderConfig));
     if (!active) {
+      stage = "enable-totp";
       await auth.projectConfigManager().updateProjectConfig({
         multiFactorConfig: { state: "ENABLED", providerConfigs: [{ state: "ENABLED", totpProviderConfig: { adjacentIntervals: 2 } }] }
       });
     }
     return jsonResponse({ ok: true });
   } catch (error) {
-    console.error("Approved admin MFA preparation failed:", error && typeof error === "object" && "code" in error ? String(error.code) : "unknown");
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
+    const detail = error instanceof Error ? error.message.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g, "[email]").slice(0, 400) : "unknown";
+    console.error("Approved admin MFA preparation failed:", stage, code, detail);
     return jsonResponse({ ok: false, error: "Authenticator setup is unavailable. HBIC must enable TOTP in Firebase Authentication or grant the service account project-configuration access." }, { status: 503 });
   }
 }
