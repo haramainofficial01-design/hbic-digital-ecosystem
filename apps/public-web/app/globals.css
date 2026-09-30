@@ -3043,18 +3043,40 @@ body:not(.tv-display-active) { background: #f8f8f4; }
 @media(prefers-reduced-motion:reduce){.prayer-glass-bar>a{transition:none}}
 @media(prefers-reduced-transparency:reduce){.prayer-glass-bar,.prayer-mobile-toggle,.prayer-mobile-panel{background:#f1faf8;backdrop-filter:none;-webkit-backdrop-filter:none}}
 
-/* On phones, the compact prayer glyph unfolds into a vertical edge panel. */
+/* Make the actual clock values the most readable part of the live companion. */
+.prayer-glass-bar{min-height:70px;gap:12px}
+.prayer-glass-next strong{font-size:15px}
+.prayer-glass-next span{font-size:17px;font-variant-numeric:tabular-nums}
+.prayer-glass-times{gap:clamp(7px,1vw,15px)}
+.prayer-glass-times>span{white-space:nowrap}
+.prayer-glass-times b{font-size:15px}
+.prayer-glass-times time{font-size:17px;font-weight:800;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.prayer-glass-times small{font-size:12px}
+.prayer-glass-times small time{font-size:13px;font-weight:750}
+.prayer-mobile-panel li span>time{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.prayer-mobile-panel li small time{font-size:12px;font-weight:750}
+/* The desktop instrument folds to a single prayer icon, while opening in full by default. */
+.prayer-glass-bar{height:70px;overflow:hidden;transition:width .62s cubic-bezier(.22,1,.36,1),height .62s cubic-bezier(.22,1,.36,1),border-radius .62s cubic-bezier(.22,1,.36,1)}
+.prayer-glass-toggle{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:1px solid rgba(255,255,255,.91);border-radius:15px;background:linear-gradient(145deg,rgba(218,246,243,.9),rgba(255,255,255,.65));box-shadow:inset 0 1px rgba(255,255,255,.96),0 5px 15px rgba(7,81,84,.11);color:#0b5a60;cursor:pointer}
+.prayer-glass-toggle:hover{background:rgba(255,255,255,.9)}
+.prayer-glass-toggle:focus-visible,.prayer-mobile-toggle:focus-visible{outline:3px solid #0a84a4;outline-offset:2px}
+.prayer-glass-content{display:flex;align-items:center;flex:1;min-width:0;gap:12px;transition:opacity .28s ease,transform .52s cubic-bezier(.22,1,.36,1),visibility 0s}
+.prayer-glass-content>a{white-space:nowrap;margin-left:auto;padding:9px 11px;border:1px solid rgba(255,255,255,.62);border-radius:11px;background:rgba(255,255,255,.42);color:#0b615f;font-size:13px;font-weight:800;text-decoration:none;transition:background .2s ease,transform .2s ease}
+.prayer-glass-content>a:hover{background:rgba(255,255,255,.76);transform:translateY(-1px)}
+.prayer-glass-bar.is-collapsed{width:58px;height:58px;min-height:58px;padding:6px;gap:0;border-radius:20px}
+.prayer-glass-bar.is-collapsed .prayer-glass-content{flex:0;width:0;min-width:0;max-width:0;gap:0;overflow:hidden;opacity:0;visibility:hidden;transform:scaleX(.45);pointer-events:none;transition:opacity .18s ease,transform .35s ease,visibility 0s linear .35s}
+@media(max-width:1600px) and (min-width:861px){.prayer-glass-bar:not(.is-collapsed){height:94px}.prayer-glass-content{flex-wrap:wrap;row-gap:5px}.prayer-glass-content>.prayer-glass-next{order:1}.prayer-glass-content>a{order:2}.prayer-glass-content>.prayer-glass-times{order:3;flex-basis:100%;justify-content:space-between}}
 @media(max-width:860px){
-  .prayer-mobile-rail{display:block;top:50%;width:52px;height:62px;transform:translateY(-50%);overflow:visible}
-  .prayer-mobile-toggle{position:relative;z-index:2;width:52px;min-height:62px;border-radius:18px;color:#075c66;box-shadow:0 15px 32px rgba(5,41,53,.24),inset 0 1px rgba(255,255,255,1)}
-  .prayer-mobile-toggle svg{filter:drop-shadow(0 2px 3px rgba(18,106,110,.16));transition:transform .32s cubic-bezier(.2,.8,.2,1)}
-  .prayer-mobile-rail.is-open .prayer-mobile-toggle svg{transform:scale(1.12)}
-  .prayer-mobile-panel{position:absolute;top:50%;right:0;z-index:1;width:min(300px,calc(100vw - 20px));max-height:min(70vh,590px);padding:21px 72px 21px 20px;border-radius:25px;background:linear-gradient(125deg,rgba(255,255,255,.94),rgba(223,246,243,.88));box-shadow:0 23px 60px rgba(3,24,39,.25),inset 0 1px rgba(255,255,255,1);transform:translateY(-50%);transform-origin:calc(100% - 26px) 50%}
-  .prayer-mobile-panel::before{content:"";position:absolute;top:12px;bottom:12px;right:61px;width:1px;background:linear-gradient(transparent,rgba(12,130,136,.27),transparent)}
-  .prayer-mobile-panel ul{min-width:0}.prayer-mobile-panel li{align-items:flex-start}.prayer-mobile-panel li span{min-width:0;font-variant-numeric:tabular-nums}
+  .prayer-mobile-rail{top:50dvh;transform:translateY(-50%);align-items:center;pointer-events:none}
+  .prayer-mobile-toggle{flex:none;pointer-events:auto;transition:transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s ease}
+  .prayer-mobile-rail.is-open .prayer-mobile-toggle{transform:scale(1.03);box-shadow:0 15px 35px rgba(3,24,39,.27),inset 0 1px rgba(255,255,255,1)}
+  .prayer-mobile-panel{position:relative;box-sizing:border-box;width:min(236px,calc(100vw - 84px));max-height:min(76dvh,640px);gap:11px;padding:20px 17px;border-radius:27px;background:linear-gradient(145deg,rgba(255,255,255,.88),rgba(213,243,240,.83));box-shadow:0 20px 56px rgba(3,24,39,.24),inset 0 1px rgba(255,255,255,.98);backdrop-filter:blur(36px) saturate(175%);-webkit-backdrop-filter:blur(36px) saturate(175%);opacity:0;visibility:hidden;pointer-events:none;transform:translateX(28px) scale(.18,.12);transform-origin:right center;clip-path:inset(42% 0 42% 90% round 27px);animation:none;transition:opacity .25s ease,transform .58s cubic-bezier(.22,1,.36,1),clip-path .58s cubic-bezier(.22,1,.36,1),visibility 0s linear .58s}
+  .prayer-mobile-panel::before{content:"";position:absolute;inset:1px 1px auto;height:38%;border-radius:27px 27px 50% 50%;background:linear-gradient(180deg,rgba(255,255,255,.55),transparent);pointer-events:none}
+  .prayer-mobile-rail.is-open .prayer-mobile-panel{opacity:1;visibility:visible;pointer-events:auto;transform:none;clip-path:inset(0 0 0 0 round 27px);transition:opacity .35s ease,transform .64s cubic-bezier(.22,1,.36,1),clip-path .64s cubic-bezier(.22,1,.36,1),visibility 0s}
+  .prayer-mobile-panel>strong{position:relative;font-size:18px;line-height:1.15}
+  .prayer-mobile-panel>span{position:relative;font-size:14px}
+  .prayer-mobile-panel li{min-height:61px;align-items:flex-start;padding:11px 0;font-size:14px}
+  .prayer-mobile-panel li span>time{font-size:18px}
+  .prayer-mobile-panel>a{position:relative;font-size:14px}
 }
-@media(max-width:860px) and (prefers-reduced-motion:no-preference){
-  .prayer-mobile-panel{animation:prayer-edge-unfold .42s cubic-bezier(.2,.84,.2,1) both}
-  @keyframes prayer-edge-unfold{from{opacity:0;filter:blur(9px);transform:translateY(-50%) scale(.18,.12)}to{opacity:1;filter:blur(0);transform:translateY(-50%) scale(1)}}
-}
-@media(max-width:860px) and (prefers-reduced-motion:reduce){.prayer-mobile-panel{animation:none}.prayer-mobile-toggle svg{transition:none}}
+@media(prefers-reduced-motion:reduce){.prayer-glass-bar,.prayer-glass-content,.prayer-mobile-panel,.prayer-mobile-toggle{transition:none!important;animation:none!important}}

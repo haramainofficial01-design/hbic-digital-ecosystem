@@ -15,6 +15,14 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 // double-taps, short enough that a parent missing the email is not stuck.
 const VERIFY_RESEND_COOLDOWN_SECONDS = 60;
 
+function verificationReturnSettings() {
+  // Firebase's hosted verification page can return parents to the exact
+  // Academy form after they confirm their address on a phone or another tab.
+  // Other preview hosts keep Firebase's default handler unless authorized.
+  if (typeof window === "undefined" || !["hbic.ca", "www.hbic.ca"].includes(window.location.hostname)) return undefined;
+  return { url: "https://hbic.ca/quran-academy", handleCodeInApp: false };
+}
+
 export function AcademyParent() {
   const academyAuth = getAcademyClientAuth();
   const [user, setUser] = useState<User | null>(null);
@@ -167,7 +175,7 @@ export function AcademyParent() {
       if (registerAccount) {
         if (password.length < 12) throw new Error("Use a password of at least 12 characters.");
         const result = await createUserWithEmailAndPassword(academyAuth, email.trim().toLowerCase(), password);
-        await sendEmailVerification(result.user);
+        await sendEmailVerification(result.user, verificationReturnSettings());
         // The verify screen renders the confirmation copy from this flag —
         // nothing is sent automatically beyond this one email.
         setVerificationEmailSent(true);
@@ -189,7 +197,7 @@ export function AcademyParent() {
     if (!current || resendCooldown > 0) return;
     setBusy(true);
     try {
-      await sendEmailVerification(current);
+      await sendEmailVerification(current, verificationReturnSettings());
       setVerificationEmailSent(true);
       setResendCooldown(VERIFY_RESEND_COOLDOWN_SECONDS);
       setStatus("");

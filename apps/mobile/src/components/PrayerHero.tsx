@@ -9,7 +9,7 @@ import {
   type PrayerName
 } from "@hbic/shared";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { brandAssets } from "../constants/assets";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";
@@ -64,7 +64,8 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30 * 1000);
-    return () => clearInterval(timer);
+    const resume = AppState.addEventListener("change", (state) => { if (state === "active") setNow(new Date()); });
+    return () => { clearInterval(timer); resume.remove(); };
   }, []);
 
   useEffect(() => {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CloudMoon, CloudSun, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
+import { CloudMoon, CloudSun, Minimize2, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { deriveDisplayFocus, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
 
 const names = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -19,6 +19,7 @@ export function PrayerRail() {
   const [payload, setPayload] = useState<TvDisplayPayload | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [open, setOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const hidden = path === "/prayer-times" || path.startsWith("/display");
 
   useEffect(() => {
@@ -47,20 +48,25 @@ export function PrayerRail() {
   const entries = payload.snapshot.prayers.filter((entry) => names.includes(entry.key));
   const nextLabel = `${focus.entry.name} ${focus.primaryKind === "iqamah" ? "iqamah" : "adhan"}`;
   return <>
-    <div className="prayer-glass-bar" role="region" aria-label="Live prayer times">
-      <span className="prayer-glass-next"><strong>Next: {nextLabel}</strong><span>{countdown(focus.date, now)}</span></span>
-      <span className="prayer-glass-times">{entries.map((entry) => <span key={entry.key}><b>{entry.name}</b> {entry.adhan}{entry.iqamah ? <small> · Iqamah {entry.iqamah}</small> : null}</span>)}</span>
-      <Link href="/prayer-times" aria-label="Open complete prayer and iqamah times">Full times ↗</Link>
+    <div className={`prayer-glass-bar${desktopCollapsed ? " is-collapsed" : ""}`} role="region" aria-label="Live prayer times">
+      <button type="button" className="prayer-glass-toggle" aria-expanded={!desktopCollapsed} aria-controls="desktop-prayer-times" aria-label={desktopCollapsed ? "Show live prayer times" : "Minimize live prayer times"} title={desktopCollapsed ? "Show prayer times" : "Minimize prayer times"} onClick={() => setDesktopCollapsed(!desktopCollapsed)}>
+        {desktopCollapsed ? <CurrentPrayerIcon size={21} strokeWidth={1.9} aria-hidden="true" /> : <Minimize2 size={20} strokeWidth={1.9} aria-hidden="true" />}
+      </button>
+      <div id="desktop-prayer-times" className="prayer-glass-content" aria-hidden={desktopCollapsed} inert={desktopCollapsed}>
+        <span className="prayer-glass-next"><strong>Next: {nextLabel}</strong><span>{countdown(focus.date, now)}</span></span>
+        <span className="prayer-glass-times">{entries.map((entry) => <span key={entry.key}><b>{entry.name}</b> <time>{entry.adhan}</time>{entry.iqamah ? <small> · Iqamah <time>{entry.iqamah}</time></small> : null}</span>)}</span>
+        <Link href="/prayer-times" aria-label="Open complete prayer and iqamah times">Full times ↗</Link>
+      </div>
     </div>
     <div className={`prayer-mobile-rail${open ? " is-open" : ""}`} role="region" aria-label="Live prayer times">
       <button type="button" className="prayer-mobile-toggle" aria-expanded={open} aria-controls="prayer-mobile-panel" onClick={() => setOpen(!open)}>
         <CurrentPrayerIcon size={23} strokeWidth={1.8} aria-hidden="true" /><small>{open ? "Close" : focus.entry.name}</small>
       </button>
-      {open ? <div id="prayer-mobile-panel" className="prayer-mobile-panel">
+      <div id="prayer-mobile-panel" className="prayer-mobile-panel" aria-hidden={!open} inert={!open}>
         <strong>Next {nextLabel}</strong><span>{countdown(focus.date, now)} remaining</span>
-        <ul>{entries.map((entry) => <li key={entry.key}><b>{entry.name}</b><span>{entry.adhan}{entry.iqamah ? <small>Iqamah {entry.iqamah}</small> : null}</span></li>)}</ul>
+        <ul>{entries.map((entry) => <li key={entry.key}><b>{entry.name}</b><span><time>{entry.adhan}</time>{entry.iqamah ? <small>Iqamah <time>{entry.iqamah}</time></small> : null}</span></li>)}</ul>
         <Link href="/prayer-times" onClick={() => setOpen(false)}>Full prayer times ↗</Link>
-      </div> : null}
+      </div>
     </div>
   </>;
 }

@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       appVersion?: string;
       environment?: "development" | "production";
       preferences?: Partial<NotificationPreference>;
+      prayerChangePreferences?: { enabled: boolean; prayers: Record<"fajr" | "dhuhr" | "asr" | "maghrib" | "isha", boolean> };
     };
     if (!body.token) {
       return jsonResponse({ ok: false, error: "Push token is required." }, { status: 400 });
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
       deviceName: body.deviceName,
       appVersion: body.appVersion,
       environment: body.environment,
-      preferences: body.preferences
+      preferences: body.preferences,
+      prayerChangePreferences: body.prayerChangePreferences
     });
     return jsonResponse({ ok: true, platform: token.platform });
   } catch (error) {

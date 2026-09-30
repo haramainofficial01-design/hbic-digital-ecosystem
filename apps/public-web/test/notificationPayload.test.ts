@@ -4,7 +4,8 @@ import {
   buildContentUpdateExpoPushMessage,
   buildVisibleExpoPushMessage,
   communityNotificationChannelId,
-  decideTokenRotation
+  decideTokenRotation,
+  visibleIqamahChanges
 } from "../lib/notificationPayload";
 
 test("visible community pushes use the stable high-priority sound channel", () => {
@@ -65,4 +66,15 @@ test("token rotation removes only a matching installation and safely disables le
   assert.equal(decideTokenRotation("device-hash", undefined), "disable-legacy");
   assert.equal(decideTokenRotation("device-hash", "another-device"), "ignore");
   assert.equal(decideTokenRotation(undefined, "another-device"), "ignore");
+});
+
+test("change alerts respect global and per-prayer consent without leaking hidden times", () => {
+  const changes = [
+    { prayer: "fajr" as const, oldTime: "6:20 AM", newTime: "6:30 AM" },
+    { prayer: "asr" as const, oldTime: "5:30 PM", newTime: "5:15 PM" }
+  ];
+  assert.deepEqual(visibleIqamahChanges(changes, false), []);
+  assert.deepEqual(visibleIqamahChanges(changes, true, { enabled: false, prayers: {} }), []);
+  assert.deepEqual(visibleIqamahChanges(changes, true, { enabled: true, prayers: { fajr: false, asr: true } }), [changes[1]]);
+  assert.deepEqual(visibleIqamahChanges(changes, true), changes);
 });

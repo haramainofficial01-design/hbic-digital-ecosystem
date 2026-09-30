@@ -209,8 +209,18 @@ export async function lookupAcademyReference(reference: string, actorUid: string
   const matches = await db.collection(families).where("reference", "==", reference).limit(2).get();
   if (matches.empty) throw new AcademyError("No Academy registration matches that reference.", 404);
   if (matches.size !== 1) throw new AcademyError("This reference needs administrator review.", 409);
+  const saved = matches.docs[0].data();
+  const currentToken = String(saved.passToken ?? "");
+  if (saved.passState !== "active" || !/^[A-Za-z0-9_-]{43}$/.test(currentToken)) {
+    throw new AcademyError("This Academy pass is inactive or replaced.", 410);
+  }
+  const pass = await db.collection(passes).doc(tokenHash(currentToken)).get();
+  if (!pass.exists || pass.data()?.state !== "active" || pass.data()?.uid !== matches.docs[0].id) {
+    throw new AcademyError("This Academy pass is no longer current.", 410);
+  }
   const family = await getAcademyFamily(matches.docs[0].id);
   if (!family) throw new AcademyError("This Academy registration was not found.", 404);
+  if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);
   await db.collection("academyAudit").add({ action: "reference_looked_up", familyId: family.id, actorUid, at: new Date().toISOString() });
   return family;
 }

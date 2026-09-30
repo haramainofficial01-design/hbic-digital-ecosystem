@@ -13,10 +13,15 @@ import {
   buildContentUpdateExpoPushMessage,
   buildVisibleExpoPushMessage,
   decideTokenRotation,
+  visibleIqamahChanges,
+  type IqamahChange,
   type ExpoPushMessage
 } from "./notificationPayload";
 
 type PushPlatform = "ios" | "android" | "web" | "unknown";
+type PrayerChangeName = "fajr" | "dhuhr" | "asr" | "maghrib" | "isha";
+type PrayerChangePreferences = { enabled: boolean; prayers: Record<PrayerChangeName, boolean> };
+const prayerChangeNames: PrayerChangeName[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 
 export type RegisteredPushToken = {
   token: string;
@@ -26,6 +31,7 @@ export type RegisteredPushToken = {
   environment?: "development" | "production" | "unknown";
   installationIdHash?: string;
   preferences: NotificationPreference;
+  prayerChangePreferences?: PrayerChangePreferences;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -81,6 +87,7 @@ export async function registerPushToken(input: {
   appVersion?: string;
   environment?: string;
   preferences?: Partial<NotificationPreference>;
+  prayerChangePreferences?: Partial<PrayerChangePreferences>;
 }) {
   const db = getDatabase();
   if (!db) throw new Error("Push token storage is not configured.");
@@ -101,6 +108,15 @@ export async function registerPushToken(input: {
     updatedAt: now,
     lastSeenAt: now
   };
+  if (input.prayerChangePreferences && typeof input.prayerChangePreferences.enabled === "boolean") {
+    token.prayerChangePreferences = {
+      enabled: input.prayerChangePreferences.enabled,
+      prayers: Object.fromEntries(prayerChangeNames.map((prayer) =>
+        [prayer, input.prayerChangePreferences?.prayers?.[prayer] !== false])) as Record<PrayerChangeName, boolean>
+    };
+  } else if (current?.prayerChangePreferences) {
+    token.prayerChangePreferences = current.prayerChangePreferences;
+  }
   if (input.deviceName?.trim()) token.deviceName = input.deviceName.trim().slice(0, 160);
   if (input.appVersion?.trim()) token.appVersion = input.appVersion.trim().slice(0, 40);
   token.environment = normalizeEnvironment(input.environment);
@@ -259,6 +275,27 @@ export async function sendPushNotification(input: SendNotificationInput, targetT
     androidChannelId: token.appVersion ? undefined : "default"
   }));
   return deliverExpoPushMessages({ tokens, messages, logData: input });
+}
+
+/** A device receives only the prayers it chose, with matching text and data. */
+export async function sendIqamahChangeNotification(effectiveDate: string, changes: IqamahChange[]) {
+  const selected = (await allEnabledTokens())
+    .map((token) => ({ token, changes: visibleIqamahChanges(changes, hasEnabledPreference(token, "iqamahChange"), token.prayerChangePreferences) }))
+    .filter(({ changes: visible }) => visible.length > 0);
+  const tokens = selected.map(({ token }) => token);
+  const messages = selected.map(({ token, changes: visible }) => {
+    const body = visible.map(({ prayer, oldTime, newTime }) =>
+      `${prayer[0].toUpperCase()}${prayer.slice(1)} ${oldTime} → ${newTime}`).join(" · ");
+    return buildVisibleExpoPushMessage(token.token, {
+      title: "Masjid Bilal iqamah update",
+      body: `Effective ${effectiveDate}: ${body}`.slice(0, 220),
+      route: "/prayer", type: "iqamahChange",
+      data: { effectiveDate, changes: visible },
+      androidChannelId: token.appVersion ? undefined : "default"
+    });
+  });
+  return deliverExpoPushMessages({ tokens, messages,
+    logData: { type: "iqamahChange", effectiveDate, changes, audience: "All" } });
 }
 
 export async function sendContentUpdateSignal(input: {

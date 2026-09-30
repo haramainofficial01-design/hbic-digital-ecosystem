@@ -316,9 +316,11 @@ export async function registerForPushNotificationsAsync({
   const projectId = Constants.easConfig?.projectId ?? (Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined)?.projectId;
   const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
   const resolvedPreferences = { ...defaultNotificationPreferences, ...(preferences ?? {}) };
+  const prayer = (await loadNotificationSettings()).prayer;
+  const prayerChangePreferences = { enabled: prayer.enabled, prayers: prayer.prayers };
   const previousToken = await readTextFile(pushTokenFile);
   const resolvedInstallationId = await installationId();
-  const signature = `${token.data}:${JSON.stringify(resolvedPreferences)}`;
+  const signature = `${token.data}:${JSON.stringify(resolvedPreferences)}:${JSON.stringify(prayerChangePreferences)}`;
   if (lastRegisteredSignature === signature) return token.data;
   if (registrationInFlight && registrationInFlightSignature === signature) return registrationInFlight;
 
@@ -333,7 +335,8 @@ export async function registerForPushNotificationsAsync({
         platform: Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "unknown",
         appVersion: Constants.expoConfig?.version,
         environment: __DEV__ ? "development" : "production",
-        preferences: resolvedPreferences
+        preferences: resolvedPreferences,
+        prayerChangePreferences
       })
     });
     if (!response.ok) {

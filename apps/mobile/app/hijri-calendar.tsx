@@ -1,7 +1,7 @@
 import { dateStringInTimeZone, resolveHijriDate } from "@hbic/shared";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -20,15 +20,34 @@ function calendarDays(year: number, month: number) {
   return [...Array<null>(leading).fill(null), ...Array.from({ length: count }, (_, index) => index + 1)];
 }
 
+function calgaryMonth(date: Date) {
+  const [year, month] = dateStringInTimeZone(date, timeZone).split("-").map(Number);
+  return { year, month: month - 1 };
+}
+
 export default function HijriCalendarScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const [viewedMonth, setViewedMonth] = useState(() => {
-    const parts = dateStringInTimeZone(new Date(), timeZone).split("-").map(Number);
-    return { year: parts[0], month: parts[1] - 1 };
-  });
-  const today = dateStringInTimeZone(new Date(), timeZone);
+  const [now, setNow] = useState(() => new Date());
+  const [viewedMonth, setViewedMonth] = useState(() => calgaryMonth(new Date()));
+  const lastCalgaryMonth = useRef(calgaryMonth(new Date()));
+  const today = dateStringInTimeZone(now, timeZone);
+  useEffect(() => {
+    const refresh = () => {
+      const fresh = new Date();
+      const month = calgaryMonth(fresh);
+      const previous = lastCalgaryMonth.current;
+      if (month.year !== previous.year || month.month !== previous.month) {
+        setViewedMonth((view) => view.year === previous.year && view.month === previous.month ? month : view);
+        lastCalgaryMonth.current = month;
+      }
+      setNow(fresh);
+    };
+    const timer = setInterval(refresh, 30_000);
+    const resume = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
+    return () => { clearInterval(timer); resume.remove(); };
+  }, []);
   const days = useMemo(() => calendarDays(viewedMonth.year, viewedMonth.month), [viewedMonth]);
   const hijriDates = days.map((day) => day === null ? null : resolveHijriDate(
     new Date(Date.UTC(viewedMonth.year, viewedMonth.month, day, 12)),

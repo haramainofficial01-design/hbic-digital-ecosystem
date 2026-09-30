@@ -140,9 +140,8 @@ async function announceIqamahChange(db: Firestore | null, effectiveDate: string,
       return true;
     });
     if (!shouldSend) return;
-    const { sendPushNotification } = await import("./notificationStore");
-    const body = changes.map(({ prayer, oldTime, newTime }) => `${prayer[0].toUpperCase()}${prayer.slice(1)} ${oldTime} → ${newTime}`).join(" · ");
-    const result = await sendPushNotification({ title: "Masjid Bilal iqamah update", body: `Effective ${effectiveDate}: ${body}`.slice(0, 220), audience: "All", route: "/prayer", type: "iqamahChange", data: { effectiveDate, changes } });
+    const { sendIqamahChangeNotification } = await import("./notificationStore");
+    const result = await sendIqamahChangeNotification(effectiveDate, changes);
     await claim.update({ status: "sent", result, sentAt: new Date().toISOString() });
   } catch (error) {
     // A notification failure must never break the canonical prayer response.
@@ -528,8 +527,6 @@ export async function applyPrayerSync(
       } catch {
         // Live values are still authoritative for this response; cache persistence can recover later.
       }
-      // A confirmed upstream change is user-visible; opt-in device preferences are applied by the push store.
-      await announceIqamahChange(db, resolution.rollover?.weekStart ?? serviceDate, cached?.normalizedContent?.iqamahTime, synced.iqamahTime);
     } catch (error) {
       if (isNextDynamicServerUsage(error)) throw error;
       lastError = error instanceof Error ? error.message : "Unable to refresh prayer data.";
@@ -564,6 +561,18 @@ export async function applyPrayerSync(
         synced = retainPrayerScheduleDuringOutage(content, nowDate);
       }
       await writeCache(db, { lastAttemptedSync, lastError });
+    }
+  }
+
+  // Compare the effective public values in both live and cached-feed paths.
+  // This catches a manual override, its removal, and the Sunday next-week
+  // rollover without notifying for adhan's ordinary daily drift.
+  if (sourceState !== "unavailable" && changedIqamahTimes(cached?.normalizedContent?.iqamahTime, synced.iqamahTime).length) {
+    await announceIqamahChange(db, resolution?.rollover?.weekStart ?? serviceDate, cached?.normalizedContent?.iqamahTime, synced.iqamahTime);
+    if (sourceState === "cached") {
+      try { await writeCache(db, { normalizedContent: {
+        prayerTime: synced.prayerTime, iqamahTime: synced.iqamahTime, jumuahSchedule: synced.jumuahSchedule
+      } }); } catch { /* The resolved public response remains authoritative. */ }
     }
   }
 

@@ -24,6 +24,17 @@ export type VisibleNotificationPayload = {
   androidChannelId?: string;
 };
 
+export type IqamahChange = { prayer: "fajr" | "dhuhr" | "asr" | "maghrib" | "isha"; oldTime: string; newTime: string };
+
+export function visibleIqamahChanges(
+  changes: IqamahChange[],
+  globalEnabled: boolean,
+  perPrayer?: { enabled: boolean; prayers: Partial<Record<IqamahChange["prayer"], boolean>> }
+) {
+  if (!globalEnabled || perPrayer?.enabled === false) return [];
+  return changes.filter(({ prayer }) => perPrayer?.prayers?.[prayer] !== false);
+}
+
 const locallyScheduledTypes = new Set<NotificationType>(["prayerReminder", "iqamahReminder"]);
 
 export type TokenRotationAction = "delete" | "disable-legacy" | "ignore";
