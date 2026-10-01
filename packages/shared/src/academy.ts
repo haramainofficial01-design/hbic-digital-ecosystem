@@ -87,6 +87,10 @@ export interface AcademyPublicFamily {
   whatsappConsent: boolean;
   children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null })[];
   paymentChoice: AcademyPaymentChoice;
+  /** How the displayed tuition month was actually paid/marked due. */
+  billingMethod?: AcademyPaymentChoice;
+  pendingPaymentChoice?: AcademyPaymentChoice | null;
+  paymentChangeEffectivePeriod?: string | null;
   policyVersion?: string;
   policyAcceptedAt?: string;
   recurringAuthorizedAt?: string | null;

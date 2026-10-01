@@ -6,6 +6,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
+import { cashReceiptEmail, enrollmentConfirmedEmail, queueAcademyEmail } from "./academyEmail";
 
 const families = "academyFamilies";
 const passes = "academyPasses";
@@ -61,6 +62,12 @@ export async function academyAdmin(request: Request) {
 
 function tokenHash(token: string) { return createHash("sha256").update(token).digest("hex"); }
 function reference() { return `QA-${randomBytes(5).toString("hex").toUpperCase()}`; }
+function priorEnrollmentEnded(data: Record<string, unknown> | undefined) {
+  if (!data) return false;
+  if (data.enrollmentState === "withdrawn") return true;
+  const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
+  return children.length > 0 && children.every((child) => child.cancelEffectiveAt && Date.parse(child.cancelEffectiveAt) <= Date.now());
+}
 function publicFamily(id: string, data: Record<string, unknown>, month: Record<string, unknown> | undefined): AcademyPublicFamily {
   const children = data.children as AcademyPublicFamily["children"];
   const hasCurrentChild = children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now());
@@ -79,6 +86,9 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     whatsappConsent: data.whatsappConsent === true,
     children,
     paymentChoice: data.paymentChoice as AcademyPublicFamily["paymentChoice"],
+    billingMethod: month?.method === "card" || month?.method === "cash" ? month.method : data.paymentChoice as AcademyPublicFamily["paymentChoice"],
+    pendingPaymentChoice: data.pendingPaymentChoice === "cash" || data.pendingPaymentChoice === "card" ? data.pendingPaymentChoice : null,
+    paymentChangeEffectivePeriod: typeof data.paymentChangeEffectivePeriod === "string" ? data.paymentChangeEffectivePeriod : null,
     policyVersion: typeof data.policyVersion === "string" ? data.policyVersion : undefined,
     policyAcceptedAt: typeof data.policyAcceptedAt === "string" ? data.policyAcceptedAt : undefined,
     recurringAuthorizedAt: typeof data.recurringAuthorizedAt === "string" ? data.recurringAuthorizedAt : null,
@@ -106,6 +116,12 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
   const amountCents = childCount === 0 || period > ACADEMY_LAST_BILLING_MONTH ? 0 : Number.isSafeInteger(unit) && unit > 0 && (mode === "per_child" || mode === "per_family")
     ? unit * (mode === "per_child" ? childCount : 1) : null;
   if (existing.exists) {
+    if (existing.data()?.status !== "paid" && existing.data()?.method !== family.paymentChoice && amountCents !== null) {
+      await ref.update({ method: family.paymentChoice, amountCents,
+        status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : "card_attention",
+        updatedAt: new Date().toISOString() });
+      return (await ref.get()).data();
+    }
     if (existing.data()?.status === "scheduled" && calgaryBillingPeriod(new Date()) >= "2026-10") {
       await ref.update({ status: "card_attention", updatedAt: new Date().toISOString() });
       return (await ref.get()).data();
@@ -143,7 +159,20 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   }
   if (input.email !== verifiedEmail) throw new AcademyError("Use the email address verified on this account.", 403);
   const familyRef = db.collection(families).doc(uid);
-  if ((await familyRef.get()).exists) throw new AcademyError("This account is already registered. Open your Academy pass instead.", 409);
+  const previous = await familyRef.get();
+  if (previous.exists && !priorEnrollmentEnded(previous.data())) throw new AcademyError("This account is already registered. Open your Academy pass instead.", 409);
+  if (previous.exists && previous.data()?.paymentChoice === "card") {
+    const { academyStripe } = await import("./academyStripe");
+    const stripe = academyStripe();
+    if (typeof previous.data()?.stripeSubscriptionId === "string") {
+      const subscription = await stripe.subscriptions.retrieve(previous.data()!.stripeSubscriptionId);
+      if (subscription.status !== "canceled") throw new AcademyError("The previous card subscription must finish before a fresh registration.", 409);
+    }
+    if (typeof previous.data()?.stripeCheckoutSessionId === "string") {
+      const session = await stripe.checkout.sessions.retrieve(previous.data()!.stripeCheckoutSessionId);
+      if (session.status === "open") throw new AcademyError("The previous card Checkout must close before a fresh registration.", 409);
+    }
+  }
   const passToken = randomBytes(32).toString("base64url");
   const now = new Date().toISOString();
   const family = {
@@ -152,6 +181,7 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     recurringAuthorizedAt: input.paymentChoice === "card" ? now : null,
     children: input.children.map((child) => ({ ...child, id: randomBytes(8).toString("hex"), classId: null, cancelEffectiveAt: null })),
     reference: reference(),
+    registrationId: randomBytes(12).toString("hex"),
     enrollmentState: "conditional",
     passToken,
     passState: "active",
@@ -159,9 +189,23 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     updatedAt: now
   };
   await db.runTransaction(async (tx) => {
-    if ((await tx.get(familyRef)).exists) throw new AcademyError("This account is already registered.", 409);
-    tx.create(familyRef, family);
+    const old = await tx.get(familyRef);
+    if (old.exists && !priorEnrollmentEnded(old.data())) throw new AcademyError("This account is already registered.", 409);
+    if (old.exists) {
+      const months = await tx.get(familyRef.collection("months"));
+      const archiveRef = db.collection("academyArchivedRegistrations").doc(String(old.data()?.reference));
+      tx.create(archiveRef, { ...old.data(), accountUid: uid, archivedAt: now, archivedReason: "fresh_registration" });
+      for (const item of months.docs) {
+        tx.set(archiveRef.collection("months").doc(item.id), item.data());
+        tx.delete(item.ref);
+      }
+      const oldPass = String(old.data()?.passToken ?? "");
+      if (oldPass) tx.set(db.collection(passes).doc(tokenHash(oldPass)), { state: "revoked", updatedAt: now }, { merge: true });
+      tx.set(familyRef, family);
+    } else tx.create(familyRef, family);
     tx.create(db.collection(passes).doc(tokenHash(passToken)), { uid, state: "active", createdAt: now });
+    tx.create(db.collection("academyAudit").doc(), { action: "fresh_registration", familyId: uid, registrationId: family.registrationId,
+      previousReference: old.exists ? String(old.data()?.reference) : null, at: now });
   });
   const month = await currentMonth(db, uid, family);
   return publicFamily(uid, family, month);
@@ -252,6 +296,9 @@ export async function receiveAcademyCash(uid: string, period: string, actor: { u
     tx.update(familyRef, { firstCashPaidAt: family.data()?.firstCashPaidAt ?? now, updatedAt: now });
     tx.create(receiptRef, receipt);
     tx.create(auditRef, { action: "cash_received", familyId: uid, period, amountCents, actorUid: actor.uid, at: now });
+    queueAcademyEmail(tx, db, cashReceiptEmail({ receiptId: receipt.number, email: String(family.data()?.email),
+      name: String(family.data()?.guardianName), reference: String(family.data()?.reference), period, amountCents, receivedAt: now,
+      enrollmentState: String(family.data()?.enrollmentState), testMode: process.env.ACADEMY_STRIPE_BILLING_MODE !== "live" }));
     return receipt;
   });
 }
@@ -271,6 +318,7 @@ export async function confirmAcademyEnrollment(uid: string, actor: { uid: string
     if (data.enrollmentState === "active") return;
     tx.update(ref, { enrollmentState: "active", checkedInAt: now, checkedInBy: actor.uid, updatedAt: now });
     tx.create(db.collection("academyAudit").doc(), { action: "enrollment_checked_in", familyId: uid, actorUid: actor.uid, actorEmail: actor.email, at: now });
+    queueAcademyEmail(tx, db, enrollmentConfirmedEmail({ uid, email: String(data.email), name: String(data.guardianName), reference: String(data.reference) }));
   });
   return getAcademyFamily(uid);
 }
@@ -282,8 +330,10 @@ export async function listAcademyFamilies() {
 }
 
 export async function getAcademyReceipts(uid: string) {
-  const snapshot = await academyDb().collection("academyReceipts").where("familyId", "==", uid).limit(36).get();
-  return snapshot.docs.map((doc) => {
+  const db = academyDb();
+  const [snapshot, family] = await Promise.all([db.collection("academyReceipts").where("familyId", "==", uid).limit(100).get(), db.collection(families).doc(uid).get()]);
+  const currentRegistrationAt = String(family.data()?.createdAt ?? "");
+  return snapshot.docs.filter((doc) => String(doc.data().receivedAt ?? "") >= currentRegistrationAt).map((doc) => {
     const data = doc.data();
     return { number: String(data.number), period: String(data.period), amountCents: Number(data.amountCents),
       method: "cash" as const, receivedAt: String(data.receivedAt), billingMode: data.billingMode === "live" ? "live" as const : "test" as const };

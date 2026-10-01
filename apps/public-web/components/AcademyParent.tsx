@@ -48,6 +48,7 @@ export function AcademyParent() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [cardAvailable, setCardAvailable] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [authorizeCardSwitch, setAuthorizeCardSwitch] = useState(false);
   const [insideApp, setInsideApp] = useState(false);
   const familyId = family?.id;
   const cashReminder = family?.paymentChoice === "cash" ? academyCashReminderStage(new Date(), family.cashReminderEligible, family.paymentState) : null;
@@ -299,6 +300,24 @@ export function AcademyParent() {
     finally { setBusy(false); }
   }
 
+  async function switchPaymentMethod(method: "card" | "cash") {
+    if (!user || !family) return;
+    if (method === "cash" && !window.confirm("Switch future unpaid tuition to cash at HBIC? Any already-paid month remains paid. Card renewal will stop before cash becomes due.")) return;
+    setBusy(true); setStatus("");
+    try {
+      const response = await fetch("/api/academy/billing/method", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken(true)}` }, body: JSON.stringify({ method, recurringAuthorized: method === "card" && authorizeCardSwitch }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Payment method could not be changed.");
+      setFamily(data.family);
+      if (data.checkoutUrl) {
+        const url = new URL(data.checkoutUrl);
+        if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw new Error("Unexpected card setup destination.");
+        window.location.assign(url.href);
+      } else setStatus(data.family?.pendingPaymentChoice === "cash" ? `Card billing will stop before cash becomes due for ${data.family.paymentChangeEffectivePeriod}.` : "Payment method updated for the next unpaid tuition month.");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Payment method could not be changed."); }
+    finally { setBusy(false); }
+  }
+
   return <main className={styles.shell}>
     <div className={styles.hero}>
       <div className={styles.academySeal} aria-label="HBIC Qur’an Academy · Masjid Bilal">
@@ -322,7 +341,7 @@ export function AcademyParent() {
           <button className={styles.primary} onClick={() => void confirmVerifiedEmail()}>I verified my email</button>
           <button className={styles.secondary} disabled={busy || resendCooldown > 0} onClick={() => void resendVerificationEmail()}>{resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : "Resend verification email"}</button>
           <button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Use a different email</button>
-        </> : !family && !registrationOpen ? <><h2>Registration is temporarily unavailable</h2><p>Classes begin Monday, October 5. Please check back shortly.</p></> : !family ? <><h2>Register your family</h2><p>One short form for all your children. Class placement and tuition are confirmed by HBIC. There is no class October 1; the first class is October 5.</p>
+        </> : family?.enrollmentState === "withdrawn" ? <><h2>Start a new Academy registration</h2><p>Your previous enrollment has ended and is not shown as active. You can register a child again with a fresh Academy pass and reference. HBIC retains legally required payment and audit history privately.</p><button className={styles.primary} disabled={!registrationOpen} onClick={() => { setFamily(null); setForm({ guardianName: "", phone: "", email: user.email?.trim().toLowerCase() ?? "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false }); }}>Register again</button></> : !family && !registrationOpen ? <><h2>Registration is temporarily unavailable</h2><p>Classes begin Monday, October 5. Please check back shortly.</p></> : !family ? <><h2>Register your family</h2><p>One short form for all your children. Class placement and tuition are confirmed by HBIC. There is no class October 1; the first class is October 5.</p>
           <div className={styles.fields}><label>Parent or guardian full name<input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label>
             <label>Phone<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
             <label>Email<input type="email" value={form.email} readOnly /></label></div>
@@ -347,10 +366,13 @@ export function AcademyParent() {
           {nextClass ? <div className={styles.summary}><div><small>NEXT CLASS</small><strong>{nextClass.title}</strong><span>{nextClass.date} · 5:30–7:00 p.m.</span></div>
             {nextClosure ? <div><small>UPCOMING CLOSURE</small><strong>{nextClosure.title}</strong><span>{nextClosure.date}</span></div> : null}</div> : null}
           <div className={styles.summary}><div><small>CHILDREN</small><strong>{family.children.map((child) => child.name).join(" · ")}</strong><span>Class placement will appear here when confirmed.</span></div>
-            <div><small>TUITION · {family.billingPeriod}</small><strong>{family.paymentState === "paid" ? family.paymentChoice === "card" ? "Card paid" : "Cash paid" : family.paymentState === "past_due" ? "Past due — please contact HBIC" : family.paymentState === "cash_due" ? "Cash due on the 1st" : family.paymentState === "card_attention" ? "Payment needs attention" : family.paymentState === "scheduled" ? family.cardSetupComplete ? "Card ready · first charge October 1" : "Card setup pending · first charge October 1" : family.paymentState === "not_due" ? "No tuition due" : "Tuition pending"}</strong><span>{money(family.amountCents)}</span></div></div>
+            <div><small>TUITION · {family.billingPeriod}</small><strong>{family.paymentState === "paid" ? family.billingMethod === "card" ? "Card paid" : "Cash paid" : family.paymentState === "past_due" ? "Past due — please contact HBIC" : family.paymentState === "cash_due" ? "Cash due on the 1st" : family.paymentState === "card_attention" ? "Payment needs attention" : family.paymentState === "scheduled" ? family.cardSetupComplete ? "Card ready · first charge October 1" : "Card setup pending · first charge October 1" : family.paymentState === "not_due" ? "No tuition due" : "Tuition pending"}</strong><span>{money(family.amountCents)}</span></div></div>
           <h3>Class rhythm</h3><p>Monday and Thursday · 5:30–7:00 p.m. through February 1, 2027. One Thursday each month is a special activity with games and an Islamic presentation; food or prizes may be offered occasionally. Check the Academy calendar for the exact date. No classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid will be announced. HBIC will confirm your child&apos;s class placement and any schedule changes.</p>
           <h3>Enrollment</h3><ul>{family.children.map((child) => <li key={child.id}>{child.name}{child.cancelEffectiveAt ? ` · Ends ${new Date(child.cancelEffectiveAt).toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })}` : <button className={styles.textButton} disabled={busy} onClick={() => void cancelChild(child.id, child.name)}>Cancel this child&apos;s enrollment</button>}</li>)}</ul>
-          {family.enrollmentState !== "withdrawn" && family.paymentChoice === "card" && cardAvailable ? <button className={styles.primary} onClick={() => void beginBilling(family.cardSetupComplete ? "portal" : "checkout").catch((error) => setStatus(error instanceof Error ? error.message : "Billing unavailable."))}>{family.cardSetupComplete ? "Update payment card" : "Complete secure card setup"}</button> : null}
+          {family.paymentChoice === "card" && cardAvailable ? <button className={styles.primary} onClick={() => void beginBilling(family.cardSetupComplete ? "portal" : "checkout").catch((error) => setStatus(error instanceof Error ? error.message : "Billing unavailable."))}>{family.cardSetupComplete ? "Update payment card" : "Complete secure card setup"}</button> : null}
+          <h3>Payment method</h3><p>Current method: {family.paymentChoice === "card" ? "Card" : "Cash at HBIC"}. Changes apply to the next unpaid month; already-paid tuition is not charged again.</p>
+          {family.pendingPaymentChoice === "cash" ? <p className={styles.terms}>Card billing is scheduled to stop. Cash begins with {family.paymentChangeEffectivePeriod}. You can keep card billing below before it stops.</p> : null}
+          {family.paymentChoice === "cash" || family.pendingPaymentChoice === "cash" ? <><label className={styles.check}><input type="checkbox" checked={authorizeCardSwitch} onChange={(event) => setAuthorizeCardSwitch(event.target.checked)} /> I authorize secure Stripe card setup and recurring monthly tuition during the active term, until cancelled.</label><button className={styles.secondary} disabled={busy || !cardAvailable || !authorizeCardSwitch} onClick={() => void switchPaymentMethod("card")}>Use card for future unpaid tuition</button></> : <button className={styles.secondary} disabled={busy} onClick={() => void switchPaymentMethod("cash")}>Switch future unpaid tuition to cash</button>}
           {payments.length ? <><h3>Payment history</h3><ul>{payments.map((payment) => <li key={payment.period}>{payment.period} · {money(payment.amountCents)} · {payment.method === "card" ? "Card" : "Cash"} · {payment.status.replaceAll("_", " ")}{payment.invoiceUrl ? <> · <a href={payment.invoiceUrl} target="_blank" rel="noopener noreferrer">View Stripe invoice</a></> : null}</li>)}</ul></> : null}
           <details className={styles.policy}><summary>Tuition &amp; Payment Policy</summary>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Accepted {family.policyVersion ?? "earlier terms"}{family.policyAcceptedAt ? ` · ${new Date(family.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</small></details>
           {content?.classes.length ? <><h3>My classes</h3><ul>{content.classes.map((item) => <li key={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime} · {item.room}</li>)}</ul></> : null}

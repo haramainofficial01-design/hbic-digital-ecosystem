@@ -1,5 +1,6 @@
 import { academyStripe, applyAcademyStripeEvent, cardBillingConfigured } from "../../../../lib/academyStripe";
 import { AcademyError } from "../../../../lib/academyStore";
+import { dispatchAcademyEmails } from "../../../../lib/academyEmail";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -11,6 +12,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     const event = academyStripe().webhooks.constructEvent(raw, signature, process.env.ACADEMY_STRIPE_WEBHOOK_SECRET!);
     await applyAcademyStripeEvent(event);
+    await dispatchAcademyEmails(1).catch(() => undefined);
     return Response.json({ received: true });
   } catch (error) {
     return Response.json({ ok: false, error: error instanceof AcademyError ? error.message : "Webhook could not be processed." },

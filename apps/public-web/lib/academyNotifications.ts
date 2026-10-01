@@ -3,6 +3,7 @@ import "server-only";
 import { ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { academyDb, getAcademyFamily } from "./academyStore";
+import { cashReminderEmail, dispatchAcademyEmails, enqueueAcademyEmail } from "./academyEmail";
 import { sendPushNotification, type RegisteredPushToken } from "./notificationStore";
 
 /** Academy announcements are targeted to enrolled parents, never all app users. */
@@ -70,17 +71,21 @@ export async function runAcademyCashReminders(now = new Date()) {
         .filter((device) => device.reminderDelivery === "server" && typeof device.token === "string" && /^(Exponent|Expo)PushToken\[[^\]]+\]$/.test(device.token))
         .map((device) => ({ token: device.token as string, platform: device.platform === "ios" || device.platform === "android" ? device.platform : "unknown",
           preferences: defaultNotificationPreferences, enabled: true, createdAt: device.updatedAt ?? "", updatedAt: device.updatedAt ?? "" }));
-      if (!tokens.length) { skipped += 1; continue; }
-      const marker = db.collection("academyReminderRuns").doc(`${document.id}_${period}_${stage}`);
+      const marker = db.collection("academyReminderRuns").doc(`${document.id}_${family.reference}_${period}_${stage}`);
       try { await marker.create({ familyId: document.id, period, stage, status: "sending", createdAt: now.toISOString() }); }
       catch (error) { if ((error as { code?: number }).code === 6) { skipped += 1; continue; } throw error; }
       try {
-        const result = await sendPushNotification({
+        const pricing = await (await import("./academyStore")).getAcademyPricing();
+        const childCount = family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > dueTime).length;
+        const amountCents = Number(month.data()?.amountCents ?? pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1));
+        if (!Number.isSafeInteger(amountCents) || amountCents <= 0) { skipped += 1; await marker.update({ status: "not_due" }); continue; }
+        await enqueueAcademyEmail(cashReminderEmail({ uid: document.id, reference: family.reference, email: family.email, name: family.guardianName, period, amountCents, stage, testMode: process.env.ACADEMY_STRIPE_BILLING_MODE !== "live" }));
+        const result = tokens.length ? await sendPushNotification({
           title: stage === "due" ? "Quran Academy cash tuition is due today" : "Quran Academy cash tuition is due soon",
           body: stage === "due" ? "Please pay at HBIC today, the 1st, and ask for your receipt." : "The next monthly cash payment is due on the 1st at HBIC.",
           audience: "All", route: "/quran-academy", type: "quranClassReminder", data: { academy: true, kind: "cash_reminder", period, stage }
-        }, tokens);
-        await marker.update({ status: result.status, accepted: result.successCount, failed: result.failureCount, finishedAt: new Date().toISOString() });
+        }, tokens) : { status: "no_tokens", successCount: 0, failureCount: 0 };
+        await marker.update({ status: result.status, accepted: result.successCount, failed: result.failureCount, emailQueued: true, finishedAt: new Date().toISOString() });
         sent += result.successCount;
       } catch (error) {
         // Allow an authorized retry on the same Calgary date after a provider
@@ -93,5 +98,5 @@ export async function runAcademyCashReminders(now = new Date()) {
     if (batch.size < 100) break;
     cursor = batch.docs[batch.docs.length - 1];
   }
-  return { checked, acceptedPushTokens: sent, skipped };
+  return { checked, acceptedPushTokens: sent, skipped, email: await dispatchAcademyEmails() };
 }
