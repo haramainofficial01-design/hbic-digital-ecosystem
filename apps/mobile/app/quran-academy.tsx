@@ -84,6 +84,11 @@ export default function QuranAcademyScreen() {
       const source = new URL(event.nativeEvent.url);
       if (source.protocol !== "https:" || !["hbic.ca", "www.hbic.ca"].includes(source.hostname) || source.pathname !== "/quran-academy") return;
       const message = JSON.parse(event.nativeEvent.data) as { type?: string; token?: string; url?: string };
+      if (message.type === "academy-google-wallet" && typeof message.url === "string") {
+        const wallet = new URL(message.url);
+        if (wallet.protocol === "https:" && wallet.hostname === "pay.google.com" && /^\/gp\/v\/save\/[A-Za-z0-9_.-]{100,12000}$/.test(wallet.pathname) && !wallet.search && !wallet.hash) void Linking.openURL(wallet.toString());
+        return;
+      }
       if (message.type === "academy-wallet" && Platform.OS === "ios" && typeof message.url === "string") {
         const wallet = new URL(message.url);
         if (wallet.protocol === "https:" && wallet.hostname === "hbic.ca" && wallet.pathname === "/api/academy/pass/wallet" &&

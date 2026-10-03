@@ -40,6 +40,7 @@ export function AcademyParent() {
   const [form, setForm] = useState<AcademyRegistrationInput>({ guardianName: "", phone: "", email: "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false });
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [appleWalletReady, setAppleWalletReady] = useState(false);
+  const [googleWalletReady, setGoogleWalletReady] = useState(false);
   const [receipts, setReceipts] = useState<{ number: string; period: string; amountCents: number; receivedAt: string; billingMode: "test" | "live" }[]>([]);
   const [payments, setPayments] = useState<AcademyPayment[]>([]);
   const [content, setContent] = useState<AcademyContent | null>(null);
@@ -218,9 +219,11 @@ export function AcademyParent() {
         const wallet = await fetch("/api/academy/pass/wallet", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
         if (!cancelled) setAppleWalletReady(wallet.ok);
       }
+      const googleWallet = await fetch("/api/academy/pass/google-wallet", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+      if (!cancelled) setGoogleWalletReady(googleWallet.ok);
     };
-    void load().catch(() => { if (!cancelled) setAppleWalletReady(false); });
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); setQrUrl(null); setAppleWalletReady(false); };
+    void load().catch(() => { if (!cancelled) { setAppleWalletReady(false); setGoogleWalletReady(false); } });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); setQrUrl(null); setAppleWalletReady(false); setGoogleWalletReady(false); };
   }, [user, familyId, currentPassToken]);
 
   async function addAppleWallet() {
@@ -233,6 +236,19 @@ export function AcademyParent() {
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "academy-wallet", url: data.appleUrl }));
       else window.location.assign(data.appleUrl);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Wallet pass could not be opened."); }
+    finally { setBusy(false); }
+  }
+
+  async function addGoogleWallet() {
+    if (!user || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/academy/pass/google-wallet", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+      const data = await response.json() as { googleUrl?: string; error?: string };
+      if (!response.ok || !data.googleUrl) throw new Error(data.error ?? "Google Wallet is unavailable.");
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "academy-google-wallet", url: data.googleUrl }));
+      else window.location.assign(data.googleUrl);
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Google Wallet could not be opened."); }
     finally { setBusy(false); }
   }
 
@@ -407,6 +423,7 @@ export function AcademyParent() {
           {family.passToken ? qrUrl ? <img className={styles.qr} src={qrUrl} alt="Private Academy pass QR code for HBIC staff scanning" /> : <p>Preparing your pass…</p> : <p>This pass is inactive. Please contact HBIC.</p>}
           <p className={styles.reference}>Registration {family.reference}</p>
           {appleWalletReady ? <button className={styles.secondary} type="button" disabled={busy} onClick={() => void addAppleWallet()}>Add to Apple Wallet</button> : null}
+          {googleWalletReady ? <button className={styles.secondary} type="button" disabled={busy} onClick={() => void addGoogleWallet()}>Add to Google Wallet</button> : null}
           {receipts.length ? <><h3>Cash receipts</h3><ul>{receipts.map((receipt) => <li key={receipt.number}>{receipt.billingMode === "test" ? "TEST PAYMENT RECEIPT · " : ""}{receipt.period} · {money(receipt.amountCents)} · Paid {new Date(receipt.receivedAt).toLocaleDateString("en-CA")} · {receipt.number}</li>)}</ul></> : null}
         </>}
         {status ? <p className={styles.status} role="status">{status}</p> : null}
