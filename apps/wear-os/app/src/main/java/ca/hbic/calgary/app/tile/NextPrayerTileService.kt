@@ -30,8 +30,9 @@ class NextPrayerTileService : TileService() {
     } ?: repository.status(now)
     val stale = snapshot?.isExpired(now) != false || snapshot.sourceStale
 
+    val safeWidth = (requestParams.deviceConfiguration.screenWidthDp - 40f).coerceIn(120f, 180f)
     val main = LayoutElementBuilders.Column.Builder()
-      .setWidth(dp(180f))
+      .setWidth(dp(safeWidth))
       .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
       .addContent(text("MASJID BILAL", 12f, 0xFFE7C66B.toInt()))
       .addContent(spacer(8f))
