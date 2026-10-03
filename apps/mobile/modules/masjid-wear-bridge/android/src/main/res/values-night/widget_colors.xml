@@ -1,0 +1,5 @@
+<resources>
+    <color name="hbic_widget_background">#0B2A3B</color>
+    <color name="hbic_widget_text">#F6F7F2</color>
+    <color name="hbic_widget_label">#E2CC96</color>
+</resources>

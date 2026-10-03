@@ -1,6 +1,7 @@
 import { academyAdmin, AcademyError } from "../../../../../lib/academyStore";
 import { assignAcademyChild, listAcademyContent, saveAcademyItem } from "../../../../../lib/academyContent";
 import { sendAcademyUpdate } from "../../../../../lib/academyNotifications";
+import { createHash } from "node:crypto";
 import { jsonResponse, optionsResponse } from "../../../../../lib/api";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ export async function POST(request: Request) {
     let notification: unknown = null;
     if (body.kind === "announcement" || body.kind === "calendar" && "type" in item && ["no_class", "holiday", "time_changed", "special_class"].includes(String(item.type))) {
       try {
-        notification = await sendAcademyUpdate({ title: body.kind === "announcement" ? String(item.title ?? "Academy update") : `Academy schedule: ${item.title}`,
+        notification = await sendAcademyUpdate({ eventKey: createHash("sha256").update(JSON.stringify({ kind: body.kind, item })).digest("hex"),
+          title: body.kind === "announcement" ? String(item.title ?? "Academy update") : `Academy schedule: ${item.title}`,
           body: "message" in item ? String(item.message ?? "") : `${"date" in item ? item.date : ""} · ${"note" in item ? item.note || item.title : item.title}`,
           classIds: "classIds" in item && Array.isArray(item.classIds) ? item.classIds : [], kind: body.kind });
       } catch (error) {

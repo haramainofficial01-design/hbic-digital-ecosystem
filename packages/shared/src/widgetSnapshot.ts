@@ -94,6 +94,7 @@ export interface WidgetPrayerSnapshot {
   nextPrayerDate: string;
   tomorrowFajrDate?: string;
   tomorrowFajrIqamah?: string;
+  tomorrowFajrIqamahDate?: string;
   nextIqamah?: string;
   nextIqamahDate?: string;
   prayers: WidgetPrayerEntry[];
@@ -299,6 +300,7 @@ export function createWidgetPrayerSnapshot(
     nextPrayerDate: nextPrayerState?.date.toISOString() ?? "",
     tomorrowFajrDate: tomorrowFajr?.toISOString(),
     tomorrowFajrIqamah,
+    tomorrowFajrIqamahDate: tomorrowFajrIqamah ? timeToDate(addDays(scheduleDate, 1), tomorrowFajrIqamah)?.toISOString() : undefined,
     nextIqamah: nextPrayerState?.iqamahTime,
     nextIqamahDate: nextIqamahDateValue?.toISOString(),
     prayers,

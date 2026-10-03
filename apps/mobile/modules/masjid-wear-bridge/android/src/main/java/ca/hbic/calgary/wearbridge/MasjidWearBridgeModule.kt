@@ -18,6 +18,8 @@ class MasjidWearBridgeModule : Module() {
         snapshot.optString("masjidTimeZoneIdentifier") != "America/Edmonton"
       ) return@Function false
 
+      HBICPrayerWidgetProvider.acceptSnapshot(context, json)
+
       val request = PutDataMapRequest.create("/hbic/prayer-snapshot-v2").apply {
         dataMap.putString("snapshot", json)
         dataMap.putInt("schemaVersion", 2)

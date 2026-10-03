@@ -132,6 +132,7 @@ test("creates the versioned absolute snapshot contract", () => {
   assert.equal(snapshot.nextPrayerKey, "isha");
   assert.equal(snapshot.nextPrayerDate, "2026-07-10T05:20:00.000Z");
   assert.equal(snapshot.tomorrowFajrDate, "2026-07-10T10:02:00.000Z");
+  assert.equal(snapshot.tomorrowFajrIqamahDate, "2026-07-10T10:30:00.000Z");
   assert.equal(snapshot.availability, "available");
   assert.equal(snapshot.stale, false);
   assert.equal(snapshot.generatedAt, "2026-07-10T04:00:00.000Z");

@@ -5,6 +5,9 @@ const nextConfig = {
   outputFileTracingExcludes: {
     "/*": [".env", ".env.*"]
   },
+  outputFileTracingIncludes: {
+    "/api/academy/pass/wallet": ["./public/brand/hbic-logo.png"]
+  },
   // Social and messaging crawlers need metadata in the initial document head.
   htmlLimitedBots: /.*/
 };

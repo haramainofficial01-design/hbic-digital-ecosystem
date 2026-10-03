@@ -39,6 +39,7 @@ export function AcademyParent() {
   const [registerAccount, setRegisterAccount] = useState(false);
   const [form, setForm] = useState<AcademyRegistrationInput>({ guardianName: "", phone: "", email: "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false });
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [appleWalletReady, setAppleWalletReady] = useState(false);
   const [receipts, setReceipts] = useState<{ number: string; period: string; amountCents: number; receivedAt: string; billingMode: "test" | "live" }[]>([]);
   const [payments, setPayments] = useState<AcademyPayment[]>([]);
   const [content, setContent] = useState<AcademyContent | null>(null);
@@ -51,6 +52,7 @@ export function AcademyParent() {
   const [authorizeCardSwitch, setAuthorizeCardSwitch] = useState(false);
   const [insideApp, setInsideApp] = useState(false);
   const familyId = family?.id;
+  const currentPassToken = family?.passToken;
   const cashReminder = family?.paymentChoice === "cash" ? academyCashReminderStage(new Date(), family.cashReminderEligible, family.paymentState) : null;
   const calgaryToday = dateStringInTimeZone(new Date(), masjidTimeZone);
   const nextStartPeriod = calgaryToday.slice(0, 7) < ACADEMY_LAST_BILLING_MONTH ? academyEnrollmentStartPeriod("next") : null;
@@ -204,7 +206,7 @@ export function AcademyParent() {
   }, [user, verified]);
 
   useEffect(() => {
-    if (!user || !familyId) return;
+    if (!user || !familyId || !currentPassToken) return;
     let objectUrl: string | null = null;
     let cancelled = false;
     const load = async () => {
@@ -212,10 +214,27 @@ export function AcademyParent() {
       if (!response.ok) return;
       objectUrl = URL.createObjectURL(await response.blob());
       if (!cancelled) setQrUrl(objectUrl);
+      if (!/Android/i.test(navigator.userAgent)) {
+        const wallet = await fetch("/api/academy/pass/wallet", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+        if (!cancelled) setAppleWalletReady(wallet.ok);
+      }
     };
-    void load();
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); setQrUrl(null); };
-  }, [user, familyId]);
+    void load().catch(() => { if (!cancelled) setAppleWalletReady(false); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); setQrUrl(null); setAppleWalletReady(false); };
+  }, [user, familyId, currentPassToken]);
+
+  async function addAppleWallet() {
+    if (!user || busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/academy/pass/wallet", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+      const data = await response.json() as { appleUrl?: string; error?: string };
+      if (!response.ok || !data.appleUrl) throw new Error(data.error ?? "Wallet pass is unavailable.");
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "academy-wallet", url: data.appleUrl }));
+      else window.location.assign(data.appleUrl);
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Wallet pass could not be opened."); }
+    finally { setBusy(false); }
+  }
 
   async function authenticate() {
     if (!academyAuth) return setStatus("Parent sign-in is temporarily unavailable. Please contact HBIC.");
@@ -348,6 +367,7 @@ export function AcademyParent() {
             <label>Phone<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
             <label>Email<input type="email" value={form.email} readOnly /></label></div>
           <label className={styles.check}><input type="checkbox" checked={form.whatsappConsent} onChange={(e) => setForm({ ...form, whatsappConsent: e.target.checked })} /> I would like Academy updates through the WhatsApp group. I can join as soon as I register, even while cash tuition is due.</label>
+          <label className={styles.check}><input type="checkbox" checked={form.emailUpdates === true} onChange={(e) => setForm({ ...form, emailUpdates: e.target.checked })} /> Email me Academy announcements, holidays and schedule changes. Payment receipts and enrollment messages are sent separately.</label>
           <h3>Children</h3>{form.children.map((child, index) => <div className={styles.child} key={index}>
             <label>Child&apos;s full name<input value={child.name} onChange={(e) => setForm({ ...form, children: form.children.map((item, i) => i === index ? { ...item, name: e.target.value } : item) })} /></label>
             <label>Age<input type="number" min={3} max={18} value={child.age} onChange={(e) => setForm({ ...form, children: form.children.map((item, i) => i === index ? { ...item, age: Number(e.target.value) } : item) })} /></label>
@@ -385,6 +405,7 @@ export function AcademyParent() {
           <h3>Academy pass</h3><p>Show this code at the desk. Staff scan the live record; a screenshot&apos;s printed payment status is never proof of payment.</p>
           {family.passToken ? qrUrl ? <img className={styles.qr} src={qrUrl} alt="Private Academy pass QR code for HBIC staff scanning" /> : <p>Preparing your pass…</p> : <p>This pass is inactive. Please contact HBIC.</p>}
           <p className={styles.reference}>Registration {family.reference}</p>
+          {appleWalletReady ? <button className={styles.secondary} type="button" disabled={busy} onClick={() => void addAppleWallet()}>Add to Apple Wallet</button> : null}
           {receipts.length ? <><h3>Cash receipts</h3><ul>{receipts.map((receipt) => <li key={receipt.number}>{receipt.billingMode === "test" ? "TEST PAYMENT RECEIPT · " : ""}{receipt.period} · {money(receipt.amountCents)} · Paid {new Date(receipt.receivedAt).toLocaleDateString("en-CA")} · {receipt.number}</li>)}</ul></> : null}
         </>}
         {status ? <p className={styles.status} role="status">{status}</p> : null}

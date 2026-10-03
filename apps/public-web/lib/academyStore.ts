@@ -6,7 +6,7 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
-import { cashReceiptEmail, enrollmentConfirmedEmail, queueAcademyEmail } from "./academyEmail";
+import { cashReceiptEmail, enrollmentConfirmedEmail, registrationEmail, queueAcademyEmail } from "./academyEmail";
 
 const families = "academyFamilies";
 const passes = "academyPasses";
@@ -86,6 +86,7 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     phone: String(data.phone),
     email: String(data.email),
     whatsappConsent: data.whatsappConsent === true,
+    emailUpdates: data.emailUpdates === true,
     children,
     paymentChoice: data.paymentChoice as AcademyPublicFamily["paymentChoice"],
     billingMethod: month?.method === "card" || month?.method === "cash" ? month.method : data.paymentChoice as AcademyPublicFamily["paymentChoice"],
@@ -213,6 +214,8 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     tx.create(db.collection(passes).doc(tokenHash(passToken)), { uid, state: "active", createdAt: now });
     tx.create(db.collection("academyAudit").doc(), { action: "fresh_registration", familyId: uid, registrationId: family.registrationId,
       previousReference: old.exists ? String(old.data()?.reference) : null, at: now });
+    queueAcademyEmail(tx, db, registrationEmail({ uid, email: input.email, name: input.guardianName,
+      reference: family.reference, period: enrollmentStartPeriod, paymentChoice: input.paymentChoice }));
   });
   const month = await currentMonth(db, uid, family);
   return publicFamily(uid, family, month);
@@ -234,6 +237,8 @@ export async function scanAcademyPass(token: string, actorUid: string) {
   const pass = await db.collection(passes).doc(tokenHash(token)).get();
   if (!pass.exists) throw new AcademyError("This Academy pass was not found.", 404);
   if (pass.data()?.state !== "active") throw new AcademyError("This Academy pass is inactive or replaced.", 410);
+  const expiresAt = pass.data()?.walletExpiresAt;
+  if (typeof expiresAt === "string" && Date.parse(expiresAt) <= Date.now()) throw new AcademyError("This Academy pass has expired.", 410);
   const family = await getAcademyFamily(String(pass.data()?.uid));
   if (!family || family.passToken !== token) throw new AcademyError("This Academy pass is no longer current.", 410);
   if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);
@@ -269,6 +274,8 @@ export async function lookupAcademyReference(reference: string, actorUid: string
   if (!pass.exists || pass.data()?.state !== "active" || pass.data()?.uid !== matches.docs[0].id) {
     throw new AcademyError("This Academy pass is no longer current.", 410);
   }
+  const expiresAt = pass.data()?.walletExpiresAt;
+  if (typeof expiresAt === "string" && Date.parse(expiresAt) <= Date.now()) throw new AcademyError("This Academy pass has expired.", 410);
   const family = await getAcademyFamily(matches.docs[0].id);
   if (!family) throw new AcademyError("This Academy registration was not found.", 404);
   if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy registration is no longer active.", 410);

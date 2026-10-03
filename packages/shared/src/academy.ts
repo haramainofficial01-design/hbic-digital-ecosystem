@@ -86,6 +86,8 @@ export interface AcademyRegistrationInput {
   phone: string;
   email: string;
   whatsappConsent: boolean;
+  /** Optional Academy schedule/announcement emails; not payment receipts. */
+  emailUpdates?: boolean;
   children: AcademyChildInput[];
   paymentChoice: AcademyPaymentChoice;
   policyVersion: typeof ACADEMY_TUITION_POLICY_VERSION | "academy-payment-policy-v2";
@@ -101,6 +103,7 @@ export interface AcademyPublicFamily {
   phone: string;
   email: string;
   whatsappConsent: boolean;
+  emailUpdates?: boolean;
   children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null })[];
   paymentChoice: AcademyPaymentChoice;
   /** How the displayed tuition month was actually paid/marked due. */
@@ -194,6 +197,7 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
   if (!/^\+?[\d\s().-]{10,22}$/.test(phone)) throw new Error("Enter a valid phone number.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid email address.");
   if (typeof value.whatsappConsent !== "boolean") throw new Error("Choose whether to receive WhatsApp updates.");
+  if (value.emailUpdates !== undefined && typeof value.emailUpdates !== "boolean") throw new Error("Choose whether to receive Academy email updates.");
   if (value.paymentChoice !== "cash" && value.paymentChoice !== "card") throw new Error("Choose card or cash.");
   if (value.startChoice !== undefined && value.startChoice !== "current" && value.startChoice !== "next") throw new Error("Choose this month or next month.");
   // Installed apps offered only the existing current-month/prorated policy.
@@ -214,7 +218,7 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
     if (level !== "qaida" && level !== "quran" && level !== "not_sure") throw new Error("Choose each child's Quran level.");
     return { name, age, level: level as AcademyLevel };
   });
-  return { guardianName, phone, email, whatsappConsent: value.whatsappConsent, children, paymentChoice: value.paymentChoice,
+  return { guardianName, phone, email, whatsappConsent: value.whatsappConsent, emailUpdates: value.emailUpdates === true, children, paymentChoice: value.paymentChoice,
     startChoice: value.startChoice === "next" ? "next" : "current",
     policyVersion: legacyCurrentMonth ? "academy-payment-policy-v2" : ACADEMY_TUITION_POLICY_VERSION, policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
 }

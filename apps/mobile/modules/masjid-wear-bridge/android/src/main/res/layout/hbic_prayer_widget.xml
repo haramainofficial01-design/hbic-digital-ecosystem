@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center_vertical" android:padding="12dp" android:background="@drawable/hbic_widget_background">
+    <LinearLayout android:id="@+id/widget_brand" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="MASJID BILAL" android:textColor="@color/hbic_widget_label" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="40dp" android:layout_height="32dp" android:gravity="center" android:text="↻" android:textSize="22sp" android:textColor="@color/hbic_widget_text" android:contentDescription="Refresh prayer times" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_next_prayer" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Prayer times" android:textColor="@color/hbic_widget_text" android:textSize="24sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/widget_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/hbic_widget_text" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+    <Chronometer android:id="@+id/widget_countdown" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textColor="@color/hbic_widget_text" android:textSize="16sp" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/widget_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="@color/hbic_widget_label" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

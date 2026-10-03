@@ -33,6 +33,13 @@ test("Academy accepts one parent with multiple children and normalizes the email
   assert.equal(registration.children[1].level, "not_sure");
 });
 
+test("Academy email update consent is explicit and legacy registrations remain valid", () => {
+  assert.equal(parseAcademyRegistration(valid).emailUpdates, false);
+  assert.equal(parseAcademyRegistration({ ...valid, emailUpdates: true }).emailUpdates, true);
+  assert.equal(parseAcademyRegistration({ ...valid, emailUpdates: false }).emailUpdates, false);
+  assert.throws(() => parseAcademyRegistration({ ...valid, emailUpdates: "yes" }), /email updates/);
+});
+
 test("Academy rejects missing consent choice, invalid ages and excess children", () => {
   assert.throws(() => parseAcademyRegistration({ ...valid, whatsappConsent: undefined }), /WhatsApp/);
   assert.throws(() => parseAcademyRegistration({ ...valid, children: [{ ...valid.children[0], age: 2 }] }), /age/);

@@ -3,13 +3,14 @@ import "server-only";
 import { ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { academyDb, getAcademyFamily } from "./academyStore";
-import { cashReminderEmail, dispatchAcademyEmails, enqueueAcademyEmail } from "./academyEmail";
+import { academyUpdateEmail, cashReminderEmail, dispatchAcademyEmails, enqueueAcademyEmail } from "./academyEmail";
 import { sendPushNotification, type RegisteredPushToken } from "./notificationStore";
 
 /** Academy announcements are targeted to enrolled parents, never all app users. */
-export async function sendAcademyUpdate(input: { title: string; body: string; classIds: string[]; kind: "announcement" | "calendar" }) {
+export async function sendAcademyUpdate(input: { eventKey: string; title: string; body: string; classIds: string[]; kind: "announcement" | "calendar" }) {
   const db = academyDb();
   const tokens: RegisteredPushToken[] = [];
+  let emailsQueued = 0;
   let cursor: QueryDocumentSnapshot | undefined;
   for (;;) {
     let query = db.collection("academyFamilies").orderBy("__name__").limit(200);
@@ -22,6 +23,11 @@ export async function sendAcademyUpdate(input: { title: string; body: string; cl
       const children = Array.isArray(data.children) ? data.children as { classId?: string | null; cancelEffectiveAt?: string | null }[] : [];
       if (!children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now())) continue;
       if (input.classIds.length && !children.some((child) => child.classId && input.classIds.includes(child.classId))) continue;
+      // Missing consent on existing families never implies an email opt-in.
+      if (data.emailUpdates === true && typeof data.email === "string") {
+        if (await enqueueAcademyEmail(academyUpdateEmail({ eventKey: input.eventKey, uid: family.id,
+          reference: String(data.reference), email: data.email, name: String(data.guardianName), title: input.title, body: input.body }))) emailsQueued += 1;
+      }
       const devices = await family.ref.collection("devices").where("enabled", "==", true).limit(20).get();
       for (const device of devices.docs) {
         const record = device.data();
@@ -33,8 +39,9 @@ export async function sendAcademyUpdate(input: { title: string; body: string; cl
     if (batch.size < 200) break;
     cursor = batch.docs[batch.docs.length - 1];
   }
-  return sendPushNotification({ title: input.title.slice(0, 90), body: input.body.slice(0, 220), audience: "All",
+  const push = await sendPushNotification({ title: input.title.slice(0, 90), body: input.body.slice(0, 220), audience: "All",
     route: "/quran-academy", type: "quranClassReminder", data: { academy: true, kind: input.kind } }, tokens);
+  return { ...push, emailsQueued, email: await dispatchAcademyEmails() };
 }
 
 /** Daily server-side fallback for enrolled cash families with app push enabled.

@@ -83,7 +83,13 @@ export default function QuranAcademyScreen() {
     try {
       const source = new URL(event.nativeEvent.url);
       if (source.protocol !== "https:" || !["hbic.ca", "www.hbic.ca"].includes(source.hostname) || source.pathname !== "/quran-academy") return;
-      const message = JSON.parse(event.nativeEvent.data) as { type?: string; token?: string };
+      const message = JSON.parse(event.nativeEvent.data) as { type?: string; token?: string; url?: string };
+      if (message.type === "academy-wallet" && Platform.OS === "ios" && typeof message.url === "string") {
+        const wallet = new URL(message.url);
+        if (wallet.protocol === "https:" && wallet.hostname === "hbic.ca" && wallet.pathname === "/api/academy/pass/wallet" &&
+            /^[A-Za-z0-9_-]{80,1200}$/.test(wallet.searchParams.get("ticket") ?? "")) void Linking.openURL(wallet.toString());
+        return;
+      }
       if (typeof message.token !== "string" || message.token.length < 100 || message.token.length > 5000) return;
       if (message.type === "academy-session") void updateAcademyDevice(message.token, false);
       if (message.type === "academy-enable-updates") void updateAcademyDevice(message.token, true);

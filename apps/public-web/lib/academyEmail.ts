@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { academyDb } from "./academyStore";
 
-type EmailKind = "card_receipt" | "cash_receipt" | "cash_reminder" | "enrollment_confirmed";
+type EmailKind = "card_receipt" | "cash_receipt" | "cash_reminder" | "enrollment_confirmed" | "registration" | "academy_update";
 type EmailMessage = { kind: EmailKind; key: string; to: string; subject: string; html: string; text: string };
 
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) =>
@@ -46,6 +46,24 @@ export function enrollmentConfirmedEmail(input: { uid: string; email: string; na
     subject: "HBIC Quran Academy · enrollment confirmed",
     html: layout("Enrollment confirmed", `<p>Assalamu alaikum ${escape(input.name)},</p><p>HBIC staff have confirmed your child’s Quran Academy enrollment. Your Academy reference is <strong>${escape(input.reference)}</strong>.</p><p>Payment standing is tracked separately. Please use your Academy pass for check-in and view your parent dashboard for the current payment status.</p>`),
     text: `Assalamu alaikum ${input.name},\n\nHBIC staff have confirmed your child’s Quran Academy enrollment. Reference: ${input.reference}. Payment standing is tracked separately; check your parent dashboard for its current status.\n\nMasjid Bilal Quran Academy` };
+}
+
+export function registrationEmail(input: { uid: string; email: string; name: string; reference: string; period: string; paymentChoice: "card" | "cash" }): EmailMessage {
+  const status = input.paymentChoice === "cash"
+    ? "Your registration is conditional. Cash tuition is due at HBIC; staff confirm payment only after receiving cash."
+    : "Complete secure Stripe Checkout to authorize card tuition. Your enrollment remains awaiting Checkout until Stripe confirms it. This email is not proof of payment.";
+  const whatsapp = "https://chat.whatsapp.com/IZhuemIDjR10DTluYIiSQq?mode=gi_t";
+  return { kind: "registration", key: `registration:${input.uid}:${input.reference}`, to: input.email,
+    subject: "HBIC Quran Academy · registration received",
+    html: layout("Your registration has been received", `<p>Assalamu alaikum ${escape(input.name)},</p><p>${escape(status)}</p><p>Academy reference: <strong>${escape(input.reference)}</strong><br>Start month: ${escape(input.period)}</p><p>Classes: Mondays &amp; Thursdays, 5:30–7:00 PM. Staff enrollment confirmation is separate from payment.</p><p><a href="https://hbic.ca/quran-academy">Open your Academy dashboard</a></p><p><a href="${whatsapp}">Join the HBIC Quran Academy WhatsApp group</a> for class updates.</p>`),
+    text: `Assalamu alaikum ${input.name},\n\n${status}\nReference: ${input.reference}\nStart month: ${input.period}\nClasses: Mondays & Thursdays, 5:30–7:00 PM. Staff enrollment confirmation is separate from payment.\nDashboard: https://hbic.ca/quran-academy\nJoin the HBIC Quran Academy WhatsApp group: ${whatsapp}` };
+}
+
+export function academyUpdateEmail(input: { eventKey: string; uid: string; reference: string; email: string; name: string; title: string; body: string }): EmailMessage {
+  return { kind: "academy_update", key: `academy-update:${input.eventKey}:${input.uid}:${input.reference}`, to: input.email,
+    subject: `HBIC Quran Academy · ${input.title.slice(0, 150).replace(/[\r\n]/g, " ")}`,
+    html: layout(input.title, `<p>Assalamu alaikum ${escape(input.name)},</p><p style="white-space:pre-line">${escape(input.body)}</p><p><a href="https://hbic.ca/quran-academy">View your Academy calendar and updates</a></p><p>You opted into Academy announcement and schedule emails at registration.</p>`),
+    text: `Assalamu alaikum ${input.name},\n\n${input.title}\n${input.body}\n\nView your Academy calendar: https://hbic.ca/quran-academy\nYou opted into Academy announcement and schedule emails at registration.` };
 }
 
 /** Queue within the same Firestore transaction as the authoritative payment/state update. */
