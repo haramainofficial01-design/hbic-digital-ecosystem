@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ACADEMY_TUITION_POLICY_VERSION, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { academyCardEnrollmentConfirmed } from "../src/academy";
+import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutTiming, academyEnrollmentStartPeriod, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -13,6 +14,17 @@ const valid = {
   recurringAuthorized: false,
   children: [{ name: "Ahmed Shafiq", age: 8, level: "qaida" }, { name: "Maryam Shafiq", age: 11, level: "not_sure" }]
 };
+
+test("card enrollment waits for Checkout or a paid invoice, never a scan or subscription update", () => {
+  assert.equal(academyCardEnrollmentConfirmed("awaiting_checkout", "checkout.session.completed"), true);
+  assert.equal(academyCardEnrollmentConfirmed("awaiting_checkout", "invoice.paid", 5000), true);
+  for (const event of ["invoice.payment_failed", "customer.subscription.updated", "qr_scanned", "staff_check_in"]) {
+    assert.equal(academyCardEnrollmentConfirmed("awaiting_checkout", event, 5000), false);
+  }
+  assert.equal(academyCardEnrollmentConfirmed("awaiting_checkout", "invoice.paid", 0), false);
+  assert.equal(academyCardEnrollmentConfirmed("withdrawn", "checkout.session.completed"), false);
+  assert.equal(academyCardEnrollmentConfirmed("active", "checkout.session.completed"), false);
+});
 
 test("Academy accepts one parent with multiple children and normalizes the email", () => {
   const registration = parseAcademyRegistration(valid);
@@ -35,6 +47,14 @@ test("Academy requires current policy acceptance and distinct recurring card aut
   assert.equal(parseAcademyRegistration(valid).recurringAuthorized, false);
 });
 
+test("installed apps retain their accepted current-month terms without gaining the new next-month option", () => {
+  const legacy = parseAcademyRegistration({ ...valid, policyVersion: "academy-payment-policy-v2" });
+  assert.equal(legacy.startChoice, "current");
+  assert.equal(legacy.policyVersion, "academy-payment-policy-v2");
+  assert.throws(() => parseAcademyRegistration({ ...valid, policyVersion: "academy-payment-policy-v2", startChoice: "next" }), /policy/);
+  assert.throws(() => parseAcademyRegistration({ ...valid, policyVersion: "academy-payment-policy-v2", policyAccepted: false }), /policy/);
+});
+
 test("Billing periods follow Calgary, including UTC month rollover and DST", () => {
   assert.equal(calgaryBillingPeriod(new Date("2026-10-01T04:30:00Z")), "2026-09");
   assert.equal(calgaryBillingPeriod(new Date("2026-10-01T06:30:00Z")), "2026-10");
@@ -45,6 +65,29 @@ test("Billing periods follow Calgary, including UTC month rollover and DST", () 
   assert.equal(academyTuitionPeriod(new Date("2026-11-01T06:30:00Z")), "2026-11");
 });
 
+test("parents select this month or next month, with server-derived term limits", () => {
+  const now = new Date("2026-10-02T18:00:00Z");
+  assert.equal(academyEnrollmentStartPeriod("current", now), "2026-10");
+  assert.equal(academyEnrollmentStartPeriod("next", now), "2026-11");
+  assert.equal(academyEnrollmentStartPeriod("next", new Date("2026-12-15T18:00:00Z")), "2027-01");
+  assert.throws(() => academyEnrollmentStartPeriod("next", new Date("2027-01-02T18:00:00Z")), /February/);
+  assert.equal(parseAcademyRegistration({ ...valid, startChoice: "next" }).startChoice, "next");
+  assert.throws(() => parseAcademyRegistration({ ...valid, startChoice: "free" }), /this month/);
+});
+
+test("current-month card Checkout charges proration now; next month has no current-month charge", () => {
+  const now = new Date("2026-10-02T18:00:00Z");
+  const current = academyCheckoutTiming("2026-10", false, now);
+  const next = academyCheckoutTiming("2026-11", false, now);
+  assert.equal(current.proration_behavior, "create_prorations");
+  assert.equal(next.proration_behavior, "none");
+  assert.equal(new Date(next.billing_cycle_anchor! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
+  assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), {});
+  assert.equal(academyCheckoutTiming("2026-10", true, now).proration_behavior, "none");
+  assert.equal(new Date(academyCheckoutTiming("2026-11", true, now).billing_cycle_anchor! * 1000).toISOString(), "2026-12-01T12:00:00.000Z");
+  assert.throws(() => academyCheckoutTiming("2027-01", true, new Date("2027-01-02T18:00:00Z")), /No February charge/);
+});
+
 test("monthly card anchor is the next first within Calgary in both DST seasons", () => {
   assert.equal(new Date(nextCalgaryFirstBillingAnchor(new Date("2026-09-26T12:00:00Z")) * 1000).toISOString(), "2026-10-01T12:00:00.000Z");
   assert.equal(new Date(nextCalgaryFirstBillingAnchor(new Date("2026-02-26T12:00:00Z")) * 1000).toISOString(), "2026-03-01T12:00:00.000Z");
@@ -53,8 +96,9 @@ test("monthly card anchor is the next first within Calgary in both DST seasons",
 test("registration and full first-day billing follow Calgary, not UTC", () => {
   assert.equal(academyRegistrationOpen(new Date("2026-09-27T05:59:59Z")), false);
   assert.equal(academyRegistrationOpen(new Date("2026-09-27T06:00:00Z")), true);
-  assert.equal(academyRegistrationOpen(new Date("2027-02-01T06:59:59Z")), true);
-  assert.equal(academyRegistrationOpen(new Date("2027-02-01T07:00:00Z")), false);
+  assert.equal(academyRegistrationOpen(new Date("2027-02-01T05:59:59Z")), true);
+  assert.equal(academyRegistrationOpen(new Date("2027-02-01T06:00:00Z")), false);
+  assert.equal(calgaryBillingPeriod(new Date("2027-02-01T06:00:00Z")), "2027-02");
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-01T05:59:59Z")), false);
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-01T06:00:00Z")), true);
   assert.equal(isCalgaryFirstOfMonth(new Date("2026-10-02T06:00:00Z")), false);

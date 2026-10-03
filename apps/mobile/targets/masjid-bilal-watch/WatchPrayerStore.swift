@@ -40,7 +40,7 @@ final class WatchPrayerStore: ObservableObject {
         refreshMessage = nil
         defer { isRefreshing = false }
 
-        if let phoneData = await receiver.latestSnapshotFromPhone(), accept(data: phoneData) {
+        if let phoneData = await receiver.latestSnapshotFromPhone(), accept(data: phoneData), snapshot?.isStale() == false {
             if playFeedback { WKInterfaceDevice.current().play(.success) }
             return
         }

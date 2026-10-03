@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 import { cashReceiptEmail, enrollmentConfirmedEmail, queueAcademyEmail } from "./academyEmail";
@@ -72,13 +72,15 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
   const children = data.children as AcademyPublicFamily["children"];
   const hasCurrentChild = children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now());
   const rawEnrollment = String(data.enrollmentState ?? "conditional");
-  const enrollmentState = rawEnrollment === "submitted" || rawEnrollment === "approved" ? "conditional" : rawEnrollment;
+  const enrollmentState = rawEnrollment === "conditional" && data.paymentChoice === "card" && !data.stripeSubscriptionId
+    ? "awaiting_checkout" : rawEnrollment === "submitted" || rawEnrollment === "approved" ? "conditional" : rawEnrollment;
   const period = String(month?.period ?? academyTuitionPeriod(new Date()));
   const today = dateStringInTimeZone(new Date(), masjidTimeZone);
   const rawPayment = String(month?.status ?? "awaiting_tuition");
   const paymentState = rawPayment === "cash_due" && today > `${period}-01` ? "past_due" : rawPayment;
   return {
     id,
+    enrollmentStartPeriod: typeof data.enrollmentStartPeriod === "string" ? data.enrollmentStartPeriod : undefined,
     reference: String(data.reference),
     guardianName: String(data.guardianName),
     phone: String(data.phone),
@@ -104,7 +106,8 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
 }
 
 async function currentMonth(db: Firestore, uid: string, family: Record<string, unknown>) {
-  const period = academyTuitionPeriod(new Date());
+  const currentPeriod = academyTuitionPeriod(new Date());
+  const period = typeof family.enrollmentStartPeriod === "string" && family.enrollmentStartPeriod > currentPeriod ? family.enrollmentStartPeriod : currentPeriod;
   const ref = db.collection(families).doc(uid).collection("months").doc(period);
   const existing = await ref.get();
   const pricing = await getAcademyPricing();
@@ -118,23 +121,23 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
   if (existing.exists) {
     if (existing.data()?.status !== "paid" && existing.data()?.method !== family.paymentChoice && amountCents !== null) {
       await ref.update({ method: family.paymentChoice, amountCents,
-        status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : "card_attention",
+        status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : calgaryBillingPeriod(new Date()) < period ? "scheduled" : "card_attention",
         updatedAt: new Date().toISOString() });
       return (await ref.get()).data();
     }
-    if (existing.data()?.status === "scheduled" && calgaryBillingPeriod(new Date()) >= "2026-10") {
+    if (existing.data()?.status === "scheduled" && calgaryBillingPeriod(new Date()) >= period) {
       await ref.update({ status: "card_attention", updatedAt: new Date().toISOString() });
       return (await ref.get()).data();
     }
     if (existing.data()?.status === "awaiting_tuition" && amountCents !== null) {
-      await ref.update({ amountCents, status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : period === "2026-10" && calgaryBillingPeriod(new Date()) < "2026-10" ? "scheduled" : "card_attention", pricedAt: new Date().toISOString() });
+      await ref.update({ amountCents, status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : calgaryBillingPeriod(new Date()) < period ? "scheduled" : "card_attention", pricedAt: new Date().toISOString() });
       return (await ref.get()).data();
     }
     return existing.data();
   }
   const month = {
     period, amountCents,
-    status: amountCents === null ? "awaiting_tuition" : amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : period === "2026-10" && calgaryBillingPeriod(new Date()) < "2026-10" ? "scheduled" : "card_attention",
+    status: amountCents === null ? "awaiting_tuition" : amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : calgaryBillingPeriod(new Date()) < period ? "scheduled" : "card_attention",
     method: family.paymentChoice,
     createdAt: new Date().toISOString()
   };
@@ -175,14 +178,18 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   }
   const passToken = randomBytes(32).toString("base64url");
   const now = new Date().toISOString();
+  let enrollmentStartPeriod: string;
+  try { enrollmentStartPeriod = academyEnrollmentStartPeriod(input.startChoice, new Date(now)); }
+  catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Choose an available start month."); }
   const family = {
     ...input,
+    enrollmentStartPeriod,
     policyAcceptedAt: now,
     recurringAuthorizedAt: input.paymentChoice === "card" ? now : null,
     children: input.children.map((child) => ({ ...child, id: randomBytes(8).toString("hex"), classId: null, cancelEffectiveAt: null })),
     reference: reference(),
     registrationId: randomBytes(12).toString("hex"),
-    enrollmentState: "conditional",
+    enrollmentState: input.paymentChoice === "card" ? "awaiting_checkout" : "conditional",
     passToken,
     passState: "active",
     createdAt: now,
@@ -312,6 +319,8 @@ export async function confirmAcademyEnrollment(uid: string, actor: { uid: string
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new AcademyError("Academy registration was not found.", 404);
     const data = snapshot.data() ?? {};
+    if (data.enrollmentStartPeriod && String(data.enrollmentStartPeriod) > calgaryBillingPeriod(new Date())) throw new AcademyError("This registration starts next month; check-in opens when that month begins.", 409);
+    if (data.enrollmentState !== "active" && data.paymentChoice === "card" && !data.stripeSubscriptionId) throw new AcademyError("The parent must finish secure Stripe Checkout before enrollment can be confirmed.", 409);
     if (!["conditional", "submitted", "approved", "active"].includes(String(data.enrollmentState))) {
       throw new AcademyError("This enrollment cannot be checked in from its current state.", 409);
     }

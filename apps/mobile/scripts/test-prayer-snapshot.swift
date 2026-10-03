@@ -18,6 +18,8 @@ enum PrayerSnapshotTests {
         try versionOneSnapshotsRemainReadable(now: now)
         try canonicalCrossConsumerFixtureDecodes()
         try jumuahDoorTransitionUsesMasjidTimeZone()
+        try canonicalCountdownBoundaries()
+        try dstAndTomorrowUseAuthoritativeDates()
         print("Prayer snapshot Swift tests passed")
     }
 
@@ -76,9 +78,9 @@ enum PrayerSnapshotTests {
     private static func nativeConsumersAdvanceAtPrayerBoundary(now: Date) throws {
         let value = makeSnapshot(now: now)
         let next = value.effectiveNextPrayer(at: now.addingTimeInterval(3_601))
-        assert(next?.key == "isha", "Expected native consumers to advance from Asr to Isha at the absolute boundary")
+        assert(next?.key == "asr" && next?.kind == "Iqamah", "After Asr adhan, agree with phone countdown to Asr iqamah")
 
-        let tomorrow = value.effectiveNextPrayer(at: now.addingTimeInterval(7_201))
+        let tomorrow = value.effectiveNextPrayer(at: now.addingTimeInterval(7_501))
         assert(tomorrow?.key == "fajr", "Expected native consumers to advance from Isha to tomorrow Fajr")
     }
 
@@ -125,6 +127,48 @@ enum PrayerSnapshotTests {
         assert(decoded.jumuahState.firstDoorsCloseTime == "2:00 PM", "Expected the shared Jumu'ah door notice")
         assert(decoded.jumuahState.title == "First Jumu'ah", "Expected the shared Jumu'ah notice title")
         assert(decoded.jumuahState.parkingNotice?.contains("park respectfully") == true, "Expected shared Jumu'ah parking guidance")
+    }
+
+    private static func canonicalCountdownBoundaries() throws {
+        let now = MasjidDateParser.date(from: "2026-07-09T20:00:00Z")!
+        let snapshot = makeSnapshot(now: now)
+        let adhan = now.addingTimeInterval(3600)
+        assert(snapshot.effectiveNextPrayer(at: adhan.addingTimeInterval(-60))?.kind == "Adhan")
+        assert(snapshot.countdownText(at: adhan.addingTimeInterval(-60)) == "1m")
+        assert(snapshot.effectiveNextPrayer(at: adhan)?.kind == "Iqamah")
+        assert(snapshot.effectiveNextPrayer(at: adhan.addingTimeInterval(1))?.key == "asr")
+        assert(snapshot.effectiveNextPrayer(at: adhan.addingTimeInterval(1740))?.key == "isha")
+        assert(snapshot.effectiveNextPrayer(at: now.addingTimeInterval(7200))?.kind == "Iqamah")
+        assert(snapshot.effectiveNextPrayer(at: now.addingTimeInterval(7500))?.key == "fajr")
+        assert(snapshot.timelineDates(after: now).contains(adhan), "Refresh exactly at adhan, not a minute or second late")
+    }
+
+    private static func dstAndTomorrowUseAuthoritativeDates() throws {
+        // Each target is already resolved by the canonical backend. Never add 24h
+        // to yesterday's Fajr, especially across an Edmonton DST transition.
+        for (service, tomorrow, seconds) in [("2026-03-07", "2026-03-08", 28440.0), ("2025-11-01", "2025-11-02", 35640.0), ("2026-10-31", "2026-11-01", 32040.0)] {
+            let zone = "America/Edmonton"
+            let afterIsha = MasjidDateParser.localDate(serviceDate: service, time: "10:06 PM", timeZoneIdentifier: zone)!
+            let fajr = MasjidDateParser.localDate(serviceDate: tomorrow, time: "7:00 AM", timeZoneIdentifier: zone)!
+            var payload = try JSONSerialization.jsonObject(with: JSONEncoder().encode(makeSnapshot(now: afterIsha.addingTimeInterval(-20000)))) as! [String: Any]
+            payload["tomorrowFajrDate"] = ISO8601DateFormatter().string(from: fajr)
+            payload["tomorrowFajrIqamah"] = "7:15 AM"
+            let snapshot = try decode(payload)
+            let next = snapshot.effectiveNextPrayer(at: afterIsha)!
+            assert(next.key == "fajr" && next.time == "7:00 AM")
+            assert(next.iqamah == "7:15 AM", "Use tomorrow's resolved iqamah, not today's value")
+            assert(next.date.timeIntervalSince(afterIsha) == seconds, "DST \(service): expected \(seconds), got \(next.date.timeIntervalSince(afterIsha))")
+            let midnight = MasjidDateParser.localDate(serviceDate: tomorrow, time: "12:00 AM", timeZoneIdentifier: zone)!
+            assert(snapshot.effectiveNextPrayer(at: midnight)?.date == fajr)
+            assert(snapshot.timelineDates(after: afterIsha).contains(midnight))
+            assert(snapshot.effectiveNextPrayer(at: fajr)?.kind == "Iqamah")
+            assert(snapshot.effectiveNextPrayer(at: fajr)?.date == fajr.addingTimeInterval(900))
+            // A new schedule/override replaces the absolute target for every consumer.
+            payload["tomorrowFajrDate"] = ISO8601DateFormatter().string(from: fajr.addingTimeInterval(300))
+            let updated = try decode(payload)
+            assert(updated.effectiveNextPrayer(at: afterIsha)?.time == "7:05 AM")
+            assert(updated.countdownText(at: afterIsha) != snapshot.countdownText(at: afterIsha))
+        }
     }
 
     private static func jumuahDoorTransitionUsesMasjidTimeZone() throws {

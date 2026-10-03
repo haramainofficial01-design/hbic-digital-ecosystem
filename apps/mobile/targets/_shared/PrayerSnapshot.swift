@@ -82,6 +82,8 @@ struct MasjidEffectivePrayer: Hashable {
     let date: Date
     let iqamah: String?
     let iqamahDate: Date?
+    var kind: String = "Adhan"
+    var adhanTime: String = ""
 }
 
 struct MasjidPrayerSnapshot: Codable, Hashable {
@@ -100,6 +102,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
     let nextPrayerTime: String
     let nextPrayerDate: String
     let tomorrowFajrDate: String?
+    let tomorrowFajrIqamah: String?
     let nextIqamah: String?
     let nextIqamahDate: String?
     let prayers: [MasjidPrayerEntry]
@@ -135,6 +138,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         case nextPrayerTime
         case nextPrayerDate
         case tomorrowFajrDate
+        case tomorrowFajrIqamah
         case nextIqamah
         case nextIqamahDate
         case prayers
@@ -188,7 +192,8 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         availability: String = "available",
         stale: Bool? = nil,
         staleReason: String? = nil,
-        hijri: MasjidHijriState? = nil
+        hijri: MasjidHijriState? = nil,
+        tomorrowFajrIqamah: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.masjidID = masjidID
@@ -205,6 +210,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         self.nextPrayerTime = nextPrayerTime
         self.nextPrayerDate = nextPrayerDate
         self.tomorrowFajrDate = tomorrowFajrDate
+        self.tomorrowFajrIqamah = tomorrowFajrIqamah
         self.nextIqamah = nextIqamah
         self.nextIqamahDate = nextIqamahDate
         self.prayers = prayers
@@ -257,6 +263,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         nextPrayerTime = try container.decodeIfPresent(String.self, forKey: .nextPrayerTime) ?? "Unavailable"
         nextPrayerDate = try container.decodeIfPresent(String.self, forKey: .nextPrayerDate) ?? ""
         tomorrowFajrDate = try container.decodeIfPresent(String.self, forKey: .tomorrowFajrDate)
+        tomorrowFajrIqamah = try container.decodeIfPresent(String.self, forKey: .tomorrowFajrIqamah)
         nextIqamah = try container.decodeIfPresent(String.self, forKey: .nextIqamah)
         nextIqamahDate = try container.decodeIfPresent(String.self, forKey: .nextIqamahDate)
         prayers = try container.decodeIfPresent([MasjidPrayerEntry].self, forKey: .prayers) ?? []
@@ -311,6 +318,10 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
 
     var nextPrayerDateValue: Date? { MasjidDateParser.date(from: nextPrayerDate) }
     var tomorrowFajrDateValue: Date? { tomorrowFajrDate.flatMap(MasjidDateParser.date(from:)) }
+    var tomorrowFajrIqamahDateValue: Date? {
+        guard let target = tomorrowFajrDateValue, let time = tomorrowFajrIqamah else { return nil }
+        return MasjidDateParser.localDate(serviceDate: MasjidDateParser.serviceDate(target, timeZoneIdentifier: masjidTimeZoneIdentifier), time: time, timeZoneIdentifier: masjidTimeZoneIdentifier)
+    }
     var generatedAtValue: Date? { MasjidDateParser.date(from: generatedAt) }
     var expiresAtValue: Date? { MasjidDateParser.date(from: expiresAt) }
     var jumuahDoorsCloseDateValue: Date? {
@@ -331,7 +342,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(identifier: masjidTimeZoneIdentifier) ?? .current
+        formatter.timeZone = MasjidDateParser.resolvedTimeZone(date, identifier: masjidTimeZoneIdentifier)
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date) == jumuahState.serviceDate
     }
@@ -365,14 +376,19 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         if let upcoming = prayers
             .filter({ $0.key != "sunrise" })
             .compactMap({ prayer -> MasjidEffectivePrayer? in
-                guard let adhanDate = prayer.adhanDateValue, adhanDate > date else { return nil }
+                guard let adhanDate = prayer.adhanDateValue else { return nil }
+                let iqamahDate = prayer.iqamahDateValue
+                let waitingForIqamah = adhanDate <= date && (iqamahDate.map { $0 > adhanDate && $0 > date } ?? false)
+                guard adhanDate > date || waitingForIqamah else { return nil }
                 return MasjidEffectivePrayer(
                     key: prayer.key,
                     name: prayer.name,
-                    time: prayer.adhan,
-                    date: adhanDate,
+                    time: waitingForIqamah ? (prayer.iqamah ?? prayer.adhan) : prayer.adhan,
+                    date: waitingForIqamah ? iqamahDate! : adhanDate,
                     iqamah: prayer.iqamah,
-                    iqamahDate: prayer.iqamahDateValue
+                    iqamahDate: iqamahDate,
+                    kind: waitingForIqamah ? "Iqamah" : "Adhan",
+                    adhanTime: prayer.adhan
                 )
             })
             .sorted(by: { $0.date < $1.date })
@@ -381,17 +397,21 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         }
 
         guard let tomorrowFajrDateValue,
-              tomorrowFajrDateValue > date,
               let fajr = prayers.first(where: { $0.key == "fajr" }) else {
             return nil
         }
+        let tomorrowIqamahDate = tomorrowFajrIqamahDateValue
+        let waitingForIqamah = tomorrowFajrDateValue <= date && (tomorrowIqamahDate.map { $0 > tomorrowFajrDateValue && $0 > date } ?? false)
+        guard tomorrowFajrDateValue > date || waitingForIqamah else { return nil }
         return MasjidEffectivePrayer(
             key: fajr.key,
             name: fajr.name,
-            time: fajr.adhan,
-            date: tomorrowFajrDateValue,
-            iqamah: fajr.iqamah,
-            iqamahDate: nil
+            time: waitingForIqamah ? tomorrowFajrIqamah! : MasjidDateParser.displayTime(tomorrowFajrDateValue, timeZoneIdentifier: masjidTimeZoneIdentifier),
+            date: waitingForIqamah ? tomorrowIqamahDate! : tomorrowFajrDateValue,
+            iqamah: tomorrowFajrIqamah,
+            iqamahDate: tomorrowIqamahDate,
+            kind: waitingForIqamah ? "Iqamah" : "Adhan",
+            adhanTime: MasjidDateParser.displayTime(tomorrowFajrDateValue, timeZoneIdentifier: masjidTimeZoneIdentifier)
         )
     }
 
@@ -411,7 +431,7 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         let previous = prayerDates.filter { $0 <= date }.max()
             ?? prayerDates.max().flatMap { latest in
                 var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+                calendar.timeZone = MasjidDateParser.resolvedTimeZone(latest, identifier: timezone)
                 return calendar.date(byAdding: .day, value: -1, to: latest)
             }
             ?? date
@@ -424,16 +444,16 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         let transitions = prayers.flatMap { prayer in
             [prayer.adhanDateValue, prayer.iqamahDateValue].compactMap { $0 }
         }
-        .filter { $0 > date } + [tomorrowFajrDateValue, jumuahDoorsCloseDateValue]
+        .filter { $0 > date } + [tomorrowFajrDateValue, tomorrowFajrIqamahDateValue, jumuahDoorsCloseDateValue]
             .compactMap { $0 }
             .filter { $0 > date }
             + jumuahState.sessions.compactMap(jumuahSessionDate).filter { $0 > date }
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+        calendar.timeZone = MasjidDateParser.resolvedTimeZone(date, identifier: timezone)
         let midnight = calendar.nextDate(
             after: date,
-            matching: DateComponents(hour: 0, minute: 1),
+            matching: DateComponents(hour: 0, minute: 0),
             matchingPolicy: .nextTime
         )
 
@@ -453,6 +473,30 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
             return nil
         }
         return decode(data)
+    }
+
+    /// Extensions use the same published resolver as the phone, never a second calculation.
+    /// A bounded request also refreshes widgets while the phone app is closed.
+    static func refreshedFromCanonicalSource() async -> MasjidPrayerSnapshot? {
+        let cached = loadFromAppGroup()
+        do {
+            var request = URLRequest(url: URL(string: "https://hbic.ca/api/content/prayer-snapshot")!)
+            request.timeoutInterval = 5
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await URLSession.shared.data(for: request)
+            struct Envelope: Decodable { let ok: Bool; let snapshot: MasjidPrayerSnapshot }
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.ok,
+                  MasjidSharedData.supportedSchemaVersions.contains(envelope.snapshot.schemaVersion),
+                  envelope.snapshot.masjidID == "masjid-bilal-calgary",
+                  envelope.snapshot.masjidTimeZoneIdentifier == "America/Edmonton" else { return cached }
+            let incoming = envelope.snapshot
+            if let existingDate = cached?.generatedAtValue, let incomingDate = incoming.generatedAtValue, incomingDate < existingDate { return cached }
+            if let encoded = try? JSONEncoder().encode(incoming) {
+                UserDefaults(suiteName: MasjidSharedData.appGroup)?.set(encoded, forKey: MasjidSharedData.snapshotKey)
+            }
+            return incoming
+        } catch { return cached }
     }
 
     static let preview = MasjidPrayerSnapshot(
@@ -521,6 +565,29 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
 }
 
 enum MasjidDateParser {
+    // Match the shared canonical conversion on devices with older timezone databases.
+    // Alberta remains UTC−6 from November 2026; historical DST remains intact.
+    static func resolvedTimeZone(_ date: Date, identifier: String) -> TimeZone {
+        if identifier == "America/Edmonton", date.timeIntervalSince1970 >= 1793520000 {
+            return TimeZone(secondsFromGMT: -21600)!
+        }
+        return TimeZone(identifier: identifier) ?? TimeZone(identifier: "America/Edmonton")!
+    }
+    static func serviceDate(_ date: Date, timeZoneIdentifier: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = resolvedTimeZone(date, identifier: timeZoneIdentifier)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+    static func displayTime(_ date: Date, timeZoneIdentifier: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = resolvedTimeZone(date, identifier: timeZoneIdentifier)
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
     private static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -539,7 +606,8 @@ enum MasjidDateParser {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? .current
+            formatter.timeZone = timeZoneIdentifier == "America/Edmonton" && serviceDate >= "2026-11-01"
+                ? TimeZone(secondsFromGMT: -21600)! : (TimeZone(identifier: timeZoneIdentifier) ?? .current)
             formatter.dateFormat = format
             if let value = formatter.date(from: "\(serviceDate) \(time)") {
                 return value

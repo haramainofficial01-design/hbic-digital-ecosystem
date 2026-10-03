@@ -148,7 +148,9 @@ test("uses Calgary timezone even when the runtime timezone differs", () => {
 test("converts wall-clock times correctly across Calgary DST changes", () => {
   assert.equal(timeToDate("2026-03-08", "1:30 AM")?.toISOString(), "2026-03-08T08:30:00.000Z");
   assert.equal(timeToDate("2026-03-08", "3:30 AM")?.toISOString(), "2026-03-08T09:30:00.000Z");
-  assert.equal(timeToDate("2026-11-01", "12:00 PM")?.toISOString(), "2026-11-01T19:00:00.000Z");
+  assert.equal(timeToDate("2025-11-02", "12:00 PM")?.toISOString(), "2025-11-02T19:00:00.000Z");
+  assert.equal(timeToDate("2026-11-01", "12:00 PM")?.toISOString(), "2026-11-01T18:00:00.000Z");
+  assert.equal(timeToDate("2027-02-01", "12:00 AM")?.toISOString(), "2027-02-01T06:00:00.000Z");
 });
 
 test("formats the final minute without getting stuck at zero", () => {
@@ -196,7 +198,7 @@ test("Hijri positive and negative adjustments follow the adjacent Calgary date",
   assert.equal(getHijriDate(instant, 1)?.label, next?.label);
 });
 
-test("Hijri overrides follow Calgary midnight across the autumn DST change", () => {
+test("Hijri overrides follow Calgary midnight across the permanent Alberta Time transition", () => {
   const settings = {
     calendar: "islamic-umalqura" as const,
     adjustmentDays: 0,
@@ -210,8 +212,8 @@ test("Hijri overrides follow Calgary midnight across the autumn DST change", () 
   const day = (instant: string) => resolveHijriDate(new Date(instant), settings)?.day;
   assert.equal(day("2026-11-01T05:59:00.000Z"), 20);
   assert.equal(day("2026-11-01T06:00:00.000Z"), 21);
-  assert.equal(day("2026-11-02T06:59:00.000Z"), 21);
-  assert.equal(day("2026-11-02T07:00:00.000Z"), 22);
+  assert.equal(day("2026-11-02T05:59:00.000Z"), 21);
+  assert.equal(day("2026-11-02T06:00:00.000Z"), 22);
 });
 
 test("upcoming White Days returns the next 13th, 14th, and 15th with Gregorian equivalents", () => {

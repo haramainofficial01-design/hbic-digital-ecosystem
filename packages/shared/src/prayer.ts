@@ -54,9 +54,19 @@ export function parseClock(time: string): ClockTime | null {
   return { hour, minute };
 }
 
+/** Alberta keeps UTC−6 from November 2026. Older ICU/device databases still
+ * apply a winter rollback. Preserve the canonical identifier in records;
+ * normalize formatting/conversion only, so all consumers agree.
+ * https://www.alberta.ca/albertas-new-time-system-abt
+ */
+export function resolvedMasjidTimeZone(date: Date, timeZone = masjidTimeZone) {
+  return timeZone === "America/Edmonton" && date.getTime() >= Date.parse("2026-11-01T08:00:00Z")
+    ? "Etc/GMT+6" : timeZone;
+}
+
 export function datePartsInTimeZone(date: Date, timeZone = masjidTimeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
+    timeZone: resolvedMasjidTimeZone(date, timeZone),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -248,13 +258,13 @@ export function getHijriDate(date = new Date(), adjustmentDays = 0, timeZone = m
   const adjustedDate = new Date(date.getTime() + adjustmentDays * 86_400_000);
   try {
     const options: Intl.DateTimeFormatOptions = {
-      timeZone,
+      timeZone: resolvedMasjidTimeZone(adjustedDate, timeZone),
       day: "numeric",
       month: "long",
       year: "numeric"
     };
     const parts = mobileHijriParts
-      ? mobileHijriParts(adjustedDate, timeZone)
+      ? mobileHijriParts(adjustedDate, resolvedMasjidTimeZone(adjustedDate, timeZone))
       : new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", options).formatToParts(adjustedDate);
     const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
     const day = Number(read("day"));
@@ -487,7 +497,7 @@ export function formatCountdown(target: Date, now = new Date()): string {
  * Calgary Maghrib, rather than a fixed weekday clock or the device timezone.
  */
 export function isJumuahWindow(prayer: PrayerTime, now = new Date(), timeZone = masjidTimeZone) {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(now);
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: resolvedMasjidTimeZone(now, timeZone), weekday: "short" }).format(now);
   if (weekday !== "Thu" && weekday !== "Fri") return false;
   const serviceDate = dateStringInTimeZone(now, timeZone);
   const maghrib = timeToDate(serviceDate, prayer.maghrib, timeZone);

@@ -93,7 +93,7 @@ struct WatchHomeView: View {
 
     var body: some View {
         NavigationStack {
-            TimelineView(.periodic(from: Date(), by: 60)) { context in
+            TimelineView(.periodic(from: Date(), by: 1)) { context in
                 let snapshot = store.snapshot
                 let effective = snapshot?.effectiveNextPrayer(at: context.date)
                 ZStack {
@@ -144,7 +144,7 @@ struct WatchHomeView: View {
                     .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("UP NEXT")
+                        Text("NEXT \(effective.kind.uppercased())")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.white.opacity(0.6))
                         Text(effective.name)
@@ -158,7 +158,7 @@ struct WatchHomeView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         if showCountdown {
-                            Text(countdownLabel(snapshot.countdownText(at: now)))
+                            Text(timerInterval: now...max(now, effective.date), countsDown: true)
                                 .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(WatchPalette.gold)
                                 .lineLimit(1)
@@ -174,7 +174,7 @@ struct WatchHomeView: View {
                             Text("ADHAN")
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.58))
-                            Text(effective.time)
+                            Text(effective.adhanTime)
                                 .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
                         }
                         Divider().frame(height: 24)
@@ -189,7 +189,7 @@ struct WatchHomeView: View {
                     }
                     .foregroundStyle(.white.opacity(0.82))
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Adhan \(effective.time), iqamah \(iqamah)")
+                    .accessibilityLabel("Adhan \(effective.adhanTime), iqamah \(iqamah)")
                 }
             }
             .padding(.horizontal, 10)

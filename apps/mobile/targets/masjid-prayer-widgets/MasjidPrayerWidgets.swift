@@ -18,11 +18,14 @@ struct PrayerTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<PrayerTimelineEntry>) -> Void) {
-        let now = Date()
-        let snapshot = MasjidPrayerSnapshot.loadFromAppGroup()
-        let dates = [now] + (snapshot?.timelineDates(after: now).map { $0.addingTimeInterval(1) } ?? [])
-        let entries = dates.map { PrayerTimelineEntry(date: $0, snapshot: snapshot) }
-        completion(Timeline(entries: entries, policy: .after(dates.last ?? now.addingTimeInterval(900))))
+        Task {
+            let snapshot = await MasjidPrayerSnapshot.refreshedFromCanonicalSource()
+            let now = Date()
+            let dates = [now] + (snapshot?.timelineDates(after: now) ?? [])
+            let entries = dates.map { PrayerTimelineEntry(date: $0, snapshot: snapshot) }
+            let refresh = max(now.addingTimeInterval(60), min(snapshot?.expiresAtValue ?? now.addingTimeInterval(1800), now.addingTimeInterval(1800)))
+            completion(Timeline(entries: entries, policy: .after(refresh)))
+        }
     }
 }
 
@@ -62,12 +65,8 @@ struct MasjidPrayerWidgetView: View {
 
     private var homeWidgetPadding: CGFloat {
         switch family {
-        case .systemSmall:
-            return 12
-        case .systemMedium:
-            return 14
-        case .systemLarge:
-            return 14
+        case .systemSmall, .systemMedium, .systemLarge:
+            return 0
         default:
             return 0
         }
@@ -150,8 +149,9 @@ struct MasjidPrayerWidgetView: View {
                 }
                 Spacer(minLength: 2)
                 if effectivePrayer.date > entry.date {
-                    Text(effectivePrayer.date, style: .timer)
+                    Text(timerInterval: entry.date...max(entry.date, effectivePrayer.date), countsDown: true)
                         .font(.caption.bold().monospacedDigit())
+                        .lineLimit(1)
                 }
                 hijriLabel
                 staleLabel
@@ -177,14 +177,14 @@ struct MasjidPrayerWidgetView: View {
                     }
                     Text(effectivePrayer.name)
                         .font(.title.bold())
-                    Text("Adhan \(effectivePrayer.time)")
+                    Text("\(effectivePrayer.kind) \(effectivePrayer.time)")
                         .font(.subheadline.bold())
                     if let iqamah = effectivePrayer.iqamah {
                         Text("Iqamah \(iqamah)")
                             .font(.subheadline)
                     }
                     if effectivePrayer.date > entry.date {
-                        Text(effectivePrayer.date, style: .timer)
+                        Text(timerInterval: entry.date...max(entry.date, effectivePrayer.date), countsDown: true)
                             .font(.headline.monospacedDigit())
                     }
                     hijriLabel
@@ -326,12 +326,9 @@ struct MasjidPrayerWidgetView: View {
                     Text("Iqamah \(iqamah)")
                         .font(.caption2)
                 }
-                if !snapshot.hijriDate.isEmpty {
-                    Text(snapshot.isWhiteDay ? "\(snapshot.hijriDate) · White Day" : snapshot.hijriDate)
-                        .font(.caption2)
-                        .lineLimit(1)
-                }
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .accessibilityElement(children: .combine)
         } else {
             Text("Open Masjid Bilal for prayer times")

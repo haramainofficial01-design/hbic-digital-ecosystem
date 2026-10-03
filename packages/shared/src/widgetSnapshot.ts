@@ -9,6 +9,7 @@ import {
   getPrayerScheduleState,
   getUpcomingWhiteDays,
   masjidTimeZone,
+  resolvedMasjidTimeZone,
   resolveHijriDate,
   timeToDate
 } from "./prayer";
@@ -123,7 +124,7 @@ export const dateInMasjidTimeZone = timeToDate;
 function nextFridayDate(now: Date) {
   const today = dateStringInTimeZone(now, masjidTimeZone);
   const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: masjidTimeZone,
+    timeZone: resolvedMasjidTimeZone(now),
     weekday: "short"
   }).format(now);
   const weekdayIndex = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);

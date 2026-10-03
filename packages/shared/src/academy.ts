@@ -1,7 +1,9 @@
+import { resolvedMasjidTimeZone } from "./prayer";
+
 /** Academy records are private. Only server routes may read/write them. */
 export type AcademyLevel = "qaida" | "quran" | "not_sure";
 export type AcademyPaymentChoice = "cash" | "card";
-export type AcademyEnrollmentState = "conditional" | "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
+export type AcademyEnrollmentState = "awaiting_checkout" | "conditional" | "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
 export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "card_attention" | "past_due" | "scheduled" | "not_due";
 
 /** HBIC's approved starting tuition; administrators can change future pricing. */
@@ -21,8 +23,8 @@ export const ACADEMY_ALBERTA_GENERAL_HOLIDAYS = [
   { date: "2027-01-01", title: "New Year’s Day" }
 ] as const;
 /** Immutable copy: increment the version and retain this text if terms change. */
-export const ACADEMY_TUITION_POLICY_VERSION = "academy-payment-policy-v2";
-export const ACADEMY_TUITION_POLICY = [
+export const ACADEMY_TUITION_POLICY_VERSION = "academy-payment-policy-v3";
+export const ACADEMY_TUITION_POLICY_V2 = [
   { title: "Monthly tuition", body: "Tuition is CAD $50 total per enrolled child each month. HBIC does not add GST or another tax on top. The amount due is shown before card checkout or cash payment." },
   { title: "Card payments", body: "Registering before October 2026 collects your card without a September tuition charge. The first full monthly charge is October 1. From October onward, a mid-month signup is prorated immediately and renews on the 1st. The final charge for this term is January 1, 2027; the February 1 class is included without February tuition. Billing stops for the Ramadan and Eid al-Fitr break and will resume only after HBIC announces a new term and approved billing start. You authorize recurring monthly charges during the active term until that child's enrollment is cancelled. Stripe processes card details; HBIC does not store full card numbers or CVV." },
   { title: "Cash payments", body: "September registrations owe no September tuition. October cash tuition is due in person at HBIC on October 1, even though there is no class that day; tuition is monthly, not per class. The final cash tuition due for this term is January 1, 2027; the February 1 class is included without February tuition. No cash tuition is due during the Ramadan and Eid al-Fitr break. Bring your Academy pass. Payment is recorded only after authorized staff receive and confirm the cash; a receipt follows confirmation." },
@@ -31,8 +33,20 @@ export const ACADEMY_TUITION_POLICY = [
   { title: "Classes and changes", body: "This term begins October 5, 2026 and ends February 1, 2027. Classes meet Mondays and Thursdays, 5:30–7:00 p.m., except published holidays and closures; there is no class October 1. One Thursday each month is a special activity with games and an Islamic presentation; HBIC publishes the exact date and may change it. There are no classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid is to be announced. Tuition is monthly, not per class. Participation depends on placement, availability and payment standing. HBIC will communicate material schedule changes. Any new terms require a new policy version and acceptance." }
 ] as const;
 
+export const ACADEMY_TUITION_POLICY = [
+  { title: "Enrollment start", body: "Choose this month to attend available current-month classes and pay now: card tuition is prorated for a mid-month start, then renews on the 1st. Or choose next month: your card is collected securely now, no current-month tuition is charged, and the first full monthly charge is on the 1st of your chosen month. Cash tuition is due for your chosen start month. Card registration becomes Conditional only after Stripe confirms Checkout; staff separately confirm enrollment/check-in. No February tuition or automatic restart after the term break." },
+  ...ACADEMY_TUITION_POLICY_V2.map((section) => section.title === "Card payments" ? {
+    ...section, body: "For a current-month start, card tuition is charged now (prorated for a mid-month signup), then renews on the 1st. For a next-month start, Stripe collects the card now and the first $50-per-child monthly charge is on the 1st of the selected month. There is no September tuition. The final charge for this term is January 1, 2027; the February 1 class is included without February tuition. Billing stops for the Ramadan and Eid al-Fitr break and resumes only after HBIC announces a new term and approved billing start. You authorize recurring monthly charges during the active term until that child's enrollment is cancelled. Stripe processes card details; HBIC does not store full card numbers or CVV."
+  } : section)
+] as const;
+
+/** Stripe confirmation changes enrollment readiness, never marks the ledger paid. */
+export function academyCardEnrollmentConfirmed(state: AcademyEnrollmentState, eventType: string, amountPaid = 0): boolean {
+  return state === "awaiting_checkout" && (eventType === "checkout.session.completed" || eventType === "invoice.paid" && amountPaid > 0);
+}
+
 export function academyRegistrationOpen(now = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: resolvedMasjidTimeZone(now), year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
   const value = (kind: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === kind)?.value;
   const date = `${value("year")}-${value("month")}-${value("day")}`;
   return date >= ACADEMY_REGISTRATION_OPEN_DATE && date <= "2027-01-31";
@@ -67,18 +81,20 @@ export interface AcademyChildInput {
 }
 
 export interface AcademyRegistrationInput {
+  startChoice?: "current" | "next";
   guardianName: string;
   phone: string;
   email: string;
   whatsappConsent: boolean;
   children: AcademyChildInput[];
   paymentChoice: AcademyPaymentChoice;
-  policyVersion: typeof ACADEMY_TUITION_POLICY_VERSION;
+  policyVersion: typeof ACADEMY_TUITION_POLICY_VERSION | "academy-payment-policy-v2";
   policyAccepted: boolean;
   recurringAuthorized: boolean;
 }
 
 export interface AcademyPublicFamily {
+  enrollmentStartPeriod?: string;
   id: string;
   reference: string;
   guardianName: string;
@@ -105,7 +121,7 @@ export interface AcademyPublicFamily {
 }
 
 export function calgaryBillingPeriod(now: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit" }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: resolvedMasjidTimeZone(now), year: "numeric", month: "2-digit" }).formatToParts(now);
   return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
 }
 
@@ -115,8 +131,36 @@ export function academyTuitionPeriod(now = new Date()): string {
   return period < ACADEMY_FIRST_BILLING_MONTH ? ACADEMY_FIRST_BILLING_MONTH : period;
 }
 
+/** The server derives the month; clients cannot supply a price or billing date. */
+export function academyEnrollmentStartPeriod(choice: "current" | "next" = "current", now = new Date()): string {
+  const current = calgaryBillingPeriod(now);
+  const [year, month] = current.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month, 1, 12)).toISOString().slice(0, 7);
+  const selected = choice === "next" ? next : current;
+  const start = selected < ACADEMY_FIRST_BILLING_MONTH ? ACADEMY_FIRST_BILLING_MONTH : selected;
+  if (start > ACADEMY_LAST_BILLING_MONTH) throw new Error("Next-term enrollment will open after HBIC announces it. There is no February tuition for this term.");
+  return start;
+}
+
+/** Secure Checkout timing for a selected, server-resolved enrollment month. */
+export function academyCheckoutTiming(startPeriod: string | undefined, monthPaid: boolean, now = new Date()) {
+  const current = calgaryBillingPeriod(now);
+  let period = startPeriod && startPeriod > current ? startPeriod : academyTuitionPeriod(now);
+  if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Invalid enrollment start month.");
+  if (monthPaid) {
+    const [year, month] = period.split("-").map(Number);
+    period = new Date(Date.UTC(year, month, 1, 12)).toISOString().slice(0, 7);
+  }
+  if (period > ACADEMY_LAST_BILLING_MONTH) throw new Error("No further tuition is due this term. No February charge will be created.");
+  if (period > current) {
+    const [year, month] = period.split("-").map(Number);
+    return { billing_cycle_anchor: Math.floor(Date.UTC(year, month - 1, 1, 12) / 1000), proration_behavior: "none" as const };
+  }
+  return isCalgaryFirstOfMonth(now) ? {} : { billing_cycle_anchor: nextCalgaryFirstBillingAnchor(now), proration_behavior: "create_prorations" as const };
+}
+
 export function isCalgaryFirstOfMonth(now: Date): boolean {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", day: "numeric" }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: resolvedMasjidTimeZone(now), day: "numeric" }).formatToParts(now);
   return Number(parts.find((part) => part.type === "day")?.value) === 1;
 }
 
@@ -128,7 +172,7 @@ export function nextCalgaryFirstBillingAnchor(now: Date): number {
 
 export function academyCashReminderStage(now: Date, eligible: boolean, paymentState: AcademyPaymentState): "upcoming" | "due" | null {
   if (!eligible || paymentState === "not_due" || paymentState === "paid") return null;
-  const local = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const local = new Intl.DateTimeFormat("en-CA", { timeZone: resolvedMasjidTimeZone(now), year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
   const value = (kind: Intl.DateTimeFormatPartTypes) => Number(local.find((part) => part.type === kind)?.value);
   const year = value("year"), month = value("month"), day = value("day");
   if (day === 1) return "due";
@@ -151,7 +195,11 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error("Enter a valid email address.");
   if (typeof value.whatsappConsent !== "boolean") throw new Error("Choose whether to receive WhatsApp updates.");
   if (value.paymentChoice !== "cash" && value.paymentChoice !== "card") throw new Error("Choose card or cash.");
-  if (value.policyVersion !== ACADEMY_TUITION_POLICY_VERSION || value.policyAccepted !== true) throw new Error("Read and accept the current Academy tuition policy.");
+  if (value.startChoice !== undefined && value.startChoice !== "current" && value.startChoice !== "next") throw new Error("Choose this month or next month.");
+  // Installed apps offered only the existing current-month/prorated policy.
+  // Keep that exact legacy path valid; a new start-month choice requires v3.
+  const legacyCurrentMonth = value.policyVersion === "academy-payment-policy-v2" && value.startChoice === undefined;
+  if ((!legacyCurrentMonth && value.policyVersion !== ACADEMY_TUITION_POLICY_VERSION) || value.policyAccepted !== true) throw new Error("Read and accept the current Academy tuition policy.");
   if (value.paymentChoice === "card" && value.recurringAuthorized !== true) throw new Error("Authorize recurring card tuition before continuing.");
   if (!Array.isArray(value.children) || value.children.length < 1 || value.children.length > 8) {
     throw new Error("Add between one and eight children.");
@@ -167,5 +215,6 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
     return { name, age, level: level as AcademyLevel };
   });
   return { guardianName, phone, email, whatsappConsent: value.whatsappConsent, children, paymentChoice: value.paymentChoice,
-    policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
+    startChoice: value.startChoice === "next" ? "next" : "current",
+    policyVersion: legacyCurrentMonth ? "academy-payment-policy-v2" : ACADEMY_TUITION_POLICY_VERSION, policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
 }

@@ -21,12 +21,14 @@ struct ComplicationProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-        let now = Date()
-        let snapshot = MasjidPrayerSnapshot.loadFromAppGroup()
-        let dates = [now] + (snapshot?.timelineDates(after: now).map { $0.addingTimeInterval(1) } ?? [])
-        let entries = dates.map { ComplicationEntry(date: $0, snapshot: snapshot) }
-        let refresh = dates.last ?? now.addingTimeInterval(900)
-        completion(Timeline(entries: entries, policy: .after(refresh)))
+        Task {
+            let snapshot = await MasjidPrayerSnapshot.refreshedFromCanonicalSource()
+            let now = Date()
+            let dates = [now] + (snapshot?.timelineDates(after: now) ?? [])
+            let entries = dates.map { ComplicationEntry(date: $0, snapshot: snapshot) }
+            let refresh = max(now.addingTimeInterval(60), min(snapshot?.expiresAtValue ?? now.addingTimeInterval(1800), now.addingTimeInterval(1800)))
+            completion(Timeline(entries: entries, policy: .after(refresh)))
+        }
     }
 }
 
@@ -72,8 +74,9 @@ struct PrayerComplicationView: View {
                 VStack(spacing: 0) {
                     Text(String(effectivePrayer.name.prefix(3)))
                         .font(.caption2.bold())
-                    Text(snapshot.countdownText(at: entry.date))
-                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    Text(timerInterval: entry.date...max(entry.date, effectivePrayer.date), countsDown: true)
+                        .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
+                        .lineLimit(1)
                         .minimumScaleFactor(0.65)
                 }
             }
@@ -92,8 +95,9 @@ struct PrayerComplicationView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(effectivePrayer.name)
                         .font(.headline)
-                    Text("Adhan \(effectivePrayer.time)")
+                    Text("\(effectivePrayer.kind) \(effectivePrayer.time)")
                         .font(.caption2)
+                        .lineLimit(1)
                     if let doorsClose = snapshot.jumuahDoorsCloseDateValue,
                        snapshot.isJumuahServiceDay(at: entry.date),
                        doorsClose > entry.date {
@@ -104,15 +108,9 @@ struct PrayerComplicationView: View {
                         Text("Iqamah \(iqamah)")
                             .font(.caption2)
                     }
-                    if snapshot.isWhiteDay {
-                        Text("White Day")
-                            .font(.caption2)
-                    } else if !snapshot.hijriDate.isEmpty {
-                        Text(snapshot.hijriDate)
-                            .font(.caption2)
-                            .lineLimit(1)
-                    }
                 }
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
