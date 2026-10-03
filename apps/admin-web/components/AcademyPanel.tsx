@@ -172,6 +172,22 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     finally { setBusy(false); }
   }
 
+  async function changeFamilyPayment(method: "card" | "cash") {
+    if (!scanned) return;
+    const reason = window.prompt("Record the parent's payment-method request for the audit history:", "Parent requested payment method change")?.trim();
+    if (!reason) return;
+    if (reason.length < 8 || reason.length > 300) return setMessage("Enter a reason between 8 and 300 characters.");
+    if (!window.confirm(method === "cash" ? "Switch future unpaid tuition to cash? Paid months remain unchanged and any current card subscription stops at its period end." : "Ask the parent to finish card authorization in their Academy account? Staff cannot authorize or charge their card.")) return;
+    setBusy(true); setMessage("");
+    try {
+      await adminRequest("/api/admin/academy/billing-method", { method: "POST", body: JSON.stringify({ familyId: scanned.id, method, reason }) });
+      await scan(scanned.passToken);
+      await load();
+      setMessage(method === "cash" ? "Cash arrangement updated. Paid months are unchanged; check the scheduled effective month." : "Card setup requested. The parent must authorize tuition and complete Stripe Checkout from their Academy account.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not change the payment arrangement."); }
+    finally { setBusy(false); }
+  }
+
   async function withdrawRegistration(family: AcademyPublicFamily) {
     if (!["awaiting_checkout", "conditional"].includes(family.enrollmentState)) return;
     const reason = window.prompt(`Why should ${family.guardianName}'s pending registration be withdrawn? This reason is saved in the audit history.`, "Registration entered by mistake")?.trim();
@@ -267,6 +283,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
           <select aria-label={`Class for ${child.name}`} value={child.classId ?? ""} onChange={(event) => void assignChild(child.id, event.target.value)}><option value="">Awaiting class</option>{classes.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}</option>)}</select>
         </li>)}</ul>
         <div className="academy-admin-payment"><strong>{paymentLabel(scanned)}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.billingMethod === "card" ? "Online payment / card" : "Cash"}</span><span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div>
+        {scanned.enrollmentState !== "withdrawn" ? <div className="academy-admin-card"><h4>Payment arrangement</h4><p>Change this at the parent’s request. Paid months remain unchanged; card payments remain confirmed only by Stripe.</p>{scanned.pendingPaymentChoice === "cash" ? <p>Cash starts {scanned.paymentChangeEffectivePeriod}.</p> : null}<div className="academy-admin-actions"><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("cash")}>Arrange cash payment</button><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("card")}>Request secure card setup</button></div><small>Card setup requires the parent’s own authorization and secure Checkout. Each staff request is audited.</small></div> : null}
         {history ? <><h4>Payment history</h4>{history.payments.length ? history.payments.map((payment) => <p key={payment.period}>{payment.period} · {payment.method} · {payment.status.replaceAll("_", " ")} · {amount(payment.amountCents)}{payment.paidAt ? ` · paid ${new Date(payment.paidAt).toLocaleDateString("en-CA")}` : ""}</p>) : <p>No payment months recorded yet.</p>}{history.receipts.length ? <><h4>Cash receipts</h4>{history.receipts.map((receipt) => <p key={receipt.number}>{receipt.number} · {receipt.period} · {amount(receipt.amountCents)}</p>)}</> : null}{history.audit.length ? <><h4>Recent record activity</h4>{history.audit.slice(0, 10).map((entry) => <p key={entry.id}>{entry.at ? new Date(entry.at).toLocaleString("en-CA") : "Date unavailable"} · {entry.action.replaceAll("_", " ")}</p>)}</> : null}</> : null}
         {scanned.billingMethod === "cash" && ["cash_due", "past_due"].includes(scanned.paymentState) ? <button className="primary" onClick={() => void receiveCash()} disabled={busy}>Mark cash received</button> : null}
         {scanned.enrollmentState === "conditional" ? <button className="secondary" onClick={() => void confirmEnrollment()} disabled={busy}>Confirm enrollment / check in</button> : null}

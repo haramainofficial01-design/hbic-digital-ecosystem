@@ -104,9 +104,17 @@ struct PrayerComplicationView: View {
                         Text("Doors close \(snapshot.jumuahState.firstDoorsCloseTime ?? "")")
                             .font(.caption2)
                             .lineLimit(1)
-                    } else if let iqamah = effectivePrayer.iqamah {
-                        Text("Iqamah \(iqamah)")
-                            .font(.caption2)
+                    } else {
+                        HStack(spacing: 4) {
+                            Text(timerInterval: entry.date...max(entry.date, effectivePrayer.date), countsDown: true)
+                                .font(.caption2.bold().monospacedDigit())
+                                .lineLimit(1)
+                            if let iqamah = effectivePrayer.iqamah {
+                                Text("Iq \(iqamah)")
+                                    .font(.caption2)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                 }
                 .lineLimit(1)

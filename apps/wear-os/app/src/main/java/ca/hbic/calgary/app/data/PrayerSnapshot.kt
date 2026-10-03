@@ -2,6 +2,10 @@ package ca.hbic.calgary.app.data
 
 import org.json.JSONObject
 import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class PrayerEntry(
   val key: String,
@@ -17,7 +21,8 @@ data class PrayerFocus(
   val prayerName: String,
   val kind: String,
   val displayTime: String,
-  val instant: Instant
+  val instant: Instant,
+  val iqamah: String? = null
 )
 
 data class PrayerSnapshot(
@@ -28,7 +33,8 @@ data class PrayerSnapshot(
   val availability: String,
   val sourceStale: Boolean,
   val entries: List<PrayerEntry>,
-  val tomorrowFajr: Instant?
+  val tomorrowFajr: Instant?,
+  val tomorrowFajrIqamah: String? = null
 ) {
   fun isExpired(now: Instant = Instant.now()) = !now.isBefore(expiresAt)
 
@@ -36,18 +42,27 @@ data class PrayerSnapshot(
     val congregational = entries.filter { it.key != "sunrise" }
     for (entry in congregational) {
       if (now.isBefore(entry.adhanInstant)) {
-        return PrayerFocus(entry.key, entry.name, "Adhan", entry.adhan, entry.adhanInstant)
+        return PrayerFocus(entry.key, entry.name, "Adhan", entry.adhan, entry.adhanInstant, entry.iqamah)
       }
       val iqamahInstant = entry.iqamahInstant
       val iqamah = entry.iqamah
       if (iqamahInstant != null && iqamah != null && now.isBefore(iqamahInstant)) {
-        return PrayerFocus(entry.key, entry.name, "Iqamah", iqamah, iqamahInstant)
+        return PrayerFocus(entry.key, entry.name, "Iqamah", iqamah, iqamahInstant, iqamah)
       }
     }
     val fajr = entries.firstOrNull { it.key == "fajr" }
-    return if (tomorrowFajr != null && fajr != null && now.isBefore(tomorrowFajr)) {
-      PrayerFocus("fajr", "Fajr", "Adhan", fajr.adhan, tomorrowFajr)
-    } else null
+    val nextFajr = tomorrowFajr ?: return null
+    if (fajr == null) return null
+    val zone = ZoneId.of("America/Edmonton")
+    val formatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
+    val iqamahInstant = tomorrowFajrIqamah?.let { time -> runCatching {
+      nextFajr.atZone(zone).toLocalDate().atTime(LocalTime.parse(time, formatter)).atZone(zone).toInstant()
+    }.getOrNull() }
+    return when {
+      now.isBefore(nextFajr) -> PrayerFocus("fajr", "Fajr", "Adhan", formatter.withZone(zone).format(nextFajr), nextFajr, tomorrowFajrIqamah)
+      iqamahInstant != null && iqamahInstant.isAfter(nextFajr) && now.isBefore(iqamahInstant) -> PrayerFocus("fajr", "Fajr", "Iqamah", tomorrowFajrIqamah!!, iqamahInstant, tomorrowFajrIqamah)
+      else -> null
+    }
   }
 
   companion object {
@@ -81,7 +96,8 @@ data class PrayerSnapshot(
         availability = json.getString("availability"),
         sourceStale = json.optBoolean("stale", false),
         entries = entries,
-        tomorrowFajr = json.optString("tomorrowFajrDate").takeIf(String::isNotBlank)?.let(Instant::parse)
+        tomorrowFajr = json.optString("tomorrowFajrDate").takeIf { it.isNotBlank() && it != "null" }?.let(Instant::parse),
+        tomorrowFajrIqamah = json.optString("tomorrowFajrIqamah").takeIf { it.isNotBlank() && it != "null" }
       )
     }.getOrNull()
   }

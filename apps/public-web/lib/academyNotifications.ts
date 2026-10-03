@@ -47,8 +47,12 @@ export async function sendAcademyUpdate(input: { eventKey: string; title: string
 /** Daily server-side fallback for enrolled cash families with app push enabled.
  * A family/device using this route does not also schedule local cash reminders.
  */
-export async function runAcademyCashReminders(now = new Date()) {
-  const db = academyDb();
+export async function runAcademyCashReminders(now = new Date(), dependencies = {
+  db: academyDb, family: getAcademyFamily,
+  pricing: async () => (await import("./academyStore")).getAcademyPricing(),
+  enqueueEmail: enqueueAcademyEmail, sendPush: sendPushNotification, dispatchEmails: dispatchAcademyEmails
+}) {
+  const db = dependencies.db();
   const dueMonth = calgaryBillingPeriod(new Date(nextCalgaryFirstBillingAnchor(now) * 1000));
   const currentMonth = calgaryBillingPeriod(now);
   let checked = 0, sent = 0, skipped = 0;
@@ -61,7 +65,7 @@ export async function runAcademyCashReminders(now = new Date()) {
       checked += 1;
       const record = document.data();
       if (record.paymentChoice !== "cash" || !record.firstCashPaidAt) continue;
-      const family = await getAcademyFamily(document.id);
+      const family = await dependencies.family(document.id);
       if (!family || family.enrollmentState === "withdrawn") continue;
       // Upcoming reminders concern the *next* month's ledger. A paid current
       // month must not suppress them, while a prepaid next month must.
@@ -82,17 +86,24 @@ export async function runAcademyCashReminders(now = new Date()) {
       try { await marker.create({ familyId: document.id, period, stage, status: "sending", createdAt: now.toISOString() }); }
       catch (error) { if ((error as { code?: number }).code === 6) { skipped += 1; continue; } throw error; }
       try {
-        const pricing = await (await import("./academyStore")).getAcademyPricing();
+        const pricing = await dependencies.pricing();
         const childCount = family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > dueTime).length;
         const amountCents = Number(month.data()?.amountCents ?? pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1));
         if (!Number.isSafeInteger(amountCents) || amountCents <= 0) { skipped += 1; await marker.update({ status: "not_due" }); continue; }
-        await enqueueAcademyEmail(cashReminderEmail({ uid: document.id, reference: family.reference, email: family.email, name: family.guardianName, period, amountCents, stage, testMode: process.env.ACADEMY_STRIPE_BILLING_MODE !== "live" }));
-        const result = tokens.length ? await sendPushNotification({
+        await dependencies.enqueueEmail(cashReminderEmail({ uid: document.id, reference: family.reference, email: family.email, name: family.guardianName, period, amountCents, stage, testMode: process.env.ACADEMY_STRIPE_BILLING_MODE !== "live" }));
+        const result = tokens.length ? await dependencies.sendPush({
           title: stage === "due" ? "Quran Academy cash tuition is due today" : "Quran Academy cash tuition is due soon",
           body: stage === "due" ? "Please pay at HBIC today, the 1st, and ask for your receipt." : "The next monthly cash payment is due on the 1st at HBIC.",
           audience: "All", route: "/quran-academy", type: "quranClassReminder", data: { academy: true, kind: "cash_reminder", period, stage }
         }, tokens) : { status: "no_tokens", successCount: 0, failureCount: 0 };
-        await marker.update({ status: result.status, accepted: result.successCount, failed: result.failureCount, emailQueued: true, finishedAt: new Date().toISOString() });
+        if (result.status === "no_tokens") {
+          // Email enqueue is independently idempotent. Do not consume the push
+          // reminder before a parent enables a real Academy device that day.
+          await marker.delete();
+        } else {
+          await marker.update({ status: result.status, accepted: result.successCount, failed: result.failureCount,
+            logId: "logId" in result ? result.logId : null, emailQueued: true, finishedAt: new Date().toISOString() });
+        }
         sent += result.successCount;
       } catch (error) {
         // Allow an authorized retry on the same Calgary date after a provider
@@ -105,5 +116,5 @@ export async function runAcademyCashReminders(now = new Date()) {
     if (batch.size < 100) break;
     cursor = batch.docs[batch.docs.length - 1];
   }
-  return { checked, acceptedPushTokens: sent, skipped, email: await dispatchAcademyEmails() };
+  return { checked, acceptedPushTokens: sent, skipped, email: await dependencies.dispatchEmails() };
 }

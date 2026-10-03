@@ -3,6 +3,7 @@ package ca.hbic.calgary.app.data
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PrayerSnapshotTest {
@@ -40,5 +41,24 @@ class PrayerSnapshotTest {
     val focus = PrayerSnapshot.parse(fixture)!!.focus(Instant.parse("2026-07-09T20:00:00Z"))
     assertEquals("asr", focus?.prayerKey)
     assertEquals("Adhan", focus?.kind)
+  }
+
+  @Test fun usesNextDaysCanonicalTimeRatherThanTodaysLabel() {
+    val snapshot = PrayerSnapshot.parse(fixture)!!.copy(tomorrowFajr = Instant.parse("2026-07-10T10:04:00Z"), tomorrowFajrIqamah = "5:10 AM")
+    val focus = snapshot.focus(Instant.parse("2026-07-10T06:00:00Z"))
+    assertEquals("4:04 AM", focus?.displayTime)
+    assertEquals("5:10 AM", focus?.iqamah)
+    assertEquals("Adhan", snapshot.focus(Instant.parse("2026-07-10T10:03:00Z"))?.kind)
+    assertEquals("Iqamah", snapshot.focus(Instant.parse("2026-07-10T10:04:00Z"))?.kind)
+    assertEquals("Iqamah", snapshot.focus(Instant.parse("2026-07-10T10:04:01Z"))?.kind)
+    assertNull(snapshot.focus(Instant.parse("2026-07-10T11:10:00Z")))
+  }
+
+  @Test fun resolvesCanonicalNextDayIqamahAcrossCalgaryDst() {
+    val snapshot = PrayerSnapshot.parse(fixture)!!.copy(tomorrowFajr = Instant.parse("2026-11-01T13:00:00Z"), tomorrowFajrIqamah = "6:30 AM")
+    assertEquals("6:00 AM", snapshot.focus(Instant.parse("2026-11-01T07:59:00Z"))?.displayTime)
+    val focus = snapshot.focus(Instant.parse("2026-11-01T13:00:00Z"))
+    assertEquals("6:30 AM", focus?.displayTime)
+    assertEquals(Instant.parse("2026-11-01T13:30:00Z"), focus?.instant)
   }
 }

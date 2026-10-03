@@ -113,6 +113,7 @@ export interface AcademyPublicFamily {
   policyVersion?: string;
   policyAcceptedAt?: string;
   recurringAuthorizedAt?: string | null;
+  staffCardSetupRequestedAt?: string | null;
   enrollmentState: AcademyEnrollmentState;
   billingPeriod: string;
   amountCents: number | null;

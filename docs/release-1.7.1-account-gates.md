@@ -1,6 +1,6 @@
 # HBIC 1.7.1 account gates
 
-The owner explicitly requires live Academy email and both Wallet systems to be verified before final mobile builds. Do not consume new EAS build numbers or submit older binaries while these gates remain open.
+The owner requires Wallet verification and native runtime checks before final mobile builds. Email DNS verification is now explicitly an external domain-owner action and must not stop other release work. Do not submit older binaries or claim incomplete service gates are passed.
 
 ## Apple Wallet
 
@@ -10,14 +10,13 @@ The owner explicitly requires live Academy email and both Wallet systems to be v
 - The downloaded certificate matches the newly generated private signing key; it is issued by Apple's WWDR G4 intermediate.
 - Private signing material is preserved locally under ignored `.local-secrets/apple-wallet/`. Never commit it, paste it into chat, or expose it to browser/mobile bundles.
 - Signed server-side `.pkpass` generation is deployed on hbic.ca in deployment `dpl_4oAJ5tnnZN8KsDh1mcGXAxXZwKRH`, release source `85b47c2`. The previous deployment `dpl_CZm3A5qKEfiKbopFk8qBmp6gT2WF` remains the rollback point.
-- The real signed package passed archive/manifest/signature checks and opened in the native iOS Wallet import sheet. An authorized live issuance returned HTTP 200, resolved the current pass, and left the paid ledger unchanged; its manifest and CMS signature also passed. Actual Add/import remains required before PASS.
+- The real signed package passed archive/manifest/signature checks and opened in the native iOS Wallet import sheet. An authorized live issuance returned HTTP 200, resolved the current pass, and left the paid ledger unchanged; its manifest and CMS signature also passed. The owner subsequently confirmed successful actual iPhone Wallet addition: Apple Wallet PASS.
 - Downloads use a five-minute encrypted capability, recheck the current live pass, and include only the opaque lookup URL in the QR. Downloading/scanning never confirms a card payment or enrollment.
 
 ## Email
 
 - Resend domain setup: https://resend.com/domains/add/46360a9d-83fb-4756-afe1-bc229277fc7b
-- DNS account required: https://hpanel.hostinger.com/domains/dns
-- The accessible Hostinger session showed no domains to manage. Access to the account controlling hbic.ca is required; do not register a replacement domain or alter nameservers, website records, or existing MX records.
+- The owner cannot currently access the GoDaddy domain account. The accessible Hostinger session lists no domains. Send the prepared public Resend TXT/CNAME records to the domain administrator; use the existing authoritative DNS host and do not guess/change DNS elsewhere.
 - Add only Resend's current sending verification records, then verify the domain. Keep the production sending-only API key in sensitive Vercel Production configuration.
 - Required variables: `ACADEMY_RESEND_API_KEY`, `ACADEMY_EMAIL_FROM=academy@hbic.ca`.
 - Actual inbox delivery, not merely an API success response, is required for PASS. Do not fabricate payments or enrollment records to test mail.
@@ -28,6 +27,7 @@ The owner explicitly requires live Academy email and both Wallet systems to be v
 - Issuer setup: https://pay.google.com/business/console/
 - The accessible session showed the initial business setup form, not an issuer dashboard. The owner must complete required business/legal acceptance using the authorized HBIC Google account.
 - Issuer identity, production publishing approval, service-account authorization, real pass generation, and import are not yet verified. Never show a dead Add to Wallet button or advertise demo-only issuance as public production support.
+- The latest authorized business profile still shows no selected payments profile and incomplete business information. Required legal/business details must be completed by the account owner; the merchant business-profile identifier is not a Wallet issuer ID.
 
 ## Release identity
 
@@ -48,4 +48,15 @@ The owner explicitly requires live Academy email and both Wallet systems to be v
 - On iOS resume from Safari, Home displayed Friday October 2 and 21 Rabi’ II 1448 AH while the device UTC date was October 3. Fajr 6:08 AM / iqamah 6:30 AM and the countdown agreed with the canonical next-day snapshot. Calendar rendering was also checked locally. Deterministic rollover tests cover boundaries; a midnight physical-device check is not claimed.
 - Local iOS simulator QA required refreshing the existing Pods and an iOS 17 simulator build override for the Xcode 27 SDK; no production deployment target, dependency version, identifier, or signing credential was changed.
 - Public-web production build, mobile typecheck/lint, and client-secret-pattern scan pass. No signing key or local secret file is traced into the Wallet function output.
-- Final release gates are not passed by compilation/source checks alone. Email inbox delivery, Google issuer production setup, Apple Wallet import, widget/complication runtime snapshots, and physical push presentation remain required. No final EAS build or submission was initiated.
+- Final release gates are not passed by compilation/source checks alone. Email inbox delivery, Google issuer production setup, widget/complication runtime coverage, and physical push presentation remain outstanding where noted. Apple Wallet import is confirmed. No final EAS build or submission was initiated.
+
+## Follow-up native and cash verification
+
+- The real iOS home-widget renderer exposed dark text on its fixed navy surface in light mode. Small/medium/large home widgets now resolve text in the dark surface appearance; lock-screen widgets remain unchanged. All three native Home Screen sizes now render readable prayer/iqamah text without overflow; small/medium countdowns are live, and the large layout keeps its intended schedule overview.
+- Apple Watch rectangular complications now use a native continuously ticking timer, as the circular complication and Watch app already do. The updated native targets and deterministic shared snapshot boundary tests pass. Native complication gallery rendering is readable; live installed Smart Stack/face coverage is still being checked, not represented as complete.
+- Wear OS now has HBIC branding, a round-screen-sized next-prayer hero, live countdown/iqamah, the canonical Hijri label, scrollable daily prayer rows, explicit cache status and refresh, and rotary scrolling. Countdown updates stop when the app is not resumed. Debug compilation, unit tests and actual round-emulator rendering pass. The existing live next-prayer Tile also renders without clipping.
+- Wear OS next-day Fajr previously reused today's display label despite counting down to tomorrow's canonical instant. The label and next-day iqamah now use the same canonical snapshot, with before/exact/after-prayer and Calgary DST tests. No independent prayer calculation was added.
+- Wear OS remains a separate native target with an unsigned local release configuration. It is not automatically included in the Android phone EAS build; signed wearable distribution must use the existing Play app signing identity. Do not advertise wearable store availability from a debug emulator build.
+- Read-only live reminder inspection found three cash families, two with a first cash payment, but zero enabled Academy devices for those families. No live reminder or fake payment was sent. An owner-authorized existing test family and registered device are required to verify actual physical delivery.
+- Four isolated reminder-job tests pass: correct cash-parent targeting, month/stage dedupe, paid/withdrawn/billing-break suppression, and advance reminders for the next unpaid month. A no-device run no longer consumes that day's push reminder; email enqueue remains independently idempotent. Email sending remains unconfigured, not claimed delivered.
+- Staff payment arrangements use the existing paid-month-preserving billing flow. Cash changes and card-setup requests require an approved director/super-admin and an audit reason. Staff cannot authorize or charge a parent's card; the parent completes existing secure Checkout. An isolated real-function test verifies paid ledger preservation, actor/reason audit, idempotent card requests and withdrawal/lock rejection. No live family billing was changed for testing.

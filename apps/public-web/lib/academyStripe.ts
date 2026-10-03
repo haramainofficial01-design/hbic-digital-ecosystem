@@ -134,7 +134,7 @@ export async function startAcademyBillingPortal(uid: string) {
 }
 
 /** A parent can switch methods without changing a paid month's receipt or enrollment. */
-export async function changeAcademyPaymentMethod(uid: string, target: "card" | "cash", recurringAuthorized: boolean) {
+export async function changeAcademyPaymentMethod(uid: string, target: "card" | "cash", recurringAuthorized: boolean, staff?: { uid: string; reason: string }) {
   const db = academyDb();
   const familyRef = db.collection("academyFamilies").doc(uid);
   const lockRef = db.collection("academyBillingLocks").doc(uid);
@@ -185,14 +185,14 @@ export async function changeAcademyPaymentMethod(uid: string, target: "card" | "
       if (!snapshot.exists || snapshot.data()?.enrollmentState === "withdrawn") throw new AcademyError("Enrollment changed during billing update.", 409);
       const current = snapshot.data()!;
       if (target === "cash" && scheduledCashPeriod) {
-        tx.update(familyRef, { pendingPaymentChoice: "cash", paymentChangeEffectivePeriod: scheduledCashPeriod, updatedAt: now });
+        tx.update(familyRef, { pendingPaymentChoice: "cash", paymentChangeEffectivePeriod: scheduledCashPeriod, staffCardSetupRequestedAt: null, updatedAt: now });
       } else if (target === "cash") {
-        tx.update(familyRef, { paymentChoice: "cash", pendingPaymentChoice: null, paymentChangeEffectivePeriod: null,
+        tx.update(familyRef, { paymentChoice: "cash", pendingPaymentChoice: null, paymentChangeEffectivePeriod: null, staffCardSetupRequestedAt: null,
           stripeCheckoutSessionId: null, stripeSubscriptionId: null,
           ...(current.enrollmentState === "awaiting_checkout" ? { enrollmentState: "conditional" } : {}), updatedAt: now });
         if (savedMonth.exists && savedMonth.data()?.status !== "paid") tx.update(monthRef, { method: "cash", status: savedMonth.data()?.amountCents === 0 ? "not_due" : "cash_due", updatedAt: now });
       } else {
-        tx.update(familyRef, { paymentChoice: "card", pendingPaymentChoice: null, paymentChangeEffectivePeriod: null,
+        tx.update(familyRef, { paymentChoice: "card", pendingPaymentChoice: null, paymentChangeEffectivePeriod: null, staffCardSetupRequestedAt: null,
           stripeSubscriptionId: subscriptionId || null,
           ...(!subscriptionId && current.enrollmentState === "conditional" ? { enrollmentState: "awaiting_checkout" } : {}),
           recurringAuthorizedAt: current.recurringAuthorizedAt ?? now, updatedAt: now });
@@ -202,7 +202,7 @@ export async function changeAcademyPaymentMethod(uid: string, target: "card" | "
       tx.create(db.collection("academyAudit").doc(), { action: "payment_method_change", familyId: uid,
         from: family.paymentChoice, to: target, effectivePeriod: scheduledCashPeriod ??
           (month?.status === "paid" ? new Date(Date.UTC(Number(monthRef.id.slice(0, 4)), Number(monthRef.id.slice(5, 7)), 1, 12)).toISOString().slice(0, 7) : monthRef.id),
-        actorUid: uid, at: now });
+        actorUid: staff?.uid ?? uid, ...(staff ? { reason: staff.reason, requestedBy: "staff" } : {}), at: now });
       tx.delete(lockRef);
     });
     if (target === "card" && !subscriptionId) return { family: await getAcademyFamily(uid), checkoutUrl: await startAcademyCheckout(uid) };
@@ -211,6 +211,29 @@ export async function changeAcademyPaymentMethod(uid: string, target: "card" | "
     await db.runTransaction(async (tx) => { if ((await tx.get(lockRef)).data()?.id === lockId) tx.delete(lockRef); });
     throw error;
   }
+}
+
+/** Staff may arrange card setup, but only the parent can authorize Stripe Checkout. */
+export async function requestAcademyCardSetup(uid: string, actor: { uid: string; reason: string }) {
+  const db = academyDb();
+  const familyRef = db.collection("academyFamilies").doc(uid);
+  await db.runTransaction(async (tx) => {
+    const [family, lock] = await Promise.all([tx.get(familyRef), tx.get(db.collection("academyBillingLocks").doc(uid))]);
+    if (!family.exists) throw new AcademyError("Academy registration was not found.", 404);
+    const current = family.data()!;
+    const children = Array.isArray(current.children) ? current.children as { cancelEffectiveAt?: string | null }[] : [];
+    if (current.enrollmentState === "withdrawn" || current.withdrawalPendingAt || !children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now())) throw new AcademyError("Withdrawn enrollment cannot change billing.", 409);
+    if (lock.exists && Number(lock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("A billing change is in progress. Try again shortly.", 409);
+    if (current.paymentChoice === "card" && current.pendingPaymentChoice !== "cash") return;
+    // Do not reverse a scheduled card-to-cash cancellation or create a charge.
+    // The existing parent flow performs the actual change after explicit consent.
+    if (current.staffCardSetupRequestedAt) return;
+    const now = new Date().toISOString();
+    tx.update(familyRef, { staffCardSetupRequestedAt: now, updatedAt: now });
+    tx.create(db.collection("academyAudit").doc(), { action: "card_setup_requested", familyId: uid,
+      actorUid: actor.uid, reason: actor.reason, at: now });
+  });
+  return getAcademyFamily(uid);
 }
 
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */

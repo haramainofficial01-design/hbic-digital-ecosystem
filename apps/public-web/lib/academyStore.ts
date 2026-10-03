@@ -95,6 +95,7 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     policyVersion: typeof data.policyVersion === "string" ? data.policyVersion : undefined,
     policyAcceptedAt: typeof data.policyAcceptedAt === "string" ? data.policyAcceptedAt : undefined,
     recurringAuthorizedAt: typeof data.recurringAuthorizedAt === "string" ? data.recurringAuthorizedAt : null,
+    staffCardSetupRequestedAt: typeof data.staffCardSetupRequestedAt === "string" ? data.staffCardSetupRequestedAt : null,
     enrollmentState: hasCurrentChild ? enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
     billingPeriod: period,
     amountCents: typeof month?.amountCents === "number" ? month.amountCents : null,

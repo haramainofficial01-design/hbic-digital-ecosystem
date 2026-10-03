@@ -34,7 +34,7 @@ struct MasjidPrayerWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
-        widgetContent
+        readableContent
         .padding(homeWidgetPadding)
         .widgetURL(URL(string: "hbiccalgary://prayer"))
         .containerBackground(for: .widget) {
@@ -43,6 +43,19 @@ struct MasjidPrayerWidgetView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+        }
+    }
+
+    @ViewBuilder private var readableContent: some View {
+        switch family {
+        case .systemSmall, .systemMedium, .systemLarge:
+            // Home widgets keep their navy background in both phone appearances.
+            // Resolve primary/secondary text against that background, not the phone theme.
+            widgetContent
+                .environment(\.colorScheme, .dark)
+                .foregroundStyle(.white)
+        default:
+            widgetContent
         }
     }
 
