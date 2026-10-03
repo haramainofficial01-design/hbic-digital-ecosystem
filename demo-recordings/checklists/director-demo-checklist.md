@@ -12,7 +12,7 @@
 - [ ] Demo data is safe and does not reveal private information.
 - [ ] No secrets, tokens, database URLs, or passwords are visible.
 - [ ] Prayer times look correct.
-- [ ] Iqamah times show iqamah.ca/manual-update context correctly.
+- [ ] Iqamah times show current branded HBIC values correctly.
 - [ ] Jumu'ah times look correct.
 - [ ] Event cards look clean.
 - [ ] Summer camp promotion is visible and respectful.

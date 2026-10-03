@@ -50,7 +50,7 @@
 - HBIC now has a public website, admin dashboard workflow, and mobile app experience designed around prayer times, iqamah, Jumu'ah, programs, media, donations, youth, and contact.
 - The admin workflow supports draft edits and a Publish Changes path so normal content updates do not require a code deploy once production backend credentials are connected.
 - The mobile app is designed to fetch published content from the same backend/API used by the website.
-- Prayer and iqamah content is structured for iqamah.ca source data with manual admin override support.
+- Prayer and iqamah content is structured for internal live sync with manual admin override support.
 - Widgets have been scaffolded for a next-prayer Home Screen and Lock Screen experience as a native follow-up milestone.
 
 ## 7. Payment/Staged Delivery Notes
