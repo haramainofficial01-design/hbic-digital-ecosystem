@@ -9,8 +9,8 @@ The owner explicitly requires live Academy email and both Wallet systems to be v
 - Issued Pass Type signing certificate: `RPZZH7LUWP`, named HBIC Quran Academy Wallet, expires November 2, 2027 UTC.
 - The downloaded certificate matches the newly generated private signing key; it is issued by Apple's WWDR G4 intermediate.
 - Private signing material is preserved locally under ignored `.local-secrets/apple-wallet/`. Never commit it, paste it into chat, or expose it to browser/mobile bundles.
-- Signed server-side `.pkpass` generation is implemented. Production signing variables are configured privately; the route must be deployed before public issuance is available.
-- The real signed package passed archive/manifest/signature checks and opened in the native iOS Wallet import sheet. Actual Add/import and live current-pass verification remain required before PASS.
+- Signed server-side `.pkpass` generation is deployed on hbic.ca in deployment `dpl_4oAJ5tnnZN8KsDh1mcGXAxXZwKRH`, release source `85b47c2`. The previous deployment `dpl_CZm3A5qKEfiKbopFk8qBmp6gT2WF` remains the rollback point.
+- The real signed package passed archive/manifest/signature checks and opened in the native iOS Wallet import sheet. An authorized live issuance returned HTTP 200, resolved the current pass, and left the paid ledger unchanged; its manifest and CMS signature also passed. Actual Add/import remains required before PASS.
 - Downloads use a five-minute encrypted capability, recheck the current live pass, and include only the opaque lookup URL in the QR. Downloading/scanning never confirms a card payment or enrollment.
 
 ## Email
@@ -41,8 +41,11 @@ The owner explicitly requires live Academy email and both Wallet systems to be v
 
 - Prayer/Hijri, notification payload/dedupe, TV, webhook signature, Wallet capability, and Academy registration/consent tests pass. Swift prayer snapshot boundary tests pass; all existing Apple target identifiers are preserved.
 - Public production Stripe delivery returned HTTP 200. The existing October paid ledger remains CAD 50 paid and its event marker remains unchanged; no new payment was created.
+- Expo receipts for the October 2 prayer-change notification confirmed 126 successful deliveries and 14 `DeviceNotRegistered` failures, with no pending receipts. Receipt results were recorded and the 14 stale token records disabled; no new alert was sent. Provider receipts do not substitute for a physical-device visual check.
 - Android's existing Expo native module now includes the real home widget. Kotlin compilation and a local debug APK build pass. The Pixel launcher widget retrieved the live canonical Fajr schedule, displayed a ticking countdown, and remained readable at large text size.
 - Current Watch app, iOS widget, and Watch complication targets compile for their simulators. Watch runtime snapshots at 40 mm and 46 mm show the live schedule/countdown without clipping the prayer card.
-- Android runtime shows the polished Quran/Recite maintenance screen and opens the Sunnah.com external browser path.
+- Android and refreshed iOS simulator runtimes show the polished Quran/Recite maintenance screen. Each platform's actual Hadith button handler opened Sunnah.com in its external browser.
+- On iOS resume from Safari, Home displayed Friday October 2 and 21 Rabi’ II 1448 AH while the device UTC date was October 3. Fajr 6:08 AM / iqamah 6:30 AM and the countdown agreed with the canonical next-day snapshot. Calendar rendering was also checked locally. Deterministic rollover tests cover boundaries; a midnight physical-device check is not claimed.
+- Local iOS simulator QA required refreshing the existing Pods and an iOS 17 simulator build override for the Xcode 27 SDK; no production deployment target, dependency version, identifier, or signing credential was changed.
 - Public-web production build, mobile typecheck/lint, and client-secret-pattern scan pass. No signing key or local secret file is traced into the Wallet function output.
-- Final release gates are not passed by compilation/source checks alone. Email inbox delivery, Google issuer production setup, Wallet import/live lookup, and physical push delivery must be confirmed before signed store builds.
+- Final release gates are not passed by compilation/source checks alone. Email inbox delivery, Google issuer production setup, Apple Wallet import, widget/complication runtime snapshots, and physical push presentation remain required. No final EAS build or submission was initiated.
