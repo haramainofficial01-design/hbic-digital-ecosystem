@@ -168,6 +168,7 @@ test("the canonical cross-consumer fixture carries the same Isha transition", ()
   assert.equal(fixture.nextPrayerKey, "isha");
   assert.equal(fixture.nextPrayerDate, "2026-07-10T05:20:00.000Z");
   assert.equal(fixture.tomorrowFajrDate, "2026-07-10T10:02:00.000Z");
+  assert.equal(fixture.tomorrowFajrIqamahDate, "2026-07-10T10:30:00.000Z");
   assert.equal(fixture.jumuahState.firstDoorsCloseTime, "2:00 PM");
 });
 

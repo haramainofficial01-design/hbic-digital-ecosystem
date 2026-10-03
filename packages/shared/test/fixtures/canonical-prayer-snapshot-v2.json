@@ -13,6 +13,8 @@
   "nextPrayerTime": "11:20 PM",
   "nextPrayerDate": "2026-07-10T05:20:00.000Z",
   "tomorrowFajrDate": "2026-07-10T10:02:00.000Z",
+  "tomorrowFajrIqamah": "4:30 AM",
+  "tomorrowFajrIqamahDate": "2026-07-10T10:30:00.000Z",
   "nextIqamah": "11:25 PM",
   "nextIqamahDate": "2026-07-10T05:25:00.000Z",
   "prayers": [
