@@ -141,6 +141,16 @@ export default function QuranAcademyScreen() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Stripe opens in the parent's browser. Returning to HBIC must retrieve the
+  // live webhook-confirmed enrollment, rather than leave a stale pending pass.
+  useEffect(() => {
+    if (!user || !verified) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refresh();
+    });
+    return () => subscription.remove();
+  }, [user, verified, refresh]);
+
   useEffect(() => {
     if (!user || !family) return;
     void reconcileAcademyCashReminders(family, new Date(), serverCashReminders && serverDeviceRegistered).catch(() => undefined);
