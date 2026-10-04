@@ -3,13 +3,11 @@
 import {
   TotpMultiFactorGenerator,
   getMultiFactorResolver,
-  multiFactor,
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
-  type MultiFactorResolver,
-  type TotpSecret
+  type MultiFactorResolver
 } from "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import { adminAuth } from "../lib/firebaseClient";
@@ -30,45 +28,54 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [sharedPassword, setSharedPassword] = useState("");
   const [code, setCode] = useState("");
   const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
-  const [secret, setSecret] = useState<TotpSecret | null>(null);
   const [status, setStatus] = useState("Sign in with your personal HBIC administrator account.");
   const [busy, setBusy] = useState(false);
-  const generating = useRef(false);
+  const handlingAuth = useRef(false);
+  const sharedSession = useRef(false);
+  const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
 
   useEffect(() => onIdTokenChanged(adminAuth, async (user) => {
+    if (sharedSession.current || handlingAuth.current) return;
+    handlingAuth.current = true;
+    try {
     if (!user) {
       onSession(null);
+      setSignedInEmail(null);
       return;
     }
+    await user.reload();
+    if (sharedSession.current) return;
     if (!user.emailVerified) {
       onSession(null);
+      setSignedInEmail(null);
       setStatus("Verify the email address before administrator access can continue.");
       return;
     }
-    if (multiFactor(user).enrolledFactors.length === 0) {
+    const idToken = await user.getIdToken(true);
+    const response = await fetch("/api/admin/auth/session", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
+    if (sharedSession.current) return;
+    if (!response.ok || adminAuth.currentUser?.uid !== user.uid) {
       onSession(null);
-      if (!generating.current && !secret) {
-        generating.current = true;
-        try {
-          const session = await multiFactor(user).getSession();
-          setSecret(await TotpMultiFactorGenerator.generateSecret(session));
-          setStatus("MFA is required. Add the secret below to your authenticator app, then enter its six-digit code.");
-        } catch {
-          setStatus("Unable to start MFA enrollment. Sign out and try again.");
-        } finally {
-          generating.current = false;
-        }
-      }
+      setSignedInEmail(null);
+      setStatus("This email is not approved for administrator access, or the session expired.");
       return;
     }
-    onSession(`Bearer ${await user.getIdToken()}`, user.email ?? undefined);
-    setStatus(`Signed in securely as ${user.email}. MFA is active.`);
-  }), [onSession, secret]);
+    onSession(`Bearer ${idToken}`, user.email ?? undefined);
+    setSignedInEmail(user.email);
+    setStatus(`Signed in as ${user.email}. You can load and publish the protected prayer settings.`);
+    } catch {
+      onSession(null);
+      setSignedInEmail(null);
+      setStatus("Could not refresh administrator sign-in. Sign out and try again.");
+    } finally { handlingAuth.current = false; }
+  }), [onSession]);
 
   async function login() {
     setBusy(true);
     setStatus("Signing in…");
     try {
+      sharedSession.current = false;
+      onSession(null);
       await signInWithEmailAndPassword(adminAuth, email.trim().toLowerCase(), password);
       setPassword("");
     } catch (error) {
@@ -99,24 +106,6 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  async function enrollMfa() {
-    const user = adminAuth.currentUser;
-    if (!user || !secret) return;
-    setBusy(true);
-    try {
-      const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, code.trim());
-      await multiFactor(user).enroll(assertion, "HBIC Authenticator");
-      setSecret(null);
-      setCode("");
-      onSession(`Bearer ${await user.getIdToken(true)}`, user.email ?? undefined);
-      setStatus(`Signed in securely as ${user.email}. MFA is active.`);
-    } catch {
-      setStatus("That enrollment code was invalid or expired. Enter the newest authenticator code.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function sendSetupEmail() {
     setBusy(true);
     try {
@@ -129,23 +118,20 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     }
   }
 
-  function useSharedAccess() {
-    onSession(basicAuthorization(sharedEmail, sharedPassword), sharedEmail.trim().toLowerCase());
-    setSharedPassword("");
-    setStatus("Shared HBIC access is ready. Load the protected display settings to verify it.");
-  }
-
-  if (secret) {
-    return (
-      <div className="firebase-auth-panel">
-        <strong>Set up authenticator MFA</strong>
-        <p>In Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app, add this setup key:</p>
-        <code>{secret.secretKey}</code>
-        <label><span>Six-digit authenticator code</span><input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
-        <button type="button" onClick={enrollMfa} disabled={busy || code.length !== 6}>Activate MFA</button>
-        <p role="status">{status}</p>
-      </div>
-    );
+  async function useSharedAccess() {
+    setBusy(true);
+    try {
+      const token = basicAuthorization(sharedEmail, sharedPassword);
+      const response = await fetch("/api/admin/content/draft", { headers: { Authorization: token }, cache: "no-store" });
+      if (!response.ok) throw new Error("Shared access was not accepted.");
+      sharedSession.current = true;
+      onSession(token, sharedEmail.trim().toLowerCase());
+      setSharedPassword("");
+      setStatus("Shared HBIC access verified for publishing prayer settings.");
+    } catch {
+      onSession(null);
+      setStatus("Shared access could not be verified. Check the email and password.");
+    } finally { setBusy(false); }
   }
 
   if (resolver) {
@@ -159,10 +145,10 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     );
   }
 
-  if (adminAuth.currentUser && multiFactor(adminAuth.currentUser).enrolledFactors.length > 0) {
+  if (signedInEmail) {
     return (
       <div className="firebase-auth-panel firebase-auth-ready">
-        <div><strong>{adminAuth.currentUser.email}</strong><p role="status">{status}</p></div>
+        <div><strong>{signedInEmail}</strong><p role="status">{status}</p></div>
         <button type="button" onClick={() => void signOut(adminAuth)}>Sign out</button>
       </div>
     );
@@ -180,9 +166,10 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <strong>Existing shared HBIC access</strong>
         <label><span>Shared administrator email</span><input type="email" autoComplete="username" value={sharedEmail} onChange={(event) => setSharedEmail(event.target.value)} /></label>
         <label><span>Shared administrator password</span><input type="password" autoComplete="current-password" value={sharedPassword} onChange={(event) => setSharedPassword(event.target.value)} /></label>
-        <button type="button" onClick={useSharedAccess} disabled={!sharedEmail.trim() || !sharedPassword}>Use shared access</button>
+        <button type="button" onClick={useSharedAccess} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
       </div>
       <p role="status">{status}</p>
+      {adminAuth.currentUser && <button type="button" onClick={() => { sharedSession.current = false; void signOut(adminAuth); }}>Sign out of current account</button>}
     </div>
   );
 }

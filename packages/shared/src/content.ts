@@ -186,7 +186,8 @@ export function toPublicContent(content: HbicContent, now = new Date()): HbicCon
       sourceUrl: undefined,
       updatedBy: "",
       adjustmentNotes: "",
-      overrides: undefined
+      overrides: undefined,
+      automaticIqamah: undefined
     },
     announcements: content.announcements.filter((announcement) => {
       if (!isVisibleItem(announcement)) return false;

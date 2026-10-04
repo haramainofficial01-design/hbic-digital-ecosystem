@@ -5,6 +5,9 @@ import {
   defaultContent,
   notificationCategories,
   normalizeContent,
+  isIqamahOverrideActive,
+  iqamahOverrideExpiresAt,
+  iqamahOverrideWeekEndsAt,
   prayerLabels,
   validateContent,
   type Announcement,
@@ -90,20 +93,15 @@ type PrayerSyncStatus = {
 };
 
 function isOverrideCurrentlyActive(override?: IqamahOverride | null, now = new Date()) {
-  if (!override?.enabled || !override.value?.trim()) return false;
-  const startsAt = override.startsAt ? Date.parse(override.startsAt) : null;
-  const endsAt = override.endsAt ? Date.parse(override.endsAt) : null;
-  if (startsAt && now.getTime() < startsAt) return false;
-  if (endsAt && now.getTime() > endsAt) return false;
-  return true;
+  return isIqamahOverrideActive(override, now);
 }
 
 function overrideStatusLabel(override?: IqamahOverride | null, now = new Date()) {
   if (!override?.enabled) return "Automatic (no override)";
   if (!override.value?.trim()) return "Incomplete — add a time";
   const startsAt = override.startsAt ? Date.parse(override.startsAt) : null;
-  const endsAt = override.endsAt ? Date.parse(override.endsAt) : null;
-  if (endsAt && now.getTime() > endsAt) return "Expired";
+  const expires = iqamahOverrideExpiresAt(override);
+  if (!expires || now.getTime() >= Date.parse(expires)) return "Expired — automatic timetable";
   if (startsAt && now.getTime() < startsAt) return "Future — scheduled";
   return "Active";
 }
@@ -552,6 +550,7 @@ function PrayerPanel({
           value: "",
           ...(current.iqamahTime.overrides?.[prayer] ?? {}),
           ...patch,
+          endsAt: iqamahOverrideWeekEndsAt(new Date(updatedAt)),
           updatedAt
         }
       };
@@ -679,7 +678,7 @@ function PrayerPanel({
 
       <div className="card full">
         <h2>Manual iqamah overrides</h2>
-        <p className="muted">Enable an override only when HBIC changes a specific iqamah time. Clearing it returns that prayer to the current live timetable value.</p>
+        <p className="muted">Publish an override to change that prayer everywhere. It expires Sunday at midnight, Calgary time, and the new week's backend timetable takes over automatically.</p>
         {iqamahOverridePrayers.map((prayer) => {
           const override = iqamahTime.overrides?.[prayer] ?? { enabled: false, value: "" };
           const effectiveField = `${prayer}Iqamah` as "fajrIqamah" | "dhuhrIqamah" | "asrIqamah" | "maghribIqamah" | "ishaIqamah";
@@ -695,7 +694,7 @@ function PrayerPanel({
                 <ToggleField label="Override enabled" checked={Boolean(override.enabled)} onChange={(enabled) => updateOverride(prayer, { enabled })} />
                 <Field label="Override time" value={override.value ?? ""} onChange={(value) => updateOverride(prayer, { value })} />
                 <Field label="Starts at (optional ISO/local text)" value={override.startsAt ?? ""} onChange={(startsAt) => updateOverride(prayer, { startsAt })} />
-                <Field label="Expires at (optional ISO/local text)" value={override.endsAt ?? ""} onChange={(endsAt) => updateOverride(prayer, { endsAt })} />
+                <Field label="Automatically expires (Calgary Sunday midnight)" value={iqamahOverrideExpiresAt(override) ?? "Set an override time"} onChange={() => undefined} disabled />
                 <Field label="Internal note" value={override.note ?? ""} onChange={(note) => updateOverride(prayer, { note })} />
               </div>
               <div className="actions">

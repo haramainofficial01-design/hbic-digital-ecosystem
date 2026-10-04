@@ -24,7 +24,7 @@ test("public caches preserve display/mobile contracts and invalidate after publi
   globalThis.fetch = async () => { upstream++; return Response.json({ salah_fajr: "6:00 AM", salah_sunrise: "7:30 AM", salah_zuhr: "1:30 PM", salah_asr: "4:30 PM", salah_maghrib: "7:00 PM", salah_isha: "8:30 PM", iqamah_fajr: "6:30 AM", iqamah_zuhr: "2:00 PM", iqamah_asr: "5:15 PM", iqamah_maghrib: "+10 MINS", iqamah_isha: "+5 MINS", jummah: "1:45/2:30PM" }); };
   try {
     invalidatePublicReads();
-    const responses = await Promise.all(Array.from({ length: 40 }, () => display()));
+    const responses = await Promise.all(Array.from({ length: 40 }, () => display(new Request("https://hbic.ca/api/display"))));
     assert.equal(upstream, 1);
     const first = await responses[0].json();
     assert.deepEqual(Object.keys(first).sort(), ["contentVersion", "display", "ok", "snapshot"]);
@@ -39,7 +39,7 @@ test("public caches preserve display/mobile contracts and invalidate after publi
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("cache-control"), "public, max-age=0, s-maxage=15, must-revalidate");
     }
-    invalidatePublicReads(); await display();
+    invalidatePublicReads(); await display(new Request("https://hbic.ca/api/display"));
     assert.equal(upstream, 2);
   } finally { globalThis.fetch = originalFetch; invalidatePublicReads(); }
 });

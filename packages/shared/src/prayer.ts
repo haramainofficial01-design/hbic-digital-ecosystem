@@ -1,5 +1,5 @@
 import { prayerOrder } from "./constants";
-import type { HijriSettings, IqamahTime, PrayerName, PrayerTime } from "./types";
+import type { HijriSettings, IqamahOverride, IqamahTime, PrayerName, PrayerTime } from "./types";
 
 export const masjidTimeZone = "America/Edmonton";
 export const congregationalPrayerOrder = prayerOrder.filter((prayer): prayer is Exclude<PrayerName, "sunrise"> => prayer !== "sunrise");
@@ -35,10 +35,7 @@ export function getIqamahForPrayerDate(
     return getIqamahForPrayer(prayer, iqamah);
   }
   const override = iqamah.overrides?.[prayer];
-  const time = targetInstant.getTime();
-  if (override?.enabled && override.value?.trim() &&
-      (!override.startsAt || Date.parse(override.startsAt) <= time) &&
-      (!override.endsAt || Date.parse(override.endsAt) > time)) return override.value.trim();
+  if (isIqamahOverrideActive(override, targetInstant, iqamah.updatedAt)) return override!.value.trim();
   return iqamah.upcomingWeekIqamah?.[prayer] || getIqamahForPrayer(prayer, iqamah);
 }
 
@@ -126,6 +123,32 @@ export function timeToDate(date: string, time: string, timeZone = masjidTimeZone
   const correctedOffset = timeZoneOffset(result, timeZone);
   if (correctedOffset !== firstOffset) result = new Date(wallClock - correctedOffset);
   return result;
+}
+
+/** A manual iqamah belongs to one Sunday–Saturday Calgary week, never forever. */
+export function iqamahOverrideWeekEndsAt(anchor: Date, timeZone = masjidTimeZone): string {
+  const date = dateStringInTimeZone(anchor, timeZone);
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return timeToDate(addDays(date, 7 - weekday), "12:00 AM", timeZone)!.toISOString();
+}
+
+export function iqamahOverrideExpiresAt(override?: IqamahOverride | null, fallbackUpdatedAt?: string): string | undefined {
+  if (!override) return undefined;
+  const anchor = override.updatedAt || fallbackUpdatedAt || override.startsAt;
+  const weekEnd = anchor && Number.isFinite(Date.parse(anchor))
+    ? Date.parse(iqamahOverrideWeekEndsAt(new Date(anchor))) : undefined;
+  const requestedEnd = override.endsAt ? Date.parse(override.endsAt) : undefined;
+  if (requestedEnd !== undefined && !Number.isFinite(requestedEnd)) return undefined;
+  const ends = [weekEnd, requestedEnd].filter((value): value is number => value !== undefined);
+  return ends.length ? new Date(Math.min(...ends)).toISOString() : undefined;
+}
+
+export function isIqamahOverrideActive(override?: IqamahOverride | null, now = new Date(), fallbackUpdatedAt?: string): boolean {
+  if (!override?.enabled || !override.value?.trim()) return false;
+  const expires = iqamahOverrideExpiresAt(override, fallbackUpdatedAt);
+  if (!expires || now.getTime() >= Date.parse(expires)) return false;
+  const starts = override.startsAt ? Date.parse(override.startsAt) : undefined;
+  return starts === undefined || (Number.isFinite(starts) && now.getTime() >= starts);
 }
 
 export interface PrayerCelestialPosition {

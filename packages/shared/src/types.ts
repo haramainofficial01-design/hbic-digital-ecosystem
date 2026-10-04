@@ -78,6 +78,8 @@ export interface IqamahTime {
   sourceUrl?: string;
   manualOverride: boolean;
   overrides?: Partial<Record<IqamahPrayerName, IqamahOverride>>;
+  /** Last verified automatic values, retained independently of manual overrides. */
+  automaticIqamah?: Partial<Record<IqamahPrayerName, string>>;
   /** Feed-provided next-week values, used for Saturday-to-Sunday rollover only. */
   upcomingWeekIqamah?: Partial<Record<IqamahPrayerName, string>>;
   adjustmentNotes: string;

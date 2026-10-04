@@ -10,8 +10,8 @@ export function OPTIONS() {
   return optionsResponse();
 }
 
-const displayReads = createReadCache(async () => {
-  const { content } = await getPublishedContent();
+async function readDisplay(fresh = false) {
+  const { content } = await getPublishedContent({ fresh });
   const publicContent = toPublicContent(content);
   return {
     ok: true,
@@ -26,9 +26,13 @@ const displayReads = createReadCache(async () => {
       }
     }
   };
-}, publicReadTtlMs);
+}
+const displayReads = createReadCache(() => readDisplay(), publicReadTtlMs);
 registerPublicReadInvalidator(displayReads.clear);
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.has("verify")) {
+    return jsonResponse(await readDisplay(true), { headers: { "Cache-Control": "no-store" } });
+  }
   return jsonResponse(await displayReads.get(dateStringInTimeZone(new Date(), masjidTimeZone)), { headers: publicReadHeaders });
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent } from "@hbic/shared";
+import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent, iqamahOverrideWeekEndsAt } from "@hbic/shared";
+import { boundPrayerOverrides } from "../lib/prayerOverrides";
 import {
   changedIqamahTimes,
   applyPrayerSync,
@@ -52,6 +53,57 @@ const baseFeed: PrayerFeed = {
   nw_i_isha: "+5 MINS",
   jummah: "1:45/2:30PM"
 };
+
+test("weekly overrides end exactly at Calgary Sunday midnight, not UTC midnight", () => {
+  const content = contentWithAsrOverride();
+  const end = iqamahOverrideWeekEndsAt(now);
+  assert.equal(end, "2026-09-13T06:00:00.000Z");
+  assert.equal(isOverrideActive(content.iqamahTime.overrides?.asr, new Date("2026-09-13T05:59:59Z")), true);
+  assert.equal(isOverrideActive(content.iqamahTime.overrides?.asr, new Date(end)), false);
+  const sunday = resolveEffectivePrayerSchedule(content, { ...baseFeed, iqamah_asr: "5:45 PM" }, "live", "2026-09-13", end, new Date(end));
+  assert.equal(sunday.content.iqamahTime.asrIqamah, "5:45 PM");
+  assert.equal(sunday.content.iqamahTime.manualOverride, false);
+  assert.equal(createWidgetPrayerSnapshot(sunday.content, new Date(end)).prayers.find(p => p.key === "asr")?.iqamah, "5:45 PM");
+});
+
+test("server bounds expiry and only actual override edits renew its week", () => {
+  const original = contentWithAsrOverride();
+  original.iqamahTime.overrides!.asr!.endsAt = "2099-01-01T00:00:00Z";
+  const bounded = boundPrayerOverrides(original, undefined, now);
+  assert.equal(bounded.iqamahTime.overrides!.asr!.endsAt, "2026-09-13T06:00:00.000Z");
+  const later = new Date("2026-09-15T18:00:00Z");
+  const unchanged = boundPrayerOverrides(bounded, original, later);
+  assert.equal(unchanged.iqamahTime.overrides!.asr!.updatedAt, sourceUpdatedAt);
+  assert.equal(isOverrideActive(unchanged.iqamahTime.overrides?.asr, later), false);
+  const edited = structuredClone(unchanged);
+  edited.iqamahTime.overrides!.asr!.value = "5:55 PM";
+  const renewed = boundPrayerOverrides(edited, unchanged, later);
+  assert.equal(renewed.iqamahTime.overrides!.asr!.updatedAt, later.toISOString());
+  assert.equal(renewed.iqamahTime.overrides!.asr!.endsAt, "2026-09-20T06:00:00.000Z");
+  assert.equal(isOverrideActive(renewed.iqamahTime.overrides?.asr, later), true);
+});
+
+test("expired override cannot survive an outage or malformed legacy timestamp", () => {
+  const confirmed = resolveEffectivePrayerSchedule(contentWithAsrOverride(), baseFeed, "live", "2026-09-08", sourceUpdatedAt, now).content;
+  const retained = retainPrayerScheduleDuringOutage(confirmed, new Date("2026-09-13T06:00:00Z"));
+  assert.equal(retained.iqamahTime.asrIqamah, "6:00 PM");
+  assert.equal(retained.iqamahTime.manualOverride, false);
+  const invalid = contentWithAsrOverride();
+  invalid.iqamahTime.overrides!.asr!.updatedAt = "invalid";
+  assert.equal(isOverrideActive(boundPrayerOverrides(invalid).iqamahTime.overrides?.asr, now), false);
+});
+
+test("draft preview never overwrites the public comparison snapshot or sends prayer alerts", async () => {
+  const previous = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-09-08", sourceUpdatedAt, now).content;
+  const writes: unknown[] = [];
+  const db = { collection: () => ({ doc: () => ({
+    get: async () => ({ exists: true, data: () => ({ feed: baseFeed, serviceDate: "2026-09-08", lastAttemptedSync: sourceUpdatedAt, normalizedContent: previous }) }),
+    set: async (value: unknown) => { writes.push(value); }
+  }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
+  const preview = await applyPrayerSync(contentWithAsrOverride(), db, { now, preview: true });
+  assert.equal(preview.content.iqamahTime.asrIqamah, "6:15 PM");
+  assert.equal(writes.length, 0);
+});
 
 test("visible change alerts include only changed iqamah prayers", () => {
   const before = structuredClone(defaultContent.iqamahTime);

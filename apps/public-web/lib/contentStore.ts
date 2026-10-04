@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { getFirestore, type DocumentData } from "firebase-admin/firestore";
 import { defaultContent, normalizeContent, validateContent, dateStringInTimeZone, masjidTimeZone, type HbicContent } from "@hbic/shared";
 import { applyPrayerSync } from "./prayerSync";
+import { boundPrayerOverrides } from "./prayerOverrides";
 import { assertPublicationPreconditions, type PublicationPreconditions } from "./publicationGuards";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { createReadCache } from "./readCache";
@@ -141,7 +142,7 @@ export async function getDraftContent(): Promise<{ content: HbicContent; status:
   if (draftSnapshot.exists) {
     const storedDraftUpdatedAt = draftSnapshot.data()?.updatedAt ?? draftSnapshot.data()?.content?.updatedAt;
     return {
-      content: (await applyPrayerSync(normalizeContent({ ...extractContent(draftSnapshot.data()), status: "draft" }), db)).content,
+      content: (await applyPrayerSync(normalizeContent({ ...extractContent(draftSnapshot.data()), status: "draft" }), db, { preview: true })).content,
       status,
       draftUpdatedAt: storedDraftUpdatedAt ? String(storedDraftUpdatedAt) : null
     };
@@ -166,16 +167,19 @@ export async function saveDraftContent(content: HbicContent, expected: Publicati
   if (errors.length) throw new Error(errors.join(" "));
 
   const draftRef = db.collection(CMS_COLLECTION).doc(DRAFT_DOC);
-  await db.runTransaction(async (transaction) => {
+  const savedDraft = await db.runTransaction(async (transaction) => {
     const current = await transaction.get(draftRef);
     const currentDraftUpdatedAt = current.data()?.updatedAt ?? current.data()?.content?.updatedAt;
     assertPublicationPreconditions({
       draftUpdatedAt: current.exists && currentDraftUpdatedAt ? String(currentDraftUpdatedAt) : null
     }, { expectedDraftUpdatedAt: expected.expectedDraftUpdatedAt });
-    transaction.set(draftRef, { content: stripUndefined(draft), status: "draft", updatedAt: now });
+    const previous = current.exists ? extractContent(current.data()) : normalizeContent({ iqamahTime: { ...draft.iqamahTime, overrides: {} } });
+    const bounded = boundPrayerOverrides(draft, previous, new Date(now));
+    transaction.set(draftRef, { content: stripUndefined(bounded), status: "draft", updatedAt: now });
+    return bounded;
   });
 
-  return { content: draft, status, draftUpdatedAt: now };
+  return { content: savedDraft, status, draftUpdatedAt: now };
 }
 
 export async function publishDraftContent(expected: PublicationPreconditions = {}) {
@@ -197,13 +201,13 @@ export async function publishDraftContent(expected: PublicationPreconditions = {
       publishedVersion: currentVersion
     }, expected);
     const now = new Date().toISOString();
-    const content = normalizeContent({
+    const content = boundPrayerOverrides(normalizeContent({
       ...extractContent(draftSnapshot.data()),
       status: "published",
       version: currentVersion + 1,
       updatedAt: now,
       publishedAt: now
-    });
+    }));
     const errors = validateContent(content);
     if (errors.length) throw new Error(errors.join(" "));
 
@@ -234,5 +238,7 @@ export async function publishDraftContent(expected: PublicationPreconditions = {
     return { content, status, publication };
   });
   invalidatePublicReads();
-  return result;
+  // Broadcast the resolved published values, never stale draft/base timings.
+  const resolved = await applyPrayerSync(result.content, db);
+  return { ...result, content: resolved.content };
 }

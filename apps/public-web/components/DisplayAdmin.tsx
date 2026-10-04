@@ -3,6 +3,8 @@
 import {
   defaultContent,
   normalizeContent,
+  isIqamahOverrideActive,
+  iqamahOverrideWeekEndsAt,
   prayerLabels,
   validateContent,
   type HbicContent,
@@ -56,7 +58,7 @@ export function DisplayAdmin() {
   const [publishedVersion, setPublishedVersion] = useState(defaultContent.version);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Sign in with your personal administrator account and MFA to continue.");
+  const [message, setMessage] = useState("Sign in with the same approved administrator email and password used on the main dashboard.");
   const [tone, setTone] = useState<"info" | "success" | "error">("info");
   const [syncStatus, setSyncStatus] = useState<PrayerSyncStatus | null>(null);
   const handleAdminSession = useCallback((token: string | null) => {
@@ -78,7 +80,7 @@ export function DisplayAdmin() {
   }
 
   async function adminRequest(path: string, init?: RequestInit) {
-    if (!adminToken) throw new Error("Complete personal administrator sign-in and MFA first.");
+    if (!adminToken) throw new Error("Sign in with your approved administrator email and password first.");
     const response = await fetch(path, {
       ...init,
       cache: "no-store",
@@ -186,6 +188,7 @@ export function DisplayAdmin() {
             ...(current.iqamahTime.overrides?.[prayer] ?? {}),
             enabled: true,
             value: formatted,
+            endsAt: iqamahOverrideWeekEndsAt(new Date(updatedAt)),
             updatedAt
           }
         },
@@ -238,14 +241,14 @@ export function DisplayAdmin() {
         <section className={styles.card}>
           <div className={styles.sectionTitle}>
             <div><span>Canonical schedule</span><h2>Prayer &amp; iqamah</h2></div>
-            <small>Iqamah.ca supplies automatic values. An override replaces only that prayer everywhere until cleared.</small>
+            <small>Published edits update the shared schedule everywhere. Overrides expire Sunday at midnight, Calgary time, then return to the backend timetable.</small>
           </div>
           <div className={styles.prayerRows}>
             {content.prayerTime && (["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"] as const).map((prayer) => {
               const editable = prayer !== "sunrise";
               const iqamahField = `${prayer}Iqamah` as keyof HbicContent["iqamahTime"];
               const automatic = editable ? syncStatus?.schedule?.automatic.iqamah[prayer as IqamahPrayerName] : undefined;
-              const hasOverride = editable && Boolean(content.iqamahTime.overrides?.[prayer as IqamahPrayerName]?.enabled);
+              const hasOverride = editable && isIqamahOverrideActive(content.iqamahTime.overrides?.[prayer as IqamahPrayerName], new Date(), content.iqamahTime.updatedAt);
               const effective = editable
                 ? hasOverride
                   ? content.iqamahTime.overrides?.[prayer as IqamahPrayerName]?.value

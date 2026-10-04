@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createWidgetPrayerSnapshot } from "@hbic/shared";
-import { getDraftContent, getDatabase, getPublishedContentVersion } from "../../../../lib/contentStore";
+import { getDraftContent, getDatabase, getPublishedContent } from "../../../../lib/contentStore";
 import { applyPrayerSync, forcePrayerSync } from "../../../../lib/prayerSync";
 import { sendContentUpdateSignal } from "../../../../lib/notificationStore";
 import { recordPublicationUpdate } from "../../../../lib/publicationStore";
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const { content, status } = await getDraftContent();
   // The panel must describe the same resolved feed used by the public display,
   // even when the diagnostic cache document has not been populated yet.
-  const prayerSync = (await applyPrayerSync(content, db)).status;
+  const prayerSync = (await applyPrayerSync(content, db, { preview: true })).status;
   return jsonResponse({ ok: true, backend: status, prayerSync });
 }
 
@@ -30,11 +30,11 @@ export async function POST(request: Request) {
 
   try {
     const db = getDatabase();
-    const { content, status } = await getDraftContent();
+    const { content, status } = await getPublishedContent({ fresh: true });
     const synced = await forcePrayerSync(content, db);
     revalidatePath("/");
     revalidatePath("/prayer-times");
-    const contentVersion = (await getPublishedContentVersion()).version;
+    const contentVersion = content.version;
     const publication = await recordPublicationUpdate({ kind: "prayer-sync", contentVersion });
     const snapshot = createWidgetPrayerSnapshot(synced.content, new Date());
     let propagation;
