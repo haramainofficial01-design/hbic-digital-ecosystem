@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDatabase } from "./contentStore";
+import { invalidatePublicReads } from "./publicReadPolicy";
 
 const publicationStateRef = () => getDatabase()?.collection("publicationState").doc("current") ?? null;
 
@@ -24,7 +25,7 @@ export async function recordPublicationUpdate(input: { kind: PublicationKind; co
   const ref = publicationStateRef();
   if (!db || !ref) throw new Error("Publication state storage is not configured.");
   const updatedAt = new Date().toISOString();
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const current = await transaction.get(ref);
     const revision = Number(current.data()?.revision ?? 0) + 1;
     transaction.set(ref, {
@@ -35,4 +36,6 @@ export async function recordPublicationUpdate(input: { kind: PublicationKind; co
     });
     return { revision, updatedAt, kind: input.kind, contentVersion: input.contentVersion };
   });
+  invalidatePublicReads();
+  return result;
 }

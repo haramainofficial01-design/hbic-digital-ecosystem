@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { SiteChrome } from "../../components/SiteChrome";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 
 export const revalidate = 300;
 

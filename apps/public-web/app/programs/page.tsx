@@ -1,5 +1,5 @@
 import { SiteChrome } from "../../components/SiteChrome";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 import { isVisibleItem, type ServiceItem } from "@hbic/shared";
 import Image from "next/image";
 import type { CSSProperties } from "react";

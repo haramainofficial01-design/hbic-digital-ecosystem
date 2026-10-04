@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { SiteChrome } from "../../components/SiteChrome";
 import { StoreDownloadButtons } from "../../components/AppStoreLinks";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 
 export const metadata: Metadata = {
   title: "Masjid Bilal App | Hazrat Bilal Islamic Centre",

@@ -162,7 +162,11 @@ export function AcademyParent() {
   useEffect(() => {
     if (!user || !verified) return;
     let cancelled = false;
+    let inFlight = false;
+    let lastRefresh = 0;
     const refresh = async () => {
+      if (cancelled || inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
       try {
         const idToken = await user.getIdToken(true);
         const response = await fetch("/api/academy/family", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
@@ -184,26 +188,30 @@ export function AcademyParent() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load Academy details.");
         if (!cancelled) { setFamily(data.family); setStatus(""); }
-        const receiptResponse = await fetch("/api/academy/receipts", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+        const receiptResponse = await fetch("/api/academy/receipts", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
         if (receiptResponse.ok) {
           const receiptData = await receiptResponse.json();
           if (!cancelled) setReceipts(receiptData.receipts ?? []);
         }
-        const paymentsResponse = await fetch("/api/academy/payments", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+        const paymentsResponse = await fetch("/api/academy/payments", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
         if (paymentsResponse.ok) {
           const paymentData = await paymentsResponse.json();
           if (!cancelled) setPayments(paymentData.payments ?? []);
         }
-        const contentResponse = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${await user.getIdToken(true)}` }, cache: "no-store" });
+        const contentResponse = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
         if (contentResponse.ok) {
           const contentData = await contentResponse.json();
           if (!cancelled) setContent(contentData.content);
         }
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : "Could not load Academy details."); }
+      finally { inFlight = false; lastRefresh = Date.now(); }
     };
     void refresh();
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60_000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    const onFocus = () => { if (Date.now() - lastRefresh >= 5_000) void refresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
   }, [user, verified]);
 
   useEffect(() => {

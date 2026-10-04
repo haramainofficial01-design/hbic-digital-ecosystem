@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CloudMoon, CloudSun, Minimize2, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { deriveDisplayFocus, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
+import { fetchPublicDisplay } from "../lib/displayClient";
 
 const names = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const prayerIcons: Record<string, LucideIcon> = { fajr: CloudMoon, dhuhr: Sun, asr: CloudSun, maghrib: Sunset, isha: MoonStar };
@@ -28,17 +29,17 @@ export function PrayerRail() {
     const refresh = async () => {
       if (document.visibilityState !== "visible") return;
       try {
-        const response = await fetch(`/api/display?rail=${Date.now()}`, { cache: "no-store" });
-        const data = await response.json() as TvDisplayPayload;
-        if (!disposed && response.ok && data.ok) setPayload(data);
+        const data = await fetchPublicDisplay();
+        if (!disposed) setPayload(data);
       } catch { /* Keep the prior snapshot until the next retry. */ }
     };
     void refresh();
-    const timer = window.setInterval(() => { setNow(new Date()); void refresh(); }, 60_000);
+    const clock = window.setInterval(() => setNow(new Date()), 1_000);
+    const timer = window.setInterval(() => void refresh(), 60_000);
     const onFocus = () => { setNow(new Date()); void refresh(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
-    return () => { disposed = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+    return () => { disposed = true; window.clearInterval(clock); window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
   }, [hidden]);
 
   if (hidden || !payload || !snapshotMatchesCalgaryDate(payload.snapshot, now) || payload.snapshot.availability !== "available") return null;

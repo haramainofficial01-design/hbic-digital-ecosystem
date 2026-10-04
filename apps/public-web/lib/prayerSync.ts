@@ -498,9 +498,15 @@ export async function applyPrayerSync(
       cached?.rollover
     );
     synced = resolution.content;
-    if (resolution.rollover) {
+    if (resolution.rollover && JSON.stringify(resolution.rollover) !== JSON.stringify(cached?.rollover)) {
       try { await writeCache(db, { rollover: resolution.rollover }); } catch { /* Public response still uses the confirmed feed. */ }
     }
+  } else if (!options.force && !cached?.feed && cached?.lastError && cached.lastAttemptedSync &&
+    nowDate.getTime() - Date.parse(cached.lastAttemptedSync) >= 0 &&
+    nowDate.getTime() - Date.parse(cached.lastAttemptedSync) < PRAYER_REFRESH_INTERVAL_MS) {
+    // An empty source cache used to retry the upstream on every request during
+    // an outage. Retain the unavailable/stale state and the original attempt
+    // timestamp, so this is a bounded retry delay, not a sliding indefinite one.
   } else {
     try {
       const feed = await fetchOfficialFeed();

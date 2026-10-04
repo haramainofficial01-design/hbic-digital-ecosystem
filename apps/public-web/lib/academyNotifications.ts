@@ -52,9 +52,16 @@ export async function runAcademyCashReminders(now = new Date(), dependencies = {
   pricing: async () => (await import("./academyStore")).getAcademyPricing(),
   enqueueEmail: enqueueAcademyEmail, sendPush: sendPushNotification, dispatchEmails: dispatchAcademyEmails
 }) {
-  const db = dependencies.db();
   const dueMonth = calgaryBillingPeriod(new Date(nextCalgaryFirstBillingAnchor(now) * 1000));
   const currentMonth = calgaryBillingPeriod(now);
+  const calendarStage = academyCashReminderStage(now, true, "cash_due");
+  const reminderPeriod = calendarStage === "upcoming" ? dueMonth : currentMonth;
+  // Most days cannot send a reminder. Avoid walking all families/ledgers on
+  // those days; the independent email dispatcher still gets its normal turn.
+  if (!calendarStage || reminderPeriod > ACADEMY_LAST_BILLING_MONTH) {
+    return { checked: 0, acceptedPushTokens: 0, skipped: 0, email: await dependencies.dispatchEmails() };
+  }
+  const db = dependencies.db();
   let checked = 0, sent = 0, skipped = 0;
   let cursor: QueryDocumentSnapshot | undefined;
   for (;;) {

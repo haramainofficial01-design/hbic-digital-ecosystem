@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isJumuahDisplayWindow, type TvDisplayPayload } from "../lib/tvDisplay";
+import { isJumuahDisplayWindow } from "../lib/tvDisplay";
+import { fetchPublicDisplay } from "../lib/displayClient";
 
 const blessings = [
   "May your visit bring benefit.",
@@ -68,7 +69,7 @@ export function SiteExperience() {
       if (disposed || inFlight || document.visibilityState === "hidden") return;
       inFlight = true;
       try {
-        const response = await fetch(`/api/content/version?live=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch("/api/content/version");
         const data = await response.json().catch(() => null) as { publicationRevision?: number } | null;
         const rendered = Number(document.querySelector("[data-hbic-publication-revision]")?.getAttribute("data-hbic-publication-revision") ?? 0);
         const published = Number(data?.publicationRevision ?? 0);
@@ -84,7 +85,7 @@ export function SiteExperience() {
       }
     };
     const onFocus = () => void checkPublishedVersion();
-    const timer = window.setInterval(checkPublishedVersion, 15_000);
+    const timer = window.setInterval(checkPublishedVersion, 60_000);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     void checkPublishedVersion();
@@ -100,10 +101,10 @@ export function SiteExperience() {
     if (pathname.startsWith("/display")) return;
     let disposed = false;
     const refresh = async () => {
+      if (document.visibilityState === "hidden") return;
       try {
-        const response = await fetch(`/api/display?occasion=${Date.now()}`, { cache: "no-store" });
-        const payload = await response.json() as TvDisplayPayload;
-        if (!disposed && response.ok && payload.ok) setJumuahActive(isJumuahDisplayWindow(payload.snapshot, new Date()));
+        const payload = await fetchPublicDisplay();
+        if (!disposed) setJumuahActive(isJumuahDisplayWindow(payload.snapshot, new Date()));
       } catch {
         // Occasion styling is decorative and never interrupts public content.
       }

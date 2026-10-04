@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
-    const { content, status } = await getPublishedContent();
+    const { content, status } = await getPublishedContent({ fresh: true });
     return jsonResponse({ ok: true, content, backend: status });
   } catch (error) {
     return jsonResponse(

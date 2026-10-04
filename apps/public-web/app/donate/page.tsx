@@ -1,6 +1,6 @@
 import { CopyButton } from "../../components/CopyButton";
 import { SiteChrome } from "../../components/SiteChrome";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 import { ArrowUpRight, HeartHandshake } from "lucide-react";
 
 const etransferEmail = "bilalislamiccentrecalgary@gmail.com";

@@ -3,6 +3,7 @@ import test from "node:test";
 import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent } from "@hbic/shared";
 import {
   changedIqamahTimes,
+  applyPrayerSync,
   isOverrideActive,
   resolveEffectivePrayerSchedule,
   retainPrayerScheduleDuringOutage,
@@ -12,6 +13,26 @@ import { deriveDisplayFocus } from "../lib/tvDisplay";
 
 const now = new Date("2026-09-08T18:00:00.000Z");
 const sourceUpdatedAt = "2026-09-08T17:59:00.000Z";
+
+test("an unavailable upstream with no feed has bounded retry backoff, while force sync still retries", async () => {
+  const original = globalThis.fetch;
+  let attempts = 0, writes = 0;
+  globalThis.fetch = async () => { attempts++; throw new Error("isolated upstream outage"); };
+  const db = { collection: () => ({ doc: () => ({
+    get: async () => ({ exists: true, data: () => ({ lastAttemptedSync: sourceUpdatedAt, lastError: "isolated upstream outage" }) }),
+    set: async () => { writes++; }
+  }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
+  try {
+    const result = await applyPrayerSync(defaultContent, db, { now });
+    assert.equal(result.status.sourceState, "unavailable");
+    assert.equal(result.status.lastAttemptedSync, sourceUpdatedAt);
+    assert.equal(attempts, 0); assert.equal(writes, 0);
+    await applyPrayerSync(defaultContent, db, { now, force: true });
+    assert.equal(attempts, 1); assert.equal(writes, 1);
+    await applyPrayerSync(defaultContent, db, { now: new Date("2026-09-08T18:04:00Z") });
+    assert.equal(attempts, 2);
+  } finally { globalThis.fetch = original; }
+});
 const baseFeed: PrayerFeed = {
   salah_fajr: "5:31 AM",
   salah_sunrise: "7:01 AM",

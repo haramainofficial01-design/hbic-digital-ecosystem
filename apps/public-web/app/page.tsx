@@ -1,4 +1,4 @@
-import { getPublishedContent } from "../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../lib/contentStore";
 import { PrayerTable } from "../components/PrayerTable";
 import { SiteChrome } from "../components/SiteChrome";
 import { WelcomeFilm } from "../components/WelcomeFilm";

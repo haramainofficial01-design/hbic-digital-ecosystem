@@ -107,12 +107,12 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
   };
 }
 
-async function currentMonth(db: Firestore, uid: string, family: Record<string, unknown>) {
+async function currentMonth(db: Firestore, uid: string, family: Record<string, unknown>, sharedPricing?: Awaited<ReturnType<typeof getAcademyPricing>>) {
   const currentPeriod = academyTuitionPeriod(new Date());
   const period = typeof family.enrollmentStartPeriod === "string" && family.enrollmentStartPeriod > currentPeriod ? family.enrollmentStartPeriod : currentPeriod;
   const ref = db.collection(families).doc(uid).collection("months").doc(period);
   const existing = await ref.get();
-  const pricing = await getAcademyPricing();
+  const pricing = sharedPricing ?? await getAcademyPricing();
   const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
   const childCount = Array.isArray(family.children) ? family.children.filter((child: { cancelEffectiveAt?: string | null }) =>
     !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length : 0;
@@ -343,7 +343,11 @@ export async function confirmAcademyEnrollment(uid: string, actor: { uid: string
 export async function listAcademyFamilies() {
   const db = academyDb();
   const docs = await db.collection(families).orderBy("createdAt", "desc").limit(100).get();
-  return Promise.all(docs.docs.map(async (doc) => publicFamily(doc.id, doc.data(), await currentMonth(db, doc.id, doc.data()))));
+  // One configuration read, not the same pricing document once per family.
+  // Month ledgers remain uncached and authoritative on every refresh.
+  if (!docs.size) return [];
+  const pricing = await getAcademyPricing();
+  return Promise.all(docs.docs.map(async (doc) => publicFamily(doc.id, doc.data(), await currentMonth(db, doc.id, doc.data(), pricing))));
 }
 
 export async function getAcademyReceipts(uid: string) {

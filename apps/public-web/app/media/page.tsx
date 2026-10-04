@@ -3,7 +3,7 @@ import { join } from "path";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { SiteChrome } from "../../components/SiteChrome";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 
 const youthHighlights = [
   {

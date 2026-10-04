@@ -1,6 +1,6 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { HalalDirectoryForms } from "../../components/HalalDirectoryForms";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 import { getPublicHalalRestaurants } from "../../lib/halalStore";
 import { notFound } from "next/navigation";
 

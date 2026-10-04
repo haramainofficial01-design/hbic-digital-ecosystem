@@ -1,6 +1,6 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { AskMasjidForm } from "../../components/AskMasjidForm";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 import {
   getCurrentDailyBenefit,
   getEffectiveJumuahDoorNotice,

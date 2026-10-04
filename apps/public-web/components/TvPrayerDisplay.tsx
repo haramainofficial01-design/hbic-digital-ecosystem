@@ -18,6 +18,7 @@ import {
   type TvWeatherReading
 } from "../lib/tvDisplay";
 import styles from "./TvPrayerDisplay.module.css";
+import { publicDisplayUrl } from "../lib/displayClient";
 
 const cacheKey = "hbic-tv-display-v1";
 const weatherCacheKey = "hbic-tv-weather-v1";
@@ -184,10 +185,14 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
   const [previewWeather, setPreviewWeather] = useState<TvWeatherMode | null>(null);
   const [debugMetrics, setDebugMetrics] = useState<Record<string, string | number> | null>(null);
   const requestedServiceDate = useRef("");
+  const displayInFlight = useRef(false);
+  const weatherInFlight = useRef(false);
 
   const refreshDisplay = useCallback(async () => {
+    if (document.visibilityState === "hidden" || displayInFlight.current) return;
+    displayInFlight.current = true;
     try {
-      const response = await fetch(`/api/display?refresh=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch(publicDisplayUrl());
       const data = await response.json() as TvDisplayPayload & { error?: string };
       if (!response.ok || data.ok !== true) throw new Error(data.error || "Display data unavailable");
       setPayload(data);
@@ -195,19 +200,21 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       setOffline(false);
     } catch {
       setOffline(true);
-    }
+    } finally { displayInFlight.current = false; }
   }, []);
 
   const refreshWeather = useCallback(async () => {
+    if (document.visibilityState === "hidden" || weatherInFlight.current) return;
+    weatherInFlight.current = true;
     try {
-      const response = await fetch(`/api/display/weather?refresh=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch("/api/display/weather");
       const data = await response.json() as TvWeatherReading & { ok?: boolean };
       if (!response.ok || data.ok === false || typeof data.temperature !== "number") return;
       setWeather(data);
       window.localStorage.setItem(weatherCacheKey, JSON.stringify(data));
     } catch {
       // Weather is optional and must never displace or interrupt prayer times.
-    }
+    } finally { weatherInFlight.current = false; }
   }, []);
 
   useEffect(() => {
@@ -272,12 +279,16 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       void refreshWeather();
     };
     window.addEventListener("online", reconnect);
+    window.addEventListener("focus", reconnect);
+    document.addEventListener("visibilitychange", reconnect);
     void refreshWeather();
     return () => {
       window.clearInterval(clock);
       window.clearInterval(contentRefresh);
       window.clearInterval(weatherRefresh);
       window.removeEventListener("online", reconnect);
+      window.removeEventListener("focus", reconnect);
+      document.removeEventListener("visibilitychange", reconnect);
     };
   }, [refreshDisplay, refreshWeather]);
 

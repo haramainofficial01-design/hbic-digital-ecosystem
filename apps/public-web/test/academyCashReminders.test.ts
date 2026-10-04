@@ -60,6 +60,17 @@ test("targets only the eligible cash parent and deduplicates the same month/stag
   assert.deepEqual(f.records.get("academyFamilies/cash-parent/months/2026-11"), before);
 });
 
+test("ordinary days and the billing pause do not scan families or create reminders", async () => {
+  for (const date of ["2026-11-15T19:00:00Z", "2027-02-01T19:00:00Z"]) {
+    const f = fixture();
+    f.dependencies.db = () => { throw new Error("No family scan should run on this date"); };
+    const result = await runAcademyCashReminders(new Date(date), f.dependencies);
+    assert.equal(result.checked, 0);
+    assert.equal(result.acceptedPushTokens, 0);
+    assert.equal(f.emails.size, 0);
+  }
+});
+
 test("a parent enabling a device later that day can receive the reminder once", async () => {
   const f = fixture(); const now = new Date("2026-11-01T19:00:00Z");
   assert.equal((await runAcademyCashReminders(now, f.dependencies)).acceptedPushTokens, 0);

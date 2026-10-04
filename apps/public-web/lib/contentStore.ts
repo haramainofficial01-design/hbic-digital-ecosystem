@@ -1,10 +1,13 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 
 import { getFirestore, type DocumentData } from "firebase-admin/firestore";
-import { defaultContent, normalizeContent, validateContent, type HbicContent } from "@hbic/shared";
+import { defaultContent, normalizeContent, validateContent, dateStringInTimeZone, masjidTimeZone, type HbicContent } from "@hbic/shared";
 import { applyPrayerSync } from "./prayerSync";
 import { assertPublicationPreconditions, type PublicationPreconditions } from "./publicationGuards";
 import { getFirebaseApp } from "./firebaseAdmin";
+import { createReadCache } from "./readCache";
+import { invalidatePublicReads, registerPublicReadInvalidator, publicReadTtlMs, publicPageCacheTag } from "./publicReadPolicy";
 
 export { getFirebaseApp } from "./firebaseAdmin";
 
@@ -70,7 +73,24 @@ function stripUndefined<T>(value: T): T {
   return value;
 }
 
-export async function getPublishedContent(): Promise<{ content: HbicContent; status: ContentStoreStatus }> {
+const publishedReads = createReadCache(readPublishedContent, publicReadTtlMs);
+registerPublicReadInvalidator(publishedReads.clear);
+const pageReads = unstable_cache(async (_serviceDate: string) => readPublishedContent(), [publicPageCacheTag], { revalidate: 60, tags: [publicPageCacheTag] });
+
+/** Public page rendering uses Next's data cache so the existing ISR pages do
+ * not become per-visitor SSR merely because the upstream fetch is no-store.
+ * Dynamic APIs still use the separate short-lived canonical read below. */
+export function getPublishedPageContent() {
+  return pageReads(dateStringInTimeZone(new Date(), masjidTimeZone));
+}
+
+export async function getPublishedContent(options: { fresh?: boolean } = {}): Promise<{ content: HbicContent; status: ContentStoreStatus }> {
+  if (options.fresh) return readPublishedContent();
+  // Never reuse yesterday's resolved schedule across the Calgary rollover.
+  return publishedReads.get(dateStringInTimeZone(new Date(), masjidTimeZone));
+}
+
+async function readPublishedContent(): Promise<{ content: HbicContent; status: ContentStoreStatus }> {
   const status = getContentStoreStatus();
   const db = getDatabase();
 
@@ -163,7 +183,7 @@ export async function publishDraftContent(expected: PublicationPreconditions = {
   const db = getDatabase();
   if (!db) throw new Error(`Firestore publishing is not configured. Missing: ${status.missing.join(", ")}`);
 
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const draftRef = db.collection(CMS_COLLECTION).doc(DRAFT_DOC);
     const publishedRef = db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC);
     const publicationRef = db.collection("publicationState").doc("current");
@@ -213,4 +233,6 @@ export async function publishDraftContent(expected: PublicationPreconditions = {
     transaction.set(publicationRef, publication);
     return { content, status, publication };
   });
+  invalidatePublicReads();
+  return result;
 }

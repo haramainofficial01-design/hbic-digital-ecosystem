@@ -50,6 +50,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<{ stop: () => void } | null>(null);
   const cameraSessionRef = useRef(0);
+  const loadingRef = useRef(false);
 
   const stopCamera = () => {
     cameraSessionRef.current += 1;
@@ -59,6 +60,8 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   useEffect(() => () => stopCamera(), []);
 
   const load = useCallback(async (silent = false) => {
+    if (silent && loadingRef.current) return;
+    loadingRef.current = true;
     if (!silent) { setBusy(true); setMessage(""); }
     try {
       const [data, pricing, academyContent] = await Promise.all([adminRequest("/api/admin/academy"), adminRequest("/api/admin/academy/pricing"), adminRequest("/api/admin/academy/content")]);
@@ -73,15 +76,16 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
       setLoaded(true);
     }
     catch (error) { if (!silent) { setLoaded(false); setMessage(error instanceof Error ? error.message : "Unable to load Academy records."); } }
-    finally { if (!silent) setBusy(false); }
+    finally { loadingRef.current = false; if (!silent) setBusy(false); }
   }, [adminRequest]);
   useEffect(() => { if (personalSession) void load(); }, [personalSession, load]);
   useEffect(() => {
     if (!personalSession) return;
     const refresh = () => { if (document.visibilityState === "visible") void load(true); };
-    const timer = window.setInterval(refresh, 15_000);
+    const timer = window.setInterval(refresh, 60_000);
     window.addEventListener("focus", refresh);
-    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [personalSession, load]);
 
   useEffect(() => {
