@@ -678,7 +678,7 @@ function PrayerPanel({
 
       <div className="card full">
         <h2>Manual iqamah overrides</h2>
-        <p className="muted">Publish an override to change that prayer everywhere. It expires Sunday at midnight, Calgary time, and the new week's backend timetable takes over automatically.</p>
+        <p className="muted">Publish an override to change that prayer everywhere. It expires Sunday at midnight, Calgary time, and the new week&apos;s backend timetable takes over automatically.</p>
         {iqamahOverridePrayers.map((prayer) => {
           const override = iqamahTime.overrides?.[prayer] ?? { enabled: false, value: "" };
           const effectiveField = `${prayer}Iqamah` as "fajrIqamah" | "dhuhrIqamah" | "asrIqamah" | "maghribIqamah" | "ishaIqamah";
