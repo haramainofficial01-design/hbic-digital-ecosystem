@@ -284,6 +284,37 @@ export async function lookupAcademyReference(reference: string, actorUid: string
   return family;
 }
 
+export async function moveAcademyCashStartToCurrentMonth(uid: string, actor: { uid: string; email: string }, reason: string) {
+  const cleanReason = reason.trim();
+  if (cleanReason.length < 8 || cleanReason.length > 300) throw new AcademyError("Enter a reason between 8 and 300 characters.");
+  const db = academyDb();
+  const familyRef = db.collection(families).doc(uid);
+  const currentPeriod = academyTuitionPeriod(new Date());
+  let updated: Record<string, unknown> | null = null;
+  await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(familyRef);
+    if (!snapshot.exists) throw new AcademyError("Academy registration was not found.", 404);
+    const data = snapshot.data() ?? {};
+    if (data.enrollmentState === "withdrawn" || data.withdrawalPendingAt) throw new AcademyError("Withdrawn enrollment cannot be moved.", 409);
+    if (data.paymentChoice !== "cash") throw new AcademyError("Only a cash registration can be moved from this staff control.", 409);
+    const previous = String(data.enrollmentStartPeriod ?? currentPeriod);
+    if (previous <= currentPeriod) { updated = data; return; }
+    if (!["conditional", "submitted", "approved"].includes(String(data.enrollmentState))) {
+      throw new AcademyError("Only a pending/conditional cash registration can be moved to the current month.", 409);
+    }
+    const now = new Date().toISOString();
+    updated = { ...data, enrollmentStartPeriod: currentPeriod, updatedAt: now };
+    tx.update(familyRef, { enrollmentStartPeriod: currentPeriod, updatedAt: now });
+    tx.create(db.collection("academyAudit").doc(), {
+      action: "enrollment_start_corrected", familyId: uid, fromPeriod: previous, toPeriod: currentPeriod,
+      reason: cleanReason, actorUid: actor.uid, actorEmail: actor.email, at: now
+    });
+  });
+  const data = updated ?? (await familyRef.get()).data() ?? {};
+  const month = await currentMonth(db, uid, data);
+  return publicFamily(uid, data, month);
+}
+
 export async function receiveAcademyCash(uid: string, period: string, actor: { uid: string; email: string }) {
   const db = academyDb();
   if (!/^\d{4}-\d{2}$/.test(period) || period !== academyTuitionPeriod(new Date())) {
