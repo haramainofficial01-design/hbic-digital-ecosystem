@@ -142,6 +142,11 @@ export interface AcademyPublicFamily {
   enrollmentState: AcademyEnrollmentState;
   billingPeriod: string;
   amountCents: number | null;
+  /** Present only when an approved undercharge correction exists for this period. */
+  underchargeOriginalPaidCents?: number | null;
+  underchargeCorrectionCents?: number | null;
+  underchargeCorrectionPendingCents?: number | null;
+  underchargeCorrectionStatus?: string | null;
   paymentState: AcademyPaymentState;
   cardSetupComplete?: boolean;
   passToken: string;

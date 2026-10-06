@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { requestAcademyPasswordReset } from "../lib/academyParentActions";
-import { cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "../lib/academyCheckoutState";
+import { academyCorrectedMonthPaidCents, academyTuitionSatisfiedForConfirmation, cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "../lib/academyCheckoutState";
 
 test("forgot-password action sends the entered parent address and gives neutral success feedback", async () => {
   let sentTo = "";
@@ -38,6 +38,23 @@ test("Checkout completion during expiry makes cash preflight fail", async () => 
     status = "complete"; // Checkout completed while the cash request was expiring it.
     throw new Error("Stripe reports Checkout is complete");
   }), /still processing/);
+});
+
+test("correction ledger reaches the approved total and repeated correction cannot overcount", () => {
+  assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 4264, previousPaidCents: 4264, expectedCents: 5000, correctionPaidCents: 736 }), 5000);
+  assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 4277, previousPaidCents: 4277, expectedCents: 5000, correctionPaidCents: 723 }), 5000);
+  assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 4288, previousPaidCents: 4288, expectedCents: 5000, correctionPaidCents: 712 }), 5000);
+  assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 5000, previousPaidCents: 4288, expectedCents: 5000, correctionPaidCents: 712 }), 5000);
+});
+
+test("enrollment confirmation requires full card tuition or a recorded cash receipt", () => {
+  const cardPaid = { method: "card" as const, monthMethod: "card", monthStatus: "paid", amountCents: 5000, requiredCents: 5000 };
+  assert.equal(academyTuitionSatisfiedForConfirmation(cardPaid), true);
+  assert.equal(academyTuitionSatisfiedForConfirmation({ ...cardPaid, amountCents: 4264 }), false);
+  assert.equal(academyTuitionSatisfiedForConfirmation({ ...cardPaid, monthStatus: "card_attention" }), false);
+  const cashPaid = { method: "cash" as const, monthMethod: "cash", monthStatus: "paid", amountCents: 5000, requiredCents: 5000 };
+  assert.equal(academyTuitionSatisfiedForConfirmation(cashPaid), false);
+  assert.equal(academyTuitionSatisfiedForConfirmation({ ...cashPaid, cashReceiptExists: true }), true);
 });
 
 test("forgot-password action handles missing, invalid, and delivery-error cases", async () => {

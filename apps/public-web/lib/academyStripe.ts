@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
+import { academyCorrectedMonthPaidCents } from "./academyCheckoutState";
 
 // 00:00 Calgary on February 1, before Stripe's February renewal. The final
 // February 1 class remains included in January tuition after billing stops.
@@ -395,7 +396,6 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
       pricing.tuitionMode === "per_child" ? academyTuitionTotalCents(pricing.monthlyCents, childCount) : pricing.monthlyCents;
     if (!Number.isSafeInteger(expectedCents) || expectedCents <= paidCents) return null;
     const adjustment = await db.collection("academyBillingAdjustments").doc(`${doc.id}_${period}`).get();
-    if (adjustment.exists) return null;
     return {
       familyId: doc.id,
       guardianName: String(data.guardianName ?? ""),
@@ -404,7 +404,7 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
       paidCents,
       expectedCents,
       differenceCents: expectedCents - paidCents,
-      adjustmentStatus: null
+      adjustmentStatus: adjustment.exists ? String(adjustment.data()?.status ?? "in_progress") : null
     } satisfies AcademyUndercharge;
   }));
   return candidates.filter((item): item is NonNullable<typeof item> => item !== null);
@@ -866,13 +866,18 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
     }
     const monthData = month?.data();
     if (underchargeAdjustment && monthRef) {
-      const basePaid = Math.max(Number(monthData?.amountCents ?? 0), Number.isSafeInteger(underchargePreviousCents) ? underchargePreviousCents : 0);
+      const originalPaid = Number.isSafeInteger(underchargePreviousCents) && underchargePreviousCents >= 0
+        ? underchargePreviousCents : Math.max(0, Number(monthData?.amountCents ?? 0));
+      const basePaid = Math.max(Number(monthData?.amountCents ?? 0), originalPaid);
       const expected = Number.isSafeInteger(underchargeExpectedCents) && underchargeExpectedCents > 0 ? underchargeExpectedCents : basePaid + Math.max(0, amountCents);
       const adjustmentRef = db.collection("academyBillingAdjustments").doc(`${uid}_${period}`);
       if (event.type === "invoice.paid") {
-        const corrected = Math.min(expected, basePaid + Math.max(0, amountCents));
+        const corrected = academyCorrectedMonthPaidCents({ currentPaidCents: Math.max(0, Number(monthData?.amountCents ?? 0)),
+          previousPaidCents: Math.max(0, Number.isSafeInteger(underchargePreviousCents) ? underchargePreviousCents : 0),
+          expectedCents: expected, correctionPaidCents: Math.max(0, amountCents) });
         tx.set(monthRef, {
           period, method: "card", status: corrected >= expected ? "paid" : "card_attention", amountCents: corrected,
+          underchargeOriginalPaidCents: originalPaid,
           underchargeCorrectionCents: Math.max(0, amountCents), underchargeCorrectionInvoiceId: invoiceId,
           underchargeCorrectedAt: now, updatedAt: now
         }, { merge: true });

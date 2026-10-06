@@ -7,7 +7,7 @@ import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, ac
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 import { cashReceiptEmail, enrollmentConfirmedEmail, registrationEmail, queueAcademyEmail } from "./academyEmail";
-import { cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "./academyCheckoutState";
+import { academyTuitionSatisfiedForConfirmation, cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "./academyCheckoutState";
 
 const families = "academyFamilies";
 const pendingRegistrations = "academyPendingRegistrations";
@@ -101,12 +101,29 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     enrollmentState: hasCurrentChild ? enrollmentState as AcademyPublicFamily["enrollmentState"] : "withdrawn",
     billingPeriod: period,
     amountCents: typeof month?.amountCents === "number" ? month.amountCents : null,
+    underchargeOriginalPaidCents: Number.isSafeInteger(month?.underchargeOriginalPaidCents) ? Number(month?.underchargeOriginalPaidCents) : null,
+    underchargeCorrectionCents: Number.isSafeInteger(month?.underchargeCorrectionCents) ? Number(month?.underchargeCorrectionCents) : null,
+    underchargeCorrectionPendingCents: Number.isSafeInteger(month?.underchargeCorrectionPendingCents) ? Number(month?.underchargeCorrectionPendingCents) : null,
+    underchargeCorrectionStatus: typeof month?.underchargeCorrectionStatus === "string" ? month.underchargeCorrectionStatus : null,
     paymentState: paymentState as AcademyPublicFamily["paymentState"],
     cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
     createdAt: String(data.createdAt)
   };
+}
+
+async function monthWithUnderchargeState(db: Firestore, uid: string, period: string, month: Record<string, unknown> | undefined) {
+  const adjustment = await db.collection("academyBillingAdjustments").doc(`${uid}_${period}`).get();
+  if (!adjustment.exists) return month;
+  const data = adjustment.data() ?? {};
+  if (data.status === "paid") return month;
+  const differenceCents = Number(data.differenceCents ?? 0);
+  if (!Number.isSafeInteger(differenceCents) || differenceCents <= 0) return month;
+  return { ...month,
+    underchargeOriginalPaidCents: Number.isSafeInteger(data.paidCents) ? Number(data.paidCents) : null,
+    underchargeCorrectionPendingCents: differenceCents,
+    underchargeCorrectionStatus: String(data.status ?? "pending") };
 }
 
 async function currentMonth(db: Firestore, uid: string, family: Record<string, unknown>, sharedPricing?: Awaited<ReturnType<typeof getAcademyPricing>>) {
@@ -478,8 +495,9 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     return false;
   });
   if (cashConversionAlreadyApplied) return getAcademyFamily(uid);
-  const month = await currentMonth(db, uid, family);
-  return publicFamily(uid, family, month);
+  const rawMonth = await currentMonth(db, uid, family);
+  const period = String(rawMonth?.period ?? family.enrollmentStartPeriod ?? academyTuitionPeriod(new Date()));
+  return publicFamily(uid, family, await monthWithUnderchargeState(db, uid, period, rawMonth));
 }
 
 export async function getAcademyFamily(uid: string) {
@@ -487,8 +505,9 @@ export async function getAcademyFamily(uid: string) {
   const doc = await db.collection(families).doc(uid).get();
   if (!doc.exists) return null;
   const family = doc.data()!;
-  const month = await currentMonth(db, uid, family);
-  return publicFamily(uid, family, month);
+  const rawMonth = await currentMonth(db, uid, family);
+  const period = String(rawMonth?.period ?? family.enrollmentStartPeriod ?? academyTuitionPeriod(new Date()));
+  return publicFamily(uid, family, await monthWithUnderchargeState(db, uid, period, rawMonth));
 }
 
 export async function scanAcademyPass(token: string, actorUid: string) {
@@ -613,20 +632,40 @@ export async function receiveAcademyCash(uid: string, period: string, actor: { u
 export async function confirmAcademyEnrollment(uid: string, actor: { uid: string; email: string }) {
   const db = academyDb();
   const ref = db.collection(families).doc(uid);
+  const period = academyTuitionPeriod(new Date());
+  const pricing = await getAcademyPricing();
   const now = new Date().toISOString();
   await db.runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) throw new AcademyError("Academy registration was not found.", 404);
     const data = snapshot.data() ?? {};
-    if (data.enrollmentStartPeriod && String(data.enrollmentStartPeriod) > calgaryBillingPeriod(new Date())) throw new AcademyError("This registration starts next month; check-in opens when that month begins.", 409);
-    if (data.enrollmentState !== "active" && data.paymentChoice === "card" && !data.stripeSubscriptionId) throw new AcademyError("The parent must finish secure Stripe Checkout before enrollment can be confirmed.", 409);
+    if (data.enrollmentStartPeriod && String(data.enrollmentStartPeriod) > period) throw new AcademyError("This registration starts next month; check-in opens when that month begins.", 409);
     if (!["conditional", "submitted", "approved", "active"].includes(String(data.enrollmentState))) {
       throw new AcademyError("This enrollment cannot be checked in from its current state.", 409);
     }
     if (data.enrollmentState === "active") return;
-    tx.update(ref, { enrollmentState: "active", checkedInAt: now, checkedInBy: actor.uid, updatedAt: now });
+    const monthRef = ref.collection("months").doc(period);
+    const month = await tx.get(monthRef);
+    const children = Array.isArray(data.children) ? data.children as { id: string; name: string; cancelEffectiveAt?: string | null }[] : [];
+    const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
+    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const requiredCents = childCount === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
+    const receiptId = typeof month.data()?.receiptId === "string" ? month.data()!.receiptId : "";
+    const receipt = receiptId ? await tx.get(db.collection("academyReceipts").doc(receiptId)) : null;
+    if (!academyTuitionSatisfiedForConfirmation({
+      method: data.paymentChoice === "card" ? "card" : "cash", monthMethod: month.data()?.method,
+      monthStatus: month.data()?.status, amountCents: month.data()?.amountCents, requiredCents,
+      cashReceiptExists: Boolean(receipt?.exists && receipt.data()?.method === "cash" && receipt.data()?.familyId === uid && receipt.data()?.period === period)
+    })) {
+      throw new AcademyError(data.paymentChoice === "card"
+        ? "Stripe must confirm the full current-month tuition before enrollment can be confirmed."
+        : "Authorized staff must receive and record the full current-month cash tuition before enrollment can be confirmed.", 409);
+    }
+    const welcomeEmailId = queueAcademyEmail(tx, db, enrollmentConfirmedEmail({ uid, email: String(data.email),
+      name: String(data.guardianName), reference: String(data.reference), childNames: children.map((child) => child.name) }));
+    tx.update(ref, { enrollmentState: "active", checkedInAt: now, checkedInBy: actor.uid,
+      welcomeEmailQueuedAt: now, welcomeEmailNotificationId: welcomeEmailId, updatedAt: now });
     tx.create(db.collection("academyAudit").doc(), { action: "enrollment_checked_in", familyId: uid, actorUid: actor.uid, actorEmail: actor.email, at: now });
-    queueAcademyEmail(tx, db, enrollmentConfirmedEmail({ uid, email: String(data.email), name: String(data.guardianName), reference: String(data.reference) }));
   });
   return getAcademyFamily(uid);
 }
@@ -638,7 +677,11 @@ export async function listAcademyFamilies() {
   // Month ledgers remain uncached and authoritative on every refresh.
   if (!docs.size) return [];
   const pricing = await getAcademyPricing();
-  return Promise.all(docs.docs.map(async (doc) => publicFamily(doc.id, doc.data(), await currentMonth(db, doc.id, doc.data(), pricing))));
+  return Promise.all(docs.docs.map(async (doc) => {
+    const month = await currentMonth(db, doc.id, doc.data(), pricing);
+    const period = String(month?.period ?? academyTuitionPeriod(new Date()));
+    return publicFamily(doc.id, doc.data(), await monthWithUnderchargeState(db, doc.id, period, month));
+  }));
 }
 
 export async function getAcademyReceipts(uid: string) {
@@ -657,9 +700,14 @@ export async function getAcademyPaymentHistory(uid: string) {
   const db = academyDb();
   const family = await db.collection(families).doc(uid).get();
   if (!family.exists) throw new AcademyError("Academy registration was not found.", 404);
-  const months = await family.ref.collection("months").orderBy("__name__", "desc").limit(24).get();
+  const [months, adjustments] = await Promise.all([
+    family.ref.collection("months").orderBy("__name__", "desc").limit(24).get(),
+    db.collection("academyBillingAdjustments").where("familyId", "==", uid).limit(24).get()
+  ]);
+  const adjustmentByPeriod = new Map(adjustments.docs.map((doc) => [String(doc.data().period ?? ""), doc.data()]));
   return months.docs.map((doc) => {
     const data = doc.data();
+    const adjustment = adjustmentByPeriod.get(doc.id);
     const invoiceUrl = typeof data.invoiceUrl === "string" ? data.invoiceUrl : "";
     let safeInvoiceUrl: string | null = null;
     try {
@@ -669,6 +717,10 @@ export async function getAcademyPaymentHistory(uid: string) {
     return { period: doc.id, method: data.method === "card" ? "card" as const : "cash" as const,
       status: typeof data.status === "string" ? data.status : "awaiting_tuition",
       amountCents: Number.isSafeInteger(data.amountCents) ? Number(data.amountCents) : null,
+      underchargeOriginalPaidCents: Number.isSafeInteger(data.underchargeOriginalPaidCents) ? Number(data.underchargeOriginalPaidCents) : adjustment && adjustment.status !== "paid" && Number.isSafeInteger(adjustment.paidCents) ? Number(adjustment.paidCents) : null,
+      underchargeCorrectionCents: Number.isSafeInteger(data.underchargeCorrectionCents) ? Number(data.underchargeCorrectionCents) : null,
+      underchargeCorrectionPendingCents: adjustment && adjustment.status !== "paid" && Number.isSafeInteger(adjustment.differenceCents) ? Number(adjustment.differenceCents) : null,
+      underchargeCorrectionStatus: adjustment && adjustment.status !== "paid" ? String(adjustment.status ?? "pending") : null,
       paidAt: typeof data.paidAt === "string" ? data.paidAt : null, invoiceUrl: safeInvoiceUrl };
   });
 }

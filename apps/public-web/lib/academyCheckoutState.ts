@@ -8,6 +8,34 @@ export function cashConversionWasApplied(family: Record<string, unknown> | undef
   return family?.cashConversionFromRegistrationId === registrationId;
 }
 
+/** Combine an actual paid correction with the already-paid base without exceeding the approved tuition. */
+export function academyCorrectedMonthPaidCents(input: {
+  currentPaidCents: number;
+  previousPaidCents: number;
+  expectedCents: number;
+  correctionPaidCents: number;
+}) {
+  const valid = Object.values(input).every((value) => Number.isSafeInteger(value) && value >= 0);
+  if (!valid || input.expectedCents <= 0) throw new Error("Invalid Academy tuition correction amounts.");
+  return Math.min(input.expectedCents,
+    Math.max(input.currentPaidCents, input.previousPaidCents) + input.correctionPaidCents);
+}
+
+/** Enrollment can be confirmed only after this month's tuition was actually received. */
+export function academyTuitionSatisfiedForConfirmation(input: {
+  method: "card" | "cash";
+  monthMethod: unknown;
+  monthStatus: unknown;
+  amountCents: unknown;
+  requiredCents: number;
+  cashReceiptExists?: boolean;
+}) {
+  if (!Number.isSafeInteger(input.requiredCents) || input.requiredCents <= 0 ||
+      input.monthMethod !== input.method || input.monthStatus !== "paid" ||
+      typeof input.amountCents !== "number" || input.amountCents < input.requiredCents) return false;
+  return input.method === "card" || input.cashReceiptExists === true;
+}
+
 /** Verify that Stripe has permanently closed an unpaid Checkout before cash conversion. */
 export async function expireUnpaidAcademyCheckout(
   sessionId: string,

@@ -41,11 +41,16 @@ export function cashReminderEmail(input: { uid: string; reference: string; email
     text: `${input.testMode ? "TEST REMINDER — no payment is due from this test.\n\n" : ""}Assalamu alaikum ${input.name},\n\nYour HBIC Quran Academy cash tuition of ${money(input.amountCents)} for ${input.period} is ${due ? "due today" : "due on the 1st"}. Please pay in person at HBIC; staff will confirm payment and issue a receipt.\n\nMasjid Bilal Quran Academy` };
 }
 
-export function enrollmentConfirmedEmail(input: { uid: string; email: string; name: string; reference: string }): EmailMessage {
+export function enrollmentConfirmedEmail(input: { uid: string; email: string; name: string; reference: string; childNames: string[] }): EmailMessage {
+  const children = input.childNames.map((name) => name.trim()).filter(Boolean);
+  const childText = children.length === 1 ? children[0] : children.length === 2
+    ? `${children[0]} and ${children[1]}`
+    : `${children.slice(0, -1).join(", ")}, and ${children.at(-1) ?? "your children"}`;
+  const childPhrase = children.length === 1 ? `your child ${childText}` : `your children ${childText}`;
   return { kind: "enrollment_confirmed", key: `enrollment-confirmed:${input.uid}:${input.reference}`, to: input.email,
-    subject: "HBIC Quran Academy · enrollment confirmed",
-    html: layout("Enrollment confirmed", `<p>Assalamu alaikum ${escape(input.name)},</p><p>HBIC staff have confirmed your child’s Quran Academy enrollment. Your Academy reference is <strong>${escape(input.reference)}</strong>.</p><p>Payment standing is tracked separately. Please use your Academy pass for check-in and view your parent dashboard for the current payment status.</p>`),
-    text: `Assalamu alaikum ${input.name},\n\nHBIC staff have confirmed your child’s Quran Academy enrollment. Reference: ${input.reference}. Payment standing is tracked separately; check your parent dashboard for its current status.\n\nMasjid Bilal Quran Academy` };
+    subject: "Welcome to HBIC Quran Academy",
+    html: layout("Welcome to Quran Academy", `<p>Assalamu alaikum ${escape(input.name)},</p><p>JazakAllahu khairan for registering ${escape(childPhrase)} with HBIC Quran Academy. We’re very happy to welcome your family.</p><p>Your support helps your child learn Qur’an and helps our masjid continue growing these classes. May Allah put barakah in their learning, make the Qur’an a light in their life, and reward your family. We look forward to having them with us, inshaAllah.</p><p>Academy reference: <strong>${escape(input.reference)}</strong></p><p>Use your Academy pass for check-in and your parent dashboard for payment and class updates.</p>`),
+    text: `Assalamu alaikum ${input.name},\n\nJazakAllahu khairan for registering ${childPhrase} with HBIC Quran Academy. We’re very happy to welcome your family.\n\nYour support helps your child learn Qur’an and helps our masjid continue growing these classes. May Allah put barakah in their learning, make the Qur’an a light in their life, and reward your family. We look forward to having them with us, inshaAllah.\n\nAcademy reference: ${input.reference}\nUse your Academy pass for check-in and your parent dashboard for payment and class updates.\n\n— HBIC Quran Academy` };
 }
 
 export function registrationEmail(input: { uid: string; email: string; name: string; reference: string; period: string; paymentChoice: "card" | "cash" }): EmailMessage {
