@@ -62,6 +62,18 @@ test("installed apps retain their accepted current-month terms without gaining t
   assert.throws(() => parseAcademyRegistration({ ...valid, policyVersion: "academy-payment-policy-v2", policyAccepted: false }), /policy/);
 });
 
+test("older card terms cannot authorize the new full current-month charge", () => {
+  assert.throws(() => parseAcademyRegistration({
+    ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: "academy-payment-policy-v3", startChoice: "current"
+  }), /terms changed/);
+  assert.equal(parseAcademyRegistration({
+    ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: "academy-payment-policy-v3", startChoice: "next"
+  }).startChoice, "next");
+  assert.equal(parseAcademyRegistration({
+    ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: ACADEMY_TUITION_POLICY_VERSION, startChoice: "current"
+  }).policyVersion, ACADEMY_TUITION_POLICY_VERSION);
+});
+
 test("Billing periods follow Calgary, including UTC month rollover and DST", () => {
   assert.equal(calgaryBillingPeriod(new Date("2026-10-01T04:30:00Z")), "2026-09");
   assert.equal(calgaryBillingPeriod(new Date("2026-10-01T06:30:00Z")), "2026-10");
@@ -82,11 +94,12 @@ test("parents select this month or next month, with server-derived term limits",
   assert.throws(() => parseAcademyRegistration({ ...valid, startChoice: "free" }), /this month/);
 });
 
-test("current-month card Checkout charges proration now; next month has no current-month charge", () => {
+test("current-month card Checkout anchors renewal on the 1st without proration", () => {
   const now = new Date("2026-10-02T18:00:00Z");
   const current = academyCheckoutTiming("2026-10", false, now);
   const next = academyCheckoutTiming("2026-11", false, now);
-  assert.equal(current.proration_behavior, "create_prorations");
+  assert.equal(current.proration_behavior, "none");
+  assert.equal(new Date(current.billing_cycle_anchor! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
   assert.equal(next.proration_behavior, "none");
   assert.equal(new Date(next.billing_cycle_anchor! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
   assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), {});
