@@ -1,5 +1,61 @@
 type CheckoutSession = { id: string; status: string | null; payment_status?: string | null };
 
+type AcademyCorrectionInvoice = {
+  id: string;
+  status: string | null;
+  currency: string;
+  livemode: boolean;
+  total: number;
+  amount_due: number;
+  amount_remaining: number;
+  amount_paid: number;
+  customer: string | { id: string } | null;
+  metadata: Record<string, string> | null;
+};
+
+/** Recognize any already-existing Stripe correction before a new one can be created. */
+export function existingAcademyUnderchargeInvoiceStatus(
+  invoices: AcademyCorrectionInvoice[],
+  expected: {
+    familyId: string;
+    registrationId: string;
+    customerId: string;
+    subscriptionId: string;
+    period: string;
+    originalInvoiceId: string;
+    previousPaidCents: number;
+    expectedCents: number;
+    differenceCents: number;
+  }
+) {
+  const related = invoices.filter((invoice) => invoice.metadata?.academyAdjustment === "undercharge" &&
+    invoice.metadata?.academyFamilyUid === expected.familyId &&
+    invoice.metadata?.academyAdjustmentPeriod === expected.period);
+  if (!related.length) return null;
+  if (related.length !== 1) return { status: "needs_review", invoiceId: null };
+
+  const invoice = related[0];
+  const metadata = invoice.metadata ?? {};
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id ?? "";
+  const exactMetadata = metadata.academyRegistrationId === expected.registrationId &&
+    metadata.academySubscriptionId === expected.subscriptionId &&
+    metadata.academyPreviousPaidCents === String(expected.previousPaidCents) &&
+    metadata.academyExpectedCents === String(expected.expectedCents) &&
+    (!metadata.academyDifferenceCents || metadata.academyDifferenceCents === String(expected.differenceCents)) &&
+    (!metadata.academyOriginalInvoiceId || metadata.academyOriginalInvoiceId === expected.originalInvoiceId);
+  const exactInvoice = invoice.livemode && customerId === expected.customerId && invoice.currency === "cad" &&
+    exactMetadata && invoice.total === expected.differenceCents && invoice.amount_due === expected.differenceCents;
+  if (!exactInvoice) return { status: "needs_review", invoiceId: invoice.id };
+  if (invoice.status === "paid" && invoice.amount_paid === expected.differenceCents) {
+    return { status: "paid", invoiceId: invoice.id };
+  }
+  if (invoice.status === "open" && invoice.amount_paid === 0 && invoice.amount_remaining === expected.differenceCents) {
+    return { status: "open", invoiceId: invoice.id };
+  }
+  if (invoice.status === "draft") return { status: "draft", invoiceId: invoice.id };
+  return { status: "needs_review", invoiceId: invoice.id };
+}
+
 export function pendingAcademyRegistrationMatches(expectedId: string, actualId: unknown) {
   return expectedId.length > 0 && expectedId === actualId;
 }

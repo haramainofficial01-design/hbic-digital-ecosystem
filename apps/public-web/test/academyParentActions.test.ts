@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { requestAcademyPasswordReset } from "../lib/academyParentActions";
-import { academyCorrectedMonthPaidCents, academyTuitionSatisfiedForConfirmation, cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "../lib/academyCheckoutState";
+import { academyCorrectedMonthPaidCents, academyTuitionSatisfiedForConfirmation, cashConversionWasApplied, expireUnpaidAcademyCheckout, existingAcademyUnderchargeInvoiceStatus, pendingAcademyRegistrationMatches } from "../lib/academyCheckoutState";
 
 test("forgot-password action sends the entered parent address and gives neutral success feedback", async () => {
   let sentTo = "";
@@ -45,6 +45,20 @@ test("correction ledger reaches the approved total and repeated correction canno
   assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 4277, previousPaidCents: 4277, expectedCents: 5000, correctionPaidCents: 723 }), 5000);
   assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 4288, previousPaidCents: 4288, expectedCents: 5000, correctionPaidCents: 712 }), 5000);
   assert.equal(academyCorrectedMonthPaidCents({ currentPaidCents: 5000, previousPaidCents: 4288, expectedCents: 5000, correctionPaidCents: 712 }), 5000);
+});
+
+test("an existing exact Stripe correction is reused and blocks duplicate collection", () => {
+  const expected = { familyId: "family-1", registrationId: "registration-1", customerId: "cus_1", subscriptionId: "sub_1",
+    period: "2026-10", originalInvoiceId: "in_original", previousPaidCents: 4288, expectedCents: 5000, differenceCents: 712 };
+  const invoice = { id: "in_correction", status: "open", currency: "cad", livemode: true, total: 712, amount_due: 712,
+    amount_remaining: 712, amount_paid: 0, customer: "cus_1", metadata: { academyAdjustment: "undercharge",
+      academyFamilyUid: "family-1", academyRegistrationId: "registration-1", academySubscriptionId: "sub_1",
+      academyAdjustmentPeriod: "2026-10", academyOriginalInvoiceId: "in_original", academyPreviousPaidCents: "4288",
+      academyExpectedCents: "5000", academyDifferenceCents: "712" } };
+  assert.deepEqual(existingAcademyUnderchargeInvoiceStatus([invoice], expected), { status: "open", invoiceId: "in_correction" });
+  assert.equal(existingAcademyUnderchargeInvoiceStatus([{ ...invoice, amount_remaining: 713 }], expected)?.status, "needs_review");
+  assert.equal(existingAcademyUnderchargeInvoiceStatus([invoice, invoice], expected)?.status, "needs_review");
+  assert.equal(existingAcademyUnderchargeInvoiceStatus([], expected), null);
 });
 
 test("enrollment confirmation requires full card tuition or a recorded cash receipt", () => {

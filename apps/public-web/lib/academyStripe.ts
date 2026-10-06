@@ -5,7 +5,7 @@ import Stripe from "stripe";
 import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
-import { academyCorrectedMonthPaidCents } from "./academyCheckoutState";
+import { academyCorrectedMonthPaidCents, existingAcademyUnderchargeInvoiceStatus } from "./academyCheckoutState";
 
 // 00:00 Calgary on February 1, before Stripe's February renewal. The final
 // February 1 class remains included in January tuition after billing stops.
@@ -396,6 +396,25 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
       pricing.tuitionMode === "per_child" ? academyTuitionTotalCents(pricing.monthlyCents, childCount) : pricing.monthlyCents;
     if (!Number.isSafeInteger(expectedCents) || expectedCents <= paidCents) return null;
     const adjustment = await db.collection("academyBillingAdjustments").doc(`${doc.id}_${period}`).get();
+    let adjustmentStatus = adjustment.exists ? String(adjustment.data()?.status ?? "in_progress") : null;
+    if (!adjustment.exists) {
+      const customerId = String(data.stripeCustomerId ?? "");
+      const subscriptionId = String(data.stripeSubscriptionId ?? "");
+      const registrationId = String(data.registrationId ?? "");
+      const originalInvoiceId = String(monthData.invoiceId ?? "");
+      if (!/^cus_/.test(customerId) || !/^sub_/.test(subscriptionId) || !registrationId || !originalInvoiceId) {
+        adjustmentStatus = "needs_review";
+      } else {
+        // Firestore is not the only source of correction state: older staff
+        // workflows may already have created the Stripe invoice. Fail closed
+        // if Stripe cannot be checked so preview can never invite a duplicate.
+        const invoices = await academyStripe().invoices.list({ customer: customerId, limit: 100 });
+        adjustmentStatus = existingAcademyUnderchargeInvoiceStatus(invoices.data, {
+          familyId: doc.id, registrationId, customerId, subscriptionId, period, originalInvoiceId,
+          previousPaidCents: paidCents, expectedCents, differenceCents: expectedCents - paidCents
+        })?.status ?? null;
+      }
+    }
     return {
       familyId: doc.id,
       guardianName: String(data.guardianName ?? ""),
@@ -404,7 +423,7 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
       paidCents,
       expectedCents,
       differenceCents: expectedCents - paidCents,
-      adjustmentStatus: adjustment.exists ? String(adjustment.data()?.status ?? "in_progress") : null
+      adjustmentStatus
     } satisfies AcademyUndercharge;
   }));
   return candidates.filter((item): item is NonNullable<typeof item> => item !== null);
@@ -424,6 +443,11 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
   const results: { familyId: string; reference: string; differenceCents: number; status: string; invoiceId?: string }[] = [];
 
   for (const candidate of candidates) {
+    if (candidate.adjustmentStatus !== null) {
+      results.push({ familyId: candidate.familyId, reference: candidate.reference,
+        differenceCents: candidate.differenceCents, status: `existing_${candidate.adjustmentStatus}` });
+      continue;
+    }
     const familyRef = db.collection("academyFamilies").doc(candidate.familyId);
     const monthRef = familyRef.collection("months").doc(period);
     const adjustmentRef = db.collection("academyBillingAdjustments").doc(`${candidate.familyId}_${period}`);
@@ -446,7 +470,8 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
       return {
         customerId: String(family.data()?.stripeCustomerId ?? ""),
         subscriptionId: String(family.data()?.stripeSubscriptionId ?? ""),
-        registrationId: String(family.data()?.registrationId ?? "")
+        registrationId: String(family.data()?.registrationId ?? ""),
+        originalInvoiceId: String(month.data()?.invoiceId ?? "")
       };
     });
     if (!lock) {
@@ -456,6 +481,23 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
 
     try {
       if (!/^cus_/.test(lock.customerId) || !/^sub_/.test(lock.subscriptionId)) throw new AcademyError("Saved Stripe billing details are unavailable for this family.", 409);
+      // Recheck Stripe after acquiring the Firestore lock. This closes the gap
+      // where an older correction invoice exists without its Firestore marker.
+      const priorInvoices = await stripe.invoices.list({ customer: lock.customerId, limit: 100 });
+      const existingCorrection = existingAcademyUnderchargeInvoiceStatus(priorInvoices.data, {
+        familyId: candidate.familyId, registrationId: lock.registrationId, customerId: lock.customerId,
+        subscriptionId: lock.subscriptionId, period, originalInvoiceId: lock.originalInvoiceId,
+        previousPaidCents: candidate.paidCents, expectedCents: candidate.expectedCents,
+        differenceCents: candidate.differenceCents
+      });
+      if (existingCorrection) {
+        await adjustmentRef.set({ status: existingCorrection.status, invoiceId: existingCorrection.invoiceId,
+          updatedAt: new Date().toISOString() }, { merge: true });
+        results.push({ familyId: candidate.familyId, reference: candidate.reference,
+          differenceCents: candidate.differenceCents, status: `existing_${existingCorrection.status}`,
+          ...(existingCorrection.invoiceId ? { invoiceId: existingCorrection.invoiceId } : {}) });
+        continue;
+      }
       const subscription = await stripe.subscriptions.retrieve(lock.subscriptionId);
       if (subscription.livemode !== true || subscription.metadata.academyFamilyUid !== candidate.familyId ||
           subscription.metadata.academyRegistrationId !== lock.registrationId || objectId(subscription.customer) !== lock.customerId ||
