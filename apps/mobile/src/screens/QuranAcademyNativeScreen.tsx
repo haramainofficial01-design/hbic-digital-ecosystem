@@ -2,7 +2,7 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerificati
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, dateStringInTimeZone, isCalgaryFirstOfMonth, masjidTimeZone, type AcademyChildInput, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, dateStringInTimeZone, masjidTimeZone, type AcademyChildInput, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { AppScreen } from "../components/AppScreen";
 import { AppButton } from "../components/AppButton";
 import { GlassCard } from "../components/GlassCard";
