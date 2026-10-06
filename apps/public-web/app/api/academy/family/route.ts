@@ -1,5 +1,6 @@
-import { academyParent, getAcademyFamily, registerAcademyFamily, AcademyError } from "../../../../lib/academyStore";
+import { academyParent, getAcademyFamily, getAcademyPendingRegistration, prepareAcademyPendingCardRegistration, registerAcademyFamily, AcademyError } from "../../../../lib/academyStore";
 import { jsonResponse, optionsResponse } from "../../../../lib/api";
+import { startAcademyPendingCheckout } from "../../../../lib/academyStripe";
 import { dispatchAcademyEmails } from "../../../../lib/academyEmail";
 import { after } from "next/server";
 
@@ -14,16 +15,26 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   try {
     const parent = await academyParent(request);
-    const family = await getAcademyFamily(parent.uid);
-    return jsonResponse({ ok: true, family }, { headers: { "Cache-Control": "no-store" } });
+    const [family, pendingRegistration] = await Promise.all([
+      getAcademyFamily(parent.uid),
+      getAcademyPendingRegistration(parent.uid)
+    ]);
+    return jsonResponse({ ok: true, family, pendingRegistration }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }
 }
 
 export async function POST(request: Request) {
   try {
     const parent = await academyParent(request);
-    const family = await registerAcademyFamily(parent.uid, parent.email, await request.json());
+    const body = await request.json() as { paymentChoice?: unknown };
+    if (body.paymentChoice === "card") {
+      const pendingRegistration = await prepareAcademyPendingCardRegistration(parent.uid, parent.email, body);
+      const checkoutUrl = await startAcademyPendingCheckout(parent.uid);
+      return jsonResponse({ ok: true, family: null, pendingRegistration, checkoutUrl },
+        { status: 202, headers: { "Cache-Control": "no-store" } });
+    }
+    const family = await registerAcademyFamily(parent.uid, parent.email, body);
     after(() => dispatchAcademyEmails(20).then(() => undefined).catch(() => undefined));
-    return jsonResponse({ ok: true, family }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    return jsonResponse({ ok: true, family, pendingRegistration: null }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }
 }
