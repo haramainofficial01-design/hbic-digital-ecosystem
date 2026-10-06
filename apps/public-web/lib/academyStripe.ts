@@ -254,6 +254,159 @@ export async function requestAcademyCardSetup(uid: string, actor: { uid: string;
   return getAcademyFamily(uid);
 }
 
+type AcademyUndercharge = {
+  familyId: string;
+  guardianName: string;
+  reference: string;
+  period: string;
+  paidCents: number;
+  expectedCents: number;
+  differenceCents: number;
+  adjustmentStatus: string | null;
+};
+
+export async function previewAcademyUndercharges(period = academyTuitionPeriod(new Date())): Promise<AcademyUndercharge[]> {
+  if (!/^\d{4}-\d{2}$/.test(period)) throw new AcademyError("Choose a valid tuition month.");
+  const db = academyDb();
+  const pricing = await getAcademyPricing();
+  const families = await db.collection("academyFamilies").limit(200).get();
+  const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
+  const candidates = await Promise.all(families.docs.map(async (doc) => {
+    const data = doc.data();
+    if (data.paymentChoice !== "card" || data.enrollmentState === "withdrawn" || data.withdrawalPendingAt) return null;
+    if (typeof data.enrollmentStartPeriod === "string" && data.enrollmentStartPeriod > period) return null;
+    const month = await doc.ref.collection("months").doc(period).get();
+    const monthData = month.data();
+    if (!month.exists || monthData?.method !== "card" || monthData?.status !== "paid") return null;
+    const paidCents = Number(monthData.amountCents);
+    if (!Number.isSafeInteger(paidCents) || paidCents <= 0) return null;
+    const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
+    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const expectedCents = period > ACADEMY_TERM_END_DATE.slice(0, 7) || childCount === 0 ? 0 :
+      pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
+    if (!Number.isSafeInteger(expectedCents) || expectedCents <= paidCents) return null;
+    const adjustment = await db.collection("academyBillingAdjustments").doc(`${doc.id}_${period}`).get();
+    return {
+      familyId: doc.id,
+      guardianName: String(data.guardianName ?? ""),
+      reference: String(data.reference ?? ""),
+      period,
+      paidCents,
+      expectedCents,
+      differenceCents: expectedCents - paidCents,
+      adjustmentStatus: adjustment.exists ? String(adjustment.data()?.status ?? "existing") : null
+    } satisfies AcademyUndercharge;
+  }));
+  return candidates.filter((item): item is AcademyUndercharge => item !== null);
+}
+
+/**
+ * Collects only the exact unpaid difference caused by the former proration bug.
+ * One deterministic adjustment document and Stripe idempotency keys prevent
+ * duplicate correction charges. Month ledgers are changed only by signed
+ * Stripe invoice webhooks after payment succeeds/fails.
+ */
+export async function collectAcademyUndercharges(actor: { uid: string; email: string }, period = academyTuitionPeriod(new Date())) {
+  if (academyBillingMode() !== "live") throw new AcademyError("Live billing is required for tuition correction charges.", 409);
+  const db = academyDb();
+  const stripe = academyStripe();
+  const candidates = await previewAcademyUndercharges(period);
+  const results: { familyId: string; reference: string; differenceCents: number; status: string; invoiceId?: string }[] = [];
+
+  for (const candidate of candidates) {
+    const familyRef = db.collection("academyFamilies").doc(candidate.familyId);
+    const monthRef = familyRef.collection("months").doc(period);
+    const adjustmentRef = db.collection("academyBillingAdjustments").doc(`${candidate.familyId}_${period}`);
+    const lock = await db.runTransaction(async (tx) => {
+      const [family, month, adjustment] = await Promise.all([tx.get(familyRef), tx.get(monthRef), tx.get(adjustmentRef)]);
+      if (adjustment.exists) return null;
+      if (!family.exists || family.data()?.paymentChoice !== "card" || family.data()?.enrollmentState === "withdrawn") return null;
+      if (!month.exists || month.data()?.method !== "card" || month.data()?.status !== "paid" || Number(month.data()?.amountCents) !== candidate.paidCents) return null;
+      const now = new Date().toISOString();
+      tx.create(adjustmentRef, {
+        type: "undercharge", status: "creating", familyId: candidate.familyId, registrationId: String(family.data()?.registrationId ?? ""),
+        period, paidCents: candidate.paidCents, expectedCents: candidate.expectedCents, differenceCents: candidate.differenceCents,
+        actorUid: actor.uid, actorEmail: actor.email, createdAt: now, updatedAt: now
+      });
+      tx.create(db.collection("academyAudit").doc(), {
+        action: "card_undercharge_correction_started", familyId: candidate.familyId, period,
+        paidCents: candidate.paidCents, expectedCents: candidate.expectedCents, differenceCents: candidate.differenceCents,
+        actorUid: actor.uid, actorEmail: actor.email, at: now
+      });
+      return {
+        customerId: String(family.data()?.stripeCustomerId ?? ""),
+        subscriptionId: String(family.data()?.stripeSubscriptionId ?? ""),
+        registrationId: String(family.data()?.registrationId ?? "")
+      };
+    });
+    if (!lock) {
+      results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents, status: "skipped" });
+      continue;
+    }
+
+    try {
+      if (!/^cus_/.test(lock.customerId) || !/^sub_/.test(lock.subscriptionId)) throw new AcademyError("Saved Stripe billing details are unavailable for this family.", 409);
+      const subscription = await stripe.subscriptions.retrieve(lock.subscriptionId);
+      if (subscription.livemode !== true || subscription.metadata.academyFamilyUid !== candidate.familyId ||
+          subscription.metadata.academyRegistrationId !== lock.registrationId || objectId(subscription.customer) !== lock.customerId ||
+          subscription.status === "canceled") {
+        throw new AcademyError("Stripe subscription no longer matches this Academy registration.", 409);
+      }
+
+      const idBase = `academy-undercharge-${candidate.familyId}-${period}-${candidate.paidCents}-${candidate.expectedCents}`;
+      const item = await stripe.invoiceItems.create({
+        customer: lock.customerId,
+        subscription: lock.subscriptionId,
+        amount: candidate.differenceCents,
+        currency: "cad",
+        description: `HBIC Quran Academy ${period} tuition correction`,
+        metadata: {
+          academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
+          academyAdjustmentPeriod: period, academyPreviousPaidCents: String(candidate.paidCents),
+          academyExpectedCents: String(candidate.expectedCents)
+        }
+      }, { idempotencyKey: `${idBase}-item` });
+
+      const draft = await stripe.invoices.create({
+        customer: lock.customerId,
+        subscription: lock.subscriptionId,
+        collection_method: "charge_automatically",
+        auto_advance: false,
+        pending_invoice_items_behavior: "include",
+        description: `HBIC Quran Academy ${period} tuition correction`,
+        metadata: {
+          academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
+          academyAdjustmentPeriod: period, academyPreviousPaidCents: String(candidate.paidCents),
+          academyExpectedCents: String(candidate.expectedCents)
+        }
+      }, { idempotencyKey: `${idBase}-invoice` });
+
+      const finalized = await stripe.invoices.finalizeInvoice(draft.id, { auto_advance: false }, { idempotencyKey: `${idBase}-finalize` });
+      if (finalized.amount_due !== candidate.differenceCents) {
+        await db.runTransaction(async (tx) => {
+          tx.update(adjustmentRef, { status: "needs_review", invoiceItemId: item.id, invoiceId: finalized.id,
+            error: `Expected correction ${candidate.differenceCents}; Stripe invoice amount is ${finalized.amount_due}.`, updatedAt: new Date().toISOString() });
+        });
+        results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents, status: "needs_review", invoiceId: finalized.id });
+        continue;
+      }
+
+      const paid = await stripe.invoices.pay(finalized.id, {}, { idempotencyKey: `${idBase}-pay` });
+      await adjustmentRef.set({
+        status: paid.paid ? "payment_submitted" : String(paid.status ?? "open"),
+        invoiceItemId: item.id, invoiceId: paid.id, updatedAt: new Date().toISOString()
+      }, { merge: true });
+      results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents,
+        status: paid.paid ? "payment_submitted" : String(paid.status ?? "open"), invoiceId: paid.id });
+    } catch (error) {
+      await adjustmentRef.set({ status: "failed", error: error instanceof Error ? error.message : "Correction charge failed.", updatedAt: new Date().toISOString() }, { merge: true });
+      results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents, status: "failed" });
+    }
+  }
+
+  return results;
+}
+
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */
 export async function cancelAcademyChild(uid: string, childId: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(childId)) throw new AcademyError("Choose a valid child.");
