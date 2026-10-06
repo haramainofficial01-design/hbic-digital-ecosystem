@@ -153,10 +153,12 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
 
   async function moveStartToCurrentMonth() {
     if (!scanned || scanned.paymentChoice !== "cash") return;
+    const currentPeriod = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+    const monthLabel = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", month: "long", year: "numeric" }).format(new Date());
     const reason = window.prompt("Why should this cash registration start this month?", "Correcting the parent's enrollment start month")?.trim();
     if (!reason) return;
     if (reason.length < 8 || reason.length > 300) return setMessage("Enter a reason between 8 and 300 characters.");
-    if (!window.confirm(`Move ${scanned.guardianName}'s enrollment start to the current month? This is audited and does not mark any payment as received.`)) return;
+    if (!window.confirm(`Change ${scanned.guardianName}'s start month to ${monthLabel}? This makes ${currentPeriod} tuition due now, is recorded in the audit history, and does not mark any payment as received. Use this only if the family should start attending this month.`)) return;
     setBusy(true); setMessage("");
     try {
       await adminRequest("/api/admin/academy/start-period", { method: "POST", body: JSON.stringify({ familyId: scanned.id, reason }) });
@@ -169,6 +171,11 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
 
   async function receiveCash() {
     if (!scanned || scanned.amountCents === null || !["cash_due", "past_due"].includes(scanned.paymentState)) return;
+    const currentPeriod = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+    if (scanned.billingPeriod !== currentPeriod) {
+      setMessage(`${scanned.billingPeriod} tuition cannot be recorded as received until that month begins. If the family should start now, use “Move start to this month” first.`);
+      return;
+    }
     if (!window.confirm(`Confirm that ${amount(scanned.amountCents)} cash was received for ${scanned.billingPeriod} from ${scanned.guardianName}?`)) return;
     setBusy(true);
     try {
@@ -306,6 +313,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     return haystack.includes(query.trim().toLowerCase()) && (paymentFilter === "all" || family.paymentState === paymentFilter);
   }), [families, query, paymentFilter]);
   const cashDue = families.filter((family) => ["cash_due", "past_due"].includes(family.paymentState) && family.paymentChoice === "cash").length;
+  const currentAcademyPeriod = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
   const paid = families.filter((family) => family.paymentState === "paid").length;
   const collectedCents = families.reduce((total, family) => total + (family.paymentState === "paid" ? family.amountCents ?? 0 : 0), 0);
   const outstandingCents = families.reduce((total, family) => total + (["cash_due", "past_due", "card_attention"].includes(family.paymentState) ? family.amountCents ?? 0 : 0), 0);
@@ -335,8 +343,8 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
         <div className="academy-admin-payment"><strong>{paymentLabel(scanned)}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.billingMethod === "card" ? "Online payment / card" : "Cash"}</span><span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div>
         {scanned.enrollmentState !== "withdrawn" ? <div className="academy-admin-card"><h4>Payment arrangement</h4><p>Change this at the parent’s request. Paid months remain unchanged; card payments remain confirmed only by Stripe.</p>{scanned.pendingPaymentChoice === "cash" ? <p>Cash starts {scanned.paymentChangeEffectivePeriod}.</p> : null}<div className="academy-admin-actions"><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("cash")}>Arrange cash payment</button><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("card")}>Request secure card setup</button></div><small>Card setup requires the parent’s own authorization and secure Checkout. Each staff request is audited.</small></div> : null}
         {history ? <><h4>Payment history</h4>{history.payments.length ? history.payments.map((payment) => <p key={payment.period}>{payment.period} · {payment.method} · {payment.status.replaceAll("_", " ")} · {amount(payment.amountCents)}{payment.paidAt ? ` · paid ${new Date(payment.paidAt).toLocaleDateString("en-CA")}` : ""}</p>) : <p>No payment months recorded yet.</p>}{history.receipts.length ? <><h4>Cash receipts</h4>{history.receipts.map((receipt) => <p key={receipt.number}>{receipt.number} · {receipt.period} · {amount(receipt.amountCents)}</p>)}</> : null}{history.audit.length ? <><h4>Recent record activity</h4>{history.audit.slice(0, 10).map((entry) => <p key={entry.id}>{entry.at ? new Date(entry.at).toLocaleString("en-CA") : "Date unavailable"} · {entry.action.replaceAll("_", " ")}</p>)}</> : null}</> : null}
-        {scanned.paymentChoice === "cash" && scanned.enrollmentStartPeriod && scanned.enrollmentStartPeriod > new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7) ? <button className="secondary" onClick={() => void moveStartToCurrentMonth()} disabled={busy}>Move start to this month</button> : null}
-        {scanned.billingMethod === "cash" && ["cash_due", "past_due"].includes(scanned.paymentState) ? <button className="primary" onClick={() => void receiveCash()} disabled={busy}>Mark cash received</button> : null}
+        {scanned.paymentChoice === "cash" && scanned.enrollmentStartPeriod && scanned.enrollmentStartPeriod > currentAcademyPeriod ? <><p>This registration is scheduled for {scanned.enrollmentStartPeriod}. Move it only if the family should begin this month; doing so makes this month’s tuition due and does not record payment.</p><button className="secondary" onClick={() => void moveStartToCurrentMonth()} disabled={busy}>Move start to this month</button></> : null}
+        {scanned.billingMethod === "cash" && ["cash_due", "past_due"].includes(scanned.paymentState) ? <><button className="primary" onClick={() => void receiveCash()} disabled={busy || scanned.billingPeriod !== currentAcademyPeriod}>Mark cash received</button>{scanned.billingPeriod !== currentAcademyPeriod ? <small>{scanned.billingPeriod} tuition can be marked received starting that month. If the family should start now, move its start month first.</small> : null}</> : null}
         {scanned.enrollmentState === "conditional" ? <button className="secondary" onClick={() => void confirmEnrollment()} disabled={busy}>Confirm enrollment / check in</button> : null}
         {["awaiting_checkout", "conditional"].includes(scanned.enrollmentState) ? <button className="secondary" onClick={() => void withdrawRegistration(scanned)} disabled={busy}>Withdraw pending enrollment</button> : null}
         <button className="secondary" onClick={() => void replacePass()} disabled={busy}>Replace lost pass</button>
