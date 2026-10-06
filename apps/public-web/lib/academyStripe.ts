@@ -354,31 +354,31 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
       }
 
       const idBase = `academy-undercharge-${candidate.familyId}-${period}-${candidate.paidCents}-${candidate.expectedCents}`;
+      const correctionMetadata = {
+        academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
+        academyAdjustmentPeriod: period, academyPreviousPaidCents: String(candidate.paidCents),
+        academyExpectedCents: String(candidate.expectedCents), academySubscriptionId: lock.subscriptionId
+      };
+      const defaultPaymentMethod = objectId(subscription.default_payment_method);
+      // Use an isolated one-off invoice instead of pending subscription items so
+      // the correction can never leak into the family's next regular renewal.
+      const draft = await stripe.invoices.create({
+        customer: lock.customerId,
+        collection_method: "charge_automatically",
+        auto_advance: false,
+        ...(defaultPaymentMethod ? { default_payment_method: defaultPaymentMethod } : {}),
+        description: `HBIC Quran Academy ${period} tuition correction`,
+        metadata: correctionMetadata
+      }, { idempotencyKey: `${idBase}-invoice` });
+
       const item = await stripe.invoiceItems.create({
         customer: lock.customerId,
-        subscription: lock.subscriptionId,
+        invoice: draft.id,
         amount: candidate.differenceCents,
         currency: "cad",
         description: `HBIC Quran Academy ${period} tuition correction`,
-        metadata: {
-          academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
-          academyAdjustmentPeriod: period, academyPreviousPaidCents: String(candidate.paidCents),
-          academyExpectedCents: String(candidate.expectedCents)
-        }
+        metadata: correctionMetadata
       }, { idempotencyKey: `${idBase}-item` });
-
-      const draft = await stripe.invoices.create({
-        customer: lock.customerId,
-        subscription: lock.subscriptionId,
-        collection_method: "charge_automatically",
-        auto_advance: false,
-        description: `HBIC Quran Academy ${period} tuition correction`,
-        metadata: {
-          academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
-          academyAdjustmentPeriod: period, academyPreviousPaidCents: String(candidate.paidCents),
-          academyExpectedCents: String(candidate.expectedCents)
-        }
-      }, { idempotencyKey: `${idBase}-invoice` });
 
       const finalized = await stripe.invoices.finalizeInvoice(draft.id, { auto_advance: false }, { idempotencyKey: `${idBase}-finalize` });
       if (finalized.amount_due !== candidate.differenceCents) {
@@ -606,8 +606,11 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
   } else if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
     invoiceId = String(data.id ?? "");
     customerId = objectId(data.customer);
+    const invoiceMetadata = (data.metadata as Record<string, unknown> | null) ?? {};
+    underchargeAdjustment = invoiceMetadata.academyAdjustment === "undercharge";
     const parent = data.parent as Record<string, unknown> | undefined;
-    subscriptionId = objectId((parent?.subscription_details as Record<string, unknown> | undefined)?.subscription ?? data.subscription);
+    subscriptionId = underchargeAdjustment ? String(invoiceMetadata.academySubscriptionId ?? "") :
+      objectId((parent?.subscription_details as Record<string, unknown> | undefined)?.subscription ?? data.subscription);
     if (!subscriptionId) throw new AcademyError("Invoice subscription reference is unavailable; Stripe should retry.", 503);
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     eventRegistrationId = String(subscription.metadata.academyRegistrationId ?? "");
@@ -615,8 +618,6 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
       throw new AcademyError("Invoice and subscription do not match the Academy account.", 409);
     }
     uid = String(subscription.metadata.academyFamilyUid ?? "");
-    const invoiceMetadata = (data.metadata as Record<string, unknown> | null) ?? {};
-    underchargeAdjustment = invoiceMetadata.academyAdjustment === "undercharge";
     underchargePreviousCents = Number(invoiceMetadata.academyPreviousPaidCents ?? 0);
     underchargeExpectedCents = Number(invoiceMetadata.academyExpectedCents ?? 0);
     const adjustmentPeriod = String(invoiceMetadata.academyAdjustmentPeriod ?? "");
