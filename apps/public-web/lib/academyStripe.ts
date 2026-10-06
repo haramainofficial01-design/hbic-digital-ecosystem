@@ -580,6 +580,7 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
   if ((await markerRef.get()).exists) return;
   let uid = "", subscriptionId = "", customerId = "", period = "", amountCents = 0, eventRegistrationId = "";
   let invoiceId = "", invoiceUrl: string | null = null;
+  let underchargeAdjustment = false, underchargePreviousCents = 0, underchargeExpectedCents = 0;
   const data = event.data.object as unknown as Record<string, unknown>;
   if (event.type === "checkout.session.completed") {
     uid = String((data.metadata as Record<string, unknown> | null)?.academyFamilyUid ?? data.client_reference_id ?? "");
@@ -615,13 +616,19 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
       throw new AcademyError("Invoice and subscription do not match the Academy account.", 409);
     }
     uid = String(subscription.metadata.academyFamilyUid ?? "");
+    const invoiceMetadata = (data.metadata as Record<string, unknown> | null) ?? {};
+    underchargeAdjustment = invoiceMetadata.academyAdjustment === "undercharge";
+    underchargePreviousCents = Number(invoiceMetadata.academyPreviousPaidCents ?? 0);
+    underchargeExpectedCents = Number(invoiceMetadata.academyExpectedCents ?? 0);
+    const adjustmentPeriod = String(invoiceMetadata.academyAdjustmentPeriod ?? "");
     const lines = (data.lines as { data?: { period?: { start?: number } }[] } | undefined)?.data ?? [];
     const periodStart = Number(lines[0]?.period?.start ?? data.created);
     if (!Number.isSafeInteger(periodStart) || periodStart <= 0) throw new AcademyError("Invoice billing period is unavailable.", 503);
     const initialPeriod = String(subscription.metadata.academyInitialBillingPeriod ?? "");
-    period = String(data.billing_reason ?? "") === "subscription_create" && /^\d{4}-\d{2}$/.test(initialPeriod)
-      ? initialPeriod
-      : calgaryBillingPeriod(new Date(periodStart * 1000));
+    period = underchargeAdjustment && /^\d{4}-\d{2}$/.test(adjustmentPeriod) ? adjustmentPeriod :
+      String(data.billing_reason ?? "") === "subscription_create" && /^\d{4}-\d{2}$/.test(initialPeriod)
+        ? initialPeriod
+        : calgaryBillingPeriod(new Date(periodStart * 1000));
     amountCents = Number(event.type === "invoice.paid" ? data.amount_paid : data.amount_remaining);
     invoiceUrl = typeof data.hosted_invoice_url === "string" ? data.hosted_invoice_url : null;
   } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
@@ -705,6 +712,30 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
       tx.update(familyRef, { enrollmentState: "conditional", stripeConfirmedAt: now });
     }
     const monthData = month?.data();
+    if (underchargeAdjustment && monthRef) {
+      const basePaid = Math.max(Number(monthData?.amountCents ?? 0), Number.isSafeInteger(underchargePreviousCents) ? underchargePreviousCents : 0);
+      const expected = Number.isSafeInteger(underchargeExpectedCents) && underchargeExpectedCents > 0 ? underchargeExpectedCents : basePaid + Math.max(0, amountCents);
+      const adjustmentRef = db.collection("academyBillingAdjustments").doc(`${uid}_${period}`);
+      if (event.type === "invoice.paid") {
+        const corrected = Math.min(expected, basePaid + Math.max(0, amountCents));
+        tx.set(monthRef, {
+          period, method: "card", status: corrected >= expected ? "paid" : "card_attention", amountCents: corrected,
+          underchargeCorrectionCents: Math.max(0, amountCents), underchargeCorrectionInvoiceId: invoiceId,
+          underchargeCorrectedAt: now, updatedAt: now
+        }, { merge: true });
+        tx.set(adjustmentRef, { status: corrected >= expected ? "paid" : "partial", invoiceId, paidCents: corrected, updatedAt: now }, { merge: true });
+        if (amountCents > 0 && invoiceId) {
+          queueAcademyEmail(tx, db, cardReceiptEmail({ invoiceId, email: String(familyData.email),
+            name: String(familyData.guardianName), period, amountCents, paidAt: new Date(event.created * 1000).toISOString(), invoiceUrl,
+            testMode: academyBillingMode() !== "live" }));
+        }
+      } else {
+        tx.set(monthRef, { status: "card_attention", underchargeCorrectionInvoiceId: invoiceId, updatedAt: now }, { merge: true });
+        tx.set(adjustmentRef, { status: "payment_failed", invoiceId, updatedAt: now }, { merge: true });
+      }
+      tx.create(markerRef, { type: event.type, objectId: String(data.id ?? ""), adjustment: "undercharge", processedAt: now });
+      return;
+    }
     const monthCreated = Number(monthData?.lastStripeEventCreated ?? 0);
     const monthRank = Number(monthData?.lastStripeEventRank ?? -1);
     if (monthRef && !(event.type === "invoice.paid" && amountCents === 0) && (event.created > monthCreated || event.created === monthCreated && rank >= monthRank)) {
