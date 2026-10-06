@@ -15,7 +15,7 @@ export const ACADEMY_FIRST_FUN_CLASS_DATE = "2026-10-15";
 export const ACADEMY_FIRST_BILLING_MONTH = "2026-10";
 export const ACADEMY_LAST_BILLING_MONTH = "2027-01";
 export const ACADEMY_TERM_END_DATE = "2027-02-01";
-/** Alberta general holidays during this term: https://www.alberta.ca/alberta-general-holidays */
+/** Alberta general holidays during this term. Informational only: they do not automatically cancel Quran Academy classes. */
 export const ACADEMY_ALBERTA_GENERAL_HOLIDAYS = [
   { date: "2026-10-12", title: "Thanksgiving Day" },
   { date: "2026-11-11", title: "Remembrance Day" },
@@ -30,7 +30,7 @@ export const ACADEMY_TUITION_POLICY_V2 = [
   { title: "Cash payments", body: "September registrations owe no September tuition. October cash tuition is due in person at HBIC on October 1, even though there is no class that day; tuition is monthly, not per class. The final cash tuition due for this term is January 1, 2027; the February 1 class is included without February tuition. No cash tuition is due during the Ramadan and Eid al-Fitr break. Bring your Academy pass. Payment is recorded only after authorized staff receive and confirm the cash; a receipt follows confirmation." },
   { title: "Payment standing", body: "Each child's tuition is tracked separately. If a card charge fails or cash is overdue, HBIC will contact you to resolve it. A payment-success screen or pass screenshot is not proof of payment; the current Academy record is authoritative." },
   { title: "Cancellation and refunds", body: "You can cancel an individual child's future enrollment at any time. Future renewals for that child stop; access already paid for continues through the current period. Refund requests require HBIC administrative review; no automatic refund is promised." },
-  { title: "Classes and changes", body: "This term begins October 5, 2026 and ends February 1, 2027. Classes meet Mondays and Thursdays, 5:30–7:00 p.m., except published holidays and closures; there is no class October 1. One Thursday each month is a special activity with games and an Islamic presentation; HBIC publishes the exact date and may change it. There are no classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid is to be announced. Tuition is monthly, not per class. Participation depends on placement, availability and payment standing. HBIC will communicate material schedule changes. Any new terms require a new policy version and acceptance." }
+  { title: "Classes and changes", body: "This term begins October 5, 2026 and ends February 1, 2027. Classes meet Mondays and Thursdays, 5:30–7:00 p.m. Public/statutory holidays do not automatically cancel class; class runs as normal unless HBIC explicitly publishes a closure. There is no class October 1. One Thursday each month is a special activity with games and an Islamic presentation; HBIC publishes the exact date and may change it. There are no classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid is to be announced. Tuition is monthly, not per class. Participation depends on placement, availability and payment standing. HBIC will communicate material schedule changes. Any new terms require a new policy version and acceptance." }
 ] as const;
 
 export const ACADEMY_TUITION_POLICY = [
@@ -64,7 +64,6 @@ export function academyRecurringClasses(fromDate: string, days = 150, specialDat
     if (day.toISOString().slice(0, 10) > ACADEMY_TERM_END_DATE) break;
     const weekday = day.getUTCDay();
     if (weekday !== 1 && weekday !== 4) continue;
-    if (ACADEMY_ALBERTA_GENERAL_HOLIDAYS.some((holiday) => holiday.date === day.toISOString().slice(0, 10))) continue;
     const date = day.toISOString().slice(0, 10);
     const thursdayInMonth = Math.floor((day.getUTCDate() - 1) / 7) + 1;
     const fun = weekday === 4 && (configuredSpecialDates.has(date) || (thursdayInMonth === 3 && !configuredSpecialMonths.has(date.slice(0, 7))));
