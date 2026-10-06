@@ -59,14 +59,13 @@ export function validateAcademyItem(kind: "class" | "calendar" | "announcement",
 
 const collection = { class: "academyClasses", calendar: "academyCalendar", announcement: "academyAnnouncements" } as const;
 
-export function normalizeAcademyPublicHolidayItem(item: AcademyCalendarItem): AcademyCalendarItem {
+export function normalizeAcademyPublicHolidayItem(item: AcademyCalendarItem): AcademyCalendarItem | null {
   const knownHoliday = ACADEMY_ALBERTA_GENERAL_HOLIDAYS.find((holiday) => holiday.date === item.date);
   // Earlier versions seeded Alberta holidays as `holiday`, which incorrectly
-  // suppressed the recurring class. Only known system-generated IDs are
-  // informational; staff-created holiday/no-class records still close class.
+  // suppressed the recurring class. Hide only known system-generated records;
+  // staff-created holiday/no-class records remain visible and still close class.
   if (knownHoliday && item.id === `alberta-holiday-${knownHoliday.date}`) {
-    return { ...item, title: `${knownHoliday.title} — Academy class runs as normal`, type: "event",
-      note: "Public/statutory holiday only. Quran Academy still follows the normal Monday/Thursday schedule unless HBIC explicitly publishes a closure." };
+    return null;
   }
   return item;
 }
@@ -102,21 +101,21 @@ export async function listAcademyContent(admin = false, classFilter: string[] = 
     calendar: (() => {
       const explicit = calendarDocs.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AcademyCalendarItem))
         .filter((item) => admin || targeted(item.classIds ?? []));
-      const normalizedExplicit = explicit.map(normalizeAcademyPublicHolidayItem);
+      const normalizedExplicit = explicit.flatMap((item) => {
+        const normalized = normalizeAcademyPublicHolidayItem(item);
+        return normalized ? [normalized] : [];
+      });
       const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
       const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
       const today = `${pick("year")}-${pick("month")}-${pick("day")}`;
       const defaults: AcademyCalendarItem[] = ([
         { id: "academy-preparation-2026-10-01", date: "2026-10-01", title: "No class — Academy preparation day", type: "no_class", classIds: [],
           note: "There is no class October 1. The first regular class is Monday, October 5." },
-        ...ACADEMY_ALBERTA_GENERAL_HOLIDAYS.map((holiday) => ({ id: `alberta-holiday-${holiday.date}`, date: holiday.date,
-          title: `${holiday.title} — Academy class runs as normal`, type: "event" as const, classIds: [],
-          note: "Public/statutory holiday only. Quran Academy still follows the normal Monday/Thursday schedule unless HBIC explicitly publishes a closure." })),
         { id: "academy-term-end-2027-02-01", date: ACADEMY_TERM_END_DATE, title: "Academy term ends", type: "event", classIds: [],
           note: "Final scheduled class of the term, 5:30–7:00 p.m. No classes afterward through Ramadan and Eid al-Fitr; resumption after Eid is to be announced." },
         { id: "academy-ramadan-eid-break-2027", date: "2027-02-02", title: "Ramadan & Eid al-Fitr break — no classes", type: "no_class", classIds: [],
           note: "The term ended February 1. No classes during the Ramadan and Eid al-Fitr break. HBIC will announce the resumption date after Eid." }
-      ] as AcademyCalendarItem[]).map(normalizeAcademyPublicHolidayItem).filter((item) => item.date >= today && !normalizedExplicit.some((existing) => existing.date === item.date));
+      ] as AcademyCalendarItem[]).filter((item) => item.date >= today && !normalizedExplicit.some((existing) => existing.date === item.date));
       const changedDates = new Set(normalizedExplicit.filter((item) => ["no_class", "holiday", "time_changed", "special_class"].includes(item.type)).map((item) => item.date));
       const specialDates = normalizedExplicit.filter((item) => item.type === "special_class").map((item) => item.date);
       const recurring = academyRecurringClasses(today, 150, specialDates).filter((item) => !changedDates.has(item.date))
