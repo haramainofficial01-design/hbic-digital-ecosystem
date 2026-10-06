@@ -1,4 +1,4 @@
-import { academyParent, getAcademyFamily, getAcademyPendingRegistration, prepareAcademyPendingCardRegistration, registerAcademyFamily, AcademyError } from "../../../../lib/academyStore";
+import { academyParent, expirePendingAcademyCheckoutForCash, getAcademyFamily, getAcademyPendingRegistration, prepareAcademyPendingCardRegistration, registerAcademyFamily, AcademyError } from "../../../../lib/academyStore";
 import { jsonResponse, optionsResponse } from "../../../../lib/api";
 import { startAcademyPendingCheckout } from "../../../../lib/academyStripe";
 import { dispatchAcademyEmails } from "../../../../lib/academyEmail";
@@ -26,14 +26,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const parent = await academyParent(request);
-    const body = await request.json() as { paymentChoice?: unknown };
+    const body = await request.json() as { paymentChoice?: unknown; pendingRegistrationId?: unknown };
     if (body.paymentChoice === "card") {
       const pendingRegistration = await prepareAcademyPendingCardRegistration(parent.uid, parent.email, body);
       const checkoutUrl = await startAcademyPendingCheckout(parent.uid);
       return jsonResponse({ ok: true, family: null, pendingRegistration, checkoutUrl },
         { status: 202, headers: { "Cache-Control": "no-store" } });
     }
-    const family = await registerAcademyFamily(parent.uid, parent.email, body);
+    const expectedRegistrationId = typeof body.pendingRegistrationId === "string" ? body.pendingRegistrationId : undefined;
+    const conversion = await expirePendingAcademyCheckoutForCash(parent.uid, expectedRegistrationId);
+    const family = await registerAcademyFamily(parent.uid, parent.email, conversion?.cashRegistration ?? body,
+      conversion ? { registrationId: conversion.registrationId, checkoutSessionId: conversion.sessionId } :
+        expectedRegistrationId ? { registrationId: expectedRegistrationId, checkoutSessionId: null } : undefined);
     after(() => dispatchAcademyEmails(20).then(() => undefined).catch(() => undefined));
     return jsonResponse({ ok: true, family, pendingRegistration: null }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }

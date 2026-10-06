@@ -1,15 +1,17 @@
 "use client";
 
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, dateStringInTimeZone, masjidTimeZone, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getAcademyClientAuth } from "../lib/academyFirebaseClient";
+import { requestAcademyPasswordReset } from "../lib/academyParentActions";
 import styles from "./AcademyParent.module.css";
 
 const blankChild = () => ({ name: "", age: 8, level: "not_sure" as const });
 const money = (cents: number | null) => cents === null ? "Tuition pending" : new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
 type AcademyContent = { classes: { id: string; name: string; dayOfWeek: number; startTime: string; room: string }[]; calendar: { id: string; title: string; date: string; type: string }[]; announcements: { id: string; title: string; message: string; priority: string }[] };
 type AcademyPayment = { period: string; method: "cash" | "card"; status: string; amountCents: number | null; paidAt: string | null; invoiceUrl: string | null };
+type PendingRegistration = { registrationId: string; enrollmentStartPeriod: string; guardianName: string; phone: string; email: string; whatsappConsent: boolean; emailUpdates: boolean; children: AcademyRegistrationInput["children"]; paymentChoice: "card"; startChoice: "current" | "next"; policyVersion: AcademyRegistrationInput["policyVersion"]; policyAccepted: true; recurringAuthorized: true; checkoutStarted: boolean; createdAt: string };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 // Cooldown between verification-email resends: long enough to stop accidental
 // double-taps, short enough that a parent missing the email is not stuck.
@@ -37,6 +39,7 @@ export function AcademyParent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [registerAccount, setRegisterAccount] = useState(false);
+  const [pendingRegistration, setPendingRegistration] = useState<PendingRegistration | null>(null);
   const [form, setForm] = useState<AcademyRegistrationInput>({ guardianName: "", phone: "", email: "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false });
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [appleWalletReady, setAppleWalletReady] = useState(false);
@@ -187,7 +190,18 @@ export function AcademyParent() {
         }
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load Academy details.");
-        if (!cancelled) { setFamily(data.family); setStatus(""); }
+        if (!cancelled) {
+          setFamily(data.family);
+          setPendingRegistration(data.pendingRegistration ?? null);
+          if (data.pendingRegistration) {
+            const pending = data.pendingRegistration as PendingRegistration;
+            setForm((current) => ({ ...current, guardianName: pending.guardianName, phone: pending.phone, email: pending.email,
+              whatsappConsent: pending.whatsappConsent, emailUpdates: pending.emailUpdates, children: pending.children,
+              paymentChoice: "card", startChoice: pending.startChoice, policyVersion: pending.policyVersion,
+              policyAccepted: true, recurringAuthorized: true }));
+            if (new URLSearchParams(window.location.search).get("checkout") === "cancelled") setStatus("Checkout was not completed. You can try card Checkout again or choose cash at HBIC.");
+          } else setStatus("");
+        }
         const receiptResponse = await fetch("/api/academy/receipts", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
         if (receiptResponse.ok) {
           const receiptData = await receiptResponse.json();
@@ -282,6 +296,14 @@ export function AcademyParent() {
     finally { setBusy(false); }
   }
 
+  async function resetPassword() {
+    if (!academyAuth) return setStatus("Parent sign-in is temporarily unavailable. Please contact HBIC.");
+    setBusy(true); setStatus("");
+    try {
+      setStatus(await requestAcademyPasswordReset(email, (normalizedEmail) => sendPasswordResetEmail(academyAuth, normalizedEmail)));
+    } finally { setBusy(false); }
+  }
+
   // Sends exactly one verification email per tap, then starts the cooldown so
   // repeated taps cannot spam the parent's inbox.
   async function resendVerificationEmail() {
@@ -308,16 +330,20 @@ export function AcademyParent() {
     setBusy(true); setStatus("");
     try {
       const response = await fetch("/api/academy/family", {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken(true)}` }, body: JSON.stringify(form)
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken(true)}` },
+        body: JSON.stringify({ ...form, ...(pendingRegistration && form.paymentChoice === "cash" ? { pendingRegistrationId: pendingRegistration.registrationId } : {}) })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Registration could not be saved.");
-      setFamily(data.family);
-      setStatus(form.paymentChoice === "card" ? "Finish secure Stripe Checkout to confirm your registration." : "Conditional registration received. Bring your pass and cash tuition to HBIC.");
       if (form.paymentChoice === "card") {
-        try { await beginBilling("checkout", user); }
-        catch (error) { setStatus(`Registration saved. Card setup still needs attention: ${error instanceof Error ? error.message : "billing unavailable"}`); }
+        const url = new URL(data.checkoutUrl);
+        if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw new Error("Unexpected billing destination.");
+        window.location.assign(url.href);
+        return;
       }
+      setFamily(data.family);
+      setPendingRegistration(null);
+      setStatus("Conditional registration received. Bring your pass and cash tuition to HBIC.");
     } catch (error) { setStatus(error instanceof Error ? error.message : "Registration could not be saved."); }
     finally { setBusy(false); }
   }
@@ -379,6 +405,7 @@ export function AcademyParent() {
           <label>Email<input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <label>Password<input type="password" autoComplete={registerAccount ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           <button className={styles.primary} disabled={busy || !academyAuth} onClick={() => void authenticate()}>{registerAccount ? "Create account" : "Sign in"}</button>
+          {!registerAccount ? <button className={styles.textButton} disabled={busy || !academyAuth} onClick={() => void resetPassword()}>Forgot password?</button> : null}
           {!academyAuth ? <p className={styles.status}>Parent sign-in is temporarily unavailable. Please contact HBIC.</p> : null}
           {registrationOpen ? <button className={styles.textButton} onClick={() => setRegisterAccount(!registerAccount)}>{registerAccount ? "I already have an account" : "Create a parent account"}</button> : null}
         </> : !verified ? <><h2>Verify your email</h2><p>Open the verification link sent to {user.email}. We need a verified address before saving children&apos;s information.</p>
@@ -386,7 +413,7 @@ export function AcademyParent() {
           <button className={styles.primary} onClick={() => void confirmVerifiedEmail()}>I verified my email</button>
           <button className={styles.secondary} disabled={busy || resendCooldown > 0} onClick={() => void resendVerificationEmail()}>{resendCooldown > 0 ? `Resend verification email (${resendCooldown}s)` : "Resend verification email"}</button>
           <button className={styles.textButton} onClick={() => { if (academyAuth) void signOut(academyAuth); }}>Use a different email</button>
-        </> : family?.enrollmentState === "withdrawn" ? <><h2>Start a new Academy registration</h2><p>Your previous enrollment has ended and is not shown as active. You can register a child again with a fresh Academy pass and reference. HBIC retains legally required payment and audit history privately.</p><button className={styles.primary} disabled={!registrationOpen} onClick={() => { setFamily(null); setForm({ guardianName: "", phone: "", email: user.email?.trim().toLowerCase() ?? "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false }); }}>Register again</button></> : !family && !registrationOpen ? <><h2>Registration is temporarily unavailable</h2><p>Classes begin Monday, October 5. Please check back shortly.</p></> : !family ? <><h2>Register your family</h2><p>One short form for all your children. Class placement and tuition are confirmed by HBIC. There is no class October 1; the first class is October 5.</p>
+        </> : family?.enrollmentState === "withdrawn" ? <><h2>Start a new Academy registration</h2><p>Your previous enrollment has ended and is not shown as active. You can register a child again with a fresh Academy pass and reference. HBIC retains legally required payment and audit history privately.</p><button className={styles.primary} disabled={!registrationOpen} onClick={() => { setFamily(null); setForm({ guardianName: "", phone: "", email: user.email?.trim().toLowerCase() ?? "", whatsappConsent: false, children: [blankChild()], paymentChoice: "card", policyVersion: ACADEMY_TUITION_POLICY_VERSION, policyAccepted: false, recurringAuthorized: false }); }}>Register again</button></> : !family && !registrationOpen ? <><h2>Registration is temporarily unavailable</h2><p>Classes begin Monday, October 5. Please check back shortly.</p></> : !family ? <><h2>{pendingRegistration ? "Finish your Academy registration" : "Register your family"}</h2><p>{pendingRegistration ? "Your card Checkout is unpaid. Continue to Checkout, or choose cash at HBIC; cash stays due until staff receive it." : "One short form for all your children. Class placement and tuition are confirmed by HBIC. There is no class October 1; the first class is October 5."}</p>
           <div className={styles.fields}><label>Parent or guardian full name<input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} /></label>
             <label>Phone<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
             <label>Email<input type="email" value={form.email} readOnly /></label></div>
@@ -406,7 +433,7 @@ export function AcademyParent() {
           <details className={styles.policy} open><summary>Quran Academy Tuition &amp; Payment Policy</summary>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Policy version {ACADEMY_TUITION_POLICY_VERSION}</small></details>
           <label className={styles.check}><input type="checkbox" checked={form.policyAccepted} onChange={(e) => setForm({ ...form, policyAccepted: e.target.checked })} /> I have read and agree to the HBIC Quran Academy Tuition &amp; Payment Policy.</label>
           {form.paymentChoice === "card" ? <label className={styles.check}><input type="checkbox" checked={form.recurringAuthorized} onChange={(e) => setForm({ ...form, recurringAuthorized: e.target.checked })} /> I authorize recurring monthly tuition charges for my enrolled children until cancelled under this policy.</label> : null}
-          <button className={styles.primary} disabled={busy || !form.policyAccepted || (form.paymentChoice === "card" && (!cardAvailable || !form.recurringAuthorized))} onClick={() => void submit()}>Send registration</button>
+          <button className={styles.primary} disabled={busy || !form.policyAccepted || (form.paymentChoice === "card" && (!cardAvailable || !form.recurringAuthorized))} onClick={() => void submit()}>{pendingRegistration && form.paymentChoice === "cash" ? "Switch to cash at HBIC" : form.paymentChoice === "card" ? "Continue to secure Checkout" : "Send registration"}</button>
         </> : <><div className={styles.familyHeading}><div><span className={styles.eyebrow}>YOUR ACADEMY HOME</span><h2>{family.guardianName}</h2><p>{family.reference} · {family.enrollmentState === "awaiting_checkout" ? "Awaiting card confirmation — finish secure Stripe Checkout" : family.enrollmentState === "submitted" ? "Conditional enrollment — payment or placement pending" : family.enrollmentState}</p>{family.enrollmentStartPeriod ? <p>Enrollment starts {family.enrollmentStartPeriod}-01</p> : null}</div><button className={styles.textButton} onClick={() => void signOutAcademy()}>Sign out</button></div>
           <div className={styles.summary}><div><small>ACADEMY UPDATES</small><strong>Join the parent WhatsApp group</strong><span>Join now for class and holiday announcements, including while your enrollment is conditional.</span><a href="https://chat.whatsapp.com/IZhuemIDjR10DTluYIiSQq?mode=gi_t" target="_blank" rel="noopener noreferrer">Join the HBIC Quran Academy WhatsApp group ↗</a></div></div>
           {insideApp ? <div className={styles.summary}><div><small>APP UPDATES</small><strong>Class changes on your phone</strong><span>Opt in for Academy announcements, closures, and cash tuition reminders on this device.</span><button className={styles.secondary} type="button" onClick={() => void enableAppUpdates()}>Enable Academy app notifications</button></div></div> : null}

@@ -7,6 +7,7 @@ import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, ac
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 import { cashReceiptEmail, enrollmentConfirmedEmail, registrationEmail, queueAcademyEmail } from "./academyEmail";
+import { cashConversionWasApplied, expireUnpaidAcademyCheckout, pendingAcademyRegistrationMatches } from "./academyCheckoutState";
 
 const families = "academyFamilies";
 const pendingRegistrations = "academyPendingRegistrations";
@@ -193,6 +194,41 @@ export async function getAcademyPendingRegistration(uid: string) {
   return doc.exists ? publicPendingRegistration(doc.data() ?? {}) : null;
 }
 
+/** Close an unpaid pending card Checkout before converting its private registration to cash. */
+export async function expirePendingAcademyCheckoutForCash(uid: string, expectedRegistrationId?: string) {
+  const pending = (await academyDb().collection(pendingRegistrations).doc(uid).get()).data();
+  if (!pending) return null;
+  const registrationId = String(pending.registrationId ?? "");
+  if (expectedRegistrationId && !pendingAcademyRegistrationMatches(expectedRegistrationId, registrationId)) {
+    throw new AcademyError("The pending registration changed. Refresh before choosing cash.", 409);
+  }
+  const sessionId = pending?.stripeCheckoutSessionId;
+  const cashRegistration = {
+    guardianName: pending.guardianName, phone: pending.phone, email: pending.email,
+    whatsappConsent: pending.whatsappConsent, emailUpdates: pending.emailUpdates,
+    children: pending.children, paymentChoice: "cash" as const,
+    startChoice: pending.startChoice === "next" ? "next" as const : "current" as const,
+    policyVersion: pending.policyVersion, policyAccepted: true, recurringAuthorized: false
+  };
+  if (typeof sessionId !== "string") return { registrationId, sessionId: null, cashRegistration };
+  const stripe = (await import("./academyStripe")).academyStripe();
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.client_reference_id !== uid || session.metadata?.academyRegistrationId !== String(pending?.registrationId ?? "")) {
+    throw new AcademyError("Card Checkout could not be verified. Contact HBIC before changing payment method.", 409);
+  }
+  try {
+    await expireUnpaidAcademyCheckout(sessionId,
+      async (id) => {
+        const retrieved = await stripe.checkout.sessions.retrieve(id);
+        return { id: retrieved.id, status: retrieved.status, payment_status: retrieved.payment_status };
+      },
+      (id) => stripe.checkout.sessions.expire(id));
+  } catch (error) {
+    throw new AcademyError(error instanceof Error ? error.message : "Card Checkout could not be safely closed.", 409);
+  }
+  return { registrationId, sessionId, cashRegistration };
+}
+
 /**
  * Card signup is only a private pending application until Stripe confirms a
  * non-zero tuition payment. No Academy family, pass, enrollment, or month
@@ -214,19 +250,6 @@ export async function prepareAcademyPendingCardRegistration(uid: string, verifie
   const familyRef = db.collection(families).doc(uid);
   const previous = await familyRef.get();
   if (previous.exists && !priorEnrollmentEnded(previous.data())) throw new AcademyError("This account is already registered. Open your Academy pass instead.", 409);
-  const pendingRef = db.collection(pendingRegistrations).doc(uid);
-  const pending = await pendingRef.get();
-  if (input.paymentChoice === "cash" && typeof pending.data()?.stripeCheckoutSessionId === "string") {
-    const { academyStripe } = await import("./academyStripe");
-    try {
-      const session = await academyStripe().checkout.sessions.retrieve(pending.data()!.stripeCheckoutSessionId);
-      if (session.status === "complete") throw new AcademyError("Your card Checkout already completed. Wait for payment confirmation before changing payment method.", 409);
-      if (session.status === "open") await academyStripe().checkout.sessions.expire(session.id);
-    } catch (error) {
-      if (error instanceof AcademyError) throw error;
-      // A missing/expired unpaid Checkout does not block cash registration.
-    }
-  }
   if (previous.exists && previous.data()?.paymentChoice === "card") {
     const stripe = academyStripe();
     if (typeof previous.data()?.stripeSubscriptionId === "string") {
@@ -367,7 +390,7 @@ export async function activatePendingAcademyCardRegistration(uid: string, regist
   return getAcademyFamily(uid);
 }
 
-export async function registerAcademyFamily(uid: string, verifiedEmail: string, raw: unknown) {
+export async function registerAcademyFamily(uid: string, verifiedEmail: string, raw: unknown, cashConversion?: { registrationId: string; checkoutSessionId: string | null }) {
   if (process.env.ACADEMY_REGISTRATION_READY !== "true") throw new AcademyError("Quran Academy registration is not open yet.", 403);
   if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration is not open yet.", 403);
   const db = academyDb();
@@ -379,7 +402,18 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   }
   if (input.email !== verifiedEmail) throw new AcademyError("Use the email address verified on this account.", 403);
   const familyRef = db.collection(families).doc(uid);
+  const pendingRef = db.collection(pendingRegistrations).doc(uid);
   const previous = await familyRef.get();
+  if (cashConversion && previous.exists && cashConversionWasApplied(previous.data(), cashConversion.registrationId)) {
+    return getAcademyFamily(uid);
+  }
+  if (cashConversion) {
+    const pending = await pendingRef.get();
+    if (!pending.exists || !pendingAcademyRegistrationMatches(cashConversion.registrationId, pending.data()?.registrationId) ||
+        (pending.data()?.stripeCheckoutSessionId ?? null) !== cashConversion.checkoutSessionId) {
+      throw new AcademyError("The pending registration changed or Checkout was already resolved. Refresh before choosing cash.", 409);
+    }
+  }
   if (previous.exists && !priorEnrollmentEnded(previous.data())) throw new AcademyError("This account is already registered. Open your Academy pass instead.", 409);
   if (previous.exists && previous.data()?.paymentChoice === "card") {
     const { academyStripe } = await import("./academyStripe");
@@ -402,18 +436,26 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
     ...input,
     enrollmentStartPeriod,
     policyAcceptedAt: now,
-    recurringAuthorizedAt: input.paymentChoice === "card" ? now : null,
+    recurringAuthorizedAt: null,
     children: input.children.map((child) => ({ ...child, id: randomBytes(8).toString("hex"), classId: null, cancelEffectiveAt: null })),
     reference: reference(),
     registrationId: randomBytes(12).toString("hex"),
-    enrollmentState: input.paymentChoice === "card" ? "awaiting_checkout" : "conditional",
+    enrollmentState: "conditional",
     passToken,
     passState: "active",
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    ...(cashConversion ? { cashConversionFromRegistrationId: cashConversion.registrationId } : {})
   };
-  await db.runTransaction(async (tx) => {
-    const old = await tx.get(familyRef);
+  const cashConversionAlreadyApplied = await db.runTransaction(async (tx) => {
+    const [old, pending] = await Promise.all([tx.get(familyRef), cashConversion ? tx.get(pendingRef) : Promise.resolve(null)]);
+    if (cashConversion && old.exists && cashConversionWasApplied(old.data(), cashConversion.registrationId)) {
+      return true;
+    }
+    if (cashConversion && (!pending?.exists || !pendingAcademyRegistrationMatches(cashConversion.registrationId, pending.data()?.registrationId) ||
+        (pending.data()?.stripeCheckoutSessionId ?? null) !== cashConversion.checkoutSessionId)) {
+      throw new AcademyError("The pending registration changed or Checkout was already resolved. Refresh before choosing cash.", 409);
+    }
     if (old.exists && !priorEnrollmentEnded(old.data())) throw new AcademyError("This account is already registered.", 409);
     if (old.exists) {
       const months = await tx.get(familyRef.collection("months"));
@@ -433,7 +475,9 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
       previousReference: old.exists ? String(old.data()?.reference) : null, at: now });
     queueAcademyEmail(tx, db, registrationEmail({ uid, email: input.email, name: input.guardianName,
       reference: family.reference, period: enrollmentStartPeriod, paymentChoice: input.paymentChoice }));
+    return false;
   });
+  if (cashConversionAlreadyApplied) return getAcademyFamily(uid);
   const month = await currentMonth(db, uid, family);
   return publicFamily(uid, family, month);
 }
