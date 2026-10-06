@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 
@@ -282,7 +282,7 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
     if (!Number.isSafeInteger(paidCents) || paidCents <= 0) return null;
     const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
     const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
-    const expectedCents = period > ACADEMY_TERM_END_DATE.slice(0, 7) || childCount === 0 ? 0 :
+    const expectedCents = period > ACADEMY_LAST_BILLING_MONTH || childCount === 0 ? 0 :
       pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
     if (!Number.isSafeInteger(expectedCents) || expectedCents <= paidCents) return null;
     const adjustment = await db.collection("academyBillingAdjustments").doc(`${doc.id}_${period}`).get();
