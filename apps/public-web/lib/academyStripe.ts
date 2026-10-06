@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_TERM_END_DATE, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 
@@ -80,24 +80,42 @@ export async function startAcademyCheckout(uid: string) {
   if (typeof existingId === "string") {
     try {
       const existing = await stripe.checkout.sessions.retrieve(existingId);
-      if (existing.status === "open" && existing.url) return existing.url;
+      if (existing.status === "open" && existing.url) {
+        if (existing.metadata?.academyBillingPolicyVersion === ACADEMY_TUITION_POLICY_VERSION) return existing.url;
+        // Never reuse an open Checkout created under the old prorated policy.
+        await stripe.checkout.sessions.expire(existing.id);
+      }
     } catch { /* A stale session can be replaced after Stripe rejects it. */ }
   }
   if ((await familyRef.get()).data()?.stripeSubscriptionId) throw new AcademyError("This family already has a subscription. Use billing management instead.", 409);
   const selectedMonthPaid = (await familyRef.collection("months").doc(family.billingPeriod).get()).data()?.status === "paid";
+  const checkoutNow = new Date();
   let timing: ReturnType<typeof academyCheckoutTiming>;
-  try { timing = academyCheckoutTiming(family.enrollmentStartPeriod, selectedMonthPaid); }
+  try { timing = academyCheckoutTiming(family.enrollmentStartPeriod, selectedMonthPaid, checkoutNow); }
   catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Tuition timing is unavailable.", 409); }
+  const currentPeriod = calgaryBillingPeriod(checkoutNow);
+  const chargeCurrentMonthNow = !selectedMonthPaid &&
+    (family.enrollmentStartPeriod ?? academyTuitionPeriod(checkoutNow)) <= currentPeriod &&
+    !isCalgaryFirstOfMonth(checkoutNow);
+  const productId = objectId(price.product);
+  if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: price.id, quantity }];
+  if (chargeCurrentMonthNow) {
+    // The recurring line begins on the next 1st with no proration. This
+    // one-time line charges the full current-month tuition immediately.
+    lineItems.push({ price_data: { currency: "cad", unit_amount: config.monthlyCents, product: productId }, quantity });
+  }
+  const initialBillingPeriod = family.enrollmentStartPeriod ?? family.billingPeriod;
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     payment_method_collection: "always",
     integration_identifier: `hbic-academy-${Array.from(randomBytes(8), (byte) => String.fromCharCode(97 + byte % 26)).join("")}`,
-    line_items: [{ price: price.id, quantity }],
+    line_items: lineItems,
     customer_email: family.email,
     client_reference_id: uid,
-    metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? "") },
+    metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? ""), academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION },
     subscription_data: {
-      metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? "") },
+      metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? ""), academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION, academyInitialBillingPeriod: initialBillingPeriod },
       ...timing
     },
     success_url: `${academyPreviewOrigin()}/quran-academy?checkout=success`,
@@ -424,7 +442,10 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
     const lines = (data.lines as { data?: { period?: { start?: number } }[] } | undefined)?.data ?? [];
     const periodStart = Number(lines[0]?.period?.start ?? data.created);
     if (!Number.isSafeInteger(periodStart) || periodStart <= 0) throw new AcademyError("Invoice billing period is unavailable.", 503);
-    period = calgaryBillingPeriod(new Date(periodStart * 1000));
+    const initialPeriod = String(subscription.metadata.academyInitialBillingPeriod ?? "");
+    period = String(data.billing_reason ?? "") === "subscription_create" && /^\d{4}-\d{2}$/.test(initialPeriod)
+      ? initialPeriod
+      : calgaryBillingPeriod(new Date(periodStart * 1000));
     amountCents = Number(event.type === "invoice.paid" ? data.amount_paid : data.amount_remaining);
     invoiceUrl = typeof data.hosted_invoice_url === "string" ? data.hosted_invoice_url : null;
   } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
