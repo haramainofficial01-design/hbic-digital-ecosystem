@@ -372,7 +372,6 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
         subscription: lock.subscriptionId,
         collection_method: "charge_automatically",
         auto_advance: false,
-        pending_invoice_items_behavior: "include",
         description: `HBIC Quran Academy ${period} tuition correction`,
         metadata: {
           academyAdjustment: "undercharge", academyFamilyUid: candidate.familyId, academyRegistrationId: lock.registrationId,
