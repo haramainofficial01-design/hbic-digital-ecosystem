@@ -392,11 +392,11 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
 
       const paid = await stripe.invoices.pay(finalized.id, {}, { idempotencyKey: `${idBase}-pay` });
       await adjustmentRef.set({
-        status: paid.paid ? "payment_submitted" : String(paid.status ?? "open"),
+        status: paid.status === "paid" ? "payment_submitted" : String(paid.status ?? "open"),
         invoiceItemId: item.id, invoiceId: paid.id, updatedAt: new Date().toISOString()
       }, { merge: true });
       results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents,
-        status: paid.paid ? "payment_submitted" : String(paid.status ?? "open"), invoiceId: paid.id });
+        status: paid.status === "paid" ? "payment_submitted" : String(paid.status ?? "open"), invoiceId: paid.id });
     } catch (error) {
       await adjustmentRef.set({ status: "failed", error: error instanceof Error ? error.message : "Correction charge failed.", updatedAt: new Date().toISOString() }, { merge: true });
       results.push({ familyId: candidate.familyId, reference: candidate.reference, differenceCents: candidate.differenceCents, status: "failed" });
