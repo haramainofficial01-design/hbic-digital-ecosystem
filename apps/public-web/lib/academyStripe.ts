@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
 import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
-import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
+import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 
 // 00:00 Calgary on February 1, before Stripe's February renewal. The final
@@ -137,6 +137,97 @@ export async function startAcademyCheckout(uid: string) {
     await stripe.checkout.sessions.expire(session.id);
     throw error;
   }
+  return session.url;
+}
+
+/**
+ * Initial card signup Checkout. The registration stays in the private pending
+ * collection; no Academy family/pass/enrollment exists until Stripe reports a
+ * non-zero paid tuition invoice.
+ */
+export async function startAcademyPendingCheckout(uid: string) {
+  if (process.env.ACADEMY_REGISTRATION_READY !== "true" || !academyRegistrationOpen()) {
+    throw new AcademyError("Academy card enrollment is not open yet.", 403);
+  }
+  const db = academyDb();
+  const pendingRef = db.collection("academyPendingRegistrations").doc(uid);
+  const snapshot = await pendingRef.get();
+  if (!snapshot.exists) throw new AcademyError("Complete the Academy registration form before card Checkout.", 409);
+  const pending = snapshot.data()!;
+  if (pending.paymentChoice !== "card") throw new AcademyError("This pending registration is not set up for card payment.", 409);
+
+  const config = await academyCardConfig();
+  if (!config.cardAvailable) throw new AcademyError("Card setup is not ready.", 503);
+  const stripe = academyStripe();
+  const price = await stripe.prices.retrieve(config.stripePriceId);
+  const children = Array.isArray(pending.children) ? pending.children : [];
+  const quantity = config.tuitionMode === "per_child" ? children.length : 1;
+  if (price.livemode !== (academyBillingMode() === "live") || price.currency !== "cad" || price.recurring?.interval !== "month" ||
+      price.unit_amount !== config.monthlyCents || price.active !== true || quantity < 1) {
+    throw new AcademyError("The approved tuition and Stripe monthly price do not match.", 409);
+  }
+
+  if (typeof pending.stripeCheckoutSessionId === "string") {
+    try {
+      const existing = await stripe.checkout.sessions.retrieve(pending.stripeCheckoutSessionId);
+      if (existing.status === "open" && existing.url &&
+          existing.metadata?.academyRegistrationId === String(pending.registrationId) &&
+          existing.metadata?.academyBillingPolicyVersion === ACADEMY_TUITION_POLICY_VERSION) return existing.url;
+      if (existing.status === "complete") throw new AcademyError("Your card payment is being confirmed. Refresh shortly.", 409);
+    } catch (error) {
+      if (error instanceof AcademyError) throw error;
+      // Stale/expired Checkout is replaced below.
+    }
+  }
+
+  const checkoutNow = new Date();
+  let timing: ReturnType<typeof academyCheckoutTiming>;
+  try { timing = academyCheckoutTiming(String(pending.enrollmentStartPeriod), false, checkoutNow); }
+  catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Tuition timing is unavailable.", 409); }
+  const currentPeriod = calgaryBillingPeriod(checkoutNow);
+  const chargeCurrentMonthNow = String(pending.enrollmentStartPeriod) <= currentPeriod && !isCalgaryFirstOfMonth(checkoutNow);
+  const checkoutAmounts = academyCheckoutTuitionAmounts(config.monthlyCents, quantity, chargeCurrentMonthNow);
+  const productId = objectId(price.product);
+  if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: price.id, quantity }];
+  if (chargeCurrentMonthNow) {
+    lineItems.push({ price_data: { currency: "cad", unit_amount: checkoutAmounts.currentMonthCents, product: productId }, quantity: 1 });
+  }
+
+  const registrationId = String(pending.registrationId ?? "");
+  if (!/^[a-f0-9]{24}$/.test(registrationId)) throw new AcademyError("Pending registration reference is invalid.", 409);
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    payment_method_collection: "always",
+    integration_identifier: `hbic-academy-${Array.from(randomBytes(8), (byte) => String.fromCharCode(97 + byte % 26)).join("")}`,
+    line_items: lineItems,
+    customer_email: String(pending.email),
+    client_reference_id: uid,
+    metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId, academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION },
+    subscription_data: {
+      metadata: {
+        academyFamilyUid: uid,
+        academyRegistrationId: registrationId,
+        academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION,
+        academyInitialBillingPeriod: String(pending.enrollmentStartPeriod)
+      },
+      ...timing
+    },
+    success_url: `${academyPreviewOrigin()}/quran-academy?checkout=success`,
+    cancel_url: `${academyPreviewOrigin()}/quran-academy?checkout=cancelled`
+  });
+  if (!session.url || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Stripe returned an unexpected Checkout session.", 502);
+
+  await db.runTransaction(async (tx) => {
+    const latest = await tx.get(pendingRef);
+    if (!latest.exists || String(latest.data()?.registrationId ?? "") !== registrationId) {
+      throw new AcademyError("Pending registration changed during card setup.", 409);
+    }
+    tx.update(pendingRef, { stripeCheckoutSessionId: session.id, status: "checkout_open", updatedAt: new Date().toISOString() });
+  }).catch(async (error) => {
+    await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
+    throw error;
+  });
   return session.url;
 }
 
@@ -612,16 +703,37 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
       throw new AcademyError("Checkout subscription does not match this Academy family.", 409);
     }
     const registered = await db.collection("academyFamilies").doc(uid).get();
-    if (registered.data()?.enrollmentState === "withdrawn" || registered.data()?.withdrawalPendingAt ||
-        registered.data()?.paymentChoice !== "card" || String(registered.data()?.registrationId ?? "") !== eventRegistrationId) {
+    const pendingRef = db.collection("academyPendingRegistrations").doc(uid);
+    const pending = await pendingRef.get();
+    const familyMatches = registered.exists && registered.data()?.enrollmentState !== "withdrawn" && !registered.data()?.withdrawalPendingAt &&
+      registered.data()?.paymentChoice === "card" && String(registered.data()?.registrationId ?? "") === eventRegistrationId;
+    const pendingMatches = pending.exists && pending.data()?.paymentChoice === "card" &&
+      String(pending.data()?.registrationId ?? "") === eventRegistrationId;
+    if (!familyMatches && !pendingMatches) {
       if (subscription.status !== "canceled") await stripe.subscriptions.cancel(subscriptionId, { invoice_now: false, prorate: false });
-    } else if (subscription.cancel_at !== academyTermBillingStop) {
-      // Scheduling this before acknowledging Checkout makes the stop durable
-      // even if a later webhook is delayed. A failure asks Stripe to retry.
-      await stripe.subscriptions.update(subscriptionId, { cancel_at: academyTermBillingStop },
-        { idempotencyKey: `academy-term-stop-${subscriptionId}` });
+    } else {
+      if (subscription.cancel_at !== academyTermBillingStop) {
+        await stripe.subscriptions.update(subscriptionId, { cancel_at: academyTermBillingStop },
+          { idempotencyKey: `academy-term-stop-${subscriptionId}` });
+      }
+      if (pendingMatches && !familyMatches) {
+        await db.runTransaction(async (tx) => {
+          if ((await tx.get(markerRef)).exists) return;
+          const latest = await tx.get(pendingRef);
+          if (!latest.exists || String(latest.data()?.registrationId ?? "") !== eventRegistrationId) {
+            tx.create(markerRef, { type: event.type, ignored: true, reason: "pending_changed", processedAt: new Date().toISOString() });
+            return;
+          }
+          tx.update(pendingRef, {
+            stripeCheckoutSessionId: String(data.id ?? ""), stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
+            status: "checkout_complete_awaiting_payment", updatedAt: new Date().toISOString()
+          });
+          tx.create(markerRef, { type: event.type, pendingOnly: true, processedAt: new Date().toISOString() });
+        });
+        return;
+      }
     }
-    // Checkout establishes the family mapping. A signed invoice event settles payment.
+    // Checkout establishes billing mapping; only a non-zero paid invoice can create a new card enrollment.
   } else if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
     invoiceId = String(data.id ?? "");
     customerId = objectId(data.customer);
@@ -658,6 +770,28 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
   } else return;
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) throw new AcademyError("Stripe event has no valid Academy family association.", 409);
   const familyRef = db.collection("academyFamilies").doc(uid);
+  if ((event.type === "invoice.paid" || event.type === "invoice.payment_failed") && !(await familyRef.get()).exists) {
+    const pendingRef = db.collection("academyPendingRegistrations").doc(uid);
+    const pending = await pendingRef.get();
+    const pendingMatches = pending.exists && pending.data()?.paymentChoice === "card" &&
+      String(pending.data()?.registrationId ?? "") === eventRegistrationId;
+    if (pendingMatches && event.type === "invoice.paid" && amountCents > 0) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      if (subscription.cancel_at !== academyTermBillingStop) {
+        await stripe.subscriptions.update(subscriptionId, { cancel_at: academyTermBillingStop },
+          { idempotencyKey: `academy-term-stop-${subscriptionId}` });
+      }
+      await activatePendingAcademyCardRegistration(uid, eventRegistrationId, {
+        checkoutSessionId: typeof pending.data()?.stripeCheckoutSessionId === "string" ? pending.data()!.stripeCheckoutSessionId : null,
+        customerId, subscriptionId, termBillingStopAt: academyTermBillingStop
+      });
+    } else if (pendingMatches) {
+      await pendingRef.set({ status: event.type === "invoice.payment_failed" ? "payment_failed" : "awaiting_payment",
+        updatedAt: new Date().toISOString() }, { merge: true });
+      if (!(await markerRef.get()).exists) await markerRef.create({ type: event.type, pendingOnly: true, processedAt: new Date().toISOString() });
+      return;
+    }
+  }
   const monthRef = period ? familyRef.collection("months").doc(period) : null;
   await db.runTransaction(async (tx) => {
     if ((await tx.get(markerRef)).exists) return;
