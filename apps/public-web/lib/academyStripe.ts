@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 
@@ -97,13 +97,14 @@ export async function startAcademyCheckout(uid: string) {
   const chargeCurrentMonthNow = !selectedMonthPaid &&
     (family.enrollmentStartPeriod ?? academyTuitionPeriod(checkoutNow)) <= currentPeriod &&
     !isCalgaryFirstOfMonth(checkoutNow);
+  const checkoutAmounts = academyCheckoutTuitionAmounts(config.monthlyCents, quantity, chargeCurrentMonthNow);
   const productId = objectId(price.product);
   if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: price.id, quantity }];
   if (chargeCurrentMonthNow) {
     // Keep recurring tuition anchored to the next 1st without proration, while
     // charging one full current-month tuition amount on the initial invoice.
-    lineItems.push({ price_data: { currency: "cad", unit_amount: config.monthlyCents, product: productId }, quantity });
+    lineItems.push({ price_data: { currency: "cad", unit_amount: checkoutAmounts.currentMonthCents, product: productId }, quantity: 1 });
   }
   const initialBillingPeriod = family.enrollmentStartPeriod ?? family.billingPeriod;
   const session = await stripe.checkout.sessions.create({
@@ -271,9 +272,23 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
   const pricing = await getAcademyPricing();
   const families = await db.collection("academyFamilies").limit(200).get();
   const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
+  // If the same active parent/children were accidentally registered twice,
+  // exclude both records from automatic corrections; a human must resolve it.
+  const signatures = new Map<string, string[]>();
+  for (const doc of families.docs) {
+    const data = doc.data();
+    if (data.enrollmentState !== "active" || data.paymentChoice !== "card" || data.withdrawalPendingAt) continue;
+    const email = String(data.email ?? "").trim().toLowerCase();
+    const children = Array.isArray(data.children) ? data.children as { name?: unknown }[] : [];
+    const names = children.map((child) => String(child.name ?? "").trim().toLowerCase().replace(/\s+/g, " ")).sort();
+    if (!email || !names.length) continue;
+    const signature = `${email}|${names.join("|")}`;
+    signatures.set(signature, [...(signatures.get(signature) ?? []), doc.id]);
+  }
+  const duplicateIds = new Set([...signatures.values()].filter((ids) => ids.length > 1).flat());
   const candidates = await Promise.all(families.docs.map(async (doc) => {
     const data = doc.data();
-    if (data.paymentChoice !== "card" || data.enrollmentState === "withdrawn" || data.withdrawalPendingAt) return null;
+    if (data.paymentChoice !== "card" || data.enrollmentState !== "active" || data.withdrawalPendingAt || duplicateIds.has(doc.id)) return null;
     if (typeof data.enrollmentStartPeriod === "string" && data.enrollmentStartPeriod > period) return null;
     const month = await doc.ref.collection("months").doc(period).get();
     const monthData = month.data();
@@ -282,10 +297,14 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
     if (!Number.isSafeInteger(paidCents) || paidCents <= 0) return null;
     const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
     const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    // The former bug charged approximately $42 per child. Do not extrapolate
+    // this correction to unrelated discounts or other anomalous amounts.
+    if (pricing.tuitionMode !== "per_child" || paidCents < childCount * 4_200 || paidCents > childCount * 4_299) return null;
     const expectedCents = period > ACADEMY_LAST_BILLING_MONTH || childCount === 0 ? 0 :
-      pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
+      pricing.tuitionMode === "per_child" ? academyTuitionTotalCents(pricing.monthlyCents, childCount) : pricing.monthlyCents;
     if (!Number.isSafeInteger(expectedCents) || expectedCents <= paidCents) return null;
     const adjustment = await db.collection("academyBillingAdjustments").doc(`${doc.id}_${period}`).get();
+    if (adjustment.exists) return null;
     return {
       familyId: doc.id,
       guardianName: String(data.guardianName ?? ""),
@@ -294,10 +313,10 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
       paidCents,
       expectedCents,
       differenceCents: expectedCents - paidCents,
-      adjustmentStatus: adjustment.exists ? String(adjustment.data()?.status ?? "existing") : null
+      adjustmentStatus: null
     } satisfies AcademyUndercharge;
   }));
-  return candidates.filter((item): item is AcademyUndercharge => item !== null);
+  return candidates.filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 /**
@@ -320,7 +339,7 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
     const lock = await db.runTransaction(async (tx) => {
       const [family, month, adjustment] = await Promise.all([tx.get(familyRef), tx.get(monthRef), tx.get(adjustmentRef)]);
       if (adjustment.exists) return null;
-      if (!family.exists || family.data()?.paymentChoice !== "card" || family.data()?.enrollmentState === "withdrawn") return null;
+      if (!family.exists || family.data()?.paymentChoice !== "card" || family.data()?.enrollmentState !== "active" || family.data()?.withdrawalPendingAt) return null;
       if (!month.exists || month.data()?.method !== "card" || month.data()?.status !== "paid" || Number(month.data()?.amountCents) !== candidate.paidCents) return null;
       const now = new Date().toISOString();
       tx.create(adjustmentRef, {

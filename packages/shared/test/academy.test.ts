@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { academyCardEnrollmentConfirmed } from "../src/academy";
-import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutTiming, academyEnrollmentStartPeriod, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -66,9 +66,9 @@ test("older card terms cannot authorize the new full current-month charge", () =
   assert.throws(() => parseAcademyRegistration({
     ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: "academy-payment-policy-v3", startChoice: "current"
   }), /terms changed/);
-  assert.equal(parseAcademyRegistration({
+  assert.throws(() => parseAcademyRegistration({
     ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: "academy-payment-policy-v3", startChoice: "next"
-  }).startChoice, "next");
+  }), /current policy/);
   assert.equal(parseAcademyRegistration({
     ...valid, paymentChoice: "card", recurringAuthorized: true, policyVersion: ACADEMY_TUITION_POLICY_VERSION, startChoice: "current"
   }).policyVersion, ACADEMY_TUITION_POLICY_VERSION);
@@ -87,25 +87,38 @@ test("Billing periods follow Calgary, including UTC month rollover and DST", () 
 test("parents select this month or next month, with server-derived term limits", () => {
   const now = new Date("2026-10-02T18:00:00Z");
   assert.equal(academyEnrollmentStartPeriod("current", now), "2026-10");
-  assert.equal(academyEnrollmentStartPeriod("next", now), "2026-11");
-  assert.equal(academyEnrollmentStartPeriod("next", new Date("2026-12-15T18:00:00Z")), "2027-01");
-  assert.throws(() => academyEnrollmentStartPeriod("next", new Date("2027-01-02T18:00:00Z")), /February/);
+  assert.equal(academyNextMonthEnrollmentOpen(now), false);
+  assert.throws(() => academyEnrollmentStartPeriod("next", now), /final three days/);
+  const finalThreeDays = new Date("2026-10-29T18:00:00Z");
+  assert.equal(academyNextMonthEnrollmentOpen(finalThreeDays), true);
+  assert.equal(academyEnrollmentStartPeriod("next", finalThreeDays), "2026-11");
+  assert.equal(academyEnrollmentStartPeriod("next", new Date("2026-12-29T18:00:00Z")), "2027-01");
+  assert.throws(() => academyEnrollmentStartPeriod("next", new Date("2027-01-29T18:00:00Z")), /February/);
   assert.equal(parseAcademyRegistration({ ...valid, startChoice: "next" }).startChoice, "next");
   assert.throws(() => parseAcademyRegistration({ ...valid, startChoice: "free" }), /this month/);
 });
 
-test("current-month card Checkout anchors renewal on the 1st without proration", () => {
+test("current-month card Checkout charges one full month now and defers renewal to the 1st", () => {
   const now = new Date("2026-10-02T18:00:00Z");
   const current = academyCheckoutTiming("2026-10", false, now);
   const next = academyCheckoutTiming("2026-11", false, now);
   assert.equal(current.proration_behavior, "none");
-  assert.equal(new Date(current.billing_cycle_anchor! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
+  assert.equal(new Date(current.trial_end! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
   assert.equal(next.proration_behavior, "none");
-  assert.equal(new Date(next.billing_cycle_anchor! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
+  assert.equal(new Date(next.trial_end! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
   assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), {});
   assert.equal(academyCheckoutTiming("2026-10", true, now).proration_behavior, "none");
-  assert.equal(new Date(academyCheckoutTiming("2026-11", true, now).billing_cycle_anchor! * 1000).toISOString(), "2026-12-01T12:00:00.000Z");
+  assert.equal(new Date(academyCheckoutTiming("2026-11", true, now).trial_end! * 1000).toISOString(), "2026-12-01T12:00:00.000Z");
   assert.throws(() => academyCheckoutTiming("2027-01", true, new Date("2027-01-02T18:00:00Z")), /No February charge/);
+  assert.deepEqual([1, 2, 3].map((children) => academyTuitionTotalCents(5_000, children)), [5_000, 10_000, 15_000]);
+  assert.deepEqual([1, 2, 3].map((children) => academyCheckoutTuitionAmounts(5_000, children, true)), [
+    { currentMonthCents: 5_000, recurringMonthlyCents: 5_000 },
+    { currentMonthCents: 10_000, recurringMonthlyCents: 10_000 },
+    { currentMonthCents: 15_000, recurringMonthlyCents: 15_000 }
+  ]);
+  assert.equal(academyCheckoutTuitionAmounts(5_000, 2, false).currentMonthCents, 0);
+  assert.equal(academyCheckoutTuitionAmounts(5_000, 2, false).recurringMonthlyCents, 10_000);
+  assert.throws(() => academyTuitionTotalCents(5_000, 0), /Invalid Academy tuition/);
 });
 
 test("monthly card anchor is the next first within Calgary in both DST seasons", () => {

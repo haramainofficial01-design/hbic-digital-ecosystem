@@ -2,7 +2,7 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerificati
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState, Image, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, dateStringInTimeZone, masjidTimeZone, type AcademyChildInput, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, dateStringInTimeZone, masjidTimeZone, type AcademyChildInput, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { AppScreen } from "../components/AppScreen";
 import { AppButton } from "../components/AppButton";
 import { GlassCard } from "../components/GlassCard";
@@ -46,7 +46,7 @@ export default function QuranAcademyScreen() {
   const academyPushToken = useRef<string | null>(null);
   const cashReminder = family?.paymentChoice === "cash" ? academyCashReminderStage(new Date(), family.cashReminderEligible, family.paymentState) : null;
   const calgaryToday = dateStringInTimeZone(new Date(), masjidTimeZone);
-  const nextStartPeriod = calgaryToday.slice(0, 7) < ACADEMY_LAST_BILLING_MONTH ? academyEnrollmentStartPeriod("next") : null;
+  const nextStartPeriod = academyNextMonthEnrollmentOpen() && calgaryToday.slice(0, 7) < ACADEMY_LAST_BILLING_MONTH ? academyEnrollmentStartPeriod("next") : null;
   const classStart = family?.enrollmentStartPeriod && `${family.enrollmentStartPeriod}-01` > calgaryToday ? `${family.enrollmentStartPeriod}-01` : calgaryToday;
   const nextClass = content?.calendar.find((item) => item.date >= classStart && item.type === "class");
   const nextClosure = content?.calendar.find((item) => item.date >= calgaryToday && (item.type === "holiday" || item.type === "no_class"));
@@ -310,8 +310,8 @@ export default function QuranAcademyScreen() {
         </View>)}
         <AppButton label="Add another child" variant="secondary" disabled={form.children.length >= 8} onPress={() => setForm({ ...form, children: [...form.children, child()] })} />
         <Text style={[styles.label, { color: theme.colors.text, marginVertical: 14 }]}>When would you like to start?</Text>
-        <View style={styles.row}><AppButton label="This month · pay now" variant={form.startChoice !== "next" ? "primary" : "secondary"} onPress={() => setForm({ ...form, startChoice: "current" })} />{nextStartPeriod ? <AppButton label={`Next month · ${nextStartPeriod}-01`} variant={form.startChoice === "next" ? "primary" : "secondary"} onPress={() => setForm({ ...form, startChoice: "next" })} /> : null}</View>
-        <Text style={{ color: theme.colors.muted, lineHeight: 22, marginTop: 10 }}>{form.startChoice === "next" ? "Collect your card securely now. No charge or classes this month; tuition and attendance start next month." : "Attend current-month classes. Card tuition is charged now at the full $50 per child for the current month; enrollment stays pending until Stripe confirms Checkout."}</Text>
+        <View style={styles.row}><AppButton label="This month · $50 per child now" variant={form.startChoice !== "next" ? "primary" : "secondary"} onPress={() => setForm({ ...form, startChoice: "current" })} />{nextStartPeriod ? <AppButton label={`Next month · start ${nextStartPeriod}-01`} variant={form.startChoice === "next" ? "primary" : "secondary"} onPress={() => setForm({ ...form, startChoice: "next" })} /> : null}</View>
+        <Text style={{ color: theme.colors.muted, lineHeight: 22, marginTop: 10 }}>{form.startChoice === "next" ? `No classes or tuition this month. We securely collect your card now; the first $50-per-child tuition is charged on ${nextStartPeriod}-01. Cash is due at HBIC that day.` : "The full current-month tuition—$50 per child, with no proration—is due now. Card Checkout charges it now, then renews at $50 per child on the 1st unless you cancel. Cash is due in person at HBIC."}</Text>
         <Text style={[styles.label, { color: theme.colors.muted, marginVertical: 14 }]}>How would you like to pay?</Text>
         <View style={styles.row}><AppButton label={cardAvailable ? "Card monthly" : "Card not ready"} variant={form.paymentChoice === "card" ? "primary" : "secondary"} disabled={!cardAvailable} onPress={() => setForm({ ...form, paymentChoice: "card" })} /><AppButton label="Cash at HBIC" variant={form.paymentChoice === "cash" ? "primary" : "secondary"} onPress={() => setForm({ ...form, paymentChoice: "cash" })} /></View>
         <Text style={{ color: theme.colors.muted, lineHeight: 22, marginVertical: 12 }}>Tuition is $50 CAD per child monthly. {form.startChoice === "next" ? "Card tuition first charges on the 1st of next month. Cash tuition is due for that same start month." : calgaryToday < "2026-10-01" ? "There is no September charge. Card tuition starts October 1 at the full monthly amount; October cash tuition is due in person October 1." : `Card billing charges the full monthly amount today, then renews on the 1st. Cash is due in person on the 1st.`} There is no class October 1; tuition is monthly, not per class. You may cancel future enrollment at any time.</Text>
