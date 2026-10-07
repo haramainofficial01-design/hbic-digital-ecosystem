@@ -116,6 +116,7 @@ export interface AcademyChildInput {
   name: string;
   age: number;
   level: AcademyLevel;
+  attendanceGroup?: "boys" | "girls" | "unassigned";
 }
 
 export interface AcademyRegistrationInput {
@@ -274,4 +275,22 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
     startChoice: selectedStart,
     policyVersion: legacyV2Current ? "academy-payment-policy-v2" : legacyV3 ? "academy-payment-policy-v3" : legacyV4 ? "academy-payment-policy-v4" : ACADEMY_TUITION_POLICY_VERSION,
     policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
+}
+
+/** Monday/Thursday class dates only. Statutory holidays remain ordinary class dates. */
+export function academyAttendanceDateOpen(date: string, calendar: readonly { date: string; type: string; classIds?: readonly string[] }[] = [], classId?: string | null) {
+  const parsed = new Date(`${date}T12:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date ||
+      date < ACADEMY_FIRST_CLASS_DATE || date > ACADEMY_TERM_END_DATE || ![1, 4].includes(parsed.getUTCDay())) return false;
+  return !calendar.some(item => item.date === date && ["no_class", "holiday"].includes(item.type) &&
+    (!item.classIds?.length || !!classId && item.classIds.includes(classId)));
+}
+
+/** A roster suggestion only; an explicit staff selection always takes precedence. */
+export function academyAttendanceGroup(child: { name: string; attendanceGroup?: "boys" | "girls" | "unassigned" }) {
+  if (child.attendanceGroup === "boys" || child.attendanceGroup === "girls" || child.attendanceGroup === "unassigned") return child.attendanceGroup;
+  const name = child.name.toLowerCase().replace(/[^a-z ]/g, "").trim().split(/\s+/)[0];
+  if (["abdullah", "abdul", "abdur", "abdurrahman", "ahmad", "ahmed", "ali", "amir", "ameer", "anas", "bilal", "hamza", "hassan", "hasan", "hussain", "hussein", "ibrahim", "idris", "ismail", "kareem", "mohammad", "mohammed", "muhammad", "muhammed", "mohamed", "mohamad", "muaadh", "muadh", "maaz", "muaz", "mustafa", "mahad", "omar", "osman", "umar", "usman", "yusuf", "yousuf", "yousef", "zain", "zaid", "sahl", "sulaiman", "suleiman", "ruwais", "azlaan", "arslan", "hasanul", "zainul", "fadlullah"].includes(name)) return "boys" as const;
+  if (["aisha", "ayesha", "aishah", "amina", "aminah", "asma", "asiyah", "asiya", "fatima", "fatimah", "hafsa", "hafsah", "huda", "haniya", "haniyah", "hania", "eman", "imaan", "khadija", "khadijah", "mariam", "maryam", "mysha", "maisha", "mayesha", "sana", "sarah", "sara", "sumaya", "sumayya", "tasmia", "tasmiya", "zainab", "zaynab", "zahra", "zara"].includes(name)) return "girls" as const;
+  return "unassigned" as const;
 }

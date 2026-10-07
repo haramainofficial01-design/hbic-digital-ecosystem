@@ -91,3 +91,17 @@ test("exemptions save for legacy active families without a registration ID and p
   assert.equal(audits.every(row => row.registrationId === null), true);
   assert.equal(records.has("academyBillingLocks/legacy-exemption"), false);
 });
+
+test("staff roster groups preserve exemptions, enrollment and payment records", async () => {
+  const { setAcademyAttendanceGroup } = await import("../lib/academyContent");
+  const path = "academyFamilies/roster-group";
+  records.set(path, { enrollmentState: "active", children: [{ id: "child", name: "Local student", tuitionExempt: true }], passToken: "unchanged" });
+  await setAcademyAttendanceGroup("roster-group", "child", "girls", "staff");
+  const family = records.get(path);
+  assert.deepEqual(family?.children, [{ id: "child", name: "Local student", tuitionExempt: true, attendanceGroup: "girls" }]);
+  assert.equal(family?.enrollmentState, "active");
+  assert.equal(family?.passToken, "unchanged");
+  await setAcademyAttendanceGroup("roster-group", "child", "girls", "staff");
+  assert.equal([...records.values()].filter(row => row.action === "attendance_group_changed" && row.familyId === "roster-group").length, 1);
+  await assert.rejects(setAcademyAttendanceGroup("roster-group", "child", "guessed", "staff"), /attendance group/);
+});

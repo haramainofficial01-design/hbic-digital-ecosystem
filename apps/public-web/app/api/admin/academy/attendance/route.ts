@@ -1,6 +1,9 @@
 import { academyAdmin, academyDb, AcademyError } from "../../../../../lib/academyStore";
 import { jsonResponse, optionsResponse } from "../../../../../lib/api";
 
+import { academyAttendanceDateOpen } from "@hbic/shared";
+import { listAcademyContent } from "../../../../../lib/academyContent";
+
 export const dynamic = "force-dynamic";
 export function OPTIONS() { return optionsResponse(); }
 
@@ -34,6 +37,8 @@ export async function POST(request: Request) {
     const status = String(body.status ?? "");
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(familyId) || !/^[A-Za-z0-9_-]{1,128}$/.test(childId) ||
         !["present", "absent", "excused"].includes(status)) throw new AcademyError("Choose a student and attendance status.");
+    const calendar = (await listAcademyContent(true)).calendar;
+    if (!academyAttendanceDateOpen(date, calendar)) throw new AcademyError("Attendance can be recorded only on Monday and Thursday class dates without an HBIC closure.");
     const db = academyDb();
     const familyRef = db.collection("academyFamilies").doc(familyId);
     const attendanceRef = db.collection("academyAttendance").doc(date).collection("students").doc(`${familyId}_${childId}`);
@@ -44,6 +49,7 @@ export async function POST(request: Request) {
       const child = (family.data()?.children as { id: string; name: string; classId?: string | null; cancelEffectiveAt?: string | null }[] | undefined)
         ?.find((item) => item.id === childId && (!item.cancelEffectiveAt || item.cancelEffectiveAt.slice(0, 10) > date));
       if (!child) throw new AcademyError("This student is no longer enrolled on that date.", 409);
+      if (!academyAttendanceDateOpen(date, calendar, child.classId)) throw new AcademyError("HBIC has closed this class on the selected date.", 409);
       if (previous.data()?.status === status) return;
       tx.set(attendanceRef, { familyId, childId, childName: child.name, classId: child.classId ?? null,
         status, date, markedAt: now, markedBy: actor.uid, markedByEmail: actor.email });
