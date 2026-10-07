@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { academyBillableChildCount } from "@hbic/shared";
 import { academyPaymentFirstCheckout, academyPaymentFirstPlan, academyRecurringSubscription } from "../lib/academyPaymentFirst";
 const now = new Date("2026-10-06T18:00:00Z"), anchor = Date.UTC(2026, 10, 1, 12) / 1000;
-const input = { uid: "fixture", registrationId: "a".repeat(24), customerId: "cus_test", priceId: "price_test", quantity: 1, monthlyCents: 5000, startPeriod: "2026-10", origin: "https://preview.example.invalid", now };
+const input = { uid: "fixture", registrationId: "a".repeat(24), customerId: "cus_test", email: "fake@example.invalid", priceId: "price_test", quantity: 1, monthlyCents: 5000, startPeriod: "2026-10", origin: "https://preview.example.invalid", now };
 test("current-month Checkout pays full tuition once, saves a card, and never starts a trial", () => {
   for (const quantity of [1, 2, 3]) {
     const checkout = academyPaymentFirstCheckout({ ...input, quantity });
@@ -156,4 +156,36 @@ test("repeated cash conversion returns the same registration before parsing a pa
   const before = records.size;
   const repeated = await registerAcademyFamily(uid, "teacher@example.invalid", { paymentChoice: "cash" }, { registrationId, checkoutSessionId: null });
   assert.equal(repeated?.reference, "QA-EXEMPT"); assert.equal(records.size, before);
+});
+
+test("Checkout owns new customer creation in payment/setup modes; existing customers are reused without conflicting fields", () => {
+  for (const startPeriod of ["2026-10", "2026-11"]) {
+    const fresh = academyPaymentFirstCheckout({ ...input, customerId: undefined, startPeriod });
+    assert.equal(fresh.customer, undefined); assert.equal(fresh.customer_creation, "always"); assert.equal(fresh.customer_email, input.email);
+    const existing = academyPaymentFirstCheckout({ ...input, startPeriod });
+    assert.equal(existing.customer, "cus_test"); assert.equal(existing.customer_creation, undefined); assert.equal(existing.customer_email, undefined);
+  }
+});
+test("new pending Checkout opens without any Customer API calls and persists only its session before payment", async () => {
+  const { startAcademyPendingCheckout } = await import("../lib/academyStripe");
+  process.env.ACADEMY_REGISTRATION_READY = "true";
+  process.env.ACADEMY_STRIPE_BILLING_READY = "true";
+  process.env.ACADEMY_STRIPE_WEBHOOK_SECRET = "whsec_memory";
+  process.env.ACADEMY_STRIPE_PRICE_ID = "price_memory";
+  Object.assign(fakeStripe, {
+    customers: { create: async () => { throw Error("Customer Write forbidden"); }, retrieve: async () => { throw Error("Customer Read unnecessary"); } },
+    prices: { retrieve: async () => ({ id: "price_memory", active: true, livemode: false, currency: "cad", unit_amount: 5000, recurring: { interval: "month" } }) }
+  });
+  let created: any;
+  Object.assign(fakeStripe.checkout.sessions, { create: async (params: any) => { created = params; return { id: "cs_unpaid", url: "https://checkout.stripe.com/test", livemode: false }; } });
+  for (const customerId of [undefined, "cus_saved"]) {
+    records.clear();
+    records.set("academyPendingRegistrations/fixture", { registrationId: input.registrationId, paymentChoice: "card", email: input.email,
+      enrollmentStartPeriod: "2026-10", children: [{ name: "Fake Child", age: 8 }] , ...(customerId ? { stripeCustomerId: customerId } : {}) });
+    assert.equal(await startAcademyPendingCheckout("fixture"), "https://checkout.stripe.com/test");
+    assert.equal(created.customer, customerId); assert.equal(created.customer_creation, customerId ? undefined : "always");
+    assert.equal(records.get("academyPendingRegistrations/fixture")?.stripeCustomerId, customerId);
+    assert.equal(records.get("academyPendingRegistrations/fixture")?.stripeCheckoutSessionId, "cs_unpaid");
+    assert.equal(records.has("academyFamilies/fixture"), false);
+  }
 });

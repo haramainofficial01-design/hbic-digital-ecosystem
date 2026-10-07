@@ -18,7 +18,7 @@ export function academyMonthLabel(period: string) {
 export function academyChargeDate(anchor: number) {
   return new Date(anchor * 1000).toLocaleDateString("en-CA", { timeZone: "America/Edmonton", month: "long", day: "numeric", year: "numeric" });
 }
-export function academyPaymentFirstCheckout(input: { uid: string; registrationId: string; customerId: string; priceId: string; quantity: number; monthlyCents: number; startPeriod: string; monthPaid?: boolean; origin: string; now?: Date }): Stripe.Checkout.SessionCreateParams {
+export function academyPaymentFirstCheckout(input: { uid: string; registrationId: string; customerId?: string; email: string; priceId: string; quantity: number; monthlyCents: number; startPeriod: string; monthPaid?: boolean; origin: string; now?: Date }): Stripe.Checkout.SessionCreateParams {
   const plan = academyPaymentFirstPlan(input.monthlyCents, input.quantity, input.startPeriod, input.monthPaid, input.now);
   const metadata = { academyFamilyUid: input.uid, academyRegistrationId: input.registrationId,
     academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION, academyCheckoutFlow: ACADEMY_PAYMENT_FIRST_FLOW, academyCheckoutKind: plan.mode === "payment" ? "initial_payment" : "saved_card_setup",
@@ -27,7 +27,7 @@ export function academyPaymentFirstCheckout(input: { uid: string; registrationId
     academyInitialAmountCents: String(plan.dueNowCents) };
   const money = (cents: number) => `CA$${(cents / 100).toFixed(2)}`;
   const description = plan.recurringAnchor ? `Next automatic payment: ${money(plan.monthlyTotalCents)} on ${academyChargeDate(plan.recurringAnchor)}. Then ${money(plan.monthlyTotalCents)} on the 1st of each month through January 1, 2027 unless you cancel. No February tuition.` : "No further automatic tuition charges this term. No February tuition.";
-  return { mode: plan.mode, customer: input.customerId, client_reference_id: input.uid, payment_method_types: ["card"],
+  return { mode: plan.mode, ...(input.customerId ? { customer: input.customerId } : { customer_creation: "always" as const, customer_email: input.email }), client_reference_id: input.uid, payment_method_types: ["card"],
     metadata, custom_text: { submit: { message: description } },
     ...(plan.mode === "payment" ? { submit_type: "pay" as const,
       line_items: [{ price_data: { currency: "cad", unit_amount: plan.dueNowCents,

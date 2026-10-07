@@ -97,10 +97,9 @@ export async function startAcademyCheckout(uid: string) {
   const selectedMonthPaid = (await familyRef.collection("months").doc(family.billingPeriod).get()).data()?.status === "paid";
   const checkoutNow = new Date();
   const registrationId = String(pending?.registrationId ?? "");
-  const customer = pending?.stripeCustomerId ? await stripe.customers.retrieve(String(pending.stripeCustomerId)) :
-    await stripe.customers.create({ email: family.email, metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId } },
-      { idempotencyKey: `academy-checkout-customer-${registrationId}` });
-  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId: customer.id,
+  const customerId = typeof pending?.stripeCustomerId === "string" ? pending.stripeCustomerId : undefined;
+  if (customerId && !/^cus_[A-Za-z0-9]+$/.test(customerId)) throw new AcademyError("Saved Stripe customer reference is invalid.", 409);
+  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId, email: family.email,
     priceId: price.id, quantity, monthlyCents: config.monthlyCents, startPeriod: family.enrollmentStartPeriod ?? family.billingPeriod,
     monthPaid: selectedMonthPaid, origin: academyPreviewOrigin(), now: checkoutNow }),
     { idempotencyKey: `academy-checkout-${registrationId}-${typeof existingId === "string" ? existingId : "first"}` });
@@ -168,11 +167,9 @@ export async function startAcademyPendingCheckout(uid: string) {
   const checkoutNow = new Date();
   const registrationId = String(pending.registrationId ?? "");
   if (!/^[a-f0-9]{24}$/.test(registrationId)) throw new AcademyError("Pending registration reference is invalid.", 409);
-  const customer = typeof pending.stripeCustomerId === "string" ? await stripe.customers.retrieve(pending.stripeCustomerId) :
-    await stripe.customers.create({ email: String(pending.email), metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId } },
-      { idempotencyKey: `academy-checkout-customer-${registrationId}` });
-  if (customer.deleted || customer.livemode !== (academyBillingMode() === "live") || customer.metadata.academyFamilyUid !== uid || customer.metadata.academyRegistrationId !== registrationId) throw new AcademyError("Stripe customer does not match the pending registration.", 409);
-  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId: customer.id,
+  const customerId = typeof pending.stripeCustomerId === "string" ? pending.stripeCustomerId : undefined;
+  if (customerId && !/^cus_[A-Za-z0-9]+$/.test(customerId)) throw new AcademyError("Saved Stripe customer reference is invalid.", 409);
+  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId, email: String(pending.email),
     priceId: price.id, quantity, monthlyCents: config.monthlyCents, startPeriod: String(pending.enrollmentStartPeriod),
     origin: academyPreviewOrigin(), now: checkoutNow }),
     { idempotencyKey: `academy-checkout-${registrationId}-${typeof pending.stripeCheckoutSessionId === "string" ? pending.stripeCheckoutSessionId : "first"}` });
@@ -183,7 +180,7 @@ export async function startAcademyPendingCheckout(uid: string) {
     if (!latest.exists || String(latest.data()?.registrationId ?? "") !== registrationId) {
       throw new AcademyError("Pending registration changed during card setup.", 409);
     }
-    tx.update(pendingRef, { stripeCheckoutSessionId: session.id, stripeCustomerId: customer.id, stripeTuitionMode: config.tuitionMode, status: "checkout_open", updatedAt: new Date().toISOString() });
+    tx.update(pendingRef, { stripeCheckoutSessionId: session.id, stripeTuitionMode: config.tuitionMode, status: "checkout_open", updatedAt: new Date().toISOString() });
   }).catch(async (error) => {
     await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
     throw error;
@@ -773,6 +770,7 @@ async function applyAcademyPaymentFirstCheckout(event: Stripe.Event) {
     throw new AcademyError("Stripe Checkout is not confirmed for this registration.", 409);
   }
   const customerId = objectId(session.customer);
+  if (!/^cus_[A-Za-z0-9]+$/.test(customerId)) throw new AcademyError("Completed Checkout has no valid Stripe customer.", 409);
   let paymentMethodId = "", paymentIntentId = "", paidCents = 0;
   if (session.mode === "payment") {
     const payment = await stripe.paymentIntents.retrieve(objectId(session.payment_intent));
