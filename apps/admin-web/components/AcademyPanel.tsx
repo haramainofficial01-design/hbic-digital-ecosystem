@@ -214,6 +214,17 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     finally { setBusy(false); }
   }
 
+  async function changeTuitionExemption(childId: string, exempt: boolean) {
+    if (!scanned) return;
+    setBusy(true); setMessage("");
+    try {
+      const data = await adminRequest("/api/admin/academy/tuition-exemption", { method: "POST", body: JSON.stringify({ familyId: scanned.id, childId, exempt }) });
+      setScanned(data.family); const refreshed = await adminRequest("/api/admin/academy"); setFamilies(refreshed.families ?? []);
+      setMessage(exempt ? "Tuition exemption saved. No payment was invented; existing paid history is preserved." : "Tuition exemption removed. Future tuition resumes on its scheduled billing date.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not change tuition exemption."); }
+    finally { setBusy(false); }
+  }
+
   async function previewUndercharges() {
     setBusy(true); setMessage("");
     try {
@@ -305,7 +316,8 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
   const attendanceStudents = families.filter((family) => family.enrollmentState === "active").flatMap((family) => family.children.filter((child) => !child.cancelEffectiveAt || child.cancelEffectiveAt.slice(0, 10) > attendanceDate).map((child) => ({ family, child }))).filter(({ child }) => attendanceClass === "all" || child.classId === attendanceClass).sort((a, b) => a.child.name.localeCompare(b.child.name));
   const pendingFamilies = operationalFamilies.filter((family) => ["awaiting_checkout", "conditional", "submitted", "approved", "waitlisted"].includes(family.enrollmentState));
   const enrollmentLabel = (family: AcademyPublicFamily) => family.enrollmentState === "awaiting_checkout" ? "Awaiting Stripe Checkout confirmation" : family.enrollmentState;
-  const paymentLabel = (family: AcademyPublicFamily) => family.enrollmentState === "awaiting_checkout" ? "Card Checkout not completed" : family.paymentState === "paid" ? family.billingMethod === "card" ? "Paid online" : "Paid cash" :
+  const paymentLabel = (family: AcademyPublicFamily) =>
+    family.noTuitionDue ? "No tuition due · exempt" : family.enrollmentState === "awaiting_checkout" ? "Card Checkout not completed" : family.paymentState === "paid" ? family.billingMethod === "card" ? "Paid online" : "Paid cash" :
     family.paymentState === "cash_due" ? "Cash due" : family.paymentState === "past_due" ? "Past due" : family.paymentState === "card_attention" ? "Payment needs attention" :
     family.paymentState === "scheduled" ? "Card scheduled" : family.paymentState === "not_due" ? "No tuition due" : "Awaiting tuition";
   const correctionSummary = (payment: { underchargeOriginalPaidCents?: number | null; underchargeCorrectionCents?: number | null; underchargeCorrectionPendingCents?: number | null; underchargeCorrectionStatus?: string | null }) => {
@@ -331,8 +343,10 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
       <div className="academy-admin-actions"><button className="primary" onClick={() => void scan()} disabled={busy}>Look up pass</button><button className="secondary" onClick={() => void startCamera()} disabled={busy}>Use camera</button><button className="secondary" onClick={stopCamera}>Stop camera</button></div>
       <video ref={videoRef} muted playsInline className="academy-admin-video" aria-label="Academy QR scanner camera" />
       {scanned ? <div className="academy-admin-result"><span className="pill">{scanned.reference}</span><h3>{scanned.guardianName}</h3><p>{scanned.phone} · {scanned.email}</p><p>Registered {new Date(scanned.createdAt).toLocaleString("en-CA")} · Enrollment: {enrollmentLabel(scanned)}</p><div className="academy-admin-actions"><a href={`tel:${scanned.phone.replace(/[^\d+]/g, "")}`}>Call parent</a><a href={`mailto:${encodeURIComponent(scanned.email)}`}>Email parent</a><button className="secondary" type="button" onClick={() => void navigator.clipboard.writeText(scanned.phone).then(() => setMessage("Phone number copied.")).catch(() => setMessage("Could not copy this phone number."))}>Copy phone</button>{scanned.whatsappConsent ? <a href={`https://wa.me/${scanned.phone.replace(/\D/g, "").replace(/^(\d{10})$/, "1$1")}`} target="_blank" rel="noopener noreferrer">Open WhatsApp</a> : null}</div><p>WhatsApp consent: {scanned.whatsappConsent ? "Yes" : "No"}</p>
+        <p>Staff-approved exemptions waive unpaid tuition and future renewals. Existing paid amounts and enrollment history are retained.</p>
         <ul>{scanned.children.map((child) => <li key={child.id}>{child.name} · Age {child.age} · {child.level.replace("_", " ")}
           <select aria-label={`Class for ${child.name}`} value={child.classId ?? ""} onChange={(event) => void assignChild(child.id, event.target.value)}><option value="">Awaiting class</option>{classes.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}</option>)}</select>
+          <label><input type="checkbox" checked={child.tuitionExempt === true} disabled={busy} onChange={(event) => void changeTuitionExemption(child.id, event.target.checked)} /> No tuition due · staff-approved exemption</label>
         </li>)}</ul>
         <div className="academy-admin-payment"><strong>{paymentLabel(scanned)}</strong><span>{scanned.billingPeriod} · {amount(scanned.amountCents)} · {scanned.billingMethod === "card" ? "Card" : "Cash"}</span>{correctionSummary(scanned) ? <span>{correctionSummary(scanned)}</span> : null}<span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div>
         {scanned.enrollmentState !== "withdrawn" ? <div className="academy-admin-card"><h4>Payment arrangement</h4><p>Change this at the parent’s request. Paid months remain unchanged; card payments remain confirmed only by Stripe.</p>{scanned.pendingPaymentChoice === "cash" ? <p>Cash starts {scanned.paymentChangeEffectivePeriod}.</p> : null}<div className="academy-admin-actions"><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("cash")}>Arrange cash payment</button><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("card")}>Request secure card setup</button></div><small>Card setup requires the parent’s own authorization and secure Checkout. Each staff request is audited.</small></div> : null}

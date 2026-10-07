@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { academyBillableChildCount, ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 import { cashReceiptEmail, enrollmentConfirmedEmail, registrationEmail, queueAcademyEmail } from "./academyEmail";
@@ -74,7 +74,7 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
   const children = data.children as AcademyPublicFamily["children"];
   const hasCurrentChild = children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now());
   const rawEnrollment = String(data.enrollmentState ?? "conditional");
-  const enrollmentState = rawEnrollment === "conditional" && data.paymentChoice === "card" && !data.stripeSubscriptionId
+  const enrollmentState = rawEnrollment === "conditional" && data.paymentChoice === "card" && !data.stripeSubscriptionId && month?.status !== "paid" && month?.status !== "not_due" && !data.billingSetupState
     ? "awaiting_checkout" : rawEnrollment === "submitted" || rawEnrollment === "approved" ? "conditional" : rawEnrollment;
   const period = String(month?.period ?? academyTuitionPeriod(new Date()));
   const today = dateStringInTimeZone(new Date(), masjidTimeZone);
@@ -106,7 +106,9 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     underchargeCorrectionPendingCents: Number.isSafeInteger(month?.underchargeCorrectionPendingCents) ? Number(month?.underchargeCorrectionPendingCents) : null,
     underchargeCorrectionStatus: typeof month?.underchargeCorrectionStatus === "string" ? month.underchargeCorrectionStatus : null,
     paymentState: paymentState as AcademyPublicFamily["paymentState"],
-    cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
+    billingSetupState: ["pending", "ready", "attention"].includes(String(data.billingSetupState)) ? data.billingSetupState as AcademyPublicFamily["billingSetupState"] : undefined,
+    noTuitionDue: children.some(child => child.tuitionExempt === true) && academyBillableChildCount(children, Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)) - 1, 1, 12)) === 0,
+    cardSetupComplete: data.billingSetupState === "ready" || data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
     createdAt: String(data.createdAt)
@@ -133,8 +135,7 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
   const existing = await ref.get();
   const pricing = sharedPricing ?? await getAcademyPricing();
   const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
-  const childCount = Array.isArray(family.children) ? family.children.filter((child: { cancelEffectiveAt?: string | null }) =>
-    !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length : 0;
+  const childCount = Array.isArray(family.children) ? academyBillableChildCount(family.children, billingStart) : 0;
   const mode = pricing.tuitionMode;
   const unit = pricing.monthlyCents;
   const amountCents = childCount === 0 || period > ACADEMY_LAST_BILLING_MONTH ? 0 : Number.isSafeInteger(unit) && unit > 0 && (mode === "per_child" || mode === "per_family")
@@ -286,10 +287,14 @@ export async function prepareAcademyPendingCardRegistration(uid: string, verifie
     try {
       const session = await stripe.checkout.sessions.retrieve(existing.data()!.stripeCheckoutSessionId);
       if (session.status === "complete") throw new AcademyError("Your card payment is being confirmed. Refresh shortly.", 409);
-      if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+      if (session.status === "open") await expireUnpaidAcademyCheckout(session.id,
+        async id => { const value = await stripe.checkout.sessions.retrieve(id); return { id: value.id, status: value.status, payment_status: value.payment_status }; },
+        id => stripe.checkout.sessions.expire(id));
     } catch (error) {
       if (error instanceof AcademyError) throw error;
-      // Missing/expired stale Checkout is safe to replace.
+      if (!(error && typeof error === "object" && "code" in error && error.code === "resource_missing")) {
+        throw new AcademyError("The previous Checkout could not be safely closed. Refresh before trying again.", 409);
+      }
     }
   }
 
@@ -323,7 +328,7 @@ export async function prepareAcademyPendingCardRegistration(uid: string, verifie
 export async function activatePendingAcademyCardRegistration(uid: string, registrationId: string, stripeData: {
   checkoutSessionId?: string | null;
   customerId: string;
-  subscriptionId: string;
+  subscriptionId: string | null;
   termBillingStopAt: number;
 }) {
   const db = academyDb();
@@ -366,7 +371,11 @@ export async function activatePendingAcademyCardRegistration(uid: string, regist
     stripeCheckoutSessionId: stripeData.checkoutSessionId ?? saved.stripeCheckoutSessionId ?? null,
     stripeCustomerId: stripeData.customerId,
     stripeSubscriptionId: stripeData.subscriptionId,
-    stripeStatus: "active",
+    stripeTuitionMode: saved.stripeTuitionMode ?? "per_child",
+    initialPaymentIntentId: saved.initialPaymentIntentId ?? null,
+    initialPaidCents: saved.initialPaidCents ?? null,
+    stripeStatus: stripeData.subscriptionId ? "active" : "billing_setup_pending",
+    billingSetupState: stripeData.subscriptionId ? "ready" : "pending",
     stripeConfirmedAt: now,
     termBillingStopAt: stripeData.termBillingStopAt,
     signupStartedAt: String(saved.createdAt ?? now),
@@ -411,6 +420,10 @@ export async function registerAcademyFamily(uid: string, verifiedEmail: string, 
   if (process.env.ACADEMY_REGISTRATION_READY !== "true") throw new AcademyError("Quran Academy registration is not open yet.", 403);
   if (!academyRegistrationOpen()) throw new AcademyError("Quran Academy registration is not open yet.", 403);
   const db = academyDb();
+  if (cashConversion) {
+    const existing = await db.collection(families).doc(uid).get();
+    if (existing.exists && cashConversionWasApplied(existing.data(), cashConversion.registrationId)) return getAcademyFamily(uid);
+  }
   let input: AcademyRegistrationInput;
   try { input = parseAcademyRegistration(raw); }
   catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Check the registration details.", 400); }
@@ -646,15 +659,16 @@ export async function confirmAcademyEnrollment(uid: string, actor: { uid: string
     if (data.enrollmentState === "active") return;
     const monthRef = ref.collection("months").doc(period);
     const month = await tx.get(monthRef);
-    const children = Array.isArray(data.children) ? data.children as { id: string; name: string; cancelEffectiveAt?: string | null }[] : [];
+    const children = Array.isArray(data.children) ? data.children as { id: string; name: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[] : [];
     const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
-    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const childCount = academyBillableChildCount(children, billingStart);
     const requiredCents = childCount === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
     const receiptId = typeof month.data()?.receiptId === "string" ? month.data()!.receiptId : "";
     const receipt = receiptId ? await tx.get(db.collection("academyReceipts").doc(receiptId)) : null;
     if (!academyTuitionSatisfiedForConfirmation({
       method: data.paymentChoice === "card" ? "card" : "cash", monthMethod: month.data()?.method,
       monthStatus: month.data()?.status, amountCents: month.data()?.amountCents, requiredCents,
+      tuitionExempt: children.some(child => child.tuitionExempt === true) && childCount === 0,
       cashReceiptExists: Boolean(receipt?.exists && receipt.data()?.method === "cash" && receipt.data()?.familyId === uid && receipt.data()?.period === period)
     })) {
       throw new AcademyError(data.paymentChoice === "card"

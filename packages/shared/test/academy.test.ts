@@ -103,17 +103,17 @@ test("current-month card Checkout charges one full month now and defers renewal 
   const current = academyCheckoutTiming("2026-10", false, now);
   const next = academyCheckoutTiming("2026-11", false, now);
   const nextFirst = Math.floor(Date.UTC(2026, 10, 1, 12) / 1000);
-  assert.deepEqual(current, { trial_end: nextFirst });
-  assert.deepEqual(next, { trial_end: nextFirst });
-  assert.equal("proration_behavior" in current, false);
-  assert.equal("proration_behavior" in next, false);
-  assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), {});
+  assert.deepEqual(current, { billing_cycle_anchor: nextFirst, proration_behavior: "none" });
+  assert.deepEqual(next, { billing_cycle_anchor: nextFirst, proration_behavior: "none" });
+  assert.equal("trial_end" in current, false);
+  assert.equal("trial_end" in next, false);
+  assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), { billing_cycle_anchor: nextFirst, proration_behavior: "none" });
   const firstOfMonth = academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z"));
-  assert.equal("proration_behavior" in firstOfMonth, false);
+  assert.equal("trial_end" in firstOfMonth, false);
   const paidCurrentMonth = academyCheckoutTiming("2026-10", true, now);
-  assert.deepEqual(paidCurrentMonth, { trial_end: nextFirst });
+  assert.deepEqual(paidCurrentMonth, { billing_cycle_anchor: nextFirst, proration_behavior: "none" });
   const paidNextMonth = academyCheckoutTiming("2026-11", true, now);
-  assert.deepEqual(paidNextMonth, { trial_end: Math.floor(Date.UTC(2026, 11, 1, 12) / 1000) });
+  assert.deepEqual(paidNextMonth, { billing_cycle_anchor: Math.floor(Date.UTC(2026, 11, 1, 12) / 1000), proration_behavior: "none" });
   assert.throws(() => academyCheckoutTiming("2027-01", true, new Date("2027-01-02T18:00:00Z")), /No February charge/);
   assert.deepEqual([1, 2, 3].map((children) => academyTuitionTotalCents(5_000, children)), [5_000, 10_000, 15_000]);
   assert.deepEqual([1, 2, 3].map((children) => academyCheckoutTuitionAmounts(5_000, children, true)), [

@@ -2,10 +2,11 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutLineItemPlan, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { academyBillableChildCount, ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
-import { academyCorrectedMonthPaidCents, existingAcademyUnderchargeInvoiceStatus } from "./academyCheckoutState";
+import { ACADEMY_PAYMENT_FIRST_FLOW, academyPaymentFirstCheckout, academyRecurringSubscription } from "./academyPaymentFirst";
+import { academyCorrectedMonthPaidCents, existingAcademyUnderchargeInvoiceStatus, expireUnpaidAcademyCheckout } from "./academyCheckoutState";
 
 // 00:00 Calgary on February 1, before Stripe's February renewal. The final
 // February 1 class remains included in January tuition after billing stops.
@@ -57,6 +58,7 @@ export async function startAcademyCheckout(uid: string) {
   if (process.env.ACADEMY_REGISTRATION_READY !== "true" || !academyRegistrationOpen()) {
     throw new AcademyError("Academy card enrollment is not open yet.", 403);
   }
+  if ((await academyDb().collection("academyPendingRegistrations").doc(uid).get()).exists) return startAcademyPendingCheckout(uid);
   const family = await getAcademyFamily(uid);
   if (!family || family.paymentChoice !== "card") throw new AcademyError("Register with card billing first.", 409);
   if (family.enrollmentState === "withdrawn") throw new AcademyError("This Academy enrollment has been withdrawn.", 409);
@@ -65,7 +67,7 @@ export async function startAcademyCheckout(uid: string) {
   if (!config.cardAvailable) throw new AcademyError("Card setup is not ready.", 503);
   const stripe = academyStripe();
   const price = await stripe.prices.retrieve(config.stripePriceId);
-  const quantity = config.tuitionMode === "per_child" ? family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).length : 1;
+  const quantity = config.tuitionMode === "per_child" ? academyBillableChildCount(family.children, Date.now()) : 1;
   if (price.livemode !== (academyBillingMode() === "live") || price.currency !== "cad" || price.recurring?.interval !== "month" ||
       price.unit_amount !== config.monthlyCents || price.active !== true || quantity < 1) {
     throw new AcademyError("The approved tuition and Stripe monthly price do not match.", 409);
@@ -81,47 +83,27 @@ export async function startAcademyCheckout(uid: string) {
   if (typeof existingId === "string") {
     try {
       const existing = await stripe.checkout.sessions.retrieve(existingId);
+      if (existing.status === "complete") throw new AcademyError("Your tuition is already paid or your card is saved. Billing setup is being confirmed; do not pay again.", 409);
       if (existing.status === "open" && existing.url) {
-        if (existing.metadata?.academyBillingPolicyVersion === ACADEMY_TUITION_POLICY_VERSION) return existing.url;
+        if (existing.metadata?.academyCheckoutFlow === ACADEMY_PAYMENT_FIRST_FLOW) return existing.url;
         // Do not reuse an open Checkout created under the old prorated policy.
-        await stripe.checkout.sessions.expire(existing.id);
+        await expireUnpaidAcademyCheckout(existing.id,
+          async id => { const value = await stripe.checkout.sessions.retrieve(id); return { id: value.id, status: value.status, payment_status: value.payment_status }; },
+          id => stripe.checkout.sessions.expire(id));
       }
-    } catch { /* A stale session can be replaced after Stripe rejects it. */ }
+    } catch (error) { if (error instanceof AcademyError) throw error; if (!(error && typeof error === "object" && "code" in error && error.code === "resource_missing")) throw new AcademyError("Checkout could not be safely replaced. Refresh before retrying.", 409); }
   }
   if ((await familyRef.get()).data()?.stripeSubscriptionId) throw new AcademyError("This family already has a subscription. Use billing management instead.", 409);
   const selectedMonthPaid = (await familyRef.collection("months").doc(family.billingPeriod).get()).data()?.status === "paid";
   const checkoutNow = new Date();
-  let timing: ReturnType<typeof academyCheckoutTiming>;
-  try { timing = academyCheckoutTiming(family.enrollmentStartPeriod, selectedMonthPaid, checkoutNow); }
-  catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Tuition timing is unavailable.", 409); }
-  const currentPeriod = calgaryBillingPeriod(checkoutNow);
-  const chargeCurrentMonthNow = !selectedMonthPaid &&
-    (family.enrollmentStartPeriod ?? academyTuitionPeriod(checkoutNow)) <= currentPeriod &&
-    !isCalgaryFirstOfMonth(checkoutNow);
-  const lineItemPlan = academyCheckoutLineItemPlan(config.monthlyCents, quantity, chargeCurrentMonthNow);
-  const productId = objectId(price.product);
-  if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
-  // Keep recurring tuition anchored to the next 1st while charging one full
-  // current-month tuition amount on the initial invoice.
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = lineItemPlan.map((line) => line.kind === "recurring"
-    ? { price: price.id, quantity: line.quantity }
-    : { price_data: { currency: "cad", unit_amount: line.unitAmountCents, product: productId }, quantity: line.quantity });
-  const initialBillingPeriod = family.enrollmentStartPeriod ?? family.billingPeriod;
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_collection: "always",
-    integration_identifier: `hbic-academy-${Array.from(randomBytes(8), (byte) => String.fromCharCode(97 + byte % 26)).join("")}`,
-    line_items: lineItems,
-    customer_email: family.email,
-    client_reference_id: uid,
-    metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? ""), academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION },
-    subscription_data: {
-      metadata: { academyFamilyUid: uid, academyRegistrationId: String(pending?.registrationId ?? ""), academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION, academyInitialBillingPeriod: initialBillingPeriod },
-      ...timing
-    },
-    success_url: `${academyPreviewOrigin()}/quran-academy?checkout=success`,
-    cancel_url: `${academyPreviewOrigin()}/quran-academy?checkout=cancelled`
-  });
+  const registrationId = String(pending?.registrationId ?? "");
+  const customer = pending?.stripeCustomerId ? await stripe.customers.retrieve(String(pending.stripeCustomerId)) :
+    await stripe.customers.create({ email: family.email, metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId } },
+      { idempotencyKey: `academy-checkout-customer-${registrationId}` });
+  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId: customer.id,
+    priceId: price.id, quantity, monthlyCents: config.monthlyCents, startPeriod: family.enrollmentStartPeriod ?? family.billingPeriod,
+    monthPaid: selectedMonthPaid, origin: academyPreviewOrigin(), now: checkoutNow }),
+    { idempotencyKey: `academy-checkout-${registrationId}-${typeof existingId === "string" ? existingId : "first"}` });
   if (!session.url || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Stripe returned an unexpected Checkout session.", 502);
   try {
     await db.runTransaction(async (tx) => {
@@ -172,49 +154,28 @@ export async function startAcademyPendingCheckout(uid: string) {
       const existing = await stripe.checkout.sessions.retrieve(pending.stripeCheckoutSessionId);
       if (existing.status === "open" && existing.url &&
           existing.metadata?.academyRegistrationId === String(pending.registrationId) &&
-          existing.metadata?.academyBillingPolicyVersion === ACADEMY_TUITION_POLICY_VERSION) return existing.url;
+          existing.metadata?.academyCheckoutFlow === ACADEMY_PAYMENT_FIRST_FLOW) return existing.url;
       if (existing.status === "complete") throw new AcademyError("Your card payment is being confirmed. Refresh shortly.", 409);
+      if (existing.status === "open") await expireUnpaidAcademyCheckout(existing.id,
+          async id => { const value = await stripe.checkout.sessions.retrieve(id); return { id: value.id, status: value.status, payment_status: value.payment_status }; },
+          id => stripe.checkout.sessions.expire(id));
     } catch (error) {
       if (error instanceof AcademyError) throw error;
-      // Stale/expired Checkout is replaced below.
+      if (!(error && typeof error === "object" && "code" in error && error.code === "resource_missing")) throw new AcademyError("Checkout could not be safely replaced. Refresh before retrying.", 409);
     }
   }
 
   const checkoutNow = new Date();
-  let timing: ReturnType<typeof academyCheckoutTiming>;
-  try { timing = academyCheckoutTiming(String(pending.enrollmentStartPeriod), false, checkoutNow); }
-  catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Tuition timing is unavailable.", 409); }
-  const currentPeriod = calgaryBillingPeriod(checkoutNow);
-  const chargeCurrentMonthNow = String(pending.enrollmentStartPeriod) <= currentPeriod && !isCalgaryFirstOfMonth(checkoutNow);
-  const lineItemPlan = academyCheckoutLineItemPlan(config.monthlyCents, quantity, chargeCurrentMonthNow);
-  const productId = objectId(price.product);
-  if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = lineItemPlan.map((line) => line.kind === "recurring"
-    ? { price: price.id, quantity: line.quantity }
-    : { price_data: { currency: "cad", unit_amount: line.unitAmountCents, product: productId }, quantity: line.quantity });
-
   const registrationId = String(pending.registrationId ?? "");
   if (!/^[a-f0-9]{24}$/.test(registrationId)) throw new AcademyError("Pending registration reference is invalid.", 409);
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_collection: "always",
-    integration_identifier: `hbic-academy-${Array.from(randomBytes(8), (byte) => String.fromCharCode(97 + byte % 26)).join("")}`,
-    line_items: lineItems,
-    customer_email: String(pending.email),
-    client_reference_id: uid,
-    metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId, academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION },
-    subscription_data: {
-      metadata: {
-        academyFamilyUid: uid,
-        academyRegistrationId: registrationId,
-        academyBillingPolicyVersion: ACADEMY_TUITION_POLICY_VERSION,
-        academyInitialBillingPeriod: String(pending.enrollmentStartPeriod)
-      },
-      ...timing
-    },
-    success_url: `${academyPreviewOrigin()}/quran-academy?checkout=success`,
-    cancel_url: `${academyPreviewOrigin()}/quran-academy?checkout=cancelled`
-  });
+  const customer = typeof pending.stripeCustomerId === "string" ? await stripe.customers.retrieve(pending.stripeCustomerId) :
+    await stripe.customers.create({ email: String(pending.email), metadata: { academyFamilyUid: uid, academyRegistrationId: registrationId } },
+      { idempotencyKey: `academy-checkout-customer-${registrationId}` });
+  if (customer.deleted || customer.livemode !== (academyBillingMode() === "live") || customer.metadata.academyFamilyUid !== uid || customer.metadata.academyRegistrationId !== registrationId) throw new AcademyError("Stripe customer does not match the pending registration.", 409);
+  const session = await stripe.checkout.sessions.create(academyPaymentFirstCheckout({ uid, registrationId, customerId: customer.id,
+    priceId: price.id, quantity, monthlyCents: config.monthlyCents, startPeriod: String(pending.enrollmentStartPeriod),
+    origin: academyPreviewOrigin(), now: checkoutNow }),
+    { idempotencyKey: `academy-checkout-${registrationId}-${typeof pending.stripeCheckoutSessionId === "string" ? pending.stripeCheckoutSessionId : "first"}` });
   if (!session.url || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Stripe returned an unexpected Checkout session.", 502);
 
   await db.runTransaction(async (tx) => {
@@ -222,7 +183,7 @@ export async function startAcademyPendingCheckout(uid: string) {
     if (!latest.exists || String(latest.data()?.registrationId ?? "") !== registrationId) {
       throw new AcademyError("Pending registration changed during card setup.", 409);
     }
-    tx.update(pendingRef, { stripeCheckoutSessionId: session.id, status: "checkout_open", updatedAt: new Date().toISOString() });
+    tx.update(pendingRef, { stripeCheckoutSessionId: session.id, stripeCustomerId: customer.id, stripeTuitionMode: config.tuitionMode, status: "checkout_open", updatedAt: new Date().toISOString() });
   }).catch(async (error) => {
     await stripe.checkout.sessions.expire(session.id).catch(() => undefined);
     throw error;
@@ -385,8 +346,8 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
     if (!month.exists || monthData?.method !== "card" || monthData?.status !== "paid") return null;
     const paidCents = Number(monthData.amountCents);
     if (!Number.isSafeInteger(paidCents) || paidCents <= 0) return null;
-    const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
-    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const children = Array.isArray(data.children) ? data.children as { tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[] : [];
+    const childCount = academyBillableChildCount(children, billingStart);
     // The former bug charged approximately $42 per child. Do not extrapolate
     // this correction to unrelated discounts or other anomalous amounts.
     if (pricing.tuitionMode !== "per_child" || paidCents < childCount * 4_200 || paidCents > childCount * 4_299) return null;
@@ -556,6 +517,65 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
   return results;
 }
 
+/** Staff can waive tuition without inventing a payment or changing enrollment/check-in history. */
+export async function setAcademyTuitionExemption(uid: string, childId: string, exempt: boolean, actor: { uid: string; email: string }, reason = "Staff-approved tuition exemption") {
+  const db = academyDb(), familyRef = db.collection("academyFamilies").doc(uid), lockRef = db.collection("academyBillingLocks").doc(uid);
+  const lockId = randomBytes(12).toString("hex"), now = new Date().toISOString();
+  const family = await db.runTransaction(async tx => {
+    const [f, lock] = await Promise.all([tx.get(familyRef), tx.get(lockRef)]);
+    if (!f.exists) throw new AcademyError("Academy registration was not found.", 404);
+    if (lock.exists && Number(lock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("Another billing change is in progress. Try again shortly.", 409);
+    const children = f.data()?.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[];
+    if (!children.some(child => child.id === childId)) throw new AcademyError("Choose a child in this registration.", 404);
+    tx.set(lockRef, { id: lockId, expiresAt: Date.now() + 120_000 });
+    return f.data()!;
+  });
+  try {
+    const children = (family.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[]).map(child => child.id === childId ? { ...child, tuitionExempt: exempt } : child);
+    const quantity = children.filter(child => child.tuitionExempt !== true && !child.cancelEffectiveAt).length;
+    if (family.paymentChoice === "card") {
+      const stripe = academyStripe();
+      if (typeof family.stripeSubscriptionId === "string") {
+        const subscription = await stripe.subscriptions.retrieve(family.stripeSubscriptionId);
+        if (subscription.livemode !== (academyBillingMode() === "live") || subscription.metadata.academyFamilyUid !== uid ||
+            subscription.metadata.academyRegistrationId !== family.registrationId) throw new AcademyError("Stripe subscription does not match this registration.", 409);
+        if (subscription.status !== "canceled") {
+          const item = subscription.items.data[0];
+          if (!item || subscription.items.data.length !== 1) throw new AcademyError("Subscription items need review before exempting tuition.", 409);
+          await stripe.subscriptions.update(subscription.id, quantity === 0
+            ? { pause_collection: { behavior: "void" }, proration_behavior: "none" }
+            : { items: [{ id: item.id, quantity: family.stripeTuitionMode === "per_family" ? 1 : quantity }], pause_collection: "", proration_behavior: "none" },
+            { idempotencyKey: `academy-exemption-${lockId}` });
+        }
+      } else if (typeof family.stripeCheckoutSessionId === "string" && family.billingSetupState !== "ready") {
+        const session = await stripe.checkout.sessions.retrieve(family.stripeCheckoutSessionId);
+        if (session.status === "complete") throw new AcademyError("Let the completed card billing setup finish before changing its tuition.", 409);
+        if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+      }
+    }
+    const pricing = await getAcademyPricing(), period = academyTuitionPeriod(new Date());
+    await db.runTransaction(async tx => {
+      const monthRef = familyRef.collection("months").doc(period);
+      const [f, lock, month] = await Promise.all([tx.get(familyRef), tx.get(lockRef), tx.get(monthRef)]);
+      if (!f.exists || f.data()?.registrationId !== family.registrationId || lock.data()?.id !== lockId) throw new AcademyError("Registration changed before exemption was saved.", 409);
+      const latestChildren = (f.data()?.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[]).map(child => child.id === childId
+        ? { ...child, tuitionExempt: exempt, tuitionExemptionReason: exempt ? reason.trim().slice(0, 200) : null, tuitionExemptionChangedAt: now, tuitionExemptionChangedBy: actor.uid } : child);
+      const billable = academyBillableChildCount(latestChildren, Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)) - 1, 1, 12));
+      const amountCents = billable === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_family" ? 1 : billable);
+      tx.update(familyRef, { children: latestChildren, updatedAt: now });
+      if (month.exists && month.data()?.status !== "paid") tx.update(monthRef, { amountCents,
+        status: amountCents === 0 ? "not_due" : f.data()?.paymentChoice === "cash" ? "cash_due" : "card_attention", tuitionExemptionAppliedAt: now, updatedAt: now });
+      tx.create(db.collection("academyAudit").doc(), { action: exempt ? "tuition_exempted" : "tuition_exemption_removed",
+        familyId: uid, registrationId: family.registrationId, childId, reason: reason.trim().slice(0, 200), actorUid: actor.uid, actorEmail: actor.email, at: now });
+      tx.delete(lockRef);
+    });
+    return getAcademyFamily(uid);
+  } catch (error) {
+    await db.runTransaction(async tx => { if ((await tx.get(lockRef)).data()?.id === lockId) tx.delete(lockRef); });
+    throw error;
+  }
+}
+
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */
 export async function cancelAcademyChild(uid: string, childId: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(childId)) throw new AcademyError("Choose a valid child.");
@@ -573,7 +593,10 @@ export async function cancelAcademyChild(uid: string, childId: string) {
     return snapshot.data()!;
   });
   try {
-    const activeRenewals = (family.children as { cancelEffectiveAt?: string | null }[]).filter((child) => !child.cancelEffectiveAt).length;
+    const renewalChildren = family.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[];
+    const activeRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt).length;
+    const billableRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt && child.tuitionExempt !== true).length;
+    const exemptChild = renewalChildren.find(child => child.id === childId)?.tuitionExempt === true;
     const pricing = await getAcademyPricing();
     let effectiveAt = new Date(nextCalgaryFirstBillingAnchor(new Date()) * 1000).toISOString();
     let pendingCardSetup = false;
@@ -588,21 +611,25 @@ export async function cancelAcademyChild(uid: string, childId: string) {
         else if (session.status === "complete") subscriptionId = objectId(session.subscription);
       }
       if (!subscriptionId) {
-        pendingCardSetup = true;
-        effectiveAt = new Date().toISOString();
+        const current = await getAcademyFamily(uid);
+        pendingCardSetup = current?.paymentState !== "paid" && current?.noTuitionDue !== true;
+        if (pendingCardSetup) effectiveAt = new Date().toISOString();
       } else {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const item = subscription.items.data[0];
       const perChild = family.stripeTuitionMode !== "per_family";
       if (subscription.livemode !== (academyBillingMode() === "live") || subscription.metadata.academyFamilyUid !== uid || !item || subscription.items.data.length !== 1 ||
-          item.quantity !== (perChild ? activeRenewals : 1) || !["active", "trialing", "past_due"].includes(subscription.status)) {
+          item.quantity !== (perChild ? Math.max(1, billableRenewals) : 1) || !["active", "trialing", "past_due"].includes(subscription.status)) {
         throw new AcademyError("Subscription details need review before a child can be canceled.", 409);
       }
       effectiveAt = new Date(item.current_period_end * 1000).toISOString();
       if (activeRenewals === 1) {
         await stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true }, { idempotencyKey: `academy-cancel-${uid}-${childId}` });
-      } else if (perChild) {
-        await stripe.subscriptions.update(subscription.id, { items: [{ id: item.id, quantity: activeRenewals - 1 }], proration_behavior: "none" },
+      } else if (!exemptChild && billableRenewals === 1) {
+        await stripe.subscriptions.update(subscription.id, { pause_collection: { behavior: "void" }, proration_behavior: "none" },
+          { idempotencyKey: `academy-cancel-${uid}-${childId}` });
+      } else if (perChild && !exemptChild) {
+        await stripe.subscriptions.update(subscription.id, { items: [{ id: item.id, quantity: billableRenewals - 1 }], proration_behavior: "none" },
           { idempotencyKey: `academy-cancel-${uid}-${childId}` });
       }
       }
@@ -721,9 +748,145 @@ function objectId(value: unknown) {
   return typeof value === "string" ? value : value && typeof value === "object" && "id" in value ? String(value.id) : "";
 }
 
+/** Re-read Stripe's successful payment/setup; browser return URLs never authorize enrollment. */
+async function applyAcademyPaymentFirstCheckout(event: Stripe.Event) {
+  const db = academyDb(), stripe = academyStripe();
+  const raw = event.data.object as unknown as Record<string, unknown>;
+  const metadata = (raw.metadata ?? {}) as Record<string, string>;
+  const uid = String(metadata.academyFamilyUid ?? ""), registrationId = String(metadata.academyRegistrationId ?? "");
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid) || !/^[a-f0-9]{24}$/.test(registrationId)) throw new AcademyError("Invalid payment registration mapping.", 409);
+  const markerRef = db.collection("academyStripeEvents").doc(event.id);
+  const familyRef = db.collection("academyFamilies").doc(uid), pendingRef = db.collection("academyPendingRegistrations").doc(uid);
+  let [family, pending] = await Promise.all([familyRef.get(), pendingRef.get()]);
+  const matches = (data: Record<string, unknown> | undefined) => data?.paymentChoice === "card" && data.registrationId === registrationId;
+  const source = matches(pending.data()) ? pending : matches(family.data()) ? family : null;
+  if (!source) {
+    await db.runTransaction(async tx => { if (!(await tx.get(markerRef)).exists) tx.create(markerRef, { type: event.type, ignored: true, reason: "registration_changed", processedAt: new Date().toISOString() }); });
+    return;
+  }
+  const sessionId = event.type.startsWith("checkout.session.") ? String(raw.id) : String(source.data()?.stripeCheckoutSessionId ?? "");
+  if (source.data()?.stripeCheckoutSessionId !== sessionId) throw new AcademyError("Checkout does not match the current registration.", 409);
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  const m = session.metadata ?? {};
+  if (session.livemode !== (academyBillingMode() === "live") || session.status !== "complete" ||
+      m.academyRegistrationId !== registrationId || m.academyFamilyUid !== uid || m.academyCheckoutFlow !== ACADEMY_PAYMENT_FIRST_FLOW) {
+    throw new AcademyError("Stripe Checkout is not confirmed for this registration.", 409);
+  }
+  const customerId = objectId(session.customer);
+  let paymentMethodId = "", paymentIntentId = "", paidCents = 0;
+  if (session.mode === "payment") {
+    const payment = await stripe.paymentIntents.retrieve(objectId(session.payment_intent));
+    paidCents = Number(payment.amount_received);
+    if (session.payment_status !== "paid" || payment.status !== "succeeded" || payment.currency !== "cad" ||
+        paidCents <= 0 || paidCents !== Number(m.academyInitialAmountCents) || session.amount_total !== paidCents ||
+        objectId(payment.customer) !== customerId || payment.metadata.academyRegistrationId !== registrationId) {
+      throw new AcademyError("Full initial tuition has not been confirmed by Stripe.", 409);
+    }
+    paymentIntentId = payment.id; paymentMethodId = objectId(payment.payment_method);
+    // Persist the successful payment before any recurring-billing API request.
+    if (matches(pending.data())) {
+      await db.runTransaction(async tx => {
+        const current = await tx.get(pendingRef);
+        if (!matches(current.data()) || current.data()?.stripeCheckoutSessionId !== sessionId) throw new AcademyError("Pending registration changed before recording the payment.", 409);
+        tx.update(pendingRef, { initialPaymentIntentId: payment.id, initialPaidCents: paidCents, status: "paid_billing_setup_pending" });
+      });
+      await activatePendingAcademyCardRegistration(uid, registrationId, { checkoutSessionId: sessionId, customerId, subscriptionId: null, termBillingStopAt: academyTermBillingStop });
+    }
+    const period = String(m.academyInitialBillingPeriod), monthRef = familyRef.collection("months").doc(period);
+    const invoiceId = objectId(session.invoice);
+    const invoice = invoiceId ? await stripe.invoices.retrieve(invoiceId).catch(() => null) : null;
+    await db.runTransaction(async tx => {
+      const [currentFamily, month, receipt] = await Promise.all([tx.get(familyRef), tx.get(monthRef),
+        tx.get(db.collection("academyEmailOutbox").doc(createHash("sha256").update(`initial-payment:${registrationId}`).digest("hex")))]);
+      if (!matches(currentFamily.data())) throw new AcademyError("Paid registration changed before recording tuition.", 409);
+      if (month.data()?.initialPaymentIntentId && month.data()?.initialPaymentIntentId !== paymentIntentId) throw new AcademyError("A different initial payment is already recorded.", 409);
+      const now = new Date().toISOString();
+      tx.set(monthRef, { period, method: "card", status: "paid", amountCents: paidCents, initialPaymentIntentId: paymentIntentId,
+        invoiceId: invoiceId || paymentIntentId, invoiceUrl: invoice?.hosted_invoice_url ?? null, paidAt: month.data()?.paidAt ?? now, updatedAt: now }, { merge: true });
+      if (!receipt.exists) queueAcademyEmail(tx, db, { ...cardReceiptEmail({ invoiceId: invoiceId || paymentIntentId,
+        email: String(currentFamily.data()?.email), name: String(currentFamily.data()?.guardianName), period, amountCents: paidCents,
+        paidAt: now, invoiceUrl: invoice?.hosted_invoice_url ?? null, testMode: academyBillingMode() !== "live" }), key: `initial-payment:${registrationId}` });
+    });
+    family = await familyRef.get();
+  } else if (session.mode === "setup") {
+    const setup = await stripe.setupIntents.retrieve(objectId(session.setup_intent));
+    if (setup.status !== "succeeded" || objectId(setup.customer) !== customerId || setup.metadata?.academyRegistrationId !== registrationId) {
+      throw new AcademyError("Saved card authorization is not confirmed.", 409);
+    }
+    paymentMethodId = objectId(setup.payment_method);
+  } else throw new AcademyError("Unsupported Academy Checkout mode.", 409);
+  try {
+  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (paymentMethod.type !== "card" || objectId(paymentMethod.customer) !== customerId) throw new AcademyError("The saved payment method does not support Academy recurring tuition.", 409);
+  const latestFamily = await familyRef.get(), latestPending = await pendingRef.get();
+  const completedSource = matches(latestFamily.data()) ? latestFamily : matches(latestPending.data()) ? latestPending : null;
+  if (completedSource?.data()?.billingSetupState === "ready") {
+    await db.runTransaction(async tx => { if (!(await tx.get(markerRef)).exists) tx.create(markerRef, { type: event.type, objectId: sessionId, processedAt: new Date().toISOString() }); });
+    return;
+  }
+  const anchor = Number(m.academyRecurringAnchor);
+  if (!completedSource || completedSource.data()?.withdrawalPendingAt || completedSource.data()?.enrollmentState === "withdrawn") throw new AcademyError("Registration changed before recurring setup.", 409);
+  const currentChildren = completedSource.data()?.children as Array<{ tuitionExempt?: boolean; cancelEffectiveAt?: string }> | undefined;
+  const quantity = matches(latestFamily.data()) && Array.isArray(currentChildren)
+    ? currentChildren.filter(child => !child.tuitionExempt && !child.cancelEffectiveAt).length
+    : Number(m.academyQuantity);
+  let subscriptionId = "";
+    if (anchor && quantity > 0) {
+      // The durable customer/registration association also recovers a create
+      // whose response was lost after Stripe's 24-hour idempotency window.
+      const subscriptions: Stripe.Subscription[] = [];
+      for await (const item of stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 })) {
+        if (item.metadata.academyRegistrationId === registrationId && item.metadata.academyCheckoutFlow === ACADEMY_PAYMENT_FIRST_FLOW) subscriptions.push(item);
+      }
+      if (subscriptions.length > 1) throw new AcademyError("Multiple recurring subscriptions need staff review.", 409);
+      let subscription = subscriptions[0];
+      if (!subscription) {
+        if (anchor <= Math.floor(Date.now() / 1000)) throw new AcademyError("The intended renewal date passed; billing setup needs staff review.", 409);
+        subscription = await stripe.subscriptions.create(academyRecurringSubscription({ customerId, paymentMethodId,
+          priceId: String(m.academyStripePriceId), quantity, anchor, termStop: academyTermBillingStop,
+          uid, registrationId, startPeriod: String(m.academyInitialBillingPeriod) }),
+          { idempotencyKey: `academy-recurring-${academyBillingMode()}-${registrationId}` });
+      }
+      if (subscription.status === "canceled" || subscription.livemode !== session.livemode ||
+          subscription.billing_cycle_anchor !== anchor || subscription.items.data[0]?.price.id !== m.academyStripePriceId ||
+          subscription.items.data[0]?.quantity !== quantity) throw new AcademyError("Recurring billing does not match the authorized tuition.", 409);
+      subscriptionId = subscription.id;
+    }
+    await db.runTransaction(async tx => {
+      const [latestFamily, latestPending, marker] = await Promise.all([tx.get(familyRef), tx.get(pendingRef), tx.get(markerRef)]);
+      if (marker.exists) return;
+      const target = matches(latestFamily.data()) ? latestFamily : matches(latestPending.data()) ? latestPending : null;
+      if (!target || target.data()?.withdrawalPendingAt || target.data()?.enrollmentState === "withdrawn") throw new AcademyError("Registration changed during billing setup.", 409);
+      tx.update(target.ref, { stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId || null,
+        stripePaymentMethodId: paymentMethodId, stripeStatus: "active", billingSetupState: "ready", billingSetupError: null,
+        ...(target.ref.path === pendingRef.path ? { status: "scheduled_awaiting_first_payment" } : {}),
+        termBillingStopAt: academyTermBillingStop, updatedAt: new Date().toISOString() });
+      tx.create(markerRef, { type: event.type, objectId: sessionId, paymentIntentId: paymentIntentId || null, processedAt: new Date().toISOString() });
+    });
+  } catch (error) {
+    // A paid initial invoice is retained. Stripe retries this setup using the
+    // same registration key; the parent must never be sent to pay again.
+    await db.runTransaction(async tx => {
+      const [f, p] = await Promise.all([tx.get(familyRef), tx.get(pendingRef)]);
+      const target = matches(f.data()) ? f : matches(p.data()) ? p : null;
+      if (target) tx.update(target.ref, { billingSetupState: "attention", billingSetupError: error instanceof Error ? error.message.slice(0, 200) : "Recurring setup failed",
+        ...(target.ref.path === pendingRef.path ? { status: "billing_setup_attention" } : {}), updatedAt: new Date().toISOString() });
+    });
+    throw error;
+  }
+}
+
 export async function applyAcademyStripeEvent(event: Stripe.Event) {
   if (event.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Stripe event billing mode does not match the Academy configuration.", 403);
   const db = academyDb();
+  const initialObject = event.data.object as unknown as Record<string, unknown>;
+  const initialMetadata = (initialObject.metadata ?? {}) as Record<string, string>;
+  if (initialMetadata.academyCheckoutFlow === ACADEMY_PAYMENT_FIRST_FLOW &&
+      (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded" ||
+       event.type === "invoice.paid" && initialMetadata.academyCheckoutKind === "initial_payment")) {
+    if (!(await db.collection("academyStripeEvents").doc(event.id).get()).exists) await applyAcademyPaymentFirstCheckout(event);
+    return;
+  }
   const stripe = academyStripe();
   const markerRef = db.collection("academyStripeEvents").doc(event.id);
   if ((await markerRef.get()).exists) return;
@@ -810,7 +973,8 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
   } else return;
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) throw new AcademyError("Stripe event has no valid Academy family association.", 409);
   const familyRef = db.collection("academyFamilies").doc(uid);
-  if ((event.type === "invoice.paid" || event.type === "invoice.payment_failed") && !(await familyRef.get()).exists) {
+  if ((event.type === "invoice.paid" || event.type === "invoice.payment_failed") &&
+      String((await familyRef.get()).data()?.registrationId ?? "") !== eventRegistrationId) {
     const pendingRef = db.collection("academyPendingRegistrations").doc(uid);
     const pending = await pendingRef.get();
     const pendingMatches = pending.exists && pending.data()?.paymentChoice === "card" &&
@@ -826,7 +990,7 @@ export async function applyAcademyStripeEvent(event: Stripe.Event) {
         customerId, subscriptionId, termBillingStopAt: academyTermBillingStop
       });
     } else if (pendingMatches) {
-      await pendingRef.set({ status: event.type === "invoice.payment_failed" ? "payment_failed" : "awaiting_payment",
+      await pendingRef.set({ status: event.type === "invoice.payment_failed" ? "payment_failed" : "scheduled_awaiting_first_payment",
         updatedAt: new Date().toISOString() }, { merge: true });
       if (!(await markerRef.get()).exists) await markerRef.create({ type: event.type, pendingOnly: true, processedAt: new Date().toISOString() });
       return;

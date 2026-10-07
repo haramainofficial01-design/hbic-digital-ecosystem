@@ -6,6 +6,11 @@ export type AcademyPaymentChoice = "cash" | "card";
 export type AcademyEnrollmentState = "awaiting_checkout" | "conditional" | "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
 export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "card_attention" | "past_due" | "scheduled" | "not_due";
 
+/** Staff exemptions affect tuition, never attendance or enrollment history. */
+export function academyBillableChildCount(children: readonly { tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[], at: number) {
+  return children.filter(child => child.tuitionExempt !== true && (!child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > at)).length;
+}
+
 /** HBIC's approved starting tuition; administrators can change future pricing. */
 export const ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD = 5_000;
 /** Server-side total for the approved per-child monthly price. */
@@ -137,7 +142,7 @@ export interface AcademyPublicFamily {
   email: string;
   whatsappConsent: boolean;
   emailUpdates?: boolean;
-  children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null })[];
+  children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null; tuitionExempt?: boolean })[];
   paymentChoice: AcademyPaymentChoice;
   /** How the displayed tuition month was actually paid/marked due. */
   billingMethod?: AcademyPaymentChoice;
@@ -157,6 +162,8 @@ export interface AcademyPublicFamily {
   underchargeCorrectionStatus?: string | null;
   paymentState: AcademyPaymentState;
   cardSetupComplete?: boolean;
+  billingSetupState?: "pending" | "ready" | "attention";
+  noTuitionDue?: boolean;
   passToken: string;
   cashReminderEligible: boolean;
   createdAt: string;
@@ -185,24 +192,18 @@ export function academyEnrollmentStartPeriod(choice: "current" | "next" = "curre
   return start;
 }
 
-/** Secure Checkout timing for a selected, server-resolved enrollment month. */
+/** Recurring API timing, used only after Checkout payment/card setup succeeds. */
 export function academyCheckoutTiming(startPeriod: string | undefined, monthPaid: boolean, now = new Date()) {
   const current = calgaryBillingPeriod(now);
-  let period = startPeriod && startPeriod > current ? startPeriod : academyTuitionPeriod(now);
+  let period = startPeriod && startPeriod > current ? startPeriod : current;
   if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("Invalid enrollment start month.");
-  if (monthPaid) {
+  if (period === current || monthPaid) {
     const [year, month] = period.split("-").map(Number);
     period = new Date(Date.UTC(year, month, 1, 12)).toISOString().slice(0, 7);
   }
   if (period > ACADEMY_LAST_BILLING_MONTH) throw new Error("No further tuition is due this term. No February charge will be created.");
-  if (period > current) {
-    const [year, month] = period.split("-").map(Number);
-    return { trial_end: Math.floor(Date.UTC(year, month - 1, 1, 12) / 1000) };
-  }
-  // A trial through next month's 1st collects/attaches the payment method now,
-  // while an explicit one-time Checkout line item below charges this month's
-  // full tuition. This avoids Stripe invoicing the recurring item early too.
-  return isCalgaryFirstOfMonth(now) ? {} : { trial_end: nextCalgaryFirstBillingAnchor(now) };
+  const [year, month] = period.split("-").map(Number);
+  return { billing_cycle_anchor: Math.floor(Date.UTC(year, month - 1, 1, 12) / 1000), proration_behavior: "none" as const };
 }
 
 export function isCalgaryFirstOfMonth(now: Date): boolean {
