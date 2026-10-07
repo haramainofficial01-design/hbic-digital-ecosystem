@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { academyCardEnrollmentConfirmed } from "../src/academy";
-import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutLineItemPlan, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -102,13 +102,18 @@ test("current-month card Checkout charges one full month now and defers renewal 
   const now = new Date("2026-10-02T18:00:00Z");
   const current = academyCheckoutTiming("2026-10", false, now);
   const next = academyCheckoutTiming("2026-11", false, now);
-  assert.equal(current.proration_behavior, "none");
-  assert.equal(new Date(current.trial_end! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
-  assert.equal(next.proration_behavior, "none");
-  assert.equal(new Date(next.trial_end! * 1000).toISOString(), "2026-11-01T12:00:00.000Z");
+  const nextFirst = Math.floor(Date.UTC(2026, 10, 1, 12) / 1000);
+  assert.deepEqual(current, { trial_end: nextFirst });
+  assert.deepEqual(next, { trial_end: nextFirst });
+  assert.equal("proration_behavior" in current, false);
+  assert.equal("proration_behavior" in next, false);
   assert.deepEqual(academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z")), {});
-  assert.equal(academyCheckoutTiming("2026-10", true, now).proration_behavior, "none");
-  assert.equal(new Date(academyCheckoutTiming("2026-11", true, now).trial_end! * 1000).toISOString(), "2026-12-01T12:00:00.000Z");
+  const firstOfMonth = academyCheckoutTiming("2026-10", false, new Date("2026-10-01T18:00:00Z"));
+  assert.equal("proration_behavior" in firstOfMonth, false);
+  const paidCurrentMonth = academyCheckoutTiming("2026-10", true, now);
+  assert.deepEqual(paidCurrentMonth, { trial_end: nextFirst });
+  const paidNextMonth = academyCheckoutTiming("2026-11", true, now);
+  assert.deepEqual(paidNextMonth, { trial_end: Math.floor(Date.UTC(2026, 11, 1, 12) / 1000) });
   assert.throws(() => academyCheckoutTiming("2027-01", true, new Date("2027-01-02T18:00:00Z")), /No February charge/);
   assert.deepEqual([1, 2, 3].map((children) => academyTuitionTotalCents(5_000, children)), [5_000, 10_000, 15_000]);
   assert.deepEqual([1, 2, 3].map((children) => academyCheckoutTuitionAmounts(5_000, children, true)), [
@@ -118,6 +123,15 @@ test("current-month card Checkout charges one full month now and defers renewal 
   ]);
   assert.equal(academyCheckoutTuitionAmounts(5_000, 2, false).currentMonthCents, 0);
   assert.equal(academyCheckoutTuitionAmounts(5_000, 2, false).recurringMonthlyCents, 10_000);
+  assert.deepEqual([1, 2, 3].map((children) => academyCheckoutLineItemPlan(5_000, children, true)), [
+    [{ kind: "recurring", unitAmountCents: 5_000, quantity: 1 }, { kind: "current_month", unitAmountCents: 5_000, quantity: 1 }],
+    [{ kind: "recurring", unitAmountCents: 5_000, quantity: 2 }, { kind: "current_month", unitAmountCents: 10_000, quantity: 1 }],
+    [{ kind: "recurring", unitAmountCents: 5_000, quantity: 3 }, { kind: "current_month", unitAmountCents: 15_000, quantity: 1 }]
+  ]);
+  assert.deepEqual(academyCheckoutLineItemPlan(5_000, 2, false), [
+    { kind: "recurring", unitAmountCents: 5_000, quantity: 2 }
+  ]);
+  assert.ok(academyCheckoutLineItemPlan(5_000, 1, true).every((line) => line.unitAmountCents === 5_000 || line.unitAmountCents === 0));
   assert.throws(() => academyTuitionTotalCents(5_000, 0), /Invalid Academy tuition/);
 });
 

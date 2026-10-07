@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutLineItemPlan, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 import { academyCorrectedMonthPaidCents, existingAcademyUnderchargeInvoiceStatus } from "./academyCheckoutState";
@@ -98,15 +98,14 @@ export async function startAcademyCheckout(uid: string) {
   const chargeCurrentMonthNow = !selectedMonthPaid &&
     (family.enrollmentStartPeriod ?? academyTuitionPeriod(checkoutNow)) <= currentPeriod &&
     !isCalgaryFirstOfMonth(checkoutNow);
-  const checkoutAmounts = academyCheckoutTuitionAmounts(config.monthlyCents, quantity, chargeCurrentMonthNow);
+  const lineItemPlan = academyCheckoutLineItemPlan(config.monthlyCents, quantity, chargeCurrentMonthNow);
   const productId = objectId(price.product);
   if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: price.id, quantity }];
-  if (chargeCurrentMonthNow) {
-    // Keep recurring tuition anchored to the next 1st without proration, while
-    // charging one full current-month tuition amount on the initial invoice.
-    lineItems.push({ price_data: { currency: "cad", unit_amount: checkoutAmounts.currentMonthCents, product: productId }, quantity: 1 });
-  }
+  // Keep recurring tuition anchored to the next 1st while charging one full
+  // current-month tuition amount on the initial invoice.
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = lineItemPlan.map((line) => line.kind === "recurring"
+    ? { price: price.id, quantity: line.quantity }
+    : { price_data: { currency: "cad", unit_amount: line.unitAmountCents, product: productId }, quantity: line.quantity });
   const initialBillingPeriod = family.enrollmentStartPeriod ?? family.billingPeriod;
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
@@ -187,13 +186,12 @@ export async function startAcademyPendingCheckout(uid: string) {
   catch (error) { throw new AcademyError(error instanceof Error ? error.message : "Tuition timing is unavailable.", 409); }
   const currentPeriod = calgaryBillingPeriod(checkoutNow);
   const chargeCurrentMonthNow = String(pending.enrollmentStartPeriod) <= currentPeriod && !isCalgaryFirstOfMonth(checkoutNow);
-  const checkoutAmounts = academyCheckoutTuitionAmounts(config.monthlyCents, quantity, chargeCurrentMonthNow);
+  const lineItemPlan = academyCheckoutLineItemPlan(config.monthlyCents, quantity, chargeCurrentMonthNow);
   const productId = objectId(price.product);
   if (!productId) throw new AcademyError("The approved Stripe tuition product is unavailable.", 503);
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: price.id, quantity }];
-  if (chargeCurrentMonthNow) {
-    lineItems.push({ price_data: { currency: "cad", unit_amount: checkoutAmounts.currentMonthCents, product: productId }, quantity: 1 });
-  }
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = lineItemPlan.map((line) => line.kind === "recurring"
+    ? { price: price.id, quantity: line.quantity }
+    : { price_data: { currency: "cad", unit_amount: line.unitAmountCents, product: productId }, quantity: line.quantity });
 
   const registrationId = String(pending.registrationId ?? "");
   if (!/^[a-f0-9]{24}$/.test(registrationId)) throw new AcademyError("Pending registration reference is invalid.", 409);

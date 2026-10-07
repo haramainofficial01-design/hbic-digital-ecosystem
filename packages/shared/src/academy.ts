@@ -21,6 +21,14 @@ export function academyCheckoutTuitionAmounts(monthlyCents: number, childCount: 
   const monthlyTotalCents = academyTuitionTotalCents(monthlyCents, childCount);
   return { currentMonthCents: chargeCurrentMonth ? monthlyTotalCents : 0, recurringMonthlyCents: monthlyTotalCents };
 }
+/** Stripe Checkout line-item plan: full monthly recurring price plus an optional full current-month one-time charge. */
+export function academyCheckoutLineItemPlan(monthlyCents: number, childCount: number, chargeCurrentMonth: boolean) {
+  const monthlyTotalCents = academyTuitionTotalCents(monthlyCents, childCount);
+  return [
+    { kind: "recurring" as const, unitAmountCents: monthlyCents, quantity: childCount },
+    ...(chargeCurrentMonth ? [{ kind: "current_month" as const, unitAmountCents: monthlyTotalCents, quantity: 1 as const }] : [])
+  ];
+}
 export const ACADEMY_REGISTRATION_OPEN_DATE = "2026-09-27";
 export const ACADEMY_FIRST_CLASS_DATE = "2026-10-05";
 /** The initial special activity is October 15. One Thursday is special each month; staff can override it in the Academy calendar. */
@@ -189,12 +197,12 @@ export function academyCheckoutTiming(startPeriod: string | undefined, monthPaid
   if (period > ACADEMY_LAST_BILLING_MONTH) throw new Error("No further tuition is due this term. No February charge will be created.");
   if (period > current) {
     const [year, month] = period.split("-").map(Number);
-    return { trial_end: Math.floor(Date.UTC(year, month - 1, 1, 12) / 1000), proration_behavior: "none" as const };
+    return { trial_end: Math.floor(Date.UTC(year, month - 1, 1, 12) / 1000) };
   }
   // A trial through next month's 1st collects/attaches the payment method now,
   // while an explicit one-time Checkout line item below charges this month's
   // full tuition. This avoids Stripe invoicing the recurring item early too.
-  return isCalgaryFirstOfMonth(now) ? {} : { trial_end: nextCalgaryFirstBillingAnchor(now), proration_behavior: "none" as const };
+  return isCalgaryFirstOfMonth(now) ? {} : { trial_end: nextCalgaryFirstBillingAnchor(now) };
 }
 
 export function isCalgaryFirstOfMonth(now: Date): boolean {
