@@ -7,6 +7,8 @@ version `1.7.2`, versionCode `34`, on October 7, 2026. The existing production
 track was updated to `Masjid Bilal 1.7.2 (34)` and changes sent for review.
 A subsequent Android Publisher API read independently returned that release.
 Acceptance/submission is not a claim that Google review is complete.
+Play Console independently confirms build 34 is **In review** for full
+production rollout.
 
 Built from source commit `46d8115` using the existing Expo project
 `79283015-cb87-48ef-9761-81ab87641205` and existing Android signing credentials.
@@ -59,9 +61,14 @@ Compared with the previously submitted Android build 32:
 - R8 mapping: 7,266 of 8,218 mapped classes renamed (88.4%).
 - AAB bytes: 65,442,319 → 63,725,913.
 
-These are local artifact measurements, not Google Play's independently computed
-optimization percentages. Do not claim the old build 32 warning has disappeared
-until the new build's Console report is available.
+These are local artifact measurements. Google Play's build 34 report separately
+confirms **DEX code optimization: High**, **Obfuscation: 89%**, and total
+uncompressed DEX size **7.28 MB**. Optimization/shrinking percentages are shown
+as unavailable, not zero. The same report confirms 16 KB memory-page support,
+target SDK 36 and minimum API 24. The old build 32 warning may remain visible
+on its historical release dashboard.
+
+Verified Console artifact ID: `4860238293217950071`.
 
 ## Preservation
 
