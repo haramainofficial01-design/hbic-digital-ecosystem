@@ -9,7 +9,8 @@ import {
   type PrayerName
 } from "@hbic/shared";
 import { useEffect, useState } from "react";
-import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useVisibleClock } from "../services/useVisibleClock";
 import { brandAssets } from "../constants/assets";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";
@@ -39,7 +40,7 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
   const { theme } = useAppTheme();
   const { language, t } = useAppLanguage();
   const { content, loading, source } = usePublishedContent();
-  const [now, setNow] = useState(() => new Date());
+  const now = useVisibleClock();
   const [selectedPrayer, setSelectedPrayer] = useState<CongregationalPrayer | null>(null);
   const [showBlessing, setShowBlessing] = useState(false);
   const jumuahActive = isJumuahWindow(content.prayerTime, now);
@@ -61,12 +62,6 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
     month: "short",
     day: "numeric"
   }).format(now);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30 * 1000);
-    const resume = AppState.addEventListener("change", (state) => { if (state === "active") setNow(new Date()); });
-    return () => { clearInterval(timer); resume.remove(); };
-  }, []);
 
   useEffect(() => {
     if (focusPrayer) setSelectedPrayer(focusPrayer);

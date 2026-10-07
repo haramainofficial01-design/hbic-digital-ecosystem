@@ -1,6 +1,6 @@
 import { getWhiteDaysRemainingThisWeek } from "@hbic/shared";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useVisibleClock } from "../services/useVisibleClock";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
@@ -18,12 +18,7 @@ export function WhiteDaysNotice() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useVisibleClock(60_000);
 
   if (!content.featureFlags.hijriDateEnabled || !content.featureFlags.whiteDaysEnabled) return null;
 

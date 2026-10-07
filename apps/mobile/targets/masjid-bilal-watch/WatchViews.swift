@@ -85,6 +85,7 @@ private struct WatchBrandHeader: View {
 
 struct WatchHomeView: View {
     @EnvironmentObject private var store: WatchPrayerStore
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @AppStorage("watch.showCountdown") private var showCountdown = true
@@ -93,34 +94,44 @@ struct WatchHomeView: View {
 
     var body: some View {
         NavigationStack {
-            TimelineView(.periodic(from: Date(), by: 1)) { context in
-                let snapshot = store.snapshot
-                let effective = snapshot?.effectiveNextPrayer(at: context.date)
-                ZStack {
-                    WatchBackdrop(prayerKey: effective?.key)
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            WatchBrandHeader()
-                            prayerHero(snapshot: snapshot, effective: effective, now: context.date)
-                            if let snapshot, snapshot.isJumuahServiceDay(at: context.date) {
-                                fridayCard(snapshot: snapshot, now: context.date)
-                            }
-                            if showHijri, let snapshot, !snapshot.hijriDate.isEmpty {
-                                hijriLink(snapshot: snapshot)
-                            }
-                            communityGlance(snapshot: snapshot)
-                            navigation
-                            freshness
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 10)
+            Group {
+                if scenePhase == .active && !isLuminanceReduced {
+                    TimelineView(.periodic(from: MasjidPrayerSnapshot.displayMinuteStart(), by: 60)) { context in
+                        home(at: context.date)
                     }
+                } else {
+                    home(at: Date())
                 }
-                .animation(reduceMotion || isLuminanceReduced ? nil : .easeInOut(duration: 0.24), value: effective?.key)
             }
             .toolbar(.hidden, for: .navigationBar)
         }
         .tint(WatchPalette.teal)
+    }
+
+    private func home(at now: Date) -> some View {
+        let snapshot = store.snapshot
+        let effective = snapshot?.effectiveNextPrayer(at: now)
+        return ZStack {
+            WatchBackdrop(prayerKey: effective?.key)
+            ScrollView {
+                VStack(spacing: 8) {
+                    WatchBrandHeader()
+                    prayerHero(snapshot: snapshot, effective: effective, now: now)
+                    if let snapshot, snapshot.isJumuahServiceDay(at: now) {
+                        fridayCard(snapshot: snapshot, now: now)
+                    }
+                    if showHijri, let snapshot, !snapshot.hijriDate.isEmpty {
+                        hijriLink(snapshot: snapshot)
+                    }
+                    communityGlance(snapshot: snapshot)
+                    navigation
+                    freshness
+                }
+                .padding(.horizontal, 6)
+                .padding(.bottom, 10)
+            }
+        }
+        .animation(reduceMotion || isLuminanceReduced ? nil : .easeInOut(duration: 0.24), value: effective?.key)
     }
 
     @ViewBuilder
@@ -157,8 +168,8 @@ struct WatchHomeView: View {
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
-                        if showCountdown {
-                            Text(timerInterval: now...max(now, effective.date), countsDown: true)
+                        if showCountdown && !isLuminanceReduced && scenePhase == .active {
+                            Text(snapshot.countdownText(at: now))
                                 .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(WatchPalette.gold)
                                 .lineLimit(1)

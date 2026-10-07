@@ -425,6 +425,11 @@ struct MasjidPrayerSnapshot: Codable, Hashable {
         return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 
+    /// Align minute-only UI updates with canonical adhan/iqamah boundaries.
+    static func displayMinuteStart(at date: Date = Date()) -> Date {
+        Date(timeIntervalSince1970: floor(date.timeIntervalSince1970 / 60) * 60)
+    }
+
     func progressToNextPrayer(at date: Date = Date()) -> Double {
         guard let target = effectiveNextPrayer(at: date)?.date else { return 0 }
         let prayerDates = prayers.compactMap(\.adhanDateValue)

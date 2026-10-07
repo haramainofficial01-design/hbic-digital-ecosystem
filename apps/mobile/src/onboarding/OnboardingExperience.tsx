@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { getNextPrayerFocus } from "@hbic/shared";
+import { useAppClock } from "../services/useVisibleClock";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -44,7 +45,7 @@ export function OnboardingExperience() {
   const [step, setStep] = useState(initialStep);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [permissionState, setPermissionState] = useState<PermissionState>("idle");
-  const [now, setNow] = useState(() => new Date());
+  const now = useAppClock(active);
 
   useEffect(() => {
     setStep(initialStep);
@@ -55,11 +56,6 @@ export function OnboardingExperience() {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
     const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
     return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30 * 1000);
-    return () => clearInterval(timer);
   }, []);
 
   const haptic = useCallback((kind: "selection" | "success" = "selection") => {

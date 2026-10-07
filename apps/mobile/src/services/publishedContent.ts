@@ -37,7 +37,9 @@ export async function fetchAndCachePublishedContent(): Promise<CachedContentPayl
   const cachedAt = content.updatedAt || new Date().toISOString();
   const payload: CachedContentPayload = { content, cachedAt };
   if (publishedContentCacheFile) {
-    await FileSystem.writeAsStringAsync(publishedContentCacheFile, JSON.stringify(payload));
+    const serialized = JSON.stringify(payload);
+    const previous = await FileSystem.readAsStringAsync(publishedContentCacheFile).catch(() => "");
+    if (previous !== serialized) await FileSystem.writeAsStringAsync(publishedContentCacheFile, serialized);
   }
   return payload;
 }

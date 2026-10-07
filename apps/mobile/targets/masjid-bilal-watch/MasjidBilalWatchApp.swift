@@ -3,12 +3,16 @@ import SwiftUI
 @main
 struct MasjidBilalWatchApp: App {
     @StateObject private var store = WatchPrayerStore()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             WatchLaunchView()
                 .environmentObject(store)
                 .task { await store.refreshIfNeeded() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await store.refreshIfNeeded() } }
+                }
         }
     }
 }

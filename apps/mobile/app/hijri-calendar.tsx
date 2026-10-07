@@ -1,7 +1,8 @@
 import { dateStringInTimeZone, resolveHijriDate } from "@hbic/shared";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useVisibleClock } from "../src/services/useVisibleClock";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -29,25 +30,17 @@ export default function HijriCalendarScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const [now, setNow] = useState(() => new Date());
   const [viewedMonth, setViewedMonth] = useState(() => calgaryMonth(new Date()));
   const lastCalgaryMonth = useRef(calgaryMonth(new Date()));
-  const today = dateStringInTimeZone(now, timeZone);
-  useEffect(() => {
-    const refresh = () => {
-      const fresh = new Date();
+  const now = useVisibleClock(30_000, (fresh) => {
       const month = calgaryMonth(fresh);
       const previous = lastCalgaryMonth.current;
       if (month.year !== previous.year || month.month !== previous.month) {
         setViewedMonth((view) => view.year === previous.year && view.month === previous.month ? month : view);
         lastCalgaryMonth.current = month;
       }
-      setNow(fresh);
-    };
-    const timer = setInterval(refresh, 30_000);
-    const resume = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
-    return () => { clearInterval(timer); resume.remove(); };
-  }, []);
+  });
+  const today = dateStringInTimeZone(now, timeZone);
   const days = useMemo(() => calendarDays(viewedMonth.year, viewedMonth.month), [viewedMonth]);
   const hijriDates = days.map((day) => day === null ? null : resolveHijriDate(
     new Date(Date.UTC(viewedMonth.year, viewedMonth.month, day, 12)),

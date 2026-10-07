@@ -20,6 +20,8 @@ enum PrayerSnapshotTests {
         try jumuahDoorTransitionUsesMasjidTimeZone()
         try canonicalCountdownBoundaries()
         try dstAndTomorrowUseAuthoritativeDates()
+        let minute = MasjidPrayerSnapshot.displayMinuteStart(at: Date(timeIntervalSince1970: 1791387637))
+        assert(minute.timeIntervalSince1970 == 1791387600, "Watch minute cadence aligns to prayer-time boundaries")
         print("Prayer snapshot Swift tests passed")
     }
 

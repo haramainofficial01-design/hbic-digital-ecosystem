@@ -11,6 +11,7 @@ final class WatchPrayerStore: ObservableObject {
 
     private let receiver: WatchSnapshotReceiver
     private let endpoint = URL(string: "https://hbic.ca/api/content/prayer-snapshot")!
+    private var lastRefreshAttempt: Date?
 
     init() {
         #if DEBUG
@@ -31,11 +32,18 @@ final class WatchPrayerStore: ObservableObject {
     var isShowingCachedData: Bool { snapshot?.isStale() == true }
 
     func refreshIfNeeded() async {
+        let now = Date()
+        if let lastRefreshAttempt, now.timeIntervalSince(lastRefreshAttempt) < 60 { return }
+        if let snapshot, !snapshot.isStale(at: now), snapshot.hasUsableData,
+           let generatedAt = snapshot.generatedAtValue,
+           now.timeIntervalSince(generatedAt) >= 0,
+           now.timeIntervalSince(generatedAt) < 300 { return }
         await refresh(playFeedback: false)
     }
 
     func refresh(playFeedback: Bool = true) async {
         guard !isRefreshing else { return }
+        lastRefreshAttempt = Date()
         isRefreshing = true
         refreshMessage = nil
         defer { isRefreshing = false }
@@ -46,7 +54,9 @@ final class WatchPrayerStore: ObservableObject {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: endpoint)
+            var request = URLRequest(url: endpoint)
+            request.timeoutInterval = 8
+            let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 throw URLError(.badServerResponse)
             }

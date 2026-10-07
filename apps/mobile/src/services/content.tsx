@@ -55,11 +55,12 @@ export function PublishedContentProvider({ children }: { children: ReactNode }) 
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | undefined>();
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const lastRefreshRef = useRef(0);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
 
   const loadCachedContent = useCallback(async () => {
     const cachedPayload = await readCachedPublishedContent();
     if (cachedPayload) {
-      setContent(cachedPayload.content);
+      setContent((current) => JSON.stringify(current) === JSON.stringify(cachedPayload.content) ? current : cachedPayload.content);
       setSource("cache");
       setLastUpdatedAt(cachedPayload.cachedAt);
       return true;
@@ -68,25 +69,32 @@ export function PublishedContentProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const refreshContent = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!silent) setLoading(true);
-    setRefreshError(null);
-    lastRefreshRef.current = Date.now();
-    try {
-      const payload = await fetchAndCachePublishedContent();
-      setContent(payload.content);
-      setSource("api");
-      setLastUpdatedAt(payload.cachedAt);
-    } catch {
-      setRefreshError("Couldn't refresh right now. Pull to try again.");
-      const hadCache = await loadCachedContent();
-      if (!hadCache) {
-        setContent(unavailableBundledContent);
-        setSource("bundled-fallback");
-        setLastUpdatedAt(undefined);
+    if (refreshInFlight.current) return refreshInFlight.current;
+    const task = (async () => {
+      if (!silent) setLoading(true);
+      setRefreshError(null);
+      lastRefreshRef.current = Date.now();
+      try {
+        const payload = await fetchAndCachePublishedContent();
+        // An unchanged fetch must not republish Watch/widget snapshots or
+        // rebuild notification schedules simply because it is a new object.
+        setContent((current) => JSON.stringify(current) === JSON.stringify(payload.content) ? current : payload.content);
+        setSource("api");
+        setLastUpdatedAt(payload.cachedAt);
+      } catch {
+        setRefreshError("Couldn't refresh right now. Pull to try again.");
+        const hadCache = await loadCachedContent();
+        if (!hadCache) {
+          setContent(unavailableBundledContent);
+          setSource("bundled-fallback");
+          setLastUpdatedAt(undefined);
+        }
+      } finally {
+        if (!silent) setLoading(false);
       }
-    } finally {
-      if (!silent) setLoading(false);
-    }
+    })();
+    refreshInFlight.current = task;
+    try { await task; } finally { refreshInFlight.current = null; }
   }, [loadCachedContent]);
 
   const refresh = useCallback(() => refreshContent(), [refreshContent]);
@@ -106,11 +114,17 @@ export function PublishedContentProvider({ children }: { children: ReactNode }) 
   }, [refreshContent]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (AppState.currentState === "active") void refreshContent({ silent: true });
-    }, backgroundRefreshMs);
-
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const update = (state: string) => {
+      if (interval !== undefined) clearInterval(interval);
+      interval = undefined;
+      if (state === "active") interval = setInterval(() => {
+        if (Date.now() - lastRefreshRef.current >= backgroundRefreshMs) void refreshContent({ silent: true });
+      }, backgroundRefreshMs);
+    };
+    update(AppState.currentState);
+    const subscription = AppState.addEventListener("change", update);
+    return () => { if (interval !== undefined) clearInterval(interval); subscription.remove(); };
   }, [refreshContent]);
 
   useEffect(() => {

@@ -18,6 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Uses canonical resolved absolute dates; never calculates adhan or iqamah. */
 class HBICPrayerWidgetProvider : AppWidgetProvider() {
@@ -28,8 +29,16 @@ class HBICPrayerWidgetProvider : AppWidgetProvider() {
   override fun onReceive(context: Context, intent: Intent) {
     super.onReceive(context, intent)
     if (intent.action !in setOf(AppWidgetManager.ACTION_APPWIDGET_UPDATE, AppWidgetManager.ACTION_APPWIDGET_OPTIONS_CHANGED,
-        Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, advanceAction)) return
+        Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, advanceAction, refreshAction)) return
     refreshAll(context)
+    val manager = AppWidgetManager.getInstance(context)
+    if (manager.getAppWidgetIds(ComponentName(context, HBICPrayerWidgetProvider::class.java)).isEmpty()) return
+    val prefs = context.getSharedPreferences("hbic_prayer_widget", Context.MODE_PRIVATE)
+    val elapsed = System.currentTimeMillis() - prefs.getLong("lastFetch", 0)
+    // Prayer transitions advance from absolute cached dates. Resizing or
+    // simultaneous launcher broadcasts need not fetch the same schedule again.
+    if (intent.action != refreshAction && elapsed in 0 until 300_000) return
+    if (!fetching.compareAndSet(false, true)) return
     val pending = goAsync()
     executor.execute {
       try {
@@ -40,11 +49,13 @@ class HBICPrayerWidgetProvider : AppWidgetProvider() {
           connection.setRequestProperty("Accept", "application/json")
           if (connection.responseCode == 200) {
             val response = connection.inputStream.bufferedReader().use { it.readText() }
-            acceptSnapshot(context, JSONObject(response).getJSONObject("snapshot").toString())
+            if (acceptSnapshot(context, JSONObject(response).getJSONObject("snapshot").toString())) {
+              prefs.edit().putLong("lastFetch", System.currentTimeMillis()).apply()
+            }
           }
         } finally { connection.disconnect() }
       } catch (_: Exception) { /* Offline: keep labeled canonical cache, never invent times. */ }
-      finally { pending.finish() }
+      finally { fetching.set(false); pending.finish() }
     }
   }
 
@@ -55,6 +66,8 @@ class HBICPrayerWidgetProvider : AppWidgetProvider() {
 
   companion object {
     private const val advanceAction = "ca.hbic.calgary.app.PRAYER_WIDGET_ADVANCE"
+    private const val refreshAction = "ca.hbic.calgary.app.PRAYER_WIDGET_REFRESH"
+    private val fetching = AtomicBoolean(false)
     private val executor = Executors.newSingleThreadExecutor()
 
     private fun instant(value: String): Long? = runCatching {
@@ -69,6 +82,7 @@ class HBICPrayerWidgetProvider : AppWidgetProvider() {
       val prefs = context.getSharedPreferences("hbic_prayer_widget", Context.MODE_PRIVATE)
       val previous = runCatching { JSONObject(prefs.getString("snapshot", "") ?: "") }.getOrNull()
       if ((instant(previous?.optString("generatedAt") ?: "") ?: 0) > (instant(value.optString("generatedAt")) ?: 0)) return false
+      if (prefs.getString("snapshot", null) == raw) return true
       prefs.edit().putString("snapshot", raw).apply()
       refreshAll(context)
       return true
@@ -124,7 +138,8 @@ class HBICPrayerWidgetProvider : AppWidgetProvider() {
         context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { launch ->
           views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(context, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
-        views.setOnClickPendingIntent(R.id.widget_refresh, advanceIntent(context))
+        views.setOnClickPendingIntent(R.id.widget_refresh, PendingIntent.getBroadcast(context, 31072,
+          Intent(context, HBICPrayerWidgetProvider::class.java).setAction(refreshAction), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         manager.updateAppWidget(id, views)
       }
       if (next != null) {
