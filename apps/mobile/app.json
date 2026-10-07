@@ -45,6 +45,7 @@
       "@bacons/apple-targets",
       "./plugins/withAppleTargetSchemes",
       "./plugins/withIosSceneLifecycle",
+      "./plugins/withAndroidReleaseOptimization",
       [
         "expo-audio",
         {
