@@ -20,7 +20,10 @@ const db = { collection, runTransaction: async (callback: (tx: unknown) => Promi
   const result = await callback({ get: async (reference: { path: string }) => snapshot(reference.path),
     set: (reference: { path: string }, value: Record<string, unknown>) => writes.push(["set", reference.path, value]),
     update: (reference: { path: string }, value: Record<string, unknown>) => writes.push(["update", reference.path, value]),
-    create: (reference: { path: string }, value: Record<string, unknown>) => writes.push(["create", reference.path, value]),
+    create: (reference: { path: string }, value: Record<string, unknown>) => {
+      assert.equal(Object.values(value).includes(undefined), false, "Firestore rejects undefined audit fields");
+      writes.push(["create", reference.path, value]);
+    },
     delete: (reference: { path: string }) => writes.push(["delete", reference.path, {}]) });
   for (const [kind, path, value] of writes) {
     if (kind === "delete") { records.delete(path); continue; }
@@ -61,4 +64,30 @@ test("staff cash arrangement preserves paid tuition; card setup requires parent 
   records.delete("academyBillingLocks/fixture");
   records.set(path, { ...records.get(path), enrollmentState: "withdrawn" });
   await assert.rejects(requestAcademyCardSetup("fixture", staff), /Withdrawn/);
+});
+
+test("exemptions save for legacy active families without a registration ID and preserve paid history", async () => {
+  const { setAcademyTuitionExemption } = await import("../lib/academyStripe");
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
+  const path = "academyFamilies/legacy-exemption";
+  const ledger = `${path}/months/${period}`;
+  records.set(path, { reference: "QA-LEGACY", guardianName: "Local test", email: "test@example.invalid",
+    children: [{ id: "child-a", name: "Test A", level: "qaida" }, { id: "child-b", name: "Test B", level: "quran" }],
+    paymentChoice: "cash", enrollmentState: "active", passToken: "legacy-pass", createdAt: new Date().toISOString(), checkInAt: "preserved" });
+  records.set(ledger, { period, method: "cash", status: "paid", amountCents: 10000, receiptId: "existing-receipt" });
+  records.set("academySettings/config", { tuitionMode: "per_child", monthlyCents: 5000 });
+  const paid = structuredClone(records.get(ledger));
+  const actor = { uid: "approved-staff", email: "staff@example.invalid" };
+  for (const childId of ["child-a", "child-b"]) {
+    const family = await setAcademyTuitionExemption("legacy-exemption", childId, true, actor);
+    assert.equal(family?.children.find(child => child.id === childId)?.tuitionExempt, true);
+  }
+  assert.deepEqual(records.get(ledger), paid);
+  assert.equal(records.get(path)?.enrollmentState, "active");
+  assert.equal(records.get(path)?.passToken, "legacy-pass");
+  assert.equal(records.get(path)?.checkInAt, "preserved");
+  const audits = [...records.values()].filter(row => row.action === "tuition_exempted" && row.familyId === "legacy-exemption");
+  assert.equal(audits.length, 2);
+  assert.equal(audits.every(row => row.registrationId === null), true);
+  assert.equal(records.has("academyBillingLocks/legacy-exemption"), false);
 });

@@ -563,7 +563,7 @@ export async function setAcademyTuitionExemption(uid: string, childId: string, e
       if (month.exists && month.data()?.status !== "paid") tx.update(monthRef, { amountCents,
         status: amountCents === 0 ? "not_due" : f.data()?.paymentChoice === "cash" ? "cash_due" : "card_attention", tuitionExemptionAppliedAt: now, updatedAt: now });
       tx.create(db.collection("academyAudit").doc(), { action: exempt ? "tuition_exempted" : "tuition_exemption_removed",
-        familyId: uid, registrationId: family.registrationId, childId, reason: reason.trim().slice(0, 200), actorUid: actor.uid, actorEmail: actor.email, at: now });
+        familyId: uid, registrationId: family.registrationId ?? null, childId, reason: reason.trim().slice(0, 200), actorUid: actor.uid, actorEmail: actor.email, at: now });
       tx.delete(lockRef);
     });
     return getAcademyFamily(uid);
