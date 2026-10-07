@@ -3,6 +3,8 @@ const path = require("node:path");
 const { withAppBuildGradle, withGradleProperties, withDangerousMod } = require("@expo/config-plugins");
 
 const compatibilityRules = `# HBIC R8 reflection compatibility
+# Expo/Kotlin reflection reads record annotation defaults at runtime.
+-keep @interface expo.modules.kotlin.records.** { *; }
 # Expo loads this name from AndroidManifest metadata via Class.forName.
 -keep,allowoptimization class expo.modules.adapters.react.apploader.RNHeadlessAppLoader {
     public <init>(android.content.Context);

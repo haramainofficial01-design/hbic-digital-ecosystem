@@ -42,6 +42,7 @@ test("preserves Expo's manifest-loaded background loader without disabling other
   assert.ok(result.startsWith(original));
   assert.ok(result.includes("-keep,allowoptimization class expo.modules.adapters.react.apploader.RNHeadlessAppLoader"));
   assert.ok(result.includes("public <init>(android.content.Context);"));
+  assert.ok(result.includes("-keep @interface expo.modules.kotlin.records.** { *; }"));
   assert.equal(preserveReflectiveLoader(result), result);
   assert.ok(!result.includes("-dontobfuscate"));
   assert.ok(!result.includes("-keep class expo.**"));
