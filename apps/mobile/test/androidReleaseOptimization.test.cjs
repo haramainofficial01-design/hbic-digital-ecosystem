@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { optimizeProperties, optimizeBuildGradle } = require("../plugins/withAndroidReleaseOptimization");
+const { optimizeProperties, optimizeBuildGradle, preserveReflectiveLoader } = require("../plugins/withAndroidReleaseOptimization");
 
 test("release optimization replaces disabled/duplicate flags and preserves unrelated properties", () => {
   const original = [
@@ -34,4 +34,15 @@ test("optimization is registered in the actual Expo production configuration", (
   assert.ok(config.expo.plugins.includes("./plugins/withAndroidReleaseOptimization"));
   assert.equal(config.expo.android.package, "ca.hbic.calgary.app");
   assert.equal(config.expo.extra.eas.projectId, "79283015-cb87-48ef-9761-81ab87641205");
+});
+
+test("preserves Expo's manifest-loaded background loader without disabling other obfuscation", () => {
+  const original = "-keep class com.swmansion.reanimated.** { *; }\n";
+  const result = preserveReflectiveLoader(original);
+  assert.ok(result.startsWith(original));
+  assert.ok(result.includes("-keep,allowoptimization class expo.modules.adapters.react.apploader.RNHeadlessAppLoader"));
+  assert.ok(result.includes("public <init>(android.content.Context);"));
+  assert.equal(preserveReflectiveLoader(result), result);
+  assert.ok(!result.includes("-dontobfuscate"));
+  assert.ok(!result.includes("-keep class expo.**"));
 });
