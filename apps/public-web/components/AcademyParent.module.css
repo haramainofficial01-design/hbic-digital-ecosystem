@@ -7,3 +7,5 @@
 .verificationSecondary{font-size:14px;color:#64817d;margin:0 0 8px}
 .secondary{border:1px solid #9dbdae;border-radius:14px;background:#f4f7f5;color:#174439;font:800 16px inherit;padding:15px 24px;min-height:52px;cursor:pointer;margin-top:10px}
 .secondary:disabled{opacity:.55;cursor:wait}
+
+.message{grid-template-columns:minmax(0,1fr);margin:16px 0}.message>div{min-width:0}.message p{margin:4px 0}
