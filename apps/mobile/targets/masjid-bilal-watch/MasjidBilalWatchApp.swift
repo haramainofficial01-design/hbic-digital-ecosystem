@@ -26,6 +26,7 @@ private struct WatchLaunchView: View {
         case "community": NavigationStack { CommunityWatchView() }
         case "hijri": NavigationStack { HijriWatchView() }
         case "settings": NavigationStack { WatchSettingsView() }
+        case "quran": NavigationStack { WatchQuranHome() }
         default: WatchHomeView()
         }
         #else

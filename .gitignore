@@ -15,6 +15,7 @@ firebase-debug.log
 /ios
 /apps/mobile/android
 /apps/mobile/ios
+/apps/mobile/targets/masjid-bilal-watch/Resources/
 .vercel
 .env*
 .local-secrets/

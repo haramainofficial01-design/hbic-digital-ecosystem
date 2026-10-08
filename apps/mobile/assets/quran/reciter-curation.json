@@ -1,0 +1,14 @@
+{
+  "verifiedOn": "2026-10-08",
+  "directory": "https://pg.prh.gov.sa/index.php?Itemid=271&catid=2&id=280&lang=ar&option=com_content&view=article",
+  "catalog": "https://www.mp3quran.net/api/v3/reciters?language=eng",
+  "makkah": [54, 62, 102, 217, 92, 254, 21188],
+  "madinah": [58, 43, 162, 74, 49, 67, 159, 205, 137, 21181, 21136],
+  "popular": [112, 51, 123, 259, 118, 31, 30, 5, 4],
+  "unavailableInApprovedCatalogs": [
+    {"name": "Saleh bin Humaid", "masjid": "Makkah"},
+    {"name": "Osama Khayyat", "masjid": "Makkah"},
+    {"name": "Faisal Ghazawi", "masjid": "Makkah"},
+    {"name": "Saleh Al-Maghamisi", "masjid": "Madinah"}
+  ]
+}

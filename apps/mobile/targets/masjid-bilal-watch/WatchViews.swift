@@ -345,6 +345,10 @@ struct WatchHomeView: View {
 
     private var navigationContent: some View {
         VStack(spacing: 6) {
+            NavigationLink { WatchQuranHome() } label: {
+                Label("Quran & Recite", systemImage: "book.closed.fill").frame(maxWidth: .infinity)
+            }
+            .masjidGlassButtonStyle()
             HStack(spacing: 6) {
                 NavigationLink { DailyPrayerView() } label: {
                     Label("Today", systemImage: "list.bullet.rectangle")

@@ -1,52 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const base = (process.env.EXPO_PUBLIC_API_URL || "https://hbic.ca").replace(/\/$/, "");
-const bookmarksKey = "hbic:quran:bookmarks:v1";
-const lastReadKey = "hbic:quran:last-read:v1";
-
-export interface QuranChapter {
-  id: number;
-  nameSimple: string;
-  nameArabic: string;
-  translatedName: { name: string };
-  versesCount: number;
-  revelationPlace: string;
-}
-export interface QuranVerse {
-  id: number;
-  verseKey: string;
-  verseNumber: number;
-  textUthmani: string;
-  translation: string;
-  translationName: string;
-  audioUrl: string | null;
-}
-
-async function request<T>(query: string): Promise<T> {
-  const response = await fetch(`${base}/api/quran?${query}`);
-  const body = await response.json().catch(() => null);
-  if (!response.ok || !body?.ok) throw new Error(body?.message ?? "Quran content is unavailable.");
-  return body as T;
-}
-
-export async function listChapters() {
-  return (await request<{ chapters: QuranChapter[] }>("mode=chapters")).chapters;
-}
-export async function readChapter(id: number, page = 1) {
-  return request<{ chapter: QuranChapter; verses: QuranVerse[]; page: number; hasMore: boolean; availability: { note: string } }>(`mode=chapter&chapter=${id}&page=${page}`);
-}
-export async function searchVerses(query: string) {
-  return (await request<{ verses: QuranVerse[] }>(`mode=search&q=${encodeURIComponent(query.trim())}`)).verses;
-}
-export async function loadBookmarks(): Promise<string[]> {
-  try {
-    const value = JSON.parse(await AsyncStorage.getItem(bookmarksKey) ?? "[]");
-    return Array.isArray(value) ? value.filter((key): key is string => typeof key === "string") : [];
-  } catch { return []; }
-}
-export async function saveBookmarks(keys: string[]) { await AsyncStorage.setItem(bookmarksKey, JSON.stringify(keys)); }
-export async function loadLastRead() {
-  const value = Number(await AsyncStorage.getItem(lastReadKey));
-  return Number.isInteger(value) && value >= 1 && value <= 114 ? value : 1;
-}
-export async function saveLastRead(id: number) { await AsyncStorage.setItem(lastReadKey, String(id)); }
+import { createQuranClient } from "./quranClient";
+import { createQuranStore } from "./quranStorage";
+import { createTanzilClient } from "./quranTanzil";
+export type { QuranChapter, QuranVerse, QuranPage, QuranResources, QuranState } from "@hbic/shared";
+export const quranContentSource = process.env.EXPO_PUBLIC_QURAN_CONTENT_SOURCE === "tanzil" ? "tanzil" : "qf";
+export const quranClient = quranContentSource === "tanzil"
+  ? createTanzilClient(() => require("../../assets/quran/tanzil-uthmani.json"))
+  : createQuranClient(process.env.EXPO_PUBLIC_API_URL || "https://hbic.ca");
+export const quranStore = createQuranStore(AsyncStorage);
+export const { listChapters, readChapter, searchVerses } = quranClient;
+// Compatibility helpers retain the existing web/mobile bookmark conventions.
+export async function loadBookmarks() { return (await quranStore.read()).bookmarks; }
+export async function saveBookmarks(bookmarks: string[]) { await quranStore.update((s) => ({ ...s, bookmarks })); }
+export async function loadLastRead() { return (await quranStore.read()).lastRead?.chapter ?? 1; }
+export async function saveLastRead(chapter: number) { await quranStore.update((s) => ({ ...s, lastRead: { chapter, ayah: 1 } })); }

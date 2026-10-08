@@ -17,7 +17,8 @@
       "bundleIdentifier": "ca.hbic.calgary.app",
       "appleTeamId": "ZJ58VWNTX3",
       "infoPlist": {
-        "NSCameraUsageDescription": "Authorized HBIC staff can scan Quran Academy passes for check-in. You can enter the QA reference instead."
+        "NSCameraUsageDescription": "Authorized HBIC staff can scan Quran Academy passes for check-in. You can enter the QA reference instead.",
+        "NSSpeechRecognitionUsageDescription": "Use on-device speech only when you choose Quran voice search. HBIC does not store or upload your voice search."
       },
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -46,11 +47,13 @@
       "./plugins/withAppleTargetSchemes",
       "./plugins/withIosSceneLifecycle",
       "./plugins/withAndroidReleaseOptimization",
+      "./plugins/withQuranRecitationRuntime",
       [
         "expo-audio",
         {
-          "microphonePermission": false,
-          "recordAudioAndroid": false
+          "microphonePermission": "Record your Quran recitation only when you tap Record. Recordings stay privately on this device and can be deleted anytime.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false
         }
       ],
       [

@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {"modules": ["QuranVoiceSearchModule", "QuranAssetIntegrityModule"]},
+  "android": {"modules": ["ca.hbic.calgary.quranvoice.QuranVoiceSearchModule", "ca.hbic.calgary.quranvoice.QuranAssetIntegrityModule"]}
+}
