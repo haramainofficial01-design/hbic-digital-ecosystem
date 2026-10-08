@@ -18,6 +18,7 @@
       "appleTeamId": "ZJ58VWNTX3",
       "infoPlist": {
         "NSCameraUsageDescription": "Authorized HBIC staff can scan Quran Academy passes for check-in. You can enter the QA reference instead.",
+        "NSPhotoLibraryUsageDescription": "Allows HBIC to read a photo you explicitly select for an image attachment. Your photo library is not scanned or accessed in the background.",
         "NSSpeechRecognitionUsageDescription": "Use on-device speech only when you choose Quran voice search. HBIC does not store or upload your voice search."
       },
       "entitlements": {
@@ -51,7 +52,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Record your Quran recitation only when you tap Record. Recordings stay privately on this device and can be deleted anytime.",
+          "microphonePermission": "Use the microphone only when you choose Quran voice search, private recording or Recite Assist. Audio stays on this device and is not uploaded.",
           "recordAudioAndroid": true,
           "enableBackgroundRecording": false
         }
