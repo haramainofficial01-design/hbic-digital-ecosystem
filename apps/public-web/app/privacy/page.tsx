@@ -78,6 +78,14 @@ export default async function PrivacyPage() {
                 Our hosting and infrastructure providers process standard connection information needed to operate and protect the service. For public forms, the server uses limited request information to create a keyed security fingerprint for rate limiting and duplicate protection; the raw network address and browser identifier are not saved in the form record.
               </p>
 
+              <h3>Quran reading, recordings and Recite Assist</h3>
+              <p>
+                Quran bookmarks, reading preferences and self-reported memorization progress stay on your device or in your browser. Microphone access is optional and starts only when you choose recording, on-device voice search or Recite Assist. HBIC does not upload your microphone audio or use it to train a model. App recordings remain on your device until you delete them. Browser recordings can be reviewed locally or downloaded only when you choose; leaving or backgrounding the page discards the browser recording. Recite Assist keeps a bounded audio window in memory and erases it when stopped or backgrounded. Its early-preview feedback is not a verified recitation or Tajweed assessment.
+              </p>
+              <p>
+                Quran Foundation supplies Quran text, meaning translations and Mushaf fonts; MP3Quran supplies credited streaming recordings. Recite Assist downloads public, integrity-checked model data from Hugging Face only after your consent. These providers receive standard connection information for requested downloads or streams, not your microphone audio. Quran reading does not require an account.
+              </p>
+
               <h3>Information we do not collect in the current app</h3>
               <p>
                 The current Masjid Bilal app does not require a public user account, does not contain third-party advertising, does not use an advertising identifier, does not include a user analytics or crash-reporting SDK, and does not collect or transmit your precise location. Qibla direction features use device sensors locally when available.
