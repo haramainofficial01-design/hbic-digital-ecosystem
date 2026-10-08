@@ -30,6 +30,14 @@ test("Mushaf rejects missing lines, bad page/glyphs, duplicated positions and in
   const heading = structuredClone(page); heading.lines[0] = { number: 1, words: [], heading: "<img onerror=alert(1)>" };
   assert.throws(() => validateMushafPage(heading, 3));
 });
+test("browser Mushaf uses an explicit channel without weakening the native sandbox", () => {
+  const html = mushafDocument(page, false, "2:6", {channel: "mushaf_test_1"});
+  assert.match(html, /window.parent.postMessage/);
+  assert.match(html, /channel:"mushaf_test_1"/);
+  assert.match(html, /connect-src 'none'/);
+  assert.doesNotMatch(html, /ReactNativeWebView/);
+  assert.throws(() => mushafDocument(page, false, "", {channel: "<script>"}));
+});
 test("saved reading mode preserves old state and capitalized progress labels", () => {
   const previous = emptyQuranState(); delete (previous.preferences as Partial<typeof previous.preferences>).layout;
   assert.equal(normalizeQuranState(previous).preferences.layout, "ayah");

@@ -1,8 +1,10 @@
 # Quran & Recite — development verification, 8 October 2026
 
-This branch is **not a store-release approval**. Existing production, Academy,
-payments, prayer data, Watch/widget identifiers, and signing remain unchanged.
-No new store binary has been submitted.
+The user has authorized the reader/listening release and **optional Recite Assist
+early preview** for personal testing despite its measured limitations. This is
+not accuracy qualification. Academy, payments, prayer data, Watch/widget
+identifiers, and signing remain unchanged. Store acceptance is recorded only
+after a new signed binary has actually been accepted.
 
 ## Implemented
 
@@ -32,7 +34,7 @@ No new store binary has been submitted.
 - Apple Watch: exact offline Quran text, surah/ayah navigation, adjustable Arabic,
   live reciter catalog and native player. Progress observer is five seconds while
   visible, removed off-screen; playback pauses when wrist/app becomes inactive.
-- **Recite Assist**, development-only: native PCM, local pinned inference model,
+- **Recite Assist**, explicit optional early preview: native PCM, local pinned inference model,
   canonical-word feedback for possible differences, silence/uncertainty safeguards,
   concealed text in Test Mode, bounded six-second audio window, one inference at
   a time, two-minute session cap, explicit download/microphone consent, no upload.
@@ -41,10 +43,13 @@ No new store binary has been submitted.
   reports observations and uncertainty without retaining or uploading audio.
   Stable-completion navigation guard requires two complete observations; it never
   awards memorization scores. Full microphone/progression qualification is pending.
+  Time-aware CTC word evidence now revises overlapping guesses, preserves real
+  repetitions, retains pause/capture timestamps, and rejects weak canonical-looking
+  tokens as completion evidence. Unchanged capture never schedules inference.
 
 ## Verified evidence
 
-- 34 focused Quran/provider/storage/audio/recognition/navigation/Mushaf/permission tests pass;
+- Focused Quran/provider/storage/audio/recognition/navigation/Mushaf/permission tests pass;
   phone and public-web typechecks pass; mobile lint has no errors/warnings.
 - Phone native Debug builds compile on iOS and Android, including voice search,
   PCM recording, ONNX runtime 1.24.3 and sandbox-restricted native file hashing.
@@ -86,6 +91,13 @@ No new store binary has been submitted.
 - Inference tests use actual phone native runtimes, streamed authorized reference
   audio held only in RAM, and the same bounded window/feedback code. No live
   microphone or private user audio was collected for these tests.
+- **These earlier 19-case checks are superseded for accuracy qualification by
+  [the larger real-audio evaluation](quran-recitation-qualification.md).**
+  Native iOS/Android each execute 96 waveform controls: zero alerts in 60 negative
+  controls, but only 3/36 intended word mistakes detected. This fails assessment
+  qualification; publication is authorized only as an explicit early preview.
+  Public reviewed natural audio also exposes inadequate sensitivity;
+  no broad human word-recognition accuracy claim is made.
 - Native preparation measured **1,271 ms iOS / 2,192 ms Android**, versus prior
   JavaScript file verification **83,105 / 82,161 ms**, respectively, on simulators.
   This is startup timing, not a claimed percentage of real-device battery savings.
@@ -121,21 +133,22 @@ Neither evidence caches nor provider credentials are committed.
 - Watch resources are regenerated from the phone's exact licensed masters during
   target configuration. Generated resource copies/native projects are ignored.
 
-## Remaining release gates
+## Remaining limitations
 
 1. Qualification of natural microphone/voice-search input across different voices,
    natural mistakes, pauses and ordinary noise. Simulator/reference-fixture checks
    do not establish expert-reviewed human detection accuracy or natural sequential
-   progression. Development Recite Assist must not be presented as reliable
-   production mistake detection before this passes; no physical-device connection
+   progression. Early-preview Recite Assist must not be presented as reliable
+   mistake detection before this passes; no physical-device connection
    is requested because the user authorized simulator/emulator work instead.
 2. Four current imams lack verified recordings in the approved catalogs:
    **Saleh bin Humaid, Osama Khayyat, Faisal Ghazawi, Saleh Al-Maghamisi**.
    Obtain an authorized recording source before claiming all current Haramain
    imams. No substituted voice, invented reciter ID or dead playback button.
 3. Actual Watch audio-route import/playback and phone/Watch energy measurements.
-4. Configure approved backend credentials securely at release, enable only after
-   gates pass, then use next unused phone/store build numbers and existing IDs.
+4. Approved backend credentials stay server-only; release uses fresh phone/store
+   build numbers and existing IDs. User authorization is for an optional,
+   transparently labelled preview, not a verified automatic assessment.
 
 No physical iPhone/Android device was connected during this verification. The
 user explicitly authorized continuing with simulators/emulators rather than

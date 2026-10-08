@@ -2,8 +2,9 @@ import { mushafFontUrl, validateMushafPage, type MushafPage } from "@hbic/shared
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 /** Sandboxed typesetting only: native controls own navigation/audio/bookmarks. */
-export function mushafDocument(page: MushafPage, dark: boolean, selected: string) {
+export function mushafDocument(page: MushafPage, dark: boolean, selected: string, browser?: { channel: string }) {
   validateMushafPage(page, page.page);
+  if (browser && !/^[a-zA-Z\d_-]{1,80}$/.test(browser.channel)) throw new Error("Invalid Mushaf message channel.");
   const rows = page.lines.map((line) => `<div class="line${line.words.length ? " words" : ""}${line.heading ? " heading" : ""}${line.basmala ? " basmala" : ""}${!line.words.length && !line.heading && !line.basmala ? " empty" : ""}" data-line="${line.number}">${line.words.length
     ? line.words.map((w) => `<button data-key="${escape(w.key)}" aria-label="${escape(w.text)} — ${w.key}" class="word${selected === w.key ? " selected" : ""}">${w.glyph}</button>`).join("")
     : escape(line.heading ?? line.basmala ?? "")}</div>`).join("");
@@ -21,7 +22,7 @@ ${page.page <= 2 ? ".line.words{justify-content:center;gap:5px}.line.empty{flex:
 #status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;direction:ltr;font:15px -apple-system,sans-serif;padding:30px;text-align:center}
 </style></head><body><div id="status">Preparing Madinah page…</div><main id="page" aria-label="Madinah Mushaf page ${page.page}">${rows}</main>
 <script nonce="hbic-mushaf">(function(){var finished=false;
-function send(x,attempt){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(x));else if((attempt||0)<40)setTimeout(function(){send(x,(attempt||0)+1)},50)}
+function send(x,attempt){${browser ? `window.parent.postMessage(Object.assign({channel:${JSON.stringify(browser.channel)}},x),'*')` : "if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(x));else if((attempt||0)<40)setTimeout(function(){send(x,(attempt||0)+1)},50)"}}
 var timeout=setTimeout(function(){if(!finished){document.getElementById('status').textContent='Page font could not load. Please retry.';send({type:'error'})}},20000);
 Promise.all([document.fonts.load('30px Madinah'),document.fonts.load('22px Hafs')]).then(function(){
 if(!document.fonts.check('30px Madinah')||!document.fonts.check('22px Hafs'))throw Error('Font unavailable');

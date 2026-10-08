@@ -10,7 +10,10 @@ import type { QuranLibrary, QuranMode, ReturnTypeQuranAudio } from "./types";
 // Expo's ES2015 compilation target needs a lazy require rather than import().
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ReciteAssist = lazy<typeof import("./ReciteAssist").default>(() => Promise.resolve({ default: require("./ReciteAssist").default }));
-const assistDevelopment = __DEV__ && process.env.EXPO_PUBLIC_RECITE_ASSIST_DEVELOPMENT === "true";
+// Explicit release opt-in: recognition is an early preview, never a certified
+// assessment. Development builds retain their separate diagnostic switch.
+const assistEnabled = process.env.EXPO_PUBLIC_RECITE_ASSIST_ENABLED === "true"
+  || (__DEV__ && process.env.EXPO_PUBLIC_RECITE_ASSIST_DEVELOPMENT === "true");
 
 export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoaded }: {
   mode: QuranMode; chapter: QuranChapter; getVerse: (ayah: number) => Promise<QuranVerse>;
@@ -66,7 +69,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   return <View style={styles.content}>
     <Text style={[styles.title, { color: theme.colors.text }]}>{mode === "test" ? "Test yourself" : mode === "memorize" ? "Memorization" : "Recitation practice"}</Text>
     <Text style={{ ...textStyle, color: theme.colors.muted }}>{chapter.nameSimple} · {chapter.versesCount} ayahs</Text>
-    <Text style={{ ...textStyle, color: theme.colors.muted }}>{assistDevelopment ? "Listen, practise aloud, and review yourself. Recite Assist is an on-device development feature, not a verified assessment." : "Listen, practise aloud, and review yourself. Automatic word feedback is not available in this release."} No Tajweed scores.</Text>
+    <Text style={{ ...textStyle, color: theme.colors.muted }}>{assistEnabled ? "Listen, practise aloud, and review yourself. Recite Assist is an optional early preview: it can miss or misidentify words and is not a verified assessment." : "Listen, practise aloud, and review yourself. Automatic word feedback is not available in this release."} No Tajweed scores.</Text>
     {mode === "test" && questions.length ? <QuranSurface>
       <Text style={textStyle}>Ayahs {passage.from}–{passage.to} · {temporary ? "Temporary review" : "Saved self-review"}</Text>
       <AppButton label="Change test range" variant="ghost" disabled={practiceBusy} onPress={() => { audio.stop(); setQuestions([]); setQuestionIndex(0); setHints(0); setRevealed(false); }} />
@@ -110,7 +113,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       </> : null}
     </QuranSurface>}
     {error ? <QuranMessage message={error} /> : null}
-    {assistDevelopment && current && valid ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+    {assistEnabled && current && valid ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
       onAdvance={mode !== "test" && selectedAyah < passage.to ? async (signal) => {
         const next = selectedAyah + 1; const verse = await getVerse(next);
         if (signal.aborted) return;

@@ -2,8 +2,9 @@ import { Directory, File, Paths } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { createAsrSession, detectSpeech, type AsrSession } from "@tilawi/quran-asr";
-import { acousticQuality, compactQuietPauses } from "./reciteAssistFeedback";
+import { TextCTCDecoder, detectSpeech, type AsrTranscribeResult, type SessionOutput } from "@tilawi/quran-asr";
+import { acousticQuality, compactQuietPausesWithTimeline } from "./reciteAssistFeedback";
+import { decodeRecitationWords, type RecitationObservation } from "./recitationTracking";
 
 const revision = "e9448a0e84f3adb64c28b7a8db501dd8e0e59a84";
 const source = `https://huggingface.co/muhdur/tilawi-fastconformer-quran/resolve/${revision}/`;
@@ -13,7 +14,8 @@ const assets = {
   "quran_ctc_tokens.json": "96aa32d188d075598536fcbb936dc793466fce2a8da331e48f15932022f4dce8",
   "quran.json": "6e6f31f642c701b49a1ba090311ca4c7a97c6a5b79a302712dff815a9d7b3d03"
 } as const;
-let pending: Promise<AsrSession> | null = null;
+type LocalRecognizer = { run: (audio: Float32Array) => Promise<SessionOutput>; decoder: TextCTCDecoder; vocab: Record<string, string> };
+let pending: Promise<LocalRecognizer> | null = null;
 let release: (() => Promise<void>) | null = null;
 const leases = new Set<symbol>();
 let lastInference: Promise<unknown> = Promise.resolve();
@@ -61,23 +63,33 @@ async function prepareReciteAssist(onProgress: (message: string) => void) {
     const native = await ort.InferenceSession.create(files.get("fastconformer_full_mixed.onnx")!.uri.replace(/^file:\/\//, ""),
       { graphOptimizationLevel: "all", intraOpNumThreads: 2, interOpNumThreads: 1 });
     release = () => native.release();
-    return createAsrSession({ async run(audio) {
+    const vocab: Record<string, string> = JSON.parse(await files.get("vocab.json")!.text());
+    return { async run(audio: Float32Array) {
       const output = await native.run({ audio_signal: new ort.Tensor("float32", audio, [1, audio.length]),
         length: new ort.Tensor("int64", BigInt64Array.from([BigInt(audio.length)]), [1]) });
       const tensor = output[native.outputNames[0]];
-      if (tensor.type !== "float32" || tensor.dims.length !== 3) throw new Error("Recognition model output is invalid.");
+      if (tensor.type !== "float32" || tensor.dims.length !== 3 || tensor.dims[0] !== 1) throw new Error("Recognition model output is invalid.");
       return { logprobs: tensor.data as Float32Array, timeSteps: tensor.dims[1], vocabSize: tensor.dims[2] };
-    } }, { vocab: JSON.parse(await files.get("vocab.json")!.text()), quranCtcTokens: JSON.parse(await files.get("quran_ctc_tokens.json")!.text()),
-      quran: JSON.parse(await files.get("quran.json")!.text()) });
+    }, decoder: new TextCTCDecoder(vocab, 1024), vocab };
   })().catch((error) => { pending = null; throw error; });
   return pending;
 }
-async function recognizeRecitation(pcm: Float32Array) {
-  if (!pending || pcm.length < 16_000 || !detectSpeech(pcm)) return { text: "", quality: 0 };
+const emptyObservation = (pcm: Float32Array, startSample: number): RecitationObservation =>
+  ({text: "", quality: 0, words: [], startSample, endSample: startSample + pcm.length});
+async function recognizeRecitation(pcm: Float32Array, startSample: number): Promise<RecitationObservation> {
+  if (!Number.isSafeInteger(startSample) || startSample < 0) throw new Error("Recognition timeline is invalid.");
+  if (!pending || pcm.length < 16_000 || !detectSpeech(pcm)) return emptyObservation(pcm, startSample);
   if (pcm.length > 16_000 * 6) throw new Error("Recognition window is too long.");
-  const speech = compactQuietPauses(pcm);
-  try { const result = await (await pending).transcribeRaw(speech); return { text: result.text, quality: acousticQuality(result) }; }
-  finally { speech.fill(0); }
+  const speech = compactQuietPausesWithTimeline(pcm);
+  try {
+    const held = await pending, acoustic = await held.run(speech.pcm);
+    // No Quran-wide candidate search or forced canonical decoder per tick:
+    // only actual acoustic tokens, then bounded selected-ayah alignment.
+    const decoded = held.decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize);
+    const result: AsrTranscribeResult = {...decoded, acoustic: {...acoustic, blankId: 1024}};
+    return {text: result.text, quality: acousticQuality(result), startSample, endSample: startSample + pcm.length,
+      words: decodeRecitationWords(result, held.vocab, speech.pcm.length, speech.spans, startSample, pcm.length)};
+  } finally { speech.pcm.fill(0); }
 }
 export async function acquireReciteAssist(onProgress: (message: string) => void) {
   onProgress(closing ? "Finishing the previous recognition session…" : "Preparing recognition…");
@@ -86,8 +98,8 @@ export async function acquireReciteAssist(onProgress: (message: string) => void)
   try { await prepareReciteAssist(onProgress); }
   catch (error) { leases.delete(lease); throw error; }
   return {
-    recognize(pcm: Float32Array) {
-      const run = lastInference.catch(() => {}).then(() => leases.has(lease) ? recognizeRecitation(pcm) : { text: "", quality: 0 });
+    recognize(pcm: Float32Array, startSample = 0) {
+      const run = lastInference.catch(() => {}).then(() => leases.has(lease) ? recognizeRecitation(pcm, startSample) : emptyObservation(pcm, startSample));
       lastInference = run; return run;
     },
     async dispose() {

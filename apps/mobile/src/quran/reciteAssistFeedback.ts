@@ -1,24 +1,33 @@
 import { judgeAttempt, lcsRatio, normalizeArabicForJudge, phoneticNormalize, type AsrTranscribeResult } from "@tilawi/quran-asr";
+import type { AudioSpan } from "./recitationTracking";
 
 export interface ReciteFeedback {
   status: "uncertain" | "following" | "possible_difference";
   words: { text: string; state: "matched" | "possible_difference" | "uncertain" | "not_heard" }[];
   differences: { kind: "omission" | "substitution" | "repetition" | "extra_word"; index: number | null }[];
   attempted: number;
+  /** Navigation evidence only; never a recitation or memorization score. */
+  stableComplete?: boolean;
 }
 /** Require two complete, stable observations before suggesting verse progression.
  * This is a navigation guard, never a memorization score or teacher assessment. */
 export class ReciteCompletionGuard {
   private count = 0;
   private sent = false;
-  observe(feedback: ReciteFeedback) {
+  private lastEnd = -1;
+  observe(feedback: ReciteFeedback, endSample?: number) {
+    if (endSample !== undefined) {
+      if (!Number.isFinite(endSample) || endSample <= this.lastEnd) return false;
+      this.lastEnd = endSample;
+    }
     const complete = feedback.status === "following" && feedback.words.length >= 2
+      && feedback.stableComplete !== false
       && !feedback.differences.length && feedback.words.every((word) => word.state === "matched");
     this.count = complete ? this.count + 1 : 0;
     if (this.count < 2 || this.sent) return false;
     this.sent = true; return true;
   }
-  reset() { this.count = 0; this.sent = false; }
+  reset() { this.count = 0; this.sent = false; this.lastEnd = -1; }
 }
 /** A signal-quality indicator, NOT a calibrated probability of user correctness. */
 export function acousticQuality(result: AsrTranscribeResult) {
@@ -30,7 +39,9 @@ export function acousticQuality(result: AsrTranscribeResult) {
     for (let v = 0; v < vocabSize; v++) { const score = logprobs[t * vocabSize + v]; if (score > max) { max = score; winner = v; } }
     if (winner !== blankId && Number.isFinite(max)) { voiced++; sum += Math.min(1, Math.exp(max)); }
   }
-  return voiced >= 3 ? sum / voiced : 0;
+  // SentencePiece may encode a valid two-word ayah with only two emissions.
+  // VAD, two-word anchors and per-word stability are separate safety gates.
+  return voiced > 0 ? sum / voiced : 0;
 }
 /** Never display/generated ASR text as the Quran. Index only into canonical text. */
 export function reciteFeedback(expected: string, heard: string, quality: number): ReciteFeedback {
@@ -77,7 +88,7 @@ export function reciteFeedback(expected: string, heard: string, quality: number)
 /** Silence is not a word. Keep short articulation gaps intact, but bound long
  * quiet runs before CTC inference, which otherwise hallucinated an extra word
  * during HBIC's controlled pause evaluation. This is not a noise classifier. */
-export function compactQuietPauses(pcm: Float32Array) {
+export function compactQuietPausesWithTimeline(pcm: Float32Array) {
   const frame = 320, quiet: boolean[] = [];
   for (let start = 0; start < pcm.length; start += frame) {
     let sum = 0; const end = Math.min(pcm.length, start + frame);
@@ -96,20 +107,28 @@ export function compactQuietPauses(pcm: Float32Array) {
   }
   keep.push([begin, pcm.length]);
   const result = new Float32Array(keep.reduce((n, [a, b]) => n + b - a, 0)); let at = 0;
-  for (const [a, b] of keep) { result.set(pcm.subarray(a, b), at); at += b - a; }
-  return result;
+  const spans: AudioSpan[] = [];
+  for (const [a, b] of keep) {
+    if (b <= a) continue;
+    spans.push({compactStart: at, originalStart: a, length: b - a});
+    result.set(pcm.subarray(a, b), at); at += b - a;
+  }
+  return {pcm: result, spans};
 }
+export function compactQuietPauses(pcm: Float32Array) { return compactQuietPausesWithTimeline(pcm).pcm; }
 
 /** Bounded rolling audio; one inference at a time, no stored/uploaded mic audio. */
 export class ReciteAudioWindow {
   private buffer = new Float32Array(16_000 * 6);
   private cursor = 0;
   private length = 0;
+  private received = 0;
   append(samples: readonly number[]) {
     for (const value of samples) {
       this.buffer[this.cursor] = Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
       this.cursor = (this.cursor + 1) % this.buffer.length;
       this.length = Math.min(this.buffer.length, this.length + 1);
+      this.received++;
     }
   }
   snapshot() {
@@ -117,5 +136,6 @@ export class ReciteAudioWindow {
     for (let i = 0; i < this.length; i++) pcm[i] = this.buffer[(start + i) % this.buffer.length];
     return pcm;
   }
-  clear() { this.buffer.fill(0); this.cursor = 0; this.length = 0; }
+  snapshotWithTimeline() { return {pcm: this.snapshot(), startSample: this.received - this.length, endSample: this.received}; }
+  clear() { this.buffer.fill(0); this.cursor = 0; this.length = 0; this.received = 0; }
 }

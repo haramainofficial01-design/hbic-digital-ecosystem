@@ -26,7 +26,14 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_QURAN_ENABLED": "true",
+        "EXPO_PUBLIC_QURAN_PRODUCTION_READY": "true",
+        "EXPO_PUBLIC_QURAN_CONTENT_SOURCE": "qf",
+        "EXPO_PUBLIC_RECITE_ASSIST_ENABLED": "true",
+        "EXPO_PUBLIC_API_URL": "https://hbic.ca"
+      }
     }
   },
   "submit": {
