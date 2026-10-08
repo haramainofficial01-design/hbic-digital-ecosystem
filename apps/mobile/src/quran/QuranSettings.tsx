@@ -3,12 +3,14 @@ import type { QuranResources } from "@hbic/shared";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranSurface } from "./QuranControls";
 import type { QuranLibrary } from "./types";
+import { QuranReadingLayout } from "./QuranReadingLayout";
 export function QuranSettings({ library, resources }: { library: QuranLibrary; resources: QuranResources | null }) {
   const { theme } = useAppTheme();
   const preferences = library.library.preferences;
   const save = (change: Partial<typeof preferences>) => void library.update((s) => ({ ...s, preferences: { ...s.preferences, ...change } })).catch(() => {});
   return <View style={{ gap: 14 }}>
     <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: "700" }}>Reading preferences</Text>
+    <QuranReadingLayout library={library} />
     <QuranSurface>
       {(["arabicSize", "translationSize"] as const).map((key) => <View key={key} style={styles.row}><Text style={{ color: theme.colors.text, flex: 1, fontSize: 16 }}>{key === "arabicSize" ? "Arabic size" : "Translation size"} · {preferences[key]}</Text>
         {[-2, 2].map((delta) => <Pressable key={delta} accessibilityRole="button" accessibilityLabel={`${delta > 0 ? "Increase" : "Decrease"} ${key === "arabicSize" ? "Arabic" : "translation"} size`} onPress={() => save({ [key]: preferences[key] + delta })} style={styles.step}><Text style={{ color: theme.colors.teal, fontSize: 22 }}>{delta > 0 ? "A+" : "A−"}</Text></Pressable>)}

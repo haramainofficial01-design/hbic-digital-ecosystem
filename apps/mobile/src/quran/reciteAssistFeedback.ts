@@ -1,4 +1,4 @@
-import { judgeAttempt, normalizeArabicForJudge, type AsrTranscribeResult } from "@tilawi/quran-asr";
+import { judgeAttempt, lcsRatio, normalizeArabicForJudge, phoneticNormalize, type AsrTranscribeResult } from "@tilawi/quran-asr";
 
 export interface ReciteFeedback {
   status: "uncertain" | "following" | "possible_difference";
@@ -43,7 +43,14 @@ export function reciteFeedback(expected: string, heard: string, quality: number)
   // The upstream verse matcher accepted a one-word noise hallucination during
   // HBIC evaluation. Independent multi-word anchors are mandatory; uncertain
   // audio never becomes a recitation error, even if a verse matcher accepts it.
-  const anchors = judged.words.filter((word) => word.judgment === "correct" && word.operation !== "insertion").length;
+  // A suffix clipped by the rolling microphone window is not an independent
+  // word anchor. The upstream matcher treats substring matches (e.g. "ما"
+  // inside "ربكما") as correct, which appended spurious words to a completed
+  // verse in native evaluation. Require whole-word agreement, not substring
+  // agreement, before accepting an observation into the transcript.
+  const anchors = judged.words.filter((word) => word.judgment === "correct" && word.operation !== "insertion"
+    && word.expectedIndex !== null && word.recognizedIndex !== null
+    && lcsRatio(phoneticNormalize(words[word.expectedIndex]), phoneticNormalize(spoken[word.recognizedIndex])) >= .8).length;
   if (anchors < 2) return empty;
   const differences: ReciteFeedback["differences"] = [];
   const states = words.map((text): ReciteFeedback["words"][number] => ({ text, state: "not_heard" }));

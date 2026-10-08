@@ -1,9 +1,10 @@
-import { parseAyahReference, validateChapters, validatePage, validateVerse, type QuranPage, type QuranResources, type QuranVerse } from "@hbic/shared";
+import { parseAyahReference, validateChapters, validatePage, validateVerse, validMushafPageNumber, validateMushafPage, type MushafPage, type QuranPage, type QuranResources, type QuranVerse } from "@hbic/shared";
 
 export interface QuranSelection { reciter?: number; translation?: number }
 export function createQuranClient(base: string, fetcher: typeof fetch = fetch) {
   const pages = new Map<string, { until: number; data: QuranPage }>();
-  const selectionParams = (selection: QuranSelection): Record<string, number> => ({ reciter: selection.reciter ?? 7, translation: selection.translation ?? 85 });
+  const mushafPages = new Map<number, { until: number; data: MushafPage }>();
+  const selectionParams = (selection: QuranSelection): Record<string, number> => ({ reciter: selection.reciter ?? 7, translation: selection.translation ?? 20 });
   async function request<T>(params: Record<string, string | number>, signal?: AbortSignal): Promise<T> {
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -19,6 +20,23 @@ export function createQuranClient(base: string, fetcher: typeof fetch = fetch) {
     } finally { clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
   }
   return {
+    async mushafReference(key: string, signal?: AbortSignal) {
+      if (parseAyahReference(key)?.key !== key) throw new Error("Invalid ayah.");
+      const body = await request<{ page: number }>({ mode: "mushaf-reference", key }, signal);
+      if (!validMushafPageNumber(body.page)) throw new Error("Verified Mushaf layout is unavailable.");
+      return body.page;
+    },
+    async readMushaf(page: number, signal?: AbortSignal) {
+      if (!validMushafPageNumber(page)) throw new Error("Invalid Mushaf page.");
+      if (signal?.aborted) throw new Error("Mushaf request cancelled.");
+      const cached = mushafPages.get(page);
+      if (cached && cached.until > Date.now()) return cached.data;
+      const body = await request<{ mushaf: unknown }>({ mode: "mushaf", page }, signal);
+      const data = validateMushafPage(body.mushaf, page);
+      if (mushafPages.size >= 8) mushafPages.delete(mushafPages.keys().next().value!);
+      mushafPages.set(page, { until: Date.now() + 300_000, data });
+      return data;
+    },
     async listChapters(signal?: AbortSignal) {
       const body = await request<{ chapters: unknown; availability?: { production: boolean } }>({ mode: "chapters" }, signal);
       return validateChapters(body.chapters, body.availability?.production);
@@ -32,7 +50,7 @@ export function createQuranClient(base: string, fetcher: typeof fetch = fetch) {
     },
     async readChapter(id: number, page = 1, selection: QuranSelection = {}, signal?: AbortSignal) {
       if (!Number.isInteger(id) || id < 1 || id > 114 || !Number.isInteger(page) || page < 1 || page > 6) throw new Error("Invalid surah or page.");
-      const key = `${id}:${page}:${selection.reciter ?? 7}:${selection.translation ?? 85}`;
+      const key = `${id}:${page}:${selection.reciter ?? 7}:${selection.translation ?? 20}`;
       const cached = pages.get(key);
       if (cached && cached.until > Date.now()) return cached.data;
       const result = validatePage(await request({ mode: "chapter", chapter: id, page, ...selectionParams(selection) }, signal), id, page);
@@ -53,6 +71,6 @@ export function createQuranClient(base: string, fetcher: typeof fetch = fetch) {
       if (!Array.isArray(body.verses) || body.verses.length > 12) throw new Error("Invalid Quran search results.");
       return body.verses.map(validateVerse);
     },
-    clearContentCache() { pages.clear(); }
+    clearContentCache() { pages.clear(); mushafPages.clear(); }
   };
 }

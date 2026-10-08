@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { QuranPassage, QuranRecording } from "@hbic/shared";
+import { quranRecordingPermission } from "./recordingPermission";
 
 export function useQuranRecording(passage: QuranPassage, onSave: (recording: QuranRecording) => Promise<unknown>, stopPlayback: () => void) {
   const [phase, setPhase] = useState<"idle" | "preparing" | "recording" | "saving">("idle");
@@ -10,6 +11,7 @@ export function useQuranRecording(passage: QuranPassage, onSave: (recording: Qur
   const context = useRef<{ passage: QuranPassage; started: number } | null>(null);
   const busy = useRef(false);
   const active = useRef(true), generation = useRef(0);
+  const permissionDialog = useRef(false);
   const endRef = useRef<() => Promise<void>>(async () => {});
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, numberOfChannels: 1, bitRate: 64000 }, (status) => {
     if (status.hasError) setError("Recording was interrupted. Please try again.");
@@ -40,7 +42,7 @@ export function useQuranRecording(passage: QuranPassage, onSave: (recording: Qur
   endRef.current = stop;
   useEffect(() => {
     active.current = true;
-    const subscription = AppState.addEventListener("change", (state) => { if (state !== "active") { ++generation.current; void stop(); } });
+    const subscription = AppState.addEventListener("change", (state) => { if (state !== "active" && !permissionDialog.current) { ++generation.current; void stop(); } });
     // Invalidate pending permission/preparation work before releasing the recorder.
     return () => { active.current = false; ++generation.current; subscription.remove(); if (context.current) void stop(); }; // eslint-disable-line react-hooks/exhaustive-deps
   }, [stop]);
@@ -49,7 +51,9 @@ export function useQuranRecording(passage: QuranPassage, onSave: (recording: Qur
     busy.current = true; setError(null); setPhase("preparing"); stopPlayback();
     const epoch = ++generation.current;
     try {
-      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      const permission = await quranRecordingPermission(AudioModule, {
+        isActive: () => AppState.currentState === "active", subscribe: (check) => AppState.addEventListener("change", check)
+      }, (waiting) => { permissionDialog.current = waiting; });
       if (!active.current || epoch !== generation.current || AppState.currentState !== "active") throw new Error("Recording cancelled. Tap Record again when you return.");
       if (!permission.granted) throw new Error(permission.canAskAgain
         ? "Microphone access was declined. You can still listen and practise without recording."

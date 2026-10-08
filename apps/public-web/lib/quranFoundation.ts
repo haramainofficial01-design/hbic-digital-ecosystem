@@ -1,9 +1,10 @@
 import { SearchMode, type Verse } from "@quranjs/api";
 import { createServerClient } from "@quranjs/api/server";
-import { parseAyahReference, quranPageSize, validateChapters, validatePage, validateVerse, validAudioUrl, type QuranResources } from "@hbic/shared";
+import { parseAyahReference, quranPageSize, validateChapters, validatePage, validateVerse, validAudioUrl, validMushafPageNumber, validateMushafPage, type MushafLine, type QuranResources } from "@hbic/shared";
 
-// Verified against the provider catalog; the old 131 resource is no longer listed.
-export const translationId = 85;
+// Saheeh International verified against the production catalog. Clear Quran is
+// offered only if the provider actually lists its authorized English edition.
+export const translationId = 20;
 type Client = ReturnType<typeof createServerClient>;
 let client: Client | null = null;
 export function availability() {
@@ -22,7 +23,8 @@ function sdk(): Client {
   return client;
 }
 export function plainText(html: string) {
-  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+  return html.replace(/<sup\b[^>]*\bfoot_note\s*=[^>]*>[\s\S]*?<\/sup>/gi, "")
+    .replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
     .replace(/&#(\d+);/g, (_, code: string) => { const n = Number(code); return n <= 0x10ffff ? String.fromCodePoint(n) : ""; })
     .replace(/&#x([a-f\d]+);/gi, (_, code: string) => { const n = parseInt(code, 16); return n <= 0x10ffff ? String.fromCodePoint(n) : ""; })
@@ -68,7 +70,9 @@ export function createQuranProvider(getClient: () => Client, production: () => b
         }));
         for (const item of batch) if (item) reciters.push(item);
       }
-      return { reciters, translations: translations.filter((r) => Number.isInteger(r.id) && r.name && /^(english|urdu)$/i.test(r.languageName ?? ""))
+      return { reciters, translations: translations.filter((r) => Number.isInteger(r.id) && r.name && /^english$/i.test(r.languageName ?? "")
+        && (/^saheeh international$/i.test(r.name) || /clear quran/i.test(r.name)))
+        .sort((a, b) => a.id === translationId ? -1 : b.id === translationId ? 1 : 0)
         .map((r) => ({ id: r.id!, name: r.name!, language: r.languageName!, author: r.authorName ?? r.name! })) };
     });
   }
@@ -109,7 +113,51 @@ export function createQuranProvider(getClient: () => Client, production: () => b
     for (let i = 0; i < keys.length; i += 3) verses.push(...await Promise.all(keys.slice(i, i + 3).map((key) => verse(key, reciter, translation))));
     return { verses, navigation: result.result?.navigation ?? [] };
   }
-  return { chapters, chapter, verse, resources, search };
+  async function mushafReference(key: string) {
+    const ref = parseAyahReference(key), catalog = await chapters();
+    if (!ref || ref.key !== key || ref.ayah > (catalog.find((c) => c.id === ref.chapter)?.versesCount ?? 0)
+      || (!production() && ref.chapter > 2)) throw new Error("QF_INVALID_REFERENCE");
+    return cached(`mushaf-reference:${key}`, async () => {
+      const value = await getClient().content.v4.verses.byKey(key as never, { mushaf: 1, words: true, wordFields: { v2Page: true } });
+      const page = value.words?.[0]?.pageNumber;
+      if (!page || !validMushafPageNumber(page)) throw new Error("QF_LAYOUT_UNAVAILABLE");
+      return page;
+    });
+  }
+  async function mushaf(page: number) {
+    if (!validMushafPageNumber(page)) throw new Error("QF_INVALID_REFERENCE");
+    return cached(`mushaf-v2:${page}`, async () => {
+      const catalog = await chapters();
+      const verses = await getClient().content.v4.verses.byPage(page as never,
+        { mushaf: 1, words: true, wordFields: { codeV2: true, textUthmani: true, v2Page: true }, perPage: 50 });
+      if (!production() && verses.some((v) => Number(v.verseKey.split(":")[0]) > 2)) throw new Error("QF_PRELIVE_LIMIT");
+      const lines: MushafLine[] = Array.from({ length: 15 }, (_, i) => ({ number: i + 1, words: [] }));
+      let previousLine = 0;
+      for (const v of verses) for (const w of v.words ?? []) {
+        // A verse can straddle pages. Only this page's actual words belong here.
+        if (w.pageNumber !== page) continue;
+        const number = w.lineNumber ?? 0;
+        // The API supplies this requested field; the SDK's Word type omits it.
+        const v2Page = (w as typeof w & { v2Page?: number }).v2Page;
+        if (v2Page !== page || !Number.isInteger(number) || number < 1 || number > 15 || number < previousLine) throw new Error("QF_LAYOUT_UNAVAILABLE");
+        previousLine = number;
+        lines[number - 1].words.push({ key: v.verseKey, position: w.position, glyph: plainText(w.codeV2 ?? ""), text: w.textUthmani ?? "" });
+      }
+      const openings = verses.filter((v) => v.verseNumber === 1 && v.words?.[0]?.pageNumber === page);
+      const basmala = openings.some((v) => ![1, 9].includes(Number(v.verseKey.split(":")[0])))
+        ? (await getClient().content.v4.verses.byKey("1:1", { fields: { textUthmani: true } })).textUthmani : undefined;
+      for (const v of openings) {
+        const id = Number(v.verseKey.split(":")[0]), first = v.words![0].lineNumber!;
+        const name = catalog.find((c) => c.id === id)?.nameArabic;
+        const heading = first - ([1, 9].includes(id) ? 1 : 2);
+        if (name && heading >= 1 && !lines[heading - 1].words.length) lines[heading - 1].heading = name;
+        if (basmala && ![1, 9].includes(id) && first >= 2 && !lines[first - 2].words.length) lines[first - 2].basmala = basmala;
+      }
+      const ids = Array.from(new Set(lines.flatMap((l) => l.words.map((w) => Number(w.key.split(":")[0])))));
+      return validateMushafPage({ page, juz: verses[0]?.juzNumber, chapterNames: ids.map((id) => catalog.find((c) => c.id === id)?.nameSimple ?? ""), lines }, page);
+    });
+  }
+  return { chapters, chapter, verse, resources, search, mushaf, mushafReference };
 }
 const provider = createQuranProvider(sdk, () => availability().production);
-export const { chapters, chapter, verse, resources, search } = provider;
+export const { chapters, chapter, verse, resources, search, mushaf, mushafReference } = provider;

@@ -16,3 +16,4 @@ export * from "./widgetSnapshot";
 export * from "./qibla";
 export * from "./academy";
 export * from "./quran";
+export * from "./quranMushaf";

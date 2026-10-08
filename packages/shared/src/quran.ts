@@ -98,6 +98,9 @@ export function validatePage(value: unknown, chapterId: number, page: number): Q
 }
 
 export type MemorizationStatus = "not_started" | "practising" | "memorized" | "needs_revision";
+export const memorizationLabels: Record<MemorizationStatus, string> = {
+  not_started: "Not Started", practising: "Practising", memorized: "Memorized", needs_revision: "Needs Revision"
+};
 export interface QuranPassage { chapter: number; from: number; to: number }
 export function validPassage(value: unknown): value is QuranPassage {
   const p = value as QuranPassage;
@@ -105,7 +108,7 @@ export function validPassage(value: unknown): value is QuranPassage {
     && Number.isInteger(p.from) && Number.isInteger(p.to) && p.from >= 1 && p.to >= p.from && p.to <= 286);
 }
 export function passageId(p: QuranPassage) { return `${p.chapter}:${p.from}-${p.to}`; }
-export interface QuranPreferences { arabicSize: number; translationSize: number; showTranslation: boolean; reciter: number; translation: number }
+export interface QuranPreferences { arabicSize: number; translationSize: number; showTranslation: boolean; reciter: number; translation: number; layout: "ayah" | "madinah" }
 export interface QuranRecording extends QuranPassage { id: string; uri: string; createdAt: string; durationMillis: number }
 export interface QuranState {
   version: 2; bookmarks: string[]; lastRead: { chapter: number; ayah: number } | null;
@@ -116,7 +119,7 @@ export interface QuranState {
 }
 export function emptyQuranState(): QuranState {
   return { version: 2, bookmarks: [], lastRead: null, recent: [],
-    preferences: { arabicSize: 30, translationSize: 16, showTranslation: true, reciter: 7, translation: 85 },
+    preferences: { arabicSize: 30, translationSize: 16, showTranslation: true, reciter: 7, translation: 20, layout: "ayah" },
     listening: null, memorization: [], recordings: [] };
 }
 export function normalizeQuranState(value: unknown): QuranState {
@@ -132,6 +135,7 @@ export function normalizeQuranState(value: unknown): QuranState {
     result.listening = { reciterId: s.listening.reciterId, editionId: s.listening.editionId };
   const prefs = s.preferences;
   if (prefs) {
+    if (prefs.layout === "madinah") result.preferences.layout = "madinah";
     if (Number.isFinite(prefs.arabicSize)) result.preferences.arabicSize = Math.max(24, Math.min(48, prefs.arabicSize));
     if (Number.isFinite(prefs.translationSize)) result.preferences.translationSize = Math.max(14, Math.min(24, prefs.translationSize));
     if (typeof prefs.showTranslation === "boolean") result.preferences.showTranslation = prefs.showTranslation;

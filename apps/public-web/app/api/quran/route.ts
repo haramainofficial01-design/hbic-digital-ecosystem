@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { availability, chapter, chapters, search, resources, verse } from "../../../lib/quranFoundation";
+import { availability, chapter, chapters, search, resources, verse, mushaf, mushafReference } from "../../../lib/quranFoundation";
 import { isQuranPublicEnabled } from "../../../lib/quranRelease";
 import { quranRateLimit } from "../../../lib/quranRateLimit";
 
@@ -12,13 +12,15 @@ export async function GET(request: NextRequest) {
   if (!rate.allowed) return NextResponse.json({ ok: false, message: "Please wait a moment before trying again." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter), "Cache-Control": "no-store" } });
   const mode = request.nextUrl.searchParams.get("mode") ?? "chapters";
   const reciter = Number(request.nextUrl.searchParams.get("reciter") ?? 7);
-  const translation = Number(request.nextUrl.searchParams.get("translation") ?? 85);
+  const translation = Number(request.nextUrl.searchParams.get("translation") ?? 20);
   if (![reciter, translation].every((id) => Number.isInteger(id) && id > 0 && id < 10000)) return NextResponse.json({ ok: false, message: "Invalid Quran resource." }, { status: 400 });
   try {
     if (mode === "status") return NextResponse.json({ ok: true, availability: availability() }, { headers: { "Cache-Control": "no-store" } });
     if (mode === "chapters") return NextResponse.json({ ok: true, chapters: await chapters(), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=21600" } });
     if (mode === "resources") return NextResponse.json({ ok: true, resources: await resources(), availability: availability() }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
     if (mode === "verse") return NextResponse.json({ ok: true, verse: await verse(request.nextUrl.searchParams.get("key") ?? "", reciter, translation) }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
+    if (mode === "mushaf") return NextResponse.json({ ok: true, mushaf: await mushaf(Number(request.nextUrl.searchParams.get("page"))) }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
+    if (mode === "mushaf-reference") return NextResponse.json({ ok: true, page: await mushafReference(request.nextUrl.searchParams.get("key") ?? "") }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
     if (mode === "chapter") {
       const id = Number(request.nextUrl.searchParams.get("chapter"));
       const page = Number(request.nextUrl.searchParams.get("page") ?? 1);

@@ -9,6 +9,20 @@ No new store binary has been submitted.
 - Native phone reader: all 114 surahs, ayah navigation, Arabic/English keyword
   search and references, translations/reciter preferences, bookmarks, last read,
   continuous verse audio, repeat/range/speed/seek controls.
+- Selectable **Madinah Hafs 15-line Mushaf**, using Quran Foundation's real QCF V2
+  page/line/word positions and page-specific fonts, alongside Ayah View. All 604
+  pages are navigable; opening pages retain their special layout. Page requests
+  are bounded, cached and cancellable; failed fonts never show substitute glyphs.
+  Tapping an ayah opens native audio/bookmark/meaning actions; switching to Ayah
+  View preserves the current reference.
+- Saheeh International is the default English translation (verified resource 20).
+  The Clear Quran is offered only if the authorized provider actually lists it;
+  it was absent from the production catalog checked on this date. No guessed
+  edition IDs or other translations are presented. Unlinked footnote markers are
+  removed without changing the translation's wording.
+- Professional capitalized memorization choices, visible selected state, native
+  scrolling and short native-driver reading/view transitions. Reduce Motion is
+  respected; no perpetual animation or countdown/background frame timer was added.
 - Memorization and Test Mode: conceal Arabic/meaning, hints, reveal, randomized
   questions, temporary review, explicit self-reported progress, private recordings.
 - Full-surah listening: official MP3Quran Hafs catalog, separate recording/verse
@@ -22,12 +36,15 @@ No new store binary has been submitted.
   canonical-word feedback for possible differences, silence/uncertainty safeguards,
   concealed text in Test Mode, bounded six-second audio window, one inference at
   a time, two-minute session cap, explicit download/microphone consent, no upload.
+  Pause releases microphone capture; resume restarts it. Stop/background exit
+  releases capture and inference resources; an in-memory, unscored session review
+  reports observations and uncertainty without retaining or uploading audio.
   Stable-completion navigation guard requires two complete observations; it never
   awards memorization scores. Full microphone/progression qualification is pending.
 
 ## Verified evidence
 
-- 25 focused Quran/provider/storage/audio/recognition/navigation tests pass;
+- 34 focused Quran/provider/storage/audio/recognition/navigation/Mushaf/permission tests pass;
   phone and public-web typechecks pass; mobile lint has no errors/warnings.
 - Phone native Debug builds compile on iOS and Android, including voice search,
   PCM recording, ONNX runtime 1.24.3 and sandbox-restricted native file hashing.
@@ -40,13 +57,32 @@ No new store binary has been submitted.
 - Phone UI exercises hidden recall, hints, reveal, self-review, completion,
   bookmarks and playback. Android native full-surah streaming has an advancing
   clock and working pause/resume/stop. iOS streaming controls also exercised.
+- Actual iOS/Android native UI checks pass for Mushaf pages 1/2/3, verified fonts,
+  current-reference preservation on switching, and capitalized progress choices.
+  Twelve additional real-font browser renders (pages 1/2/3/50/106/604 at 320 px
+  light and 390 px dark) retain exact word/line positions without overflow.
+  Cached-font rendering also survives a delayed Android WebView bridge.
+- Android runtime navigation invokes one 180 ms native-driver transition. With
+  the emulator's system Reduce Motion setting enabled, navigating to Search skips
+  that transition; the original emulator setting was restored after verification.
+- Android Recite Assist lifecycle passes start, ungraded emulator silence,
+  pause/resume, stop/review, restart and background cleanup. Permission regressions
+  cover already-granted access, first consent, decline and leaving the app during
+  consent. A granted permission no longer reopens an Android permission Activity.
+- Android private recording passes actual AAC capture/save, nonempty local file,
+  advancing native playback clock, pause/stop and deletion of both file and saved
+  metadata. The emulator host microphone was disabled; only emulator silence was
+  recorded. The single test recording was deleted, with no existing records altered.
 - Watch UI exercises offline reader, next ayah, real catalog, player and stop on
   both 40 mm and 46 mm simulators. Actual Bluetooth/device playback and energy
   measurement are not implied by simulator UI tests.
-- Native iOS **7/7**, Android **7/7** controlled reference tests: correct, omission,
-  repetition, substitution, pause, low noise, silence. These verify expected
-  detection classes, **not** human microphone accuracy or a measured false-positive
-  rate. The substitution example can produce an additional possible-word flag.
+- Native iOS **19/19**, Android **19/19** controlled reference tests: correct,
+  omission, repetition, substitution, pause, low noise, silence and twelve correct
+  reference clips. Correct-reference clips produce **0/12 false-difference flags**;
+  eleven reach completion, one short two-word ayah remains uncertain/ungraded.
+  Whole-word anchors reject clipped suffixes previously accepted as substring
+  matches. These results are fixture evidence, **not** measured human microphone
+  accuracy. The substitution example can produce an additional possible-word flag.
 - Inference tests use actual phone native runtimes, streamed authorized reference
   audio held only in RAM, and the same bounded window/feedback code. No live
   microphone or private user audio was collected for these tests.
@@ -68,6 +104,10 @@ Neither evidence caches nor provider credentials are committed.
 - Quran Foundation approved backend application: `HBIC Quran & Recite`.
   Client credentials remain server-only. Production enablement is still gated by
   `HBIC_QURAN_PUBLIC_ENABLED`; store UI also requires both existing Quran flags.
+- QCF V2 Madinah layout/font URLs are supplied by Quran Foundation and loaded from
+  its authorized font CDN. The embedded renderer only typesets validated canonical
+  glyphs; network/script policy is restricted and all interactive controls remain
+  native. Fonts are not repackaged as a standalone downloadable product.
 - Tanzil Uthmani 1.1, CC BY 3.0, full original notice retained. Source XML SHA-256:
   `8c5aeae20363a98f6963720d29fce040ca8b56a8e75f8b564c257fce7f6d0417`.
 - Noto Naskh Arabic: SIL Open Font License, bundled notice retained.
@@ -83,11 +123,12 @@ Neither evidence caches nor provider credentials are committed.
 
 ## Remaining release gates
 
-1. Consented real-device microphone/recording/voice-search tests, across different
-   voices, natural mistakes, pauses and ordinary noise. Expert-reviewed detection
-   accuracy/false positives, sequential progression and session lifecycle need
-   qualification. Development Recite Assist must not be presented as reliable
-   production mistake detection before this passes.
+1. Qualification of natural microphone/voice-search input across different voices,
+   natural mistakes, pauses and ordinary noise. Simulator/reference-fixture checks
+   do not establish expert-reviewed human detection accuracy or natural sequential
+   progression. Development Recite Assist must not be presented as reliable
+   production mistake detection before this passes; no physical-device connection
+   is requested because the user authorized simulator/emulator work instead.
 2. Four current imams lack verified recordings in the approved catalogs:
    **Saleh bin Humaid, Osama Khayyat, Faisal Ghazawi, Saleh Al-Maghamisi**.
    Obtain an authorized recording source before claiming all current Haramain

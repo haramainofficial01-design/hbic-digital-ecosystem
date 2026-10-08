@@ -1,7 +1,7 @@
 import { normalizeSearch, parseAyahReference, quranPageSize, validateChapters, validatePage, validateVerse, type QuranPage, type QuranResources, type QuranVerse } from "@hbic/shared";
 import type { createQuranClient } from "./quranClient";
 type Dataset = { chapters: { chapter: import("@hbic/shared").QuranChapter; opening: string | null; verses: QuranVerse[] }[] };
-export function createTanzilClient(loadData: () => Dataset): ReturnType<typeof createQuranClient> {
+export function createTanzilClient(loadData: () => Dataset): Omit<ReturnType<typeof createQuranClient>, "readMushaf" | "mushafReference"> {
   let dataset: Dataset | null = null;
   function data() {
     if (!dataset) { const next = loadData(); validateChapters(next.chapters.map((s) => s.chapter), true); dataset = next; }

@@ -99,7 +99,7 @@ test("client forwards only resource choices, validates responses and caches boun
     const url = new URL(String(input)); urls.push(url);
     return response({ ok: true, ...(await tanzil.readChapter(1)) });
   }) as typeof fetch);
-  await client.readChapter(1, 1, { reciter: 7, translation: 85, arabicSize: 32 } as never); await client.readChapter(1);
+  await client.readChapter(1, 1, { reciter: 7, translation: 20, arabicSize: 32 } as never); await client.readChapter(1);
   assert.equal(urls.length, 1); assert.equal(urls[0].searchParams.has("arabicSize"), false);
   client.clearContentCache(); await client.readChapter(1); assert.equal(urls.length, 2);
   const bad = createQuranClient("https://hbic.example", (async () => response({ ok: true, verse: sample(2) })) as typeof fetch);

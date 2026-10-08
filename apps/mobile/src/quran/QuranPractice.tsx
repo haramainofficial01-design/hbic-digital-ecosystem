@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
-import { createSelfTest, passageId, repeatSequence, type QuranChapter, type QuranPassage, type QuranVerse, type MemorizationStatus } from "@hbic/shared";
+import { createSelfTest, memorizationLabels, passageId, repeatSequence, type QuranChapter, type QuranPassage, type QuranVerse, type MemorizationStatus } from "@hbic/shared";
 import { AppButton } from "../components/AppButton";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranMessage, QuranSurface } from "./QuranControls";
@@ -60,6 +60,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   }
   const textStyle = { color: theme.colors.text, fontSize: 16, lineHeight: 24 };
   const displayVerse = current?.verseNumber === selectedAyah ? current : null;
+  const memorizationStatus = library.library.memorization.find((p) => passageId(p) === passageId(passage))?.status ?? "not_started";
   const showText = mode === "test" ? revealed : !hidden;
   const records = library.library.recordings.filter((r) => r.chapter === chapter.id);
   return <View style={styles.content}>
@@ -109,9 +110,10 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       </> : null}
     </QuranSurface>}
     {error ? <QuranMessage message={error} /> : null}
-    {assistDevelopment && current && valid ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} onBusyChange={setAssistBusy}
-      onAdvance={mode !== "test" && selectedAyah < passage.to ? async () => {
+    {assistDevelopment && current && valid ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+      onAdvance={mode !== "test" && selectedAyah < passage.to ? async (signal) => {
         const next = selectedAyah + 1; const verse = await getVerse(next);
+        if (signal.aborted) return;
         setCurrent(verse); setReviewAyah(next);
       } : undefined} /></Suspense> : null}
     <QuranSurface>
@@ -134,8 +136,15 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
           ])} /></View>
       </View>)}
     </QuranSurface>
-    {mode !== "test" ? <QuranSurface><Text style={[styles.subtitle, { color: theme.colors.text }]}>My memorization progress</Text><Text style={{ ...textStyle, color: theme.colors.muted }}>Self-reported. A teacher can help assess your recitation.</Text>
-      <View style={styles.row}>{(["not_started", "practising", "memorized", "needs_revision"] as const).map((status) => <AppButton key={status} variant="secondary" label={status.replace(/_/g, " ")} disabled={!valid} onPress={() => void library.memorize(passage, status).catch(() => {})} />)}</View>
+    {mode !== "test" ? <QuranSurface><Text style={[styles.subtitle, { color: theme.colors.text }]}>My Memorization Progress</Text><Text style={{ ...textStyle, color: theme.colors.muted }}>Self-reported. A teacher can help assess your recitation.</Text>
+      <View style={styles.row}>{(["not_started", "practising", "memorized", "needs_revision"] as const).map((status) => <Pressable key={status} accessibilityRole="radio" accessibilityLabel={memorizationLabels[status]}
+        accessibilityState={{ checked: memorizationStatus === status, disabled: !valid || practiceBusy }} disabled={!valid || practiceBusy}
+        onPress={() => void library.memorize(passage, status).catch(() => setError("Progress could not be saved. Please try again."))}
+        style={({ pressed }) => ({ minHeight: 50, minWidth: "43%", flexGrow: 1, padding: 12, borderRadius: 17, borderWidth: 1,
+          borderColor: memorizationStatus === status ? theme.colors.teal : theme.colors.borderStrong,
+          backgroundColor: memorizationStatus === status ? theme.colors.tintSoft : theme.colors.surface, opacity: !valid || practiceBusy ? .5 : pressed ? .65 : 1 })}>
+        <Text style={{ color: memorizationStatus === status ? theme.colors.teal : theme.colors.text, textAlign: "center", fontSize: 15, lineHeight: 22, fontWeight: "700" }}>{memorizationStatus === status ? "✓ " : ""}{memorizationLabels[status]}</Text>
+      </Pressable>)}</View>
     </QuranSurface> : null}
   </View>;
 }

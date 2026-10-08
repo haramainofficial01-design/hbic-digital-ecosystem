@@ -67,6 +67,16 @@ test("comparison handles missing/substituted/repeated words, while a pause is no
   const paused = reciteFeedback(expected, "الحمد لله رب", 1); assert.equal(paused.differences.length, 0);
   assert.equal(paused.words.at(-1)?.state, "not_heard");
 });
+test("rolling-window clipped suffixes cannot become false word differences", () => {
+  const expected = "فَبِأَىِّ ءَالَآءِ رَبِّكُمَا تُكَذِّبَانِ";
+  assert.equal(reciteFeedback(expected, "فباي الاء ربكما تكذبان", .94).status, "following");
+  for (const heard of ["ما تكذببان", "ول تكذبان", "رب تكذبان"]) {
+    const feedback = reciteFeedback(expected, heard, .9);
+    assert.equal(feedback.status, "uncertain"); assert.deepEqual(feedback.differences, []);
+  }
+  assert.ok(reciteFeedback(expected, "فباي الاء ربكما ربكما تكذبان", .94).differences.some((d) => d.kind === "repetition"));
+  assert.ok(reciteFeedback(expected, "فباي الاء تكذبان", .94).differences.some((d) => d.kind === "omission"));
+});
 test("microphone memory is capped at six seconds and erased on clear", () => {
   const audio = new ReciteAudioWindow(); audio.append(Array.from({ length: 100000 }, (_, i) => i / 100000));
   const pcm = audio.snapshot(); assert.equal(pcm.length, 96000); assert.ok(Math.abs(pcm[0] - .04) < .0001);

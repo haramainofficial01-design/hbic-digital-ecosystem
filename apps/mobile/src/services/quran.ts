@@ -4,9 +4,10 @@ import { createQuranStore } from "./quranStorage";
 import { createTanzilClient } from "./quranTanzil";
 export type { QuranChapter, QuranVerse, QuranPage, QuranResources, QuranState } from "@hbic/shared";
 export const quranContentSource = process.env.EXPO_PUBLIC_QURAN_CONTENT_SOURCE === "tanzil" ? "tanzil" : "qf";
+export const quranRemoteClient = createQuranClient(process.env.EXPO_PUBLIC_API_URL || "https://hbic.ca");
 export const quranClient = quranContentSource === "tanzil"
   ? createTanzilClient(() => require("../../assets/quran/tanzil-uthmani.json"))
-  : createQuranClient(process.env.EXPO_PUBLIC_API_URL || "https://hbic.ca");
+  : quranRemoteClient;
 export const quranStore = createQuranStore(AsyncStorage);
 export const { listChapters, readChapter, searchVerses } = quranClient;
 // Compatibility helpers retain the existing web/mobile bookmark conventions.
