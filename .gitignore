@@ -33,6 +33,8 @@ backend/functions/lib/
 .agents/
 .codex/
 output/
+apps/public-web/public/quran-runtime/ort-wasm-simd-threaded.mjs
+apps/public-web/public/quran-runtime/ort-wasm-simd-threaded.wasm
 **/.gradle/
 **/.xcode.env.local
 *.p8
