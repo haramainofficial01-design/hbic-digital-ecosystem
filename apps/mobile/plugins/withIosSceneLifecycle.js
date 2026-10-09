@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { IOSConfig, withAppDelegate, withInfoPlist, withXcodeProject } = require("@expo/config-plugins");
+const { IOSConfig, withAppDelegate, withInfoPlist, withPodfile, withXcodeProject } = require("@expo/config-plugins");
 
 const sceneFile = "SceneDelegate.swift";
 
@@ -64,5 +64,14 @@ module.exports = function withIosSceneLifecycle(config) {
   config = withSceneManifest(config);
   config = withSceneAppDelegate(config);
   config = withSceneSource(config);
+  config = withPodfile(config, (mod) => {
+    const marker = "# HBIC minimum iOS pod target for current SDK";
+    if (!mod.modResults.contents.includes(marker)) {
+      const hook = "  post_install do |installer|";
+      if (!mod.modResults.contents.includes(hook)) throw new Error("HBIC iOS pod target requires the existing post_install hook.");
+      mod.modResults.contents = mod.modResults.contents.replace(hook, `${hook}\n    ${marker}\n    installer.pods_project.targets.each do |target|\n      target.build_configurations.each do |build_config|\n        deployment = build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']\n        if deployment && Gem::Version.new(deployment) < Gem::Version.new('15.1')\n          build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'\n        end\n      end\n    end`);
+    }
+    return mod;
+  });
   return config;
 };

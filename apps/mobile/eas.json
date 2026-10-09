@@ -15,6 +15,7 @@
       "environment": "production",
       "distribution": "internal",
       "ios": {
+        "image": "macos-tahoe-26.6-xcode-27.1",
         "simulator": true
       }
     },
@@ -27,6 +28,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "ios": {
+        "image": "macos-tahoe-26.6-xcode-27.1"
+      },
       "env": {
         "EXPO_PUBLIC_QURAN_ENABLED": "true",
         "EXPO_PUBLIC_QURAN_PRODUCTION_READY": "true",

@@ -27,6 +27,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     else { return }
 
     let window = UIWindow(windowScene: windowScene)
+    // A folding/multi-display scene can differ from UIScreen.main. Size the
+    // React Native host to its own scene, including after a display transition.
+    window.frame = windowScene.coordinateSpace.bounds
     self.window = window
     appDelegate.window = window
     factory.startReactNative(
@@ -34,6 +37,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       in: window,
       launchOptions: appDelegate.sceneLaunchOptions
     )
+    window.rootViewController?.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+  }
+
+  func windowScene(
+    _ windowScene: UIWindowScene,
+    didUpdate previousCoordinateSpace: UICoordinateSpace,
+    interfaceOrientation previousInterfaceOrientation: UIInterfaceOrientation,
+    traitCollection previousTraitCollection: UITraitCollection
+  ) {
+    window?.frame = windowScene.coordinateSpace.bounds
   }
 
   func sceneDidBecomeActive(_ scene: UIScene) {
