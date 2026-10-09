@@ -83,7 +83,7 @@ export const uiMore: Record<string, readonly [string, string, string]> = {
   "I have read and agree to the HBIC Quran Academy Tuition & Payment Policy.": ["میں نے HBIC قرآن اکیڈمی کی فیس اور ادائیگی کی پالیسی پڑھی ہے اور اس سے متفق ہوں۔", "پالیسی فیس و پرداخت اکادمی قرآن HBIC را خوانده‌ام و می‌پذیرم.", "قرأت سياسة الرسوم والدفع لأكاديمية القرآن HBIC وأوافق عليها."],
   "I verified my email": ["میں نے ای میل کی تصدیق کی", "ایمیل خود را تأیید کردم", "تحقّقت من بريدي الإلكتروني"],
   "Install or update the watch app": ["واچ ایپ انسٹال یا اپ ڈیٹ کریں", "نصب یا تازه‌سازی برنامه ساعت", "تثبيت تطبيق الساعة أو تحديثه"],
-  "Jumu'ah Mubarak": ["جمعہ مبارک", "جمعه مبارک", "جمعة مباركة"],
+  "Yawm al-Jumu’ah": ["یومِ جمعہ", "روز جمعه", "يوم الجمعة"],
   "Join Academy WhatsApp group": ["اکیڈمی WhatsApp گروپ میں شامل ہوں", "پیوستن به گروه WhatsApp اکادمی", "انضم إلى مجموعة WhatsApp للأكاديمية"],
   "Join the WhatsApp group now for class and holiday news, even while cash tuition is due or enrollment is conditional.": ["کلاس اور تعطیلات کی خبروں کے لیے WhatsApp گروپ میں شامل ہوں، چاہے نقد فیس واجب ہو یا داخلہ مشروط ہو۔", "برای خبرهای صنف و تعطیلات به گروه WhatsApp بپیوندید، حتی اگر فیس نقدی باقی یا ثبت‌نام مشروط باشد.", "انضم إلى مجموعة WhatsApp لأخبار الدروس والعطلات، حتى إن كانت الرسوم النقدية مستحقة أو الالتحاق مشروطًا."],
   "Jump to ayah or surah:ayah": ["آیت یا سورہ:آیت پر جائیں", "رفتن به آیه یا سوره:آیه", "انتقل إلى آية أو سورة:آية"],

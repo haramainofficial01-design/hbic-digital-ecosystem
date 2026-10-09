@@ -170,8 +170,8 @@ export function SiteExperience() {
   return (
     <>
       <div className={`jumuah-site-accent${jumuahActive ? " visible" : ""}`} aria-hidden={!jumuahActive}>
-        <span lang="ar" dir="rtl">جُمُعَة مُبَارَكَة</span>
-        <small>Jumu&apos;ah Mubarak</small>
+        <span lang="ar" dir="rtl">يَوْمُ الْجُمُعَةِ</span>
+        <small>Yawm al-Jumu’ah</small>
       </div>
       <div className={`site-loader${loaderVisible ? " visible" : ""}`} aria-hidden={!loaderVisible}>
         <div className="site-loader-mark">

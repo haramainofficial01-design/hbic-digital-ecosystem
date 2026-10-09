@@ -40,7 +40,7 @@ const prayerMoments: Record<CongregationalPrayer, { en: string; ur: string }> = 
 
 export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer }) {
   const { theme } = useAppTheme();
-  const { language, t } = useAppLanguage();
+  const { language, t, translate } = useAppLanguage();
   const { content, loading, source } = usePublishedContent();
   const now = useVisibleClock();
   const [selectedPrayer, setSelectedPrayer] = useState<CongregationalPrayer | null>(null);
@@ -97,9 +97,9 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
       </View>
       <View style={[styles.accentLine, { backgroundColor: palette.accent }]} />
       {jumuahActive ? (
-        <View style={styles.jumuahBadge} accessibilityLabel="Jumu'ah Mubarak">
-          <Text style={styles.jumuahArabic}>جُمُعَة مُبَارَكَة</Text>
-          <Text style={styles.jumuahEnglish}>JUMU&apos;AH MUBARAK</Text>
+        <View style={styles.jumuahBadge} accessibilityLabel={translate("Yawm al-Jumu’ah")}>
+          <Text style={styles.jumuahArabic}>يَوْمُ الْجُمُعَةِ</Text>
+          <Text style={styles.jumuahEnglish}>Yawm al-Jumu’ah</Text>
         </View>
       ) : null}
       <View style={styles.topRow}>
