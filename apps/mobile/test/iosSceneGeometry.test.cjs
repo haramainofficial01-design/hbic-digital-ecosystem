@@ -7,6 +7,7 @@ test('Duo release and simulator use the current Duo-capable SDK', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'eas.json'), 'utf8'));
   for (const name of ['production', 'qaSimulator']) {
     assert.equal(config.build[name].ios.image, 'macos-tahoe-26.6-xcode-27.1');
+    assert.equal(config.build[name].ios.env.SHARP_IGNORE_GLOBAL_LIBVIPS, '1');
   }
 });
 test('native window tracks its own scene instead of a different display', () => {

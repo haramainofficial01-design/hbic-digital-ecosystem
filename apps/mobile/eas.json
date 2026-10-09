@@ -16,6 +16,9 @@
       "distribution": "internal",
       "ios": {
         "image": "macos-tahoe-26.6-xcode-27.1",
+        "env": {
+          "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
+        },
         "simulator": true
       }
     },
@@ -29,7 +32,10 @@
     "production": {
       "autoIncrement": true,
       "ios": {
-        "image": "macos-tahoe-26.6-xcode-27.1"
+        "image": "macos-tahoe-26.6-xcode-27.1",
+        "env": {
+          "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
+        }
       },
       "env": {
         "EXPO_PUBLIC_QURAN_ENABLED": "true",
