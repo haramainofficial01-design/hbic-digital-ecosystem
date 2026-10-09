@@ -1,6 +1,8 @@
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, Image } from "../src/i18n/LocalizedText";
+
 import { getPublicEvents } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";

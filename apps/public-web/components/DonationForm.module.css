@@ -1,0 +1,5 @@
+.form { display: grid; gap: 18px; }
+.field { display: grid; gap: 8px; font-size: 16px; font-weight: 700; }
+.control { width: 100%; min-height: 54px; padding: 12px 16px; border: 1px solid #bdd5d4; border-radius: 14px; color: #143b43; background: #f8fbfa; font: inherit; }
+.control:focus-visible { outline: 3px solid #1594a6; outline-offset: 3px; }
+.description { margin: 0; line-height: 1.55; }

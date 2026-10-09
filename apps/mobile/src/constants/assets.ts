@@ -4,13 +4,13 @@ export const brandAssets = {
 };
 
 export const photoAssets = {
-  exterior: require("../../assets/photos/masjid-exterior.png"),
-  prayerHall: require("../../assets/photos/prayer-hall-optimized.jpg"),
+  exterior: require("../../assets/photos/masjid-exterior-mobile.webp"),
+  prayerHall: require("../../assets/photos/prayer-hall-optimized-mobile.webp"),
   summerCamp: require("../../assets/photos/summer-camp-2026.jpeg"),
   quranAcademy: require("../../assets/photos/quran-academy.jpeg"),
   taraweehPoster: require("../../assets/photos/taraweeh-2025-recitation-poster.jpg"),
   youthProgram: require("../../assets/photos/youth-program.jpeg"),
-  communityJumuah: require("../../assets/photos/community-jumuah-optimized.jpg")
+  communityJumuah: require("../../assets/photos/community-jumuah-optimized-mobile.webp")
 };
 
 export const eventPhotoAssets = {

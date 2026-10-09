@@ -2,7 +2,8 @@ import { getPublicEvents, getPublicVolunteerOpportunities, type ProgramCategory 
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../src/i18n/LocalizedText";
 import { AppButton } from "../../src/components/AppButton";
 import { AdaptiveGrid } from "../../src/components/AdaptiveGrid";
 import { AppScreen } from "../../src/components/AppScreen";

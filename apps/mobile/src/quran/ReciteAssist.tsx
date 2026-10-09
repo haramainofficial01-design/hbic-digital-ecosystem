@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, AppState, Text, View } from "react-native";
+import { AppState, View } from "react-native";
+import { Text, Alert } from "../i18n/LocalizedText";
+
 import { AudioModule } from "expo-audio";
 import { addPcmChunkListener, isPcmRecorderAvailable, startPcmRecording, stopPcmRecording } from "@tilawi/expo-pcm-recorder";
 import type { QuranVerse } from "@hbic/shared";

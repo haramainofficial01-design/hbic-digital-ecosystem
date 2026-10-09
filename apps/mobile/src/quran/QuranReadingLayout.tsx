@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { useAppTheme } from "../theme/ThemeProvider";
 import type { QuranLibrary } from "./types";
 export function QuranReadingLayout({ library, onAyahView }: { library: QuranLibrary; onAyahView?: () => void }) {

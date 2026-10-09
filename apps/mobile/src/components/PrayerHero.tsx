@@ -9,7 +9,9 @@ import {
   type PrayerName
 } from "@hbic/shared";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text, Image } from "../i18n/LocalizedText";
+
 import { useVisibleClock } from "../services/useVisibleClock";
 import { brandAssets } from "../constants/assets";
 import { useAppLanguage } from "../i18n/LanguageProvider";
@@ -56,7 +58,7 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
   const celestial = getPrayerCelestialPosition(content.prayerTime, now);
   const sunLeft = `${6 + celestial.progress * 88}%` as `${number}%`;
   const sunTop = `${64 - celestial.altitude * 40}%` as `${number}%`;
-  const dateLabel = new Intl.DateTimeFormat(language === "ur" ? "ur-PK" : "en-CA", {
+  const dateLabel = new Intl.DateTimeFormat(language === "ur" ? "ur-PK" : language === "en" ? "en-CA" : language, {
     timeZone: "America/Edmonton",
     weekday: "long",
     month: "short",
@@ -134,7 +136,7 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
         <Text style={[styles.countdown, { color: palette.accent }]} numberOfLines={1} adjustsFontSizeToFit>
           {isLiveNext ? `${formatCountdown(next.date, now)} to ${next.kind}` : dateLabel}
         </Text>
-        <Text style={styles.prayerMoment}>{prayerMoments[focusedPrayer][language]}</Text>
+        <Text style={styles.prayerMoment}>{prayerMoments[focusedPrayer][language === "ur" ? "ur" : "en"]}</Text>
       </View>
 
       <View

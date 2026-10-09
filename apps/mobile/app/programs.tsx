@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { isVisibleItem } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
 import { AdaptiveGrid } from "../src/components/AdaptiveGrid";

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "../i18n/LocalizedText";
 import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
 import { normalizeSearch, type QuranChapter } from "@hbic/shared";

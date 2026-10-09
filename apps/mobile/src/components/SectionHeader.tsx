@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { useAppTheme } from "../theme/ThemeProvider";
 
 export function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {

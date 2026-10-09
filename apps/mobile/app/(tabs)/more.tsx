@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text, Image } from "../../src/i18n/LocalizedText";
+
 import { AppButton } from "../../src/components/AppButton";
 import { AdaptiveGrid } from "../../src/components/AdaptiveGrid";
 import { AppScreen } from "../../src/components/AppScreen";
@@ -25,7 +27,7 @@ const menuItems: { title: string; subtitle: string; icon: IconName; route: strin
   { title: "Contact", subtitle: "Call, email, directions, and masjid address", icon: "call", route: "/contact" },
   { title: "About", subtitle: "Mission, services, and community information", icon: "information-circle", route: "/about" },
   { title: "Notifications", subtitle: "Prayer, iqamah, event, and media alerts", icon: "notifications", route: "/notifications" },
-  { title: "Language", subtitle: "English and Urdu navigation preferences", icon: "language", route: "/language" },
+  { title: "Language", subtitle: "English, Urdu, Dari and Arabic", icon: "language", route: "/language" },
   { title: "Settings", subtitle: "Theme and app preferences", icon: "settings", route: "/settings" },
   { title: "Staff Admin", subtitle: "Secure HBIC dashboard for authorized staff", icon: "shield-checkmark-outline", route: "/admin-dashboard" }
 ];

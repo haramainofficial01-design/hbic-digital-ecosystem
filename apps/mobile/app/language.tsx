@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { LanguageCode } from "@hbic/shared";
+import { supportedLanguages } from "@hbic/shared";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -10,10 +11,7 @@ import { useAppLanguage } from "../src/i18n/LanguageProvider";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 
-const languages: { code: LanguageCode; label: string; subtitle: string }[] = [
-  { code: "en", label: "English", subtitle: "Default app language" },
-  { code: "ur", label: "اردو", subtitle: "ایپ کی رہنمائی اور اہم کمیونٹی معلومات" }
-];
+const languages = supportedLanguages.map(language => ({ ...language, subtitle: language.code === "en" ? "English" : language.code === "ur" ? "اردو" : language.code === "fa-AF" ? "دری افغانستان" : "العربية" }));
 
 export default function LanguageScreen() {
   const router = useRouter();

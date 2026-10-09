@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { GlassCard } from "./GlassCard";

@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { PropsWithChildren } from "react";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { radii, spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
+import { useAppLanguage } from "../i18n/LanguageProvider";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -18,6 +20,7 @@ interface AppButtonProps extends PropsWithChildren {
 
 export function AppButton({ label, onPress, variant = "primary", icon, style, disabled = false, accessibilityHint }: AppButtonProps) {
   const { theme } = useAppTheme();
+  const { translate } = useAppLanguage();
   const isSecondary = variant === "secondary" || variant === "ghost";
   const backgroundColor =
     variant === "danger"
@@ -33,8 +36,8 @@ export function AppButton({ label, onPress, variant = "primary", icon, style, di
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={accessibilityHint}
+      accessibilityLabel={translate(label)}
+      accessibilityHint={accessibilityHint ? translate(accessibilityHint) : undefined}
       accessibilityState={{ disabled }}
       disabled={disabled}
       android_ripple={{ color: theme.colors.borderStrong, borderless: false }}

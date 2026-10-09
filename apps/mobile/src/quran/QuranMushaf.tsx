@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Keyboard, ScrollView, View } from "react-native";
+import { Text, TextInput, Alert } from "../i18n/LocalizedText";
+
 import { WebView } from "react-native-webview";
 import { parseAyahReference, validMushafPageNumber, type MushafPage } from "@hbic/shared";
 import { quranClient, quranRemoteClient } from "../services/quran";

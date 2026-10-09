@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";

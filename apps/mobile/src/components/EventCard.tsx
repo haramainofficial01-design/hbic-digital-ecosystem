@@ -1,6 +1,7 @@
 import type { EventItem } from "@hbic/shared";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { GlassCard } from "./GlassCard";

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getEffectiveJumuahDoorNotice, type AdhanPrayerName } from "@hbic/shared";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../src/i18n/LocalizedText";
 import { AppButton } from "../../src/components/AppButton";
 import { AppScreen } from "../../src/components/AppScreen";
 import { GlassCard } from "../../src/components/GlassCard";

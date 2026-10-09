@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";
@@ -56,7 +57,7 @@ export default function SettingsScreen() {
 
       <GlassCard compact>
         <SettingsRow title="Notifications" subtitle="Prayer, iqamah, events, media, and urgent notices" route="/notifications" />
-        <SettingsRow title="Language" subtitle="English and Urdu navigation preferences" route="/language" />
+        <SettingsRow title="Language" subtitle="English, Urdu, Dari and Arabic" route="/language" />
         <SettingsAction title="Replay introduction" subtitle="See the Masjid Bilal app introduction again" onPress={startReplay} />
       </GlassCard>
 

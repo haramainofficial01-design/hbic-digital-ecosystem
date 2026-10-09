@@ -7,7 +7,7 @@ export const hbicSettings: MasjidSettings = {
   phone: "+1 587-917-0333",
   email: "info@hbic.ca",
   website: "https://hbic.ca/",
-  donationUrl: "https://www.paypal.com/donate/?cmd=_donations&business=bilalislamiccentrecalgary%40gmail.com&currency_code=CAD&source=url&Z3JncnB0=&_sessionID=wlpuMex9BYhDWEdB_FC9jpwepKNXtrV5",
+  donationUrl: "https://hbic.ca/donate",
   social: {
     youtube: "https://www.youtube.com/@hbicyouth",
     instagram: "https://www.instagram.com/hbicyouth/",

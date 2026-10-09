@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import type { QuranResources } from "@hbic/shared";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranSurface } from "./QuranControls";

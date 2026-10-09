@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import type { PropsWithChildren } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { useAppTheme } from "../theme/ThemeProvider";
 export function QuranSurface({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { theme } = useAppTheme();

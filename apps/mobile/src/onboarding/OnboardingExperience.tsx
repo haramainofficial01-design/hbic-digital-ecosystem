@@ -1,22 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { getNextPrayerFocus } from "@hbic/shared";
+import { getNextPrayerFocus, supportedLanguages } from "@hbic/shared";
 import { useAppClock } from "../services/useVisibleClock";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AccessibilityInfo,
-  Image,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent
-} from "react-native";
+import { AccessibilityInfo, Linking, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Text, Image } from "../i18n/LocalizedText";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton } from "../components/AppButton";
 import { GlassCard } from "../components/GlassCard";
@@ -37,7 +26,7 @@ type PermissionState = "idle" | "requesting" | "enabled" | "declined" | "error";
 export function OnboardingExperience() {
   const { active, initialStep, replaying, saveProgress, complete, cancelReplay } = useOnboarding();
   const { theme } = useAppTheme();
-  const { language, t } = useAppLanguage();
+  const { language, setLanguage, t } = useAppLanguage();
   const { content } = usePublishedContent();
   const { width } = useWindowDimensions();
   const pager = useRef<ScrollView>(null);
@@ -157,6 +146,17 @@ export function OnboardingExperience() {
             </View>
             <Kicker>HAZRAT BILAL ISLAMIC CENTRE</Kicker>
             <PageTitle>Welcome to Masjid Bilal</PageTitle>
+            <Text style={{ color: theme.colors.text, fontSize: 19, fontWeight: "700" }}>Select a language to continue</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginVertical: 14 }}>
+              {supportedLanguages.map(item => <Pressable key={item.code} accessibilityRole="radio" accessibilityLabel={item.label}
+                accessibilityState={{ checked: language === item.code }} onPress={() => void setLanguage(item.code)}
+                style={{ minHeight: 52, minWidth: 110, padding: 14, borderRadius: 16, borderWidth: 1,
+                  borderColor: language === item.code ? theme.colors.teal : theme.colors.border,
+                  backgroundColor: language === item.code ? theme.colors.tintSoft : theme.colors.cardStrong }}>
+                <Text style={{ color: theme.colors.text, fontSize: 18, textAlign: "center" }}>{item.label}</Text>
+              </Pressable>)}
+            </View>
+            <Text style={{ color: theme.colors.muted }}>You can change this anytime in Settings.</Text>
             <PageBody>Prayer and iqamah times, Jumu&apos;ah, community updates, events, giving, and media—connected to the masjid from one trusted place.</PageBody>
           </OnboardingPage>
 
@@ -244,7 +244,7 @@ export function OnboardingExperience() {
             <Kicker>ALL SET</Kicker>
             <PageTitle>Masjid Bilal is ready</PageTitle>
             <PageBody>Open the Home screen for today&apos;s prayer schedule and the latest published community information.</PageBody>
-            {language === "ur" ? <Text style={[styles.detailNote, { color: theme.colors.muted }]}>{t("englishContentFallback")}</Text> : null}
+            {language !== "en" ? <Text style={[styles.detailNote, { color: theme.colors.muted }]}>{t("englishContentFallback")}</Text> : null}
           </OnboardingPage>
         </ScrollView>
 

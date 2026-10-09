@@ -2,7 +2,8 @@ import * as Linking from "expo-linking";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
@@ -11,6 +12,7 @@ import { academyEnabled } from "../src/config/releaseFeatures";
 import { reconcileAcademyCashReminders } from "../src/services/academyReminders";
 import { registerForPushNotificationsAsync } from "../src/services/notifications";
 import { useAppTheme } from "../src/theme/ThemeProvider";
+import { useAppLanguage } from "../src/i18n/LanguageProvider";
 
 const academyUrl = "https://hbic.ca/quran-academy";
 const academyPushPreferenceFile = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}academy-push-opt-in.txt` : null;
@@ -33,6 +35,7 @@ async function saveAcademyPushOptIn(value: boolean) {
 export default function QuranAcademyScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { language } = useAppLanguage();
   const webView = useRef<WebView>(null);
   const academyPushToken = useRef<string | null>(null);
   const checkoutActive = useRef(false);
@@ -129,7 +132,7 @@ export default function QuranAcademyScreen() {
     </View>
     <Text style={[styles.note, { color: theme.colors.muted }]}>Register, manage tuition and show your Academy pass here. Card payment opens secure Stripe Checkout; HBIC never sees your card number.</Text>
     {error ? <View style={styles.fallback}><Text style={{ color: theme.colors.text }}>The Academy page could not load here.</Text><AppButton label="Try again" onPress={() => { setError(false); webView.current?.reload(); }} /><AppButton label="Open hbic.ca" variant="ghost" onPress={() => void Linking.openURL(academyUrl)} /></View> :
-      <WebView ref={webView} source={{ uri: academyUrl }} originWhitelist={["https://*"]}
+      <WebView ref={webView} source={{ uri: `${academyUrl}?lang=${language}` }} originWhitelist={["https://*"]}
         javaScriptEnabled domStorageEnabled sharedCookiesEnabled thirdPartyCookiesEnabled
         // Firebase Auth loads a background iframe on its own auth domain.
         // Only route top-frame links; opening that iframe in Safari shows a

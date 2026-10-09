@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from "react-native";
+import { Text, TextInput, Alert } from "../i18n/LocalizedText";
+
 import * as FileSystem from "expo-file-system/legacy";
 import { createSelfTest, memorizationLabels, passageId, repeatSequence, type QuranChapter, type QuranPassage, type QuranVerse, type MemorizationStatus } from "@hbic/shared";
 import { AppButton } from "../components/AppButton";

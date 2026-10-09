@@ -1,7 +1,8 @@
 import { dateStringInTimeZone, resolveHijriDate } from "@hbic/shared";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { useVisibleClock } from "../src/services/useVisibleClock";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
@@ -10,10 +11,10 @@ import { SectionHeader } from "../src/components/SectionHeader";
 import { usePublishedContent } from "../src/services/content";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
+import { useAppLanguage } from "../src/i18n/LanguageProvider";
 
 const timeZone = "America/Edmonton";
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const monthName = new Intl.DateTimeFormat("en-CA", { month: "long", year: "numeric", timeZone: "UTC" });
 
 function calendarDays(year: number, month: number) {
   const count = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -29,6 +30,8 @@ function calgaryMonth(date: Date) {
 export default function HijriCalendarScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const { language } = useAppLanguage();
+  const monthName = useMemo(() => new Intl.DateTimeFormat(language === "en" ? "en-CA" : language === "ur" ? "ur-PK" : language, { month: "long", year: "numeric", timeZone: "UTC" }), [language]);
   const { content } = usePublishedContent();
   const [viewedMonth, setViewedMonth] = useState(() => calgaryMonth(new Date()));
   const lastCalgaryMonth = useRef(calgaryMonth(new Date()));

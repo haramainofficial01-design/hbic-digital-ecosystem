@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";

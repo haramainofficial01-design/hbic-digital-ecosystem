@@ -17,7 +17,7 @@ export type AdminRole = "superAdmin" | "director" | "caretaker" | "editor";
 
 export type ThemeMode = "system" | "light" | "dark" | "ramadan" | "eid";
 
-export type LanguageCode = "en" | "ur";
+export type LanguageCode = "en" | "ur" | "fa-AF" | "ar";
 
 export interface MasjidSettings {
   masjidName: string;

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, AppState, Platform, Text, View } from "react-native";
+import { AppState, Platform, View } from "react-native";
+import { Text, Alert } from "../i18n/LocalizedText";
+
 import { AudioModule } from "expo-audio";
 import { requireOptionalNativeModule, NativeModule } from "expo-modules-core";
 import { AppButton } from "../components/AppButton";

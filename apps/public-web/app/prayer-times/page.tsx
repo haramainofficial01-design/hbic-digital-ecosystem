@@ -74,7 +74,7 @@ export default async function PrayerTimesPage() {
             <h3>Help support prayer services, programs, classes, and community work.</h3>
             <p className="muted">E-transfer: <a className="inline-contact-link" href={`mailto:${etransferEmail}`}>{etransferEmail}</a></p>
             <div className="actions">
-              <a className="button primary" href={settings.donationUrl} target="_blank" rel="noreferrer">Donate by PayPal / Credit Card</a>
+              <a className="button primary" href="/donate">Donate securely</a>
               <CopyButton text={etransferEmail} label="Copy E-transfer Email" />
             </div>
           </div>

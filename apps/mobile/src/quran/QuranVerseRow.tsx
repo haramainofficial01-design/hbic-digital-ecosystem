@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { Share, StyleSheet, Text, View } from "react-native";
+import { Share, StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import type { QuranPreferences, QuranVerse } from "@hbic/shared";
 import { quranAttribution } from "@hbic/shared";
 import { useAppTheme } from "../theme/ThemeProvider";

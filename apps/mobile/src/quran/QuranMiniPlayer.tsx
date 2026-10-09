@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import type { ReturnTypeQuranAudio } from "./types";
 import { QuranIconButton, QuranSurface } from "./QuranControls";
 import { useAppTheme } from "../theme/ThemeProvider";

@@ -1,6 +1,7 @@
 import { privacyContactEmail, privacyPolicyEffectiveDate, privacyPolicyUrl } from "@hbic/shared";
 import { useRouter } from "expo-router";
-import { Linking, StyleSheet, Text } from "react-native";
+import { Linking, StyleSheet } from "react-native";
+import { Text } from "../src/i18n/LocalizedText";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { GlassCard } from "../src/components/GlassCard";

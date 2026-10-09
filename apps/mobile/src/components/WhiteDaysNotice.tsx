@@ -1,7 +1,8 @@
 import { getWhiteDaysRemainingThisWeek } from "@hbic/shared";
 import { useRouter } from "expo-router";
 import { useVisibleClock } from "../services/useVisibleClock";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";

@@ -2,13 +2,17 @@ import { academyStripe, applyAcademyStripeEvent, cardBillingConfigured } from ".
 import { after } from "next/server";
 import { dispatchAcademyEmails } from "../../../../lib/academyEmail";
 import { handleAcademyWebhook } from "../../../../lib/academyWebhook";
+import { applyDonationEvent } from "../../../../lib/donationCheckout";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const response = await handleAcademyWebhook(request, {
     configured: cardBillingConfigured,
     verify: (raw, signature) => academyStripe().webhooks.constructEvent(raw, signature, process.env.ACADEMY_STRIPE_WEBHOOK_SECRET!),
-    apply: applyAcademyStripeEvent,
+    apply: event => {
+      const object = event.data.object as unknown as { metadata?: Record<string, string> };
+      return object.metadata?.hbicPaymentKind === "donation" ? applyDonationEvent(event) : applyAcademyStripeEvent(event);
+    },
     log: (record) => console.info("academy_stripe_webhook", JSON.stringify(record))
   });
   if (response.ok) after(() => dispatchAcademyEmails(1).then(() => undefined).catch(() => undefined));

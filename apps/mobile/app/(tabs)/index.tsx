@@ -1,7 +1,9 @@
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Pressable, StyleSheet, View } from "react-native";
+import { Text, Image } from "../../src/i18n/LocalizedText";
+
 import { getPublicEvents, isVisibleItem } from "@hbic/shared";
 import { AppButton } from "../../src/components/AppButton";
 import { AppScreen } from "../../src/components/AppScreen";
@@ -100,9 +102,9 @@ export default function HomeScreen() {
         <Text style={[styles.cardKicker, { color: theme.colors.teal }]}>Support the masjid</Text>
         <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{donationCategories[0]?.title ?? "Support Masjid Bilal"}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          Donate by card or PayPal, or use e-transfer: {etransferEmail}.
+          Donate securely online or use e-transfer: {etransferEmail}.
         </Text>
-        <AppButton label="Donate" icon="heart" onPress={() => Linking.openURL(settings.donationUrl)} style={styles.button} />
+        <AppButton label="Donate" icon="heart" onPress={() => router.push("/donate" as never)} style={styles.button} />
       </GlassCard>
     </AppScreen>
   );
@@ -117,8 +119,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg
   },
   heroImage: {
-    width: "100%",
-    height: "100%"
+    ...StyleSheet.absoluteFillObject
   },
   logo: {
     width: 76,

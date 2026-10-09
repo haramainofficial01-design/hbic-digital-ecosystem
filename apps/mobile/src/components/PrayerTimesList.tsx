@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getIqamahForPrayer, getNextPrayerFocus, prayerOrder, type PrayerName } from "@hbic/shared";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../i18n/LocalizedText";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";
 import { useAppTheme } from "../theme/ThemeProvider";
