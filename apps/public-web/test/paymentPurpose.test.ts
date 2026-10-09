@@ -15,6 +15,8 @@ test("every donation has an immediately visible fund description, separate from 
     assert.equal(plan.payment_intent_data?.metadata?.hbicPaymentKind, "donation");
     assert.equal(plan.payment_intent_data?.metadata?.donationCategory, fund.id);
     assert.equal(plan.payment_intent_data?.metadata?.academyFamilyUid, undefined);
-    assert.equal(plan.custom_text?.submit?.message, `Your one-time CA$50.00 donation is for ${fund.title}. This is not Quran Academy tuition and does not enroll a child.`);
+    const submit = plan.custom_text?.submit;
+    assert.ok(submit && typeof submit === "object");
+    assert.equal(submit.message, `Your one-time CA$50.00 donation is for ${fund.title}. This is not Quran Academy tuition and does not enroll a child.`);
   }
 });
