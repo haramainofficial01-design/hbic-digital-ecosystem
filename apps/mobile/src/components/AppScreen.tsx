@@ -21,7 +21,7 @@ export function AppScreen({ children, style }: PropsWithChildren<{ style?: Style
 
   return (
     <View style={[styles.gradient, { backgroundColor: theme.colors.background }]}>
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
         <ScrollView
           contentContainerStyle={[styles.content, isWide && styles.wideContent, style]}
           showsVerticalScrollIndicator={false}

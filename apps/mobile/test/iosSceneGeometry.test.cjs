@@ -23,3 +23,8 @@ test('older pod resource targets are raised only to the existing iOS 15.1 minimu
   assert.ok(source.includes("Gem::Version.new(deployment) < Gem::Version.new('15.1')"));
   assert.ok(source.includes("build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'"));
 });
+test('content avoids a vertical system tab/status bar while the background fills the display', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/AppScreen.tsx'), 'utf8');
+  assert.ok(source.includes('edges={["top", "left", "right"]}'));
+  assert.ok(source.indexOf('styles.gradient') < source.indexOf('<SafeAreaView'));
+});
