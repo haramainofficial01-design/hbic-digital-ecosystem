@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { IOSConfig, withAppDelegate, withInfoPlist, withPodfile, withXcodeProject } = require("@expo/config-plugins");
+const { IOSConfig, withAppDelegate, withDangerousMod, withInfoPlist, withPodfile, withXcodeProject } = require("@expo/config-plugins");
+const { patchIosNativeTabsLayout } = require("./patchIosNativeTabsLayout");
 
 const sceneFile = "SceneDelegate.swift";
 
@@ -64,6 +65,16 @@ module.exports = function withIosSceneLifecycle(config) {
   config = withSceneManifest(config);
   config = withSceneAppDelegate(config);
   config = withSceneSource(config);
+  config = withDangerousMod(config, ["ios", (mod) => {
+    const screensRoot = path.dirname(require.resolve("react-native-screens/package.json", {
+      paths: [mod.modRequest.projectRoot]
+    }));
+    const host = path.join(screensRoot, "ios", "bottom-tabs", "RNSBottomTabsHostComponentView.mm");
+    const source = fs.readFileSync(host, "utf8");
+    const patched = patchIosNativeTabsLayout(source);
+    if (patched !== source) fs.writeFileSync(host, patched);
+    return mod;
+  }]);
   config = withPodfile(config, (mod) => {
     const marker = "# HBIC minimum iOS pod target for current SDK";
     if (!mod.modResults.contents.includes(marker)) {
