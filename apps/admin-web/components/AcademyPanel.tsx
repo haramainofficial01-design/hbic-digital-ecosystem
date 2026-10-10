@@ -59,6 +59,8 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     scannerRef.current = null;
   };
   useEffect(() => () => stopCamera(), []);
+  // Changing Academy sections must release the camera, not leave a hidden stream running.
+  useEffect(() => { if (section !== "Scan Pass" || !personalSession) stopCamera(); }, [section, personalSession]);
 
   const load = useCallback(async (silent = false) => {
     if (silent && loadingRef.current) return;

@@ -10,7 +10,7 @@ import {
   type Auth,
   type MultiFactorResolver
 } from "firebase/auth";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { getAdminAuth } from "../lib/firebase";
 
 const initialEmail = "haramain.official01@gmail.com";
@@ -24,10 +24,11 @@ function basicAuthorization(email: string, password: string) {
 }
 
 function AuthField({ label, value, type = "text", onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) {
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}</label>
-      <input type={type} value={value} autoComplete={type === "password" ? "current-password" : "username"} onChange={(event) => onChange(event.target.value)} />
+      <label htmlFor={id}>{label}</label>
+      <input id={id} type={type} value={value} autoComplete={type === "password" ? "current-password" : "username"} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
@@ -248,13 +249,15 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <button className="secondary" type="button" onClick={login} disabled={busy || !auth || !email.trim() || !password}>Sign in</button>
         <button className="secondary" type="button" onClick={sendSetupEmail} disabled={busy || !auth || !email.trim()}>Set or reset approved admin password</button>
       </div>
-      <div className="firebase-auth-shared">
-        <strong>Existing shared HBIC access</strong>
+      <details className="firebase-auth-shared">
+        <summary>Use existing shared HBIC access</summary>
+        <div className="firebase-auth-shared-fields">
         <AuthField label="Shared administrator email" value={sharedEmail} type="email" onChange={setSharedEmail} />
         <AuthField label="Shared administrator password" value={sharedPassword} type="password" onChange={setSharedPassword} />
         <button className="secondary" type="button" onClick={() => void verifySharedAccess()} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
         {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require an approved personal administrator account.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
-      </div>
+        </div>
+      </details>
       <p>To open private Academy records, sign in with a verified, approved personal email and private password. New personal accounts must first be approved by HBIC; shared access is for publishing only.</p>
       <p role="status">{status}</p>
     </div>

@@ -32,7 +32,7 @@ import {
   type ServiceItem,
   type VolunteerOpportunity
 } from "@hbic/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { FirebaseAdminAuth } from "./FirebaseAdminAuth";
 import { AcademyPanel } from "./AcademyPanel";
 
@@ -59,6 +59,14 @@ const pages = [
 
 type Page = (typeof pages)[number];
 type AdminResponse = Record<string, any>;
+
+const navigationGroups: { label: string; pages: Page[] }[] = [
+  { label: "Overview", pages: ["Dashboard", "Quran Academy", "Donations"] },
+  { label: "Prayer", pages: ["Prayer & Iqamah", "Jumu'ah", "Prayer Display"] },
+  { label: "Community", pages: ["Announcements", "Events", "Programs", "Media", "Halal Directory", "Community", "Volunteers"] },
+  { label: "Administration", pages: ["Push Notifications", "Diagnostics", "Feature Flags", "Settings", "Users/Roles"] }
+];
+const independentPages: Page[] = ["Quran Academy", "Prayer Display", "Push Notifications", "Diagnostics", "Users/Roles"];
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || "https://hbic.ca").replace(/\/$/, "");
 const iqamahOverridePrayers: IqamahPrayerName[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -121,13 +129,14 @@ function Field({
   type?: string;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}</label>
+      <label htmlFor={id}>{label}</label>
       {textarea ? (
-        <textarea aria-label={label} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <textarea id={id} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       ) : (
-        <input aria-label={label} type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <input id={id} type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       )}
     </div>
   );
@@ -178,6 +187,12 @@ export function AdminDashboard() {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
   const [publishedVersion, setPublishedVersion] = useState(defaultContent.version);
+  const contentWorkspace = !independentPages.includes(page);
+
+  function navigateToPage(nextPage: Page) {
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
 
   const subtitle = useMemo(() => {
     if (page === "Dashboard") return "Draft, preview, and publish Masjid Bilal content for the public website and mobile app.";
@@ -185,6 +200,7 @@ export function AdminDashboard() {
     if (page === "Prayer Display") return "Open the focused TV editor and live prayer-hall preview.";
     if (page === "Push Notifications") return "Notification preferences and logs are shown separately from content publishing.";
     if (page === "Diagnostics") return "Protected production health checks for publishing, prayer sync, and notifications.";
+    if (page === "Quran Academy") return "Families, attendance and tuition in one place. Academy actions save separately from website publishing.";
     return "Edit draft content, save it, and publish when ready.";
   }, [page]);
 
@@ -363,33 +379,39 @@ export function AdminDashboard() {
 
   return (
     <main className="admin-shell">
+      <a className="skip-link" href="#admin-workspace">Skip to workspace</a>
       <aside className="sidebar">
         <div className="brand">
           <img src="/brand/hbic-logo.png" alt="HBIC logo" />
           <div>
             <strong>Masjid Bilal Admin</strong>
-            <span>Content publishing</span>
+            <span>Your community workspace</span>
           </div>
         </div>
         <label className="mobile-page-picker">
           <span>Dashboard section</span>
-          <select value={page} onChange={(event) => setPage(event.target.value as Page)}>
+          <select value={page} onChange={(event) => navigateToPage(event.target.value as Page)}>
             {pages.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
-        <div className="sidebar-nav">
-          {pages.map((item) => (
-            <button key={item} className={`nav-button ${page === item ? "active" : ""}`} onClick={() => setPage(item)}>
-              {item}
-            </button>
+        <nav className="sidebar-nav" aria-label="Admin sections">
+          {navigationGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <p className="nav-group-label">{group.label}</p>
+              {group.pages.map((item) => (
+                <button type="button" key={item} aria-current={page === item ? "page" : undefined} className={`nav-button ${page === item ? "active" : ""}`} onClick={() => navigateToPage(item)}>
+                  <span className="nav-indicator" aria-hidden="true" />{item}
+                </button>
+              ))}
+            </div>
           ))}
-        </div>
+        </nav>
       </aside>
 
-      <section className="content">
+      <section className="content" id="admin-workspace" tabIndex={-1} aria-label="Admin workspace">
         <div className="topbar">
           <div>
-            <span className="pill">{page}</span>
+            <span className="workspace-eyebrow">HBIC · Calgary</span>
             <h1>{page}</h1>
             <p>{subtitle}</p>
           </div>
@@ -398,9 +420,12 @@ export function AdminDashboard() {
           </span>
         </div>
 
-        <div className="card full">
-          <Field label="Public content API" value={apiBase} onChange={() => undefined} disabled />
+        <div className="card full workspace-controls">
+          <div className="workspace-controls-heading"><h2>{adminToken ? "Workspace access" : "Sign in to your workspace"}</h2><span className="pill">{adminToken ? "Signed in" : "Sign-in required"}</span></div>
           <FirebaseAdminAuth onSession={handleAdminSession} />
+          <details className="connection-details">
+            <summary>Connection & publication details</summary>
+          <Field label="Public content API" value={apiBase} onChange={() => undefined} disabled />
           <p className="muted">
             Backend mode: {backendMode}. Public pages and the mobile app read the published record. Draft edits stay private until Publish Changes succeeds.
           </p>
@@ -412,17 +437,18 @@ export function AdminDashboard() {
               Firestore credentials are not configured on the public web deployment yet. Save and publish will fail loudly until production credentials are added.
             </p>
           ) : null}
-          <div className="actions">
+          </details>
+          {contentWorkspace ? <div className="actions workspace-actions">
             <button className="secondary" onClick={loadDraft} disabled={busy || !adminToken}>Load protected draft</button>
             <a className="secondary link-button" href={apiBase} target="_blank" rel="noreferrer">Preview Public Site</a>
             <button className="primary" onClick={handleSaveDraft} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Save Draft"}</button>
             <button className="primary publish" onClick={handlePublish} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Publish Changes"}</button>
-          </div>
-          {!draftLoaded ? <p className="muted">Sign in with your approved personal email and password, then load the protected draft before editing or publishing.</p> : null}
+          </div> : null}
+          {contentWorkspace && !draftLoaded ? <p className="muted">Sign in, then load the protected draft to edit website and app content.</p> : null}
         </div>
 
         {savedMessage ? <div role="status" className={`notice notice-${messageTone}`}><strong>{savedMessage}</strong></div> : null}
-        {page === "Dashboard" && <DashboardPanel content={content} />}
+        {page === "Dashboard" && <DashboardPanel content={content} onNavigate={navigateToPage} />}
         {page === "Prayer & Iqamah" && <PrayerPanel content={content} updateContent={updateContent} adminRequest={adminRequest as (path: string, init?: RequestInit) => Promise<AdminResponse>} disabled={busy} />}
         {page === "Jumu'ah" && <JumuahPanel content={content} updateContent={updateContent} />}
         {page === "Prayer Display" && <PrayerDisplayPanel />}
@@ -459,9 +485,12 @@ export function AdminDashboard() {
   );
 }
 
-function DashboardPanel({ content }: { content: HbicContent }) {
+function DashboardPanel({ content, onNavigate }: { content: HbicContent; onNavigate: (page: Page) => void }) {
   return (
     <div className="grid">
+      <div className="card full"><h2>What would you like to manage?</h2><p className="muted">Go straight to the work you do most often.</p><div className="quick-actions">
+        {([ ["Quran Academy", "Families, attendance & tuition"], ["Prayer & Iqamah", "Timetable & weekly overrides"], ["Donations", "Donation categories & links"], ["Announcements", "Community updates"] ] as const).map(([destination, description]) => <button className="quick-action" type="button" key={destination} onClick={() => onNavigate(destination)}><strong>{destination}</strong><span>{description}</span><span className="quick-action-arrow" aria-hidden="true">↗</span></button>)}
+      </div></div>
       {[
         ["Backend source", content.status, `Version ${content.version}`],
         ["Announcements", String(content.announcements.length), "Published content count"],
