@@ -63,6 +63,14 @@ export default function HomeScreen() {
       )}
       <AppButton label="Full Prayer & Iqamah" icon="time" variant="secondary" onPress={() => router.push("/prayer" as never)} />
 
+      <View style={[styles.quranCard, { backgroundColor: theme.colors.cardStrong, borderColor: theme.colors.border }]}>
+        <Text style={[styles.cardKicker, { color: theme.colors.teal }]}>Quran &amp; Recite</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Make space for your daily Quran</Text>
+        <Text style={[styles.body, { color: theme.colors.muted }]}>Madinah Mushaf and Ayah View, reciter listening, hide-and-reveal practice, word hints and self-tests. Keep private recordings and word-review flags in My Library.</Text>
+        <AppButton label="Open Quran & Recite" icon="book-outline" onPress={() => router.push("/quran" as never)} style={styles.button} />
+        <AppButton label="Community Challenges" icon="trophy-outline" variant="ghost" onPress={() => router.push({ pathname: "/quran", params: { view: "challenges" } } as never)} />
+      </View>
+
       <GlassCard tone="gold">
         <Image source={photoAssets.summerCamp} style={styles.spotlightImage} />
         <Text style={[styles.cardKicker, { color: theme.colors.navy }]}>Summer Camp 2026</Text>
@@ -111,6 +119,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  quranCard: { padding: 22, borderRadius: 26, borderWidth: StyleSheet.hairlineWidth },
   hero: {
     minHeight: 292,
     borderRadius: 34,

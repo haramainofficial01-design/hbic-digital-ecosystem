@@ -7,7 +7,35 @@ function alignQuranBridge(source) {
   if (!source.includes("onnxruntimejsi SHARED")) throw new Error("Quran native target changed; verify 16 KB alignment before release.");
   return source + "\n# HBIC 16 KB JSI alignment\ntarget_link_options(onnxruntimejsi PRIVATE \"-Wl,-z,max-page-size=16384\" \"-Wl,-z,common-page-size=16384\")\n";
 }
+function protectRecordingSession(source) {
+  const guard = "// HBIC recording-aware audio session";
+  if (source.includes(guard)) {
+    if (source.includes("if self.allowsRecording { return }") && source.includes("if wasRecordingEnabled && !mode.allowsRecording { deactivateSession() }")) return source;
+    throw new Error("Incomplete recording-session guard; inspect the installed Expo audio source.");
+  }
+  // Expo 1.1.x delays player-pause deactivation by 100 ms but checks only
+  // players. It can deactivate a newly preparing recorder. Protect the owned
+  // recording mode, then release idle audio when that mode ends; never keep
+  // the audio session permanently active to work around the race.
+  const edits = [
+    ["    self.shouldPlayInBackground = mode.shouldPlayInBackground", "    let wasRecordingEnabled = self.allowsRecording\n    self.shouldPlayInBackground = mode.shouldPlayInBackground"],
+    ["    }\n  }\n\n  private func activateSession()", "    }\n    " + guard + "\n    if wasRecordingEnabled && !mode.allowsRecording { deactivateSession() }\n  }\n\n  private func activateSession()"],
+    ["      let hasActivePlayers = self.registry.allPlayers.values.contains { $0.isPlaying }", "      " + guard + "\n      if self.allowsRecording { return }\n      let hasActivePlayers = self.registry.allPlayers.values.contains { $0.isPlaying }"]
+  ];
+  for (const [before, after] of edits) {
+    if (source.split(before).length !== 2) throw new Error("Expo audio session implementation changed; verify recorder ownership before release.");
+    source = source.replace(before, after);
+  }
+  return source;
+}
 module.exports = function withQuranRecitationRuntime(config) {
+  config = withDangerousMod(config, ["ios", async mod => {
+    const audio = require.resolve("expo-audio/package.json", { paths: [mod.modRequest.projectRoot] });
+    const filename = path.join(path.dirname(audio), "ios", "AudioModule.swift");
+    const source = await fs.readFile(filename, "utf8"), protectedSource = protectRecordingSession(source);
+    if (protectedSource !== source) await fs.writeFile(filename, protectedSource);
+    return mod;
+  }]);
   config = withDangerousMod(config, ["android", async mod => {
     // The upstream JSI bridge is compiled locally; the ORT core already has
     // correct alignment. Apply the documented linker flags to this target.
@@ -32,3 +60,4 @@ module.exports = function withQuranRecitationRuntime(config) {
   });
 };
 module.exports.alignQuranBridge = alignQuranBridge;
+module.exports.protectRecordingSession = protectRecordingSession;

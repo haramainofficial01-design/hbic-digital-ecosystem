@@ -12,7 +12,9 @@ const actions: { mode: QuranMode; title: string; detail: string; icon: keyof typ
   { mode: "memorize", title: "Memorize", detail: "Listen & repeat", icon: "repeat-outline" },
   { mode: "test", title: "Test yourself", detail: "Recall & reveal", icon: "sparkles-outline" },
   { mode: "search", title: "Search", detail: "Find an ayah", icon: "search-outline" },
-  { mode: "bookmarks", title: "Bookmarks", detail: "Your saved ayahs", icon: "bookmark-outline" }
+  { mode: "bookmarks", title: "Bookmarks", detail: "Your saved ayahs", icon: "bookmark-outline" },
+  { mode: "review", title: "My Library", detail: "Recordings & word review", icon: "albums-outline" },
+  { mode: "challenges", title: "Community Challenges", detail: "Optional seasonal rankings", icon: "trophy-outline" }
 ];
 export function QuranHome({ library, chapters, onMode, onOpen, fontLoaded, audioAvailable }: {
   library: QuranLibrary; chapters: QuranChapter[]; onMode: (mode: QuranMode, listen?: boolean) => void;
@@ -53,6 +55,6 @@ const styles = StyleSheet.create({
   content: { gap: 16, paddingBottom: 10 }, welcome: { alignItems: "center", paddingTop: 12, paddingBottom: 10 },
   title: { fontSize: 34, fontWeight: "700", lineHeight: 42, textAlign: "center" }, body: { fontSize: 16, lineHeight: 24, textAlign: "center", marginTop: 10, maxWidth: 360 },
   heading: { fontSize: 20, fontWeight: "700", marginBottom: 10 }, row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, action: { flexBasis: "30%", flexGrow: 1, minWidth: 100, padding: 16, borderRadius: 21, borderWidth: StyleSheet.hairlineWidth },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, action: { flexBasis: "45%", flexGrow: 1, minWidth: 125, padding: 16, borderRadius: 21, borderWidth: StyleSheet.hairlineWidth },
   recent: { minHeight: 44, paddingHorizontal: 14, justifyContent: "center", borderRadius: 22 }, revision: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10 }
 });

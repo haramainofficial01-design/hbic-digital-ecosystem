@@ -42,9 +42,15 @@ export function wholeWordAnchor(a: string, b: string) {
  * CTC emission times are approximate, not expert phoneme boundaries. */
 export function decodeRecitationWords(result: AsrTranscribeResult, vocab: Record<string, string>,
   compactSamples: number, spans: AudioSpan[], startSample = 0, originalSamples = compactSamples): RecitationWord[] {
+  return decodeRecitationEvidence(result, vocab, compactSamples, spans, startSample, originalSamples).words;
+}
+/** Timings and the same acoustic-quality statistic share one argmax pass. */
+export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Record<string, string>,
+  compactSamples: number, spans: AudioSpan[], startSample = 0, originalSamples = compactSamples) {
   const { logprobs, timeSteps, vocabSize, blankId } = result.acoustic;
   if (!Number.isInteger(timeSteps) || timeSteps < 1 || !Number.isInteger(vocabSize) || vocabSize < 2
-    || logprobs.length !== timeSteps * vocabSize || compactSamples < 1 || originalSamples < 1) return [];
+    || logprobs.length !== timeSteps * vocabSize || compactSamples < 1 || originalSamples < 1) return { words: [] as RecitationWord[], quality: 0 };
+  let voiced = 0, qualitySum = 0;
   const original = (sample: number, side: "start" | "end") => {
     const bounded = Math.max(0, Math.min(compactSamples, sample));
     // A start at a removed pause maps right; an end at that SAME compact
@@ -59,6 +65,7 @@ export function decodeRecitationWords(result: AsrTranscribeResult, vocab: Record
   for (let t = 0; t < timeSteps; t++) {
     let score = -Infinity, id = blankId;
     for (let v = 0; v < vocabSize; v++) if (logprobs[t * vocabSize + v] > score) { score = logprobs[t * vocabSize + v]; id = v; }
+    if (id !== blankId && Number.isFinite(score)) { voiced++; qualitySum += Math.min(1, Math.exp(score)); }
     if (id !== blankId && id !== previous) {
       const piece = vocab[String(id)] ?? "";
       if (piece && !piece.startsWith("<")) {
@@ -79,9 +86,9 @@ export function decodeRecitationWords(result: AsrTranscribeResult, vocab: Record
     previous = id;
   }
   if (current && recitationLexeme(current.text)) words.push(current);
-  return words.map(word => ({ ...word, text: recitationLexeme(word.text), edge: word.edge
+  return { quality: voiced ? qualitySum / voiced : 0, words: words.map(word => ({ ...word, text: recitationLexeme(word.text), edge: word.edge
     || (startSample > 0 && word.startSample - startSample < 1600)
-    || startSample + originalSamples - word.endSample < 1600 }));
+    || startSample + originalSamples - word.endSample < 1600 })) };
 }
 
 interface TrackedWord extends RecitationWord { support: number; context: number; lastEnd: number }

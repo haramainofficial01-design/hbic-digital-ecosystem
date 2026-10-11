@@ -1,15 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import type { PropsWithChildren } from "react";
-import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../i18n/LocalizedText";
 import { useAppTheme } from "../theme/ThemeProvider";
 export function QuranSurface({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { theme } = useAppTheme();
-  const glass = Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
-  const contentStyle = [styles.surface, { backgroundColor: glass ? undefined : theme.colors.cardStrong, borderColor: theme.colors.border }, style];
-  return glass ? <GlassView glassEffectStyle="regular" colorScheme={theme.mode} style={contentStyle}>{children}</GlassView>
-    : <View style={contentStyle}>{children}</View>;
+  // Reading/practice content stays on an opaque surface. Repeated live blur
+  // layers over scrolling Arabic and microphone feedback waste GPU work.
+  return <View style={[styles.surface, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }, style]}>{children}</View>;
 }
 export function QuranIconButton({ label, icon, onPress, disabled = false, active = false }: {
   label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void; disabled?: boolean; active?: boolean;

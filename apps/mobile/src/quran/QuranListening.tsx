@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, View } from "react-native";
 import { Text, TextInput } from "../i18n/LocalizedText";
 import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +32,7 @@ export function QuranListening({ chapters, audio, library }: { chapters: QuranCh
     if (voice) { setSelected(voice); setEditionId(voice.editions.find((e) => e.id === saved.editionId)?.id ?? voice.editions[0].id); }
   }, [reciters, library.ready, library.library.listening]);
   async function choose(voice: ListeningReciter, edition: number) {
-    audio.stop();
+    Keyboard.dismiss(); audio.stop();
     try {
       await library.update((s) => ({ ...s, listening: { reciterId: voice.id, editionId: edition } }));
       setSelected(voice); setEditionId(edition); setQuery(""); setError(null);

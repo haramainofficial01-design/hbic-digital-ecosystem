@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, FlatList, Pressable, StyleSheet, View, type ViewToken } from "react-native";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, FlatList, Keyboard, Pressable, StyleSheet, View, type ViewToken } from "react-native";
 import { Text, TextInput } from "../i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
@@ -15,6 +15,7 @@ import { QuranHome } from "./QuranHome";
 import { QuranVerseRow } from "./QuranVerseRow";
 import { QuranSettings } from "./QuranSettings";
 import { QuranPractice } from "./QuranPractice";
+import { QuranReviewLibrary } from "./QuranReviewLibrary";
 import { QuranMiniPlayer } from "./QuranMiniPlayer";
 import { QuranListening } from "./QuranListening";
 import { QuranMushaf } from "./QuranMushaf";
@@ -26,15 +27,20 @@ import { useQuranLibrary } from "./useQuranLibrary";
 import { useQuranReader } from "./useQuranReader";
 import { useQuranTransition } from "./useQuranTransition";
 import type { QuranMode } from "./types";
+import { useQuranChallengePractice } from "./useQuranChallengePractice";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const QuranChallenges = lazy(() => Promise.resolve({ default: require("./QuranChallenges").QuranChallenges as typeof import("./QuranChallenges").QuranChallenges }));
 type Row = { kind: "chapter"; chapter: QuranChapter } | { kind: "verse"; verse: QuranVerse } | { kind: "bookmark"; key: string };
-const titles: Record<QuranMode, string> = { home: "Quran & Recite", read: "Reader", listen: "Listen", search: "Search Quran", practice: "Practise", memorize: "Memorization", bookmarks: "Bookmarks", test: "Test yourself", settings: "Preferences" };
+const titles: Record<QuranMode, string> = { home: "Quran & Recite", read: "Reader", listen: "Listen", search: "Search Quran", practice: "Practise", memorize: "Memorization", bookmarks: "Bookmarks", test: "Test yourself", settings: "Preferences", review: "My Library", challenges: "Community Challenges" };
 export default function QuranReaderScreen() {
-  const router = useRouter(), params = useLocalSearchParams<{ chapter?: string; ayah?: string }>();
+  const router = useRouter(), params = useLocalSearchParams<{ chapter?: string; ayah?: string; view?: string }>();
   const { theme } = useAppTheme();
   const [fontLoaded] = useFonts({ QuranNaskh: require("../../assets/fonts/NotoNaskhArabic.ttf") });
   const library = useQuranLibrary(), audio = useQuranAudio();
   const { update: updateLibrary, bookmark: toggleBookmark } = library;
   const [mode, setMode] = useState<QuranMode>("home"), [chapterId, setChapterId] = useState(1), [target, setTarget] = useState(1);
+  const [captureActive, setCaptureActive] = useState(false);
+  const practiceInteraction = useQuranChallengePractice(mode, audio, captureActive);
   const transition = useQuranTransition(`${mode}:${chapterId}:${library.library.preferences.layout}`);
   const [query, setQuery] = useState(""), [jump, setJump] = useState("");
   const [searchResults, setSearchResults] = useState<QuranVerse[]>([]), [searching, setSearching] = useState(false);
@@ -49,9 +55,10 @@ export default function QuranReaderScreen() {
   useEffect(() => {
     if (!library.ready || restored.current) return;
     restored.current = true;
+    if (params.view === "challenges") setMode("challenges");
     const ref = parseAyahReference(`${params.chapter ?? library.library.lastRead?.chapter ?? 1}:${params.ayah ?? library.library.lastRead?.ayah ?? 1}`);
     if (ref) { setChapterId(ref.chapter); setTarget(ref.ayah); if (params.chapter) setMode("read"); }
-  }, [library.ready, library.library.lastRead, params.chapter, params.ayah]);
+  }, [library.ready, library.library.lastRead, params.chapter, params.ayah, params.view]);
   const resources = reader.resources;
   useEffect(() => {
     if (!resources || !library.ready) return;
@@ -102,17 +109,19 @@ export default function QuranReaderScreen() {
     }
   }, [autoListen, mode, reader.chapter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { if (visibleSave.current) clearTimeout(visibleSave.current); }, [mode, chapterId, library.library.preferences.layout]);
-  function open(chapter: number, ayah = 1) { pendingJump.current = true; setChapterId(chapter); setTarget(ayah); setMode("read"); setQuery(""); setError(null); }
+  const open = useCallback((chapter: number, ayah = 1) => { Keyboard.dismiss(); pendingJump.current = true; setChapterId(chapter); setTarget(ayah); setMode("read"); setQuery(""); setError(null); }, []);
   async function playContinuous() {
     if (!reader.chapter) return;
     await audio.start(Array.from({ length: reader.chapter.versesCount - target + 1 }, (_, i) => target + i), reader.getVerse);
   }
   const bookmark = useCallback((key: string) => { void toggleBookmark(key).catch(() => {}); }, [toggleBookmark]);
-  async function play(verse: QuranVerse) {
+  const play = useCallback(async (verse: QuranVerse) => {
     if (audio.playback.verse?.verseKey === verse.verseKey && audio.playback.phase === "playing") { audio.queue.pause(); return; }
     if (parseAyahReference(verse.verseKey)?.chapter !== chapterId) { await audio.start([verse.verseNumber], async () => verse); return; }
     await audio.start([verse.verseNumber], reader.getVerse);
-  }
+  }, [audio, reader.getVerse, chapterId]);
+  const playVerse = useCallback((verse: QuranVerse) => { void play(verse).catch(() => setError("Audio is unavailable.")); }, [play]);
+  const openVerse = useCallback((key: string) => { const ref = parseAyahReference(key); if (ref) open(ref.chapter, ref.ayah); }, [open]);
   const onVisible = useRef(({ viewableItems }: { viewableItems: ViewToken<Row>[] }) => {
     if (viewContext.current.mode !== "read") return;
     const row = viewableItems.find((entry) => entry.item.kind === "verse")?.item;
@@ -126,8 +135,11 @@ export default function QuranReaderScreen() {
     : mode === "read" ? reader.verses.map((verse) => ({ kind: "verse", verse }))
       : mode === "search" ? searchResults.map((verse) => ({ kind: "verse", verse }))
         : mode === "bookmarks" ? library.library.bookmarks.map((key) => ({ kind: "bookmark", key })) : [], [mode, chapterMatches, reader.verses, searchResults, library.library.bookmarks]);
-  const onMode = (next: QuranMode, listen = false) => { if (next === "read") pendingJump.current = true; setMode(next); setError(null); setAutoListen(listen); setQuery(""); };
+  const onMode = (next: QuranMode, listen = false) => { Keyboard.dismiss(); if (next === "read") pendingJump.current = true; setMode(next); setError(null); setAutoListen(listen); setQuery(""); };
   const header = <View style={styles.headerContent}>
+    {["practice", "memorize", "test"].includes(mode) ? <View style={styles.row}>
+      {([{ mode: "practice", label: "Recite" }, { mode: "memorize", label: "Memorize" }, { mode: "test", label: "Test yourself" }] as const).map(item => <AppButton key={item.mode} label={item.label} variant={mode === item.mode ? "primary" : "secondary"} onPress={() => onMode(item.mode)} />)}
+    </View> : null}
     {mode === "home" ? <QuranHome library={library} chapters={reader.chapters} fontLoaded={fontLoaded} audioAvailable={Boolean(resources?.reciters.length)} onMode={onMode} onOpen={open} /> : null}
     {resources?.contentSource === "tanzil" && mode === "home" ? <Text style={{ color: theme.colors.muted, fontSize: 13, lineHeight: 21 }}>114 surahs · Verbatim Uthmani text available offline. Reference recitation and translations require approved provider access.</Text> : null}
     {mode === "home" || mode === "search" ? <View style={[styles.search, { backgroundColor: theme.colors.cardStrong, borderColor: theme.colors.border }]}><Ionicons name="search" size={20} color={theme.colors.teal} /><TextInput accessibilityLabel={mode === "home" ? "Find surah by name or number" : "Search Quran Arabic, English or ayah reference"} value={query} onChangeText={setQuery} maxLength={120} autoCorrect={false} placeholder={mode === "home" ? "Find a surah" : "Search Arabic, English, or 2:255"} placeholderTextColor={theme.colors.subtle} style={[styles.input, { color: theme.colors.text }]} /></View> : null}
@@ -142,7 +154,7 @@ export default function QuranReaderScreen() {
       <View style={styles.row}>{resources?.reciters.length ? <AppButton label="Listen to surah" icon="headset-outline" variant="secondary" onPress={() => void playContinuous().catch(() => setError("Reference audio could not start."))} /> : null}<AppButton label="Practise" variant="secondary" icon="mic-outline" onPress={() => onMode("practice")} /></View>
       {reader.pages.length && reader.pages[0].page > 1 ? <AppButton label="Earlier ayahs" variant="ghost" onPress={() => void reader.loadPage(reader.pages[0].page - 1).catch(() => setError("Earlier ayahs could not load."))} /> : null}
     </View> : null}
-    {["practice", "memorize", "test"].includes(mode) && reader.chapter ? <QuranPractice key={`${chapterId}:${mode}:${library.library.preferences.reciter}`} mode={mode} chapter={reader.chapter} getVerse={reader.getVerse} audio={audio} library={library} fontLoaded={fontLoaded} /> : null}
+    {["practice", "memorize", "test"].includes(mode) && reader.chapter ? <QuranPractice key={`${chapterId}:${mode}:${library.library.preferences.reciter}`} mode={mode} chapter={reader.chapter} getVerse={reader.getVerse} audio={audio} library={library} fontLoaded={fontLoaded} startAyah={target} onReviewLibrary={() => onMode("review")} onCaptureActivity={setCaptureActive} /> : null}
     {mode === "settings" ? <QuranSettings library={library} resources={resources} /> : null}
     {mode === "bookmarks" ? <><Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: "700" }}>Your bookmarks</Text><Text style={{ color: theme.colors.muted, fontSize: 16 }}>Saved on this device. Tap an ayah to continue reading.</Text></> : null}
     {library.storageError ? <QuranMessage message={library.storageError} /> : null}
@@ -150,20 +162,29 @@ export default function QuranReaderScreen() {
     {error ? <QuranMessage message={error} onRetry={() => { setError(null); void reader.loadPage(versePage(target)).catch(() => setError("Quran content is unavailable. Please retry.")); }} /> : null}
     {reader.loading || busy || searching ? <ActivityIndicator color={theme.colors.teal} style={{ padding: 18 }} accessibilityLabel="Loading Quran content" /> : null}
   </View>;
-  return <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={["top", "bottom"]}>
+  return <SafeAreaView onTouchStart={practiceInteraction} style={{ flex: 1, backgroundColor: theme.colors.background }} edges={["top", "bottom"]}>
     <View style={[styles.navigation, { borderBottomColor: theme.colors.border }]}><QuranIconButton label={mode === "home" ? "Back to More" : "Quran home"} icon="chevron-back" onPress={() => { if (mode === "home") { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/more"); } else onMode("home"); }} />
       <Text numberOfLines={1} style={[styles.navTitle, { color: theme.colors.text }]}>{titles[mode]}</Text><QuranIconButton label="Search Quran" icon="search-outline" onPress={() => onMode("search")} /><QuranIconButton label="Quran preferences" icon="options-outline" onPress={() => onMode("settings")} /></View>
+    <View accessibilityRole="tablist" style={{ flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border, paddingHorizontal: 8, gap: 4 }}>
+      {([{ mode: "read", label: "Read", icon: "book-outline" }, { mode: "listen", label: "Listen", icon: "headset-outline" }, { mode: "practice", label: "Practise", icon: "mic-outline" }, { mode: "review", label: "Library", icon: "albums-outline" }] as const).map(item => {
+        const selected = mode === item.mode || item.mode === "practice" && (mode === "test" || mode === "memorize");
+        return <Pressable key={item.mode} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => onMode(item.mode)} style={{ flex: 1, minHeight: 60, justifyContent: "center", alignItems: "center", paddingVertical: 8, gap: 4 }}>
+          <Ionicons name={item.icon} size={20} color={selected ? theme.colors.teal : theme.colors.muted} /><Text style={{ color: selected ? theme.colors.teal : theme.colors.muted, fontSize: 12, fontWeight: "600" }}>{item.label}</Text>
+        </Pressable>;
+      })}
+    </View>
+    {!library.ready ? <ActivityIndicator color={theme.colors.teal} accessibilityLabel="Preparing private Quran library" /> : null}
     <Animated.View style={[{ flex: 1 }, transition]}>
     {mode === "read" && library.library.preferences.layout !== "madinah" ? <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}><QuranReadingLayout library={library} /></View> : null}
-    {mode === "listen" ? <QuranListening chapters={reader.chapters} audio={audio} library={library} />
+    {mode === "challenges" ? <Suspense fallback={<ActivityIndicator color={theme.colors.teal} />}><QuranChallenges /></Suspense> : mode === "review" ? <QuranReviewLibrary library={library} audio={audio} onPractise={(chapter, ayah) => { setChapterId(chapter); setTarget(ayah); onMode("practice"); }} /> : mode === "listen" ? <QuranListening chapters={reader.chapters} audio={audio} library={library} />
       : mode === "read" && library.library.preferences.layout === "madinah" ? <QuranMushaf reference={`${chapterId}:${target}`} library={library} audio={audio} onOpenAyah={(key) => {
         void updateLibrary((s) => ({ ...s, preferences: { ...s.preferences, layout: "ayah" } })).then(() => { const ref = parseAyahReference(key)!; open(ref.chapter, ref.ayah); }).catch(() => {});
       }} /> : <FlatList ref={list} data={rows} key={`${mode}:${chapterId}`} style={styles.list} contentContainerStyle={styles.listContent} ListHeaderComponent={header}
-      keyboardShouldPersistTaps="handled" initialNumToRender={8} maxToRenderPerBatch={6} windowSize={5}
+      keyboardShouldPersistTaps="handled" onScrollBeginDrag={practiceInteraction} initialNumToRender={8} maxToRenderPerBatch={6} windowSize={5}
       keyExtractor={(row) => row.kind === "chapter" ? `chapter:${row.chapter.id}` : row.kind === "verse" ? row.verse.verseKey : row.key}
       onViewableItemsChanged={onVisible} viewabilityConfig={{ itemVisiblePercentThreshold: 30, minimumViewTime: 400 }}
       onScrollToIndexFailed={({ index, averageItemLength }) => list.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: false })}
-      renderItem={({ item }) => item.kind === "verse" ? <QuranVerseRow verse={item.verse} preferences={library.library.preferences} bookmarked={library.library.bookmarks.includes(item.verse.verseKey)} playing={audio.playback.phase === "playing" && audio.playback.verse?.verseKey === item.verse.verseKey} fontLoaded={fontLoaded} onBookmark={bookmark} onPlay={(verse) => void play(verse).catch(() => setError("Audio is unavailable."))} onOpen={mode === "search" ? (key) => { const ref = parseAyahReference(key)!; open(ref.chapter, ref.ayah); } : undefined} />
+      renderItem={({ item }) => item.kind === "verse" ? <QuranVerseRow verse={item.verse} preferences={library.library.preferences} bookmarked={library.library.bookmarks.includes(item.verse.verseKey)} playing={audio.playback.phase === "playing" && audio.playback.verse?.verseKey === item.verse.verseKey} fontLoaded={fontLoaded} onBookmark={bookmark} onPlay={playVerse} onOpen={mode === "search" ? openVerse : undefined} />
         : item.kind === "chapter" ? <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.chapter.nameSimple}, ${item.chapter.versesCount} ayahs`} onPress={() => open(item.chapter.id)} style={({ pressed }) => [styles.chapterRow, { borderBottomColor: theme.colors.border, opacity: pressed ? .6 : 1 }]}><View style={[styles.number, { backgroundColor: theme.colors.tintSoft }]}><Text style={{ color: theme.colors.teal, fontSize: 15, fontWeight: "700" }}>{item.chapter.id}</Text></View><View style={{ flex: 1, minWidth: 100 }}><Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: "600" }}>{item.chapter.nameSimple}</Text><Text style={{ color: theme.colors.muted, fontSize: 12, lineHeight: 19, marginTop: 4 }}>{item.chapter.translatedName.name} · {item.chapter.versesCount} ayahs</Text></View><Text style={{ color: theme.colors.teal, fontFamily: fontLoaded ? "QuranNaskh" : undefined, fontSize: 24, lineHeight: 45, writingDirection: "rtl", maxWidth: "42%" }}>{item.chapter.nameArabic}</Text></Pressable>
           : <View style={[styles.chapterRow, { borderBottomColor: theme.colors.border }]}><Pressable accessibilityRole="button" accessibilityLabel={`Open bookmarked ayah ${item.key}`} onPress={() => { const ref = parseAyahReference(item.key)!; open(ref.chapter, ref.ayah); }} style={{ flex: 1, flexDirection: "row", alignItems: "center", minHeight: 48, gap: 14 }}><Ionicons name="bookmark" color={theme.colors.teal} size={22} /><Text style={{ color: theme.colors.text, fontSize: 17, flex: 1 }}>Ayah {item.key}</Text></Pressable><QuranIconButton label={`Remove bookmark ${item.key}`} icon="close" onPress={() => bookmark(item.key)} /></View>}
       ListEmptyComponent={!reader.loading && !busy && !reader.error && ["bookmarks", "search", "home"].includes(mode) ? <Text style={{ color: theme.colors.muted, fontSize: 16, lineHeight: 24, padding: 18 }}>{mode === "bookmarks" ? "No bookmarks yet. Save an ayah from the reader." : mode === "search" ? query.trim().length < 2 ? "Enter text or an ayah reference to search." : searching ? "Searching…" : "No matching ayahs. Try a surah name or reference." : "No matching surahs."}</Text> : null}

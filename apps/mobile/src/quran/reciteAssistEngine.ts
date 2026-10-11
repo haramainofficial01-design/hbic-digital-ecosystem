@@ -3,8 +3,8 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { TextCTCDecoder, detectSpeech, type AsrTranscribeResult, type SessionOutput } from "@tilawi/quran-asr";
-import { acousticQuality, compactQuietPausesWithTimeline } from "./reciteAssistFeedback";
-import { decodeRecitationWords, type RecitationObservation } from "./recitationTracking";
+import { compactQuietPausesWithTimeline } from "./reciteAssistFeedback";
+import { decodeRecitationEvidence, type RecitationObservation } from "./recitationTracking";
 
 const revision = "e9448a0e84f3adb64c28b7a8db501dd8e0e59a84";
 const source = `https://huggingface.co/muhdur/tilawi-fastconformer-quran/resolve/${revision}/`;
@@ -23,6 +23,12 @@ let closing: Promise<void> | null = null;
 /** Simulator diagnostics only; never reveals microphone content or model data. */
 export function reciteAssistDiagnostics() {
   return __DEV__ ? { leases: leases.size, preparing: pending !== null, closing: closing !== null, native: release !== null } : null;
+}
+/** Remove only recognition assets, never personal recordings. */
+export function removeReciteAssistDownload() {
+  if (leases.size || pending || closing || release) throw new Error("Stop Recite Assist before removing its download.");
+  const dir = new Directory(Paths.document, "recite-assist", revision);
+  if (dir.exists) dir.delete();
 }
 async function verified(file: File, expected: string) {
   if (!file.exists) return false;
@@ -61,7 +67,7 @@ async function prepareReciteAssist(onProgress: (message: string) => void) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ort: typeof import("onnxruntime-react-native") = require("onnxruntime-react-native");
     const native = await ort.InferenceSession.create(files.get("fastconformer_full_mixed.onnx")!.uri.replace(/^file:\/\//, ""),
-      { graphOptimizationLevel: "all", intraOpNumThreads: 2, interOpNumThreads: 1 });
+      { graphOptimizationLevel: "all", intraOpNumThreads: 1, interOpNumThreads: 1 });
     release = () => native.release();
     const vocab: Record<string, string> = JSON.parse(await files.get("vocab.json")!.text());
     return { async run(audio: Float32Array) {
@@ -87,8 +93,8 @@ async function recognizeRecitation(pcm: Float32Array, startSample: number): Prom
     // only actual acoustic tokens, then bounded selected-ayah alignment.
     const decoded = held.decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize);
     const result: AsrTranscribeResult = {...decoded, acoustic: {...acoustic, blankId: 1024}};
-    return {text: result.text, quality: acousticQuality(result), startSample, endSample: startSample + pcm.length,
-      words: decodeRecitationWords(result, held.vocab, speech.pcm.length, speech.spans, startSample, pcm.length)};
+    const evidence = decodeRecitationEvidence(result, held.vocab, speech.pcm.length, speech.spans, startSample, pcm.length);
+    return {text: result.text, ...evidence, startSample, endSample: startSample + pcm.length};
   } finally { speech.pcm.fill(0); }
 }
 export async function acquireReciteAssist(onProgress: (message: string) => void) {

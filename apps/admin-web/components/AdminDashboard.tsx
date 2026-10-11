@@ -35,6 +35,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { FirebaseAdminAuth } from "./FirebaseAdminAuth";
 import { AcademyPanel } from "./AcademyPanel";
+import { QuranChallengesPanel } from "./QuranChallengesPanel";
 
 const pages = [
   "Dashboard",
@@ -45,6 +46,7 @@ const pages = [
   "Events",
   "Programs",
   "Quran Academy",
+  "Quran Challenges",
   "Donations",
   "Media",
   "Halal Directory",
@@ -63,10 +65,10 @@ type AdminResponse = Record<string, any>;
 const navigationGroups: { label: string; pages: Page[] }[] = [
   { label: "Overview", pages: ["Dashboard", "Quran Academy", "Donations"] },
   { label: "Prayer", pages: ["Prayer & Iqamah", "Jumu'ah", "Prayer Display"] },
-  { label: "Community", pages: ["Announcements", "Events", "Programs", "Media", "Halal Directory", "Community", "Volunteers"] },
+  { label: "Community", pages: ["Quran Challenges", "Announcements", "Events", "Programs", "Media", "Halal Directory", "Community", "Volunteers"] },
   { label: "Administration", pages: ["Push Notifications", "Diagnostics", "Feature Flags", "Settings", "Users/Roles"] }
 ];
-const independentPages: Page[] = ["Quran Academy", "Prayer Display", "Push Notifications", "Diagnostics", "Users/Roles"];
+const independentPages: Page[] = ["Quran Academy", "Quran Challenges", "Prayer Display", "Push Notifications", "Diagnostics", "Users/Roles"];
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || "https://hbic.ca").replace(/\/$/, "");
 const iqamahOverridePrayers: IqamahPrayerName[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -456,6 +458,7 @@ export function AdminDashboard() {
         {page === "Events" && <EventsPanel content={content} updateContent={updateContent} />}
         {page === "Programs" && <ProgramsPanel content={content} updateContent={updateContent} />}
         {page === "Quran Academy" && <AcademyPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
+        {page === "Quran Challenges" && <QuranChallengesPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
         {page === "Donations" && <DonationsPanel content={content} updateContent={updateContent} />}
         {page === "Media" && <MediaPanel content={content} updateContent={updateContent} />}
         {page === "Halal Directory" && (

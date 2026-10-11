@@ -32,7 +32,9 @@ export function createQuranStore(storage: QuranStorage) {
   }
   async function update(change: (state: QuranState) => QuranState): Promise<QuranState> {
     const job = writes.catch(() => undefined).then(async () => {
-      const next = normalizeQuranState(change(await read()));
+      const previous = await read(), changed = change(previous);
+      if (changed === previous) return previous;
+      const next = normalizeQuranState(changed);
       await storage.setItem(quranStateKey, JSON.stringify(next));
       current = next;
       return next;

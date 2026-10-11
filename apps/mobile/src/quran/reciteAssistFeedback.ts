@@ -123,6 +123,7 @@ export class ReciteAudioWindow {
   private cursor = 0;
   private length = 0;
   private received = 0;
+  get endSample() { return this.received; }
   append(samples: readonly number[]) {
     for (const value of samples) {
       this.buffer[this.cursor] = Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
@@ -133,7 +134,9 @@ export class ReciteAudioWindow {
   }
   snapshot() {
     const pcm = new Float32Array(this.length), start = (this.cursor - this.length + this.buffer.length) % this.buffer.length;
-    for (let i = 0; i < this.length; i++) pcm[i] = this.buffer[(start + i) % this.buffer.length];
+    const first = Math.min(this.length, this.buffer.length - start);
+    pcm.set(this.buffer.subarray(start, start + first));
+    if (first < this.length) pcm.set(this.buffer.subarray(0, this.length - first), first);
     return pcm;
   }
   snapshotWithTimeline() { return {pcm: this.snapshot(), startSample: this.received - this.length, endSample: this.received}; }

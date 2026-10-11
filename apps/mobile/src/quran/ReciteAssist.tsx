@@ -4,7 +4,8 @@ import { Text, Alert } from "../i18n/LocalizedText";
 
 import { AudioModule } from "expo-audio";
 import { addPcmChunkListener, isPcmRecorderAvailable, startPcmRecording, stopPcmRecording } from "@tilawi/expo-pcm-recorder";
-import type { QuranVerse } from "@hbic/shared";
+import { parseAyahReference, type QuranVerse, type QuranRecording, type QuranRecordingMarker } from "@hbic/shared";
+import { Directory, File, Paths } from "expo-file-system";
 import { AppButton } from "../components/AppButton";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranSurface } from "./QuranControls";
@@ -12,9 +13,12 @@ import { acquireReciteAssist } from "./reciteAssistEngine";
 import { ReciteAudioWindow, ReciteCompletionGuard, type ReciteFeedback } from "./reciteAssistFeedback";
 import { RecitationTracker } from "./recitationTracking";
 import { quranRecordingPermission } from "./recordingPermission";
+import { containsVoiceEnergy, ReciteInferenceBudget } from "./reciteInferenceBudget";
+import { PcmReviewWriter } from "./pcmReview";
+import { OwnedPcmCapture } from "./ownedPcmCapture";
 
-/** Development only until microphone accuracy/noise qualification passes. */
-export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, fontLoaded, onBusyChange, onAdvance }: { verse: QuranVerse; stopPlayback: () => void; blocked: boolean; concealed: boolean; fontLoaded: boolean; onBusyChange: (busy: boolean) => void; onAdvance?: (signal: AbortSignal) => Promise<void> }) {
+/** Explicit early preview; never a verified recitation/Tajweed assessment. */
+export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, fontLoaded, onBusyChange, onAdvance, recognitionMode = "efficient", onReview, saveAudio = false, onRecording }: { verse: QuranVerse; stopPlayback: () => void; blocked: boolean; concealed: boolean; fontLoaded: boolean; onBusyChange: (busy: boolean) => void; onAdvance?: (signal: AbortSignal) => Promise<void>; recognitionMode?: "efficient" | "responsive"; onReview?: (key: string, attemptId: string, feedback: ReciteFeedback) => void; saveAudio?: boolean; onRecording?: (recording: QuranRecording, allowSessionReview: boolean) => Promise<void> }) {
   const { theme } = useAppTheme();
   const [phase, setPhase] = useState<"idle" | "preparing" | "listening" | "pausing" | "paused" | "resuming">("idle");
   const [message, setMessage] = useState("Follows recited words and flags possible word differences. Not a Tajweed assessment.");
@@ -23,7 +27,9 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
   const review = useRef<{ started: number; observations: number; unclear: number; differences: number; reached: number } | null>(null);
   const mounted = useRef(true), epoch = useRef(0), busy = useRef(false);
   const permissionDialog = useRef(false);
-  const window = useRef(new ReciteAudioWindow());
+  const [audioWindow] = useState(() => new ReciteAudioWindow());
+  const window = useRef(audioWindow);
+  const [pcmCapture] = useState(() => new OwnedPcmCapture());
   const tracker = useRef(new RecitationTracker()), lastAnalyzed = useRef(-1);
   const completion = useRef(new ReciteCompletionGuard()), advancing = useRef(false);
   const automaticFromKey = useRef<string | null>(null);
@@ -35,8 +41,15 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
   const engine = useRef<Awaited<ReturnType<typeof acquireReciteAssist>> | null>(null);
   const processing = useRef<Promise<void> | null>(null);
   const text = useRef(verse.textUthmani); text.current = verse.textUthmani;
+  const reviewCallback = useRef(onReview); reviewCallback.current = onReview;
+  const attempt = useRef("");
+  const savedAudio = useRef<{ writer: PcmReviewWriter; record: QuranRecording } | null>(null);
+  const storageWarning = useRef<string | null>(null);
+  const recordingCallback = useRef(onRecording); recordingCallback.current = onRecording;
   const stop = useCallback(() => {
     if (stopping.current) return stopping.current;
+    if (!busy.current && !engine.current && !savedAudio.current) return Promise.resolve();
+    const allowSessionReview = mounted.current && AppState.currentState === "active";
     ++epoch.current;
     pendingAdvance.current?.abort(); pendingAdvance.current = null;
     automaticFromKey.current = null;
@@ -47,19 +60,31 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
     completion.current.reset(); advancing.current = false;
     const held = engine.current; engine.current = null;
     stopping.current = (async () => {
-      await stopPcmRecording().catch(() => {});
+      await pcmCapture.stop(stopPcmRecording).catch(() => {});
       await processing.current?.catch(() => {});
+      const clip = savedAudio.current; savedAudio.current = null;
+      if (clip) {
+        try {
+          const durationMillis = clip.writer.finish();
+          if (durationMillis > 0 && recordingCallback.current) await recordingCallback.current({ ...clip.record, durationMillis,
+            markers: clip.record.markers?.filter(marker => marker.offsetMillis <= durationMillis) }, allowSessionReview);
+          else clip.writer.discard();
+        } catch {
+          try { clip.writer.discard(); } catch { /* A storage failure must never retain the microphone/model lease. */ }
+          storageWarning.current = "The private recording could not be saved. Reading and word review remain available.";
+        }
+      }
       if (held) await held.dispose().catch(() => {});
       busy.current = false;
       if (mounted.current) {
         const result = review.current;
-        if (result) setSummary(`${Math.ceil((Date.now() - result.started) / 1000)} seconds · ${result.reached} ayahs reached · ${result.observations} listening observations. ${result.unclear} unclear; ${result.differences} with possible word differences. Review with the reference; no score was assigned.`);
-        setPhase("idle"); setMessage("Session stopped. Microphone audio was not saved or uploaded.");
+        if (result) setSummary(`${Math.ceil((Date.now() - result.started) / 1000)} seconds · ${result.reached} ayahs reached · ${result.observations} listening observations. ${result.unclear} unclear; ${result.differences} with possible word differences. Review with the reference; no score was assigned.${storageWarning.current ? ` ${storageWarning.current}` : ""}`);
+        setPhase("idle"); setMessage(storageWarning.current ?? (clip ? "Session stopped. Review audio was handled by your private recording preference and was not uploaded." : "Session stopped. Microphone audio was not saved or uploaded."));
       }
       review.current = null;
     })().finally(() => { stopping.current = null; });
     return stopping.current;
-  }, []);
+  }, [pcmCapture]);
   useEffect(() => {
     mounted.current = true;
     const subscription = AppState.addEventListener("change", (state) => { if (state !== "active" && !permissionDialog.current) void stop(); });
@@ -75,23 +100,42 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
     automaticFromKey.current = null;
     if (!automatic) window.current.clear();
     tracker.current.reset(); lastAnalyzed.current = -1; completion.current.reset(); setFeedback(null);
+    attempt.current = `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }, [verse.verseKey]);
   async function capture(held: Awaited<ReturnType<typeof acquireReciteAssist>>, token: number) {
     window.current.clear(); tracker.current.reset(); lastAnalyzed.current = -1; completion.current.reset(); setFeedback(null);
     automaticFromKey.current = null;
-    microphone.current = addPcmChunkListener((samples) => { if (token === epoch.current) window.current.append(samples); });
-    await startPcmRecording(16_000, 100);
+    const budget = new ReciteInferenceBudget(recognitionMode === "efficient" ? 2500 : 2000);
+    let recentVoice = false;
+    attempt.current = `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    microphone.current = addPcmChunkListener((samples) => { if (token === epoch.current) {
+      window.current.append(samples); recentVoice ||= containsVoiceEnergy(samples);
+      if (savedAudio.current) {
+        try { savedAudio.current.writer.append(samples); }
+        catch {
+          try { savedAudio.current.writer.discard(); } catch { /* Continue tracking even when storage is unavailable. */ }
+          savedAudio.current = null;
+          storageWarning.current = "Local recording stopped because storage was unavailable. Word review continues.";
+          if (mounted.current) setMessage(storageWarning.current);
+        }
+      }
+    } });
+    await pcmCapture.start(() => startPcmRecording(16_000, 200));
     if (token !== epoch.current || !mounted.current || AppState.currentState !== "active") { await stop(); return; }
     setPhase("listening"); setMessage("Listening on this device. Unclear audio stays ungraded.");
     const analyze = () => {
       if (processing.current || advancing.current || token !== epoch.current || !engine.current) return;
+      if (!budget.ready(Date.now(), window.current.endSample, recentVoice)) return;
       const captured = window.current.snapshotWithTimeline(), {pcm, startSample, endSample} = captured, key = verseKey.current;
       // No inference merely because a timer fired. A stopped/stale recorder
       // must not keep burning CPU or count the same audio as new evidence.
       if (endSample <= lastAnalyzed.current || pcm.length < 16_000) {pcm.fill(0); return;}
       lastAnalyzed.current = endSample;
+      recentVoice = false; budget.started(endSample); const startedAt = Date.now();
       processing.current = held.recognize(pcm, startSample).then((result) => {
         if (!mounted.current || token !== epoch.current || key !== verseKey.current) return;
+        const observed = parseAyahReference(key);
+        if (savedAudio.current && observed?.chapter === savedAudio.current.record.chapter) savedAudio.current.record.to = observed.ayah;
         if (review.current) review.current.observations++;
         const assessment = tracker.current.observe(text.current, result);
         if (assessment.status === "uncertain") {
@@ -99,9 +143,22 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
           completion.current.reset(); setFeedback(assessment); return;
         }
         if (assessment.differences.length && review.current) review.current.differences++;
+        if (assessment.status === "possible_difference") {
+          reviewCallback.current?.(key, attempt.current, assessment);
+          const clip = savedAudio.current;
+          if (clip) for (const difference of assessment.differences) {
+            const markers = clip.record.markers!;
+            if (markers.length < 100 && !markers.some(m => m.key === key && m.kind === difference.kind && m.wordIndex === difference.index)) {
+              const marker: QuranRecordingMarker = { key, kind: difference.kind, wordIndex: difference.index, offsetMillis: Math.max(0, clip.writer.durationMillis - (endSample - startSample) / 16) };
+              markers.push(marker);
+            }
+          }
+        }
         setFeedback(assessment);
         if (completion.current.observe(assessment, endSample)) {
+          reviewCallback.current?.(key, attempt.current, { ...assessment, stableComplete: true });
           if (review.current) review.current.reached++;
+          const reached = parseAyahReference(key); if (savedAudio.current && reached?.chapter === savedAudio.current.record.chapter) savedAudio.current.record.to = reached.ayah;
           if (!advance.current) {
             void stop().then(() => { if (mounted.current) setMessage("Selected ayah reached. Reveal and review your recitation; no score was assigned."); });
             return;
@@ -120,9 +177,9 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
           }).finally(() => { if (pendingAdvance.current === controller) { pendingAdvance.current = null; advancing.current = false; } });
         }
       }).catch(() => { if (mounted.current && token === epoch.current) setMessage("Recognition is unavailable. Tap Stop, then retry in a quiet place."); })
-        .finally(() => { pcm.fill(0); processing.current = null; });
+        .finally(() => { pcm.fill(0); budget.finished(Date.now(), Date.now() - startedAt); processing.current = null; });
     };
-    timer.current = setInterval(analyze, 2500);
+    timer.current = setInterval(analyze, 500);
   }
   async function pause() {
     if (phase !== "listening") return;
@@ -131,7 +188,7 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
     automaticFromKey.current = null;
     if (timer.current) clearInterval(timer.current); timer.current = null;
     microphone.current?.remove(); microphone.current = null;
-    await stopPcmRecording().catch(() => {});
+    await pcmCapture.stop(stopPcmRecording).catch(() => {});
     await processing.current?.catch(() => {});
     window.current.clear(); tracker.current.reset(); lastAnalyzed.current = -1; completion.current.reset();
     if (mounted.current && engine.current) { setPhase("paused"); setMessage("Paused. The microphone is off. Resume from the current ayah."); }
@@ -144,7 +201,7 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
   }
   async function start() {
     if (busy.current || blocked || !isPcmRecorderAvailable) return;
-    busy.current = true; const token = ++epoch.current; setPhase("preparing"); setFeedback(null); setSummary(null); stopPlayback();
+    busy.current = true; const token = ++epoch.current; storageWarning.current = null; setPhase("preparing"); setFeedback(null); setSummary(null); stopPlayback();
     let held: Awaited<ReturnType<typeof acquireReciteAssist>> | null = null;
     try {
       const permission = await quranRecordingPermission(AudioModule, {
@@ -155,6 +212,14 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
       held = await acquireReciteAssist((value) => { if (mounted.current && token === epoch.current) setMessage(value); });
       if (!mounted.current || token !== epoch.current || AppState.currentState !== "active") { await held.dispose(); return; }
       engine.current = held;
+      if (saveAudio && onRecording) {
+        const ref = parseAyahReference(verseKey.current)!;
+        const dir = new Directory(Paths.cache, "quran-session"); dir.create({ intermediates: true, idempotent: true });
+        const id = `quran-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, file = new File(dir, `${id}.wav`);
+        file.create(); const handle = file.open();
+        savedAudio.current = { writer: new PcmReviewWriter({ write: bytes => handle.writeBytes(bytes), seek: offset => { handle.offset = offset; }, close: () => handle.close(), remove: () => { if (file.exists) file.delete(); } }),
+          record: { id, uri: file.uri, chapter: ref.chapter, from: ref.ayah, to: ref.ayah, createdAt: new Date().toISOString(), durationMillis: 1, markers: [] } };
+      }
       review.current = { started: Date.now(), observations: 0, unclear: 0, differences: 0, reached: 0 };
       await capture(held, token);
       if (token !== epoch.current || !mounted.current) return;
@@ -168,12 +233,12 @@ export default function ReciteAssist({ verse, stopPlayback, blocked, concealed, 
   return <QuranSurface>
     <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: "700" }}>Recite Assist</Text>
     <Text style={{ color: theme.colors.teal, fontSize: 14, marginTop: 6 }}>Ayah {verse.verseKey}</Text>
-    <Text style={{ color: theme.colors.gold, fontSize: 12, marginTop: 6 }}>EARLY PREVIEW · NOT A VERIFIED RECITATION ASSESSMENT</Text>
+    <Text style={{ color: theme.mode === "light" ? "#795500" : theme.colors.gold, fontSize: 12, fontWeight: "600", marginTop: 6 }}>EARLY PREVIEW · NOT A VERIFIED RECITATION ASSESSMENT</Text>
     <Text style={{ color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 8 }}>Can miss or misidentify words. Always review with the Quran reference or a qualified teacher. No Tajweed or pronunciation assessment.</Text>
     <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 23, marginVertical: 12 }}>{message}</Text>
     {!isPcmRecorderAvailable ? <Text style={{ color: theme.colors.muted }}>On-device recognition is unavailable on this device. Reading, listening and self-tests remain available.</Text> : <AppButton label={phase === "idle" ? "Start Recite Assist" : phase === "preparing" ? "Cancel preparation" : "Stop Recite Assist"} icon={phase === "idle" ? "mic-outline" : "stop-circle-outline"} disabled={blocked} onPress={() => {
       if (phase !== "idle") { void stop(); return; }
-      Alert.alert("Try Recite Assist preview?", "First use downloads about 104 MB of verified model data from Hugging Face. Microphone audio stays in memory on this device, is erased when stopped, and is never uploaded. This early preview misses many mistakes and may misidentify words. Always review with the reference or a qualified teacher. It does not assess Tajweed or pronunciation.", [{ text: "Not now", style: "cancel" }, { text: "Continue", onPress: () => void start() }]);
+      Alert.alert("Try Recite Assist preview?", `First use downloads about 104 MB of verified model data from Hugging Face. ${saveAudio ? "You chose a private local review recording. Audio stays on this device; retention follows your recording setting." : "Microphone audio stays in memory and is erased when stopped."} Audio is never uploaded. This preview can miss or misidentify words. It does not assess Tajweed or pronunciation.`, [{ text: "Not now", style: "cancel" }, { text: "Continue", onPress: () => void start() }]);
     }} />}
     {phase === "listening" || phase === "paused" || phase === "pausing" || phase === "resuming" ? <View style={{ marginTop: 10 }}><AppButton variant="secondary"
       label={phase === "paused" ? "Resume Recite Assist" : phase === "resuming" ? "Resuming…" : phase === "pausing" ? "Pausing…" : "Pause Recite Assist"}

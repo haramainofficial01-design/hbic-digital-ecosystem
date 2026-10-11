@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { emptyQuranState, markRead, passageId, type QuranPassage, type MemorizationStatus, type QuranState } from "@hbic/shared";
 import { quranStore } from "../services/quran";
+import * as FileSystem from "expo-file-system/legacy";
+let temporaryCleanup: Promise<void> | null = null;
+function clearInterruptedSessionFiles() {
+  // Once per process, before practice starts. Do not accumulate interrupted
+  // session-only clips or touch permanent recordings in Documents.
+  if (!temporaryCleanup) temporaryCleanup = (async () => {
+    if (!FileSystem.cacheDirectory) return;
+    const dir = `${FileSystem.cacheDirectory}quran-session/`;
+    const info = await FileSystem.getInfoAsync(dir);
+    if (!info.exists) return;
+    for (const name of await FileSystem.readDirectoryAsync(dir)) {
+      if (/^quran-\d+-[a-z0-9]+\.(m4a|wav)$/.test(name)) await FileSystem.deleteAsync(`${dir}${name}`, { idempotent: true });
+    }
+  })().catch(error => { temporaryCleanup = null; throw error; });
+  return temporaryCleanup;
+}
 export function useQuranLibrary() {
   const [library, setLibrary] = useState(emptyQuranState);
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void quranStore.read().then((state) => { if (active) { setLibrary(state); setReady(true); } })
+    void Promise.all([quranStore.read(), clearInterruptedSessionFiles().catch(() => {
+      if (active) setStorageError("Interrupted temporary recordings could not be cleared. Your saved library is still available.");
+    })]).then(([state]) => { if (active) { setLibrary(state); setReady(true); } })
       .catch((error) => { if (active) setStorageError(error instanceof Error ? error.message : "Saved Quran settings are unavailable."); });
     return () => { active = false; };
   }, []);

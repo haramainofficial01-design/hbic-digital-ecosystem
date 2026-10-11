@@ -108,19 +108,25 @@ export function validPassage(value: unknown): value is QuranPassage {
     && Number.isInteger(p.from) && Number.isInteger(p.to) && p.from >= 1 && p.to >= p.from && p.to <= 286);
 }
 export function passageId(p: QuranPassage) { return `${p.chapter}:${p.from}-${p.to}`; }
-export interface QuranPreferences { arabicSize: number; translationSize: number; showTranslation: boolean; reciter: number; translation: number; layout: "ayah" | "madinah" }
-export interface QuranRecording extends QuranPassage { id: string; uri: string; createdAt: string; durationMillis: number }
+export interface QuranPreferences { arabicSize: number; translationSize: number; showTranslation: boolean; reciter: number; translation: number; layout: "ayah" | "madinah";
+  recordingRetention: "keep" | "session"; saveAssistAudio: boolean; recognitionMode: "efficient" | "responsive" }
+export type QuranDifferenceKind = "omission" | "substitution" | "repetition" | "extra_word";
+export interface QuranRecordingMarker { key: string; kind: QuranDifferenceKind; wordIndex: number | null; offsetMillis: number }
+export interface QuranRecording extends QuranPassage { id: string; uri: string; createdAt: string; durationMillis: number; markers?: QuranRecordingMarker[] }
+export interface QuranMistake { id: string; key: string; kind: QuranDifferenceKind; wordIndex: number | null;
+  firstDetectedAt: string; lastDetectedAt: string; cleanPasses: number; lastAttemptId: string }
 export interface QuranState {
   version: 2; bookmarks: string[]; lastRead: { chapter: number; ayah: number } | null;
   recent: number[]; preferences: QuranPreferences;
   listening: { reciterId: number; editionId: number } | null;
   memorization: (QuranPassage & { status: MemorizationStatus; updatedAt: string })[];
   recordings: QuranRecording[];
+  mistakes: QuranMistake[];
 }
 export function emptyQuranState(): QuranState {
   return { version: 2, bookmarks: [], lastRead: null, recent: [],
-    preferences: { arabicSize: 30, translationSize: 16, showTranslation: true, reciter: 7, translation: 20, layout: "ayah" },
-    listening: null, memorization: [], recordings: [] };
+    preferences: { arabicSize: 30, translationSize: 16, showTranslation: true, reciter: 7, translation: 20, layout: "ayah", recordingRetention: "keep", saveAssistAudio: false, recognitionMode: "efficient" },
+    listening: null, memorization: [], recordings: [], mistakes: [] };
 }
 export function normalizeQuranState(value: unknown): QuranState {
   const result = emptyQuranState(), s = value as Partial<QuranState> | null;
@@ -135,6 +141,9 @@ export function normalizeQuranState(value: unknown): QuranState {
     result.listening = { reciterId: s.listening.reciterId, editionId: s.listening.editionId };
   const prefs = s.preferences;
   if (prefs) {
+    if (prefs.recordingRetention === "session") result.preferences.recordingRetention = "session";
+    if (typeof prefs.saveAssistAudio === "boolean") result.preferences.saveAssistAudio = prefs.saveAssistAudio;
+    if (prefs.recognitionMode === "responsive") result.preferences.recognitionMode = "responsive";
     if (prefs.layout === "madinah") result.preferences.layout = "madinah";
     if (Number.isFinite(prefs.arabicSize)) result.preferences.arabicSize = Math.max(24, Math.min(48, prefs.arabicSize));
     if (Number.isFinite(prefs.translationSize)) result.preferences.translationSize = Math.max(14, Math.min(24, prefs.translationSize));
@@ -146,11 +155,24 @@ export function normalizeQuranState(value: unknown): QuranState {
     && typeof p.updatedAt === "string").slice(0, 500);
   result.recordings = (Array.isArray(s.recordings) ? s.recordings : []).filter((p) => validPassage(p)
     && /^quran-\d+-[a-z0-9]+$/.test(p.id) && /^file:\/\//.test(p.uri)
-    && Number.isFinite(p.durationMillis) && p.durationMillis > 0 && typeof p.createdAt === "string").slice(0, 100);
+    && Number.isFinite(p.durationMillis) && p.durationMillis > 0 && typeof p.createdAt === "string").slice(0, 100).map(p => ({ ...p,
+      markers: (Array.isArray(p.markers) ? p.markers : []).filter(m => m && typeof m.key === "string" && parseAyahReference(m.key)?.key === m.key
+        && parseAyahReference(m.key)!.chapter === p.chapter && parseAyahReference(m.key)!.ayah >= p.from && parseAyahReference(m.key)!.ayah <= p.to
+        && ["omission", "substitution", "repetition", "extra_word"].includes(m.kind)
+        && (m.wordIndex === null || (Number.isInteger(m.wordIndex) && m.wordIndex >= 0 && m.wordIndex < 200))
+        && Number.isFinite(m.offsetMillis) && m.offsetMillis >= 0 && m.offsetMillis <= p.durationMillis).slice(0, 100) }));
+  result.mistakes = (Array.isArray(s.mistakes) ? s.mistakes : []).filter(m => m && typeof m.key === "string" && parseAyahReference(m.key)?.key === m.key
+    && ["omission", "substitution", "repetition", "extra_word"].includes(m.kind)
+    && (m.wordIndex === null || (Number.isInteger(m.wordIndex) && m.wordIndex >= 0 && m.wordIndex < 200))
+    && m.id === `${m.key}:${m.wordIndex ?? "ayah"}:${m.kind}` && Number.isInteger(m.cleanPasses) && m.cleanPasses >= 0 && m.cleanPasses < 3
+    && typeof m.lastAttemptId === "string" && m.lastAttemptId.length > 0 && m.lastAttemptId.length <= 100
+    && typeof m.firstDetectedAt === "string" && Number.isFinite(Date.parse(m.firstDetectedAt))
+    && typeof m.lastDetectedAt === "string" && Number.isFinite(Date.parse(m.lastDetectedAt))).slice(0, 500);
   return result;
 }
 export function markRead(state: QuranState, chapter: number, ayah: number): QuranState {
   if (!parseAyahReference(`${chapter}:${ayah}`)) throw new Error("Invalid reading position.");
+  if (state.lastRead?.chapter === chapter && state.lastRead.ayah === ayah && state.recent[0] === chapter) return state;
   return { ...state, lastRead: { chapter, ayah }, recent: [chapter, ...state.recent.filter((id) => id !== chapter)].slice(0, 12) };
 }
 export function repeatSequence(passage: QuranPassage, repeat = 1, mode: "passage" | "ayah" = "passage"): number[] {

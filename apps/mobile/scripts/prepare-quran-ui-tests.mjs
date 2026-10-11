@@ -1,0 +1,22 @@
+// Standalone XCTest runner using the installed Apple SDK. No project/signing edits.
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+const appPath = path.resolve(process.argv[2] ?? "/tmp/hbic-quran-optimization-native/Build/Products/Release-iphonesimulator/MasjidBilal.app");
+const source = path.resolve(import.meta.dirname, "../test/native/QuranOptimizationUITests.swift");
+const root = fs.mkdtempSync("/tmp/hbic-quran-ui-"), dev = path.join(execFileSync("xcode-select", ["-p"], { encoding: "utf8" }).trim(), "Platforms/iPhoneSimulator.platform/Developer");
+const output = path.resolve(process.env.HBIC_QA_OUTPUT ?? path.join(import.meta.dirname, "../../../output/quran-optimization"));
+const runner = path.join(root, "HBICQuranRunner.app"), bundle = path.join(runner, "PlugIns/HBICQuranUITests.xctest");
+fs.cpSync(path.join(dev, "Library/Xcode/Agents/XCTRunner.app"), runner, { recursive: true });
+fs.mkdirSync(bundle, { recursive: true }); fs.mkdirSync(path.join(runner, "Frameworks"), { recursive: true });
+for (const name of ["lib_TestingInterop.dylib", "libXCTestSwiftSupport.dylib"]) fs.copyFileSync(path.join(dev, "usr/lib", name), path.join(runner, "Frameworks", name));
+for (const dir of ["Library/Frameworks", "Library/PrivateFrameworks"]) for (const name of fs.readdirSync(path.join(dev, dir)).filter(n => /^XCTest|^XCUI|^XCTAutomation|^Testing\.framework$/.test(n) && n.endsWith(".framework"))) fs.cpSync(path.join(dev, dir, name), path.join(runner, "Frameworks", name), { recursive: true });
+for (const [key, value] of Object.entries({ CFBundleExecutable: "XCTRunner", CFBundleIdentifier: "ca.hbic.calgary.app.quranqa.xctrunner", CFBundleName: "HBIC Quran QA" })) execFileSync("plutil", ["-replace", key, "-string", value, path.join(runner, "Info.plist")]);
+fs.writeFileSync(path.join(bundle, "Info.plist"), JSON.stringify({ CFBundleExecutable: "HBICQuranUITests", CFBundleIdentifier: "ca.hbic.calgary.app.quranqa.tests", CFBundlePackageType: "BNDL", CFBundleVersion: "1" }));
+execFileSync("plutil", ["-convert", "xml1", path.join(bundle, "Info.plist")]);
+const sdk = execFileSync("xcrun", ["--sdk", "iphonesimulator", "--show-sdk-path"], { encoding: "utf8" }).trim();
+execFileSync("xcrun", ["swiftc", "-emit-library", "-module-name", "HBICQuranUITests", "-target", "arm64-apple-ios17.0-simulator", "-sdk", sdk, "-F", path.join(dev, "Library/Frameworks"), "-F", path.join(dev, "Library/PrivateFrameworks"), "-framework", "XCTest", "-framework", "XCUIAutomation", "-Xlinker", "-rpath", "-Xlinker", "@executable_path/Frameworks", "-o", path.join(bundle, "HBICQuranUITests"), source], { stdio: ["ignore", "ignore", "inherit"] });
+execFileSync("codesign", ["--force", "--deep", "--sign", "-", runner], { stdio: ["ignore", "ignore", "pipe"] });
+const file = path.join(root, "HBICQuranQA.xctestrun");
+fs.writeFileSync(file, JSON.stringify({ HBICQuranUITests: { TestBundlePath: bundle, TestHostPath: runner, TestHostBundleIdentifier: "ca.hbic.calgary.app.quranqa.xctrunner", IsUITestBundle: true, UITargetAppPath: appPath, UITargetAppBundleIdentifier: "ca.hbic.calgary.app", IsAppHostedTestBundle: true, EnvironmentVariables: { HBIC_QA_OUTPUT: output }, TestingEnvironmentVariables: { DYLD_FRAMEWORK_PATH: path.join(runner, "Frameworks") }, DependentProductPaths: [bundle, runner] }, __xctestrun_metadata__: { FormatVersion: 1 } }));
+execFileSync("plutil", ["-convert", "xml1", file]); console.log(file);

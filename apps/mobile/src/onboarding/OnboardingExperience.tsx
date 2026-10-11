@@ -18,8 +18,9 @@ import { registerForPushNotificationsAsync } from "../services/notifications";
 import { radii, spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { useOnboarding } from "./OnboardingProvider";
+import { onboardingPageCount } from "./onboardingState";
 
-const pageCount = 6;
+const pageCount = onboardingPageCount;
 
 type PermissionState = "idle" | "requesting" | "enabled" | "declined" | "error";
 
@@ -235,6 +236,19 @@ export function OnboardingExperience() {
               onPress={() => void enableNotifications()}
             />
             <AppButton label="Not now" variant="ghost" onPress={() => goTo(5)} />
+          </OnboardingPage>
+
+          <OnboardingPage width={width}>
+            <Kicker>QURAN &amp; RECITE</Kicker>
+            <PageTitle>A place for your daily Quran</PageTitle>
+            <PageBody>Read in Ayah View or the 15-line Madinah Mushaf. Listen to reference reciters, practise a passage, hide verses, use word hints, and test your recall.</PageBody>
+            <GlassCard style={styles.featureCard}>
+              <Ionicons name="book-outline" size={30} color={theme.colors.teal} />
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Your private practice library</Text>
+              <Text style={[styles.cardBody, { color: theme.colors.muted }]}>Choose whether to keep recordings on this device. Replay sessions, review possible word differences, or delete individual recordings anytime.</Text>
+            </GlassCard>
+            <Text style={[styles.detailNote, { color: theme.colors.muted }]}>Optional Community Challenges use nicknames and practice time. Ramadan, Dhul Hijjah events and prizes appear only when HBIC publishes the rules and details.</Text>
+            <Text style={[styles.detailNote, { color: theme.colors.muted }]}>Recite Assist is optional early-preview word tracking, not a verified assessment or Tajweed score. Recognition runs only when you start it. Reference audio streams online.</Text>
           </OnboardingPage>
 
           <OnboardingPage width={width} centered>

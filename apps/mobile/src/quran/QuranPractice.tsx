@@ -1,13 +1,14 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from "react-native";
-import { Text, TextInput, Alert } from "../i18n/LocalizedText";
+import { Text, TextInput } from "../i18n/LocalizedText";
 
-import * as FileSystem from "expo-file-system/legacy";
 import { createSelfTest, memorizationLabels, passageId, repeatSequence, type QuranChapter, type QuranPassage, type QuranVerse, type MemorizationStatus } from "@hbic/shared";
 import { AppButton } from "../components/AppButton";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranMessage, QuranSurface } from "./QuranControls";
 import { useQuranRecording } from "./useQuranRecording";
+import { rememberRecitationFeedback } from "./mistakeReview";
+import type { ReciteFeedback } from "./reciteAssistFeedback";
 import type { QuranLibrary, QuranMode, ReturnTypeQuranAudio } from "./types";
 // Expo's ES2015 compilation target needs a lazy require rather than import().
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -17,18 +18,20 @@ const ReciteAssist = lazy<typeof import("./ReciteAssist").default>(() => Promise
 const assistEnabled = process.env.EXPO_PUBLIC_RECITE_ASSIST_ENABLED === "true"
   || (__DEV__ && process.env.EXPO_PUBLIC_RECITE_ASSIST_DEVELOPMENT === "true");
 
-export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoaded }: {
+export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoaded, startAyah = 1, onReviewLibrary, onCaptureActivity }: {
   mode: QuranMode; chapter: QuranChapter; getVerse: (ayah: number) => Promise<QuranVerse>;
-  audio: ReturnTypeQuranAudio; library: QuranLibrary; fontLoaded: boolean;
+  audio: ReturnTypeQuranAudio; library: QuranLibrary; fontLoaded: boolean; startAyah?: number; onReviewLibrary?: () => void; onCaptureActivity?: (active: boolean) => void;
 }) {
   const { theme } = useAppTheme();
-  const [from, setFrom] = useState("1"), [to, setTo] = useState(String(Math.min(3, chapter.versesCount)));
+  const initialAyah = Math.max(1, Math.min(chapter.versesCount, startAyah));
+  const [from, setFrom] = useState(String(initialAyah)), [to, setTo] = useState(String(Math.min(initialAyah + 2, chapter.versesCount)));
   const [repeat, setRepeat] = useState(3), [repeatMode, setRepeatMode] = useState<"passage" | "ayah">("passage");
   const [hidden, setHidden] = useState(mode !== "practice"), [revealed, setRevealed] = useState(false);
   const [questions, setQuestions] = useState<number[]>([]), [questionIndex, setQuestionIndex] = useState(0);
   const [hints, setHints] = useState(0), [temporary, setTemporary] = useState(false);
-  const [reviewAyah, setReviewAyah] = useState(1);
+  const [reviewAyah, setReviewAyah] = useState(initialAyah);
   const [assistBusy, setAssistBusy] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false), [recordingOptionsOpen, setRecordingOptionsOpen] = useState(false);
   const [current, setCurrent] = useState<QuranVerse | null>(null), [error, setError] = useState<string | null>(null);
   const passage: QuranPassage = { chapter: chapter.id, from: Number(from), to: Number(to) };
   const valid = Number.isInteger(passage.from) && Number.isInteger(passage.to) && passage.from >= 1 && passage.to >= passage.from && passage.to <= chapter.versesCount;
@@ -38,9 +41,16 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   const recording = useQuranRecording(recordingPassage, (record) => library.update((s) => {
     if (s.recordings.length >= 100) throw new Error("You have 100 recordings. Delete an older recording before saving another.");
     return { ...s, recordings: [record, ...s.recordings] };
-  }), audio.stop);
+  }), audio.stop, library.library.preferences.recordingRetention !== "session");
+  const { update } = library;
+  const remember = useCallback((key: string, attemptId: string, feedback: ReciteFeedback) => {
+    void update(state => rememberRecitationFeedback(state, key, attemptId, feedback)).catch(() => setError("Possible-word review could not be saved."));
+  }, [update]);
   const recordingBusy = recording.phase !== "idle";
   const practiceBusy = recordingBusy || assistBusy;
+  useEffect(() => { onCaptureActivity?.(recording.phase === "recording" || assistBusy); }, [recording.phase, assistBusy, onCaptureActivity]);
+  useEffect(() => () => onCaptureActivity?.(false), [onCaptureActivity]);
+  useEffect(() => { setHints(0); setRevealed(false); }, [selectedAyah]);
   useEffect(() => {
     let active = true; setError(null);
     // Retain the assist component and its microphone lease while a sequential
@@ -67,15 +77,20 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   const displayVerse = current?.verseNumber === selectedAyah ? current : null;
   const memorizationStatus = library.library.memorization.find((p) => passageId(p) === passageId(passage))?.status ?? "not_started";
   const showText = mode === "test" ? revealed : !hidden;
-  const records = library.library.recordings.filter((r) => r.chapter === chapter.id);
   return <View style={styles.content}>
     <Text style={[styles.title, { color: theme.colors.text }]}>{mode === "test" ? "Test yourself" : mode === "memorize" ? "Memorization" : "Recitation practice"}</Text>
     <Text style={{ ...textStyle, color: theme.colors.muted }}>{chapter.nameSimple} · {chapter.versesCount} ayahs</Text>
-    <Text style={{ ...textStyle, color: theme.colors.muted }}>{assistEnabled ? "Listen, practise aloud, and review yourself. Recite Assist is an optional early preview: it can miss or misidentify words and is not a verified assessment." : "Listen, practise aloud, and review yourself. Automatic word feedback is not available in this release."} No Tajweed scores.</Text>
+    <Text style={{ ...textStyle, color: theme.colors.muted }}>Listen, hide the ayah, use a hint, and review your recall. Self-review is private, not a recitation grade.</Text>
     {mode === "test" && questions.length ? <QuranSurface>
       <Text style={textStyle}>Ayahs {passage.from}–{passage.to} · {temporary ? "Temporary review" : "Saved self-review"}</Text>
       <AppButton label="Change test range" variant="ghost" disabled={practiceBusy} onPress={() => { audio.stop(); setQuestions([]); setQuestionIndex(0); setHints(0); setRevealed(false); }} />
     </QuranSurface> : <QuranSurface>
+      <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: "600" }}>Ayahs {from}–{to}{mode !== "test" ? ` · ${repeat}× ${repeatMode === "passage" ? "whole passage" : "each ayah"}` : " · self-test"}</Text>
+      <AppButton label={optionsOpen ? "Close passage options" : "Edit passage & options"} variant="ghost" disabled={practiceBusy} onPress={() => setOptionsOpen(!optionsOpen)} />
+      {!optionsOpen ? <>
+        <AppButton label={mode === "test" ? "Start self-test" : "Listen and repeat"} icon={mode === "test" ? "sparkles-outline" : "repeat"} disabled={!valid || practiceBusy || mode !== "test" && !current?.audioUrl} onPress={() => mode === "test" ? startTest() : void listen()} />
+        {!valid ? <Text style={{ color: theme.colors.danger }}>Edit the passage to choose a valid range.</Text> : null}
+      </> : <>
       <View style={styles.row}>
         <View style={styles.flex}><Text style={textStyle}>From ayah</Text><TextInput accessibilityLabel="Practice starting ayah" keyboardType="number-pad" value={from} editable={!practiceBusy} onChangeText={(v) => { setFrom(v); setQuestions([]); }} style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border }]} /></View>
         <View style={styles.flex}><Text style={textStyle}>To ayah</Text><TextInput accessibilityLabel="Practice ending ayah" keyboardType="number-pad" value={to} editable={!practiceBusy} onChangeText={(v) => { setTo(v); setQuestions([]); }} style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border }]} /></View>
@@ -92,6 +107,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
         {!current?.audioUrl ? <Text style={{ ...textStyle, color: theme.colors.muted }}>Reference audio is unavailable in this content edition. You can still record, recall and review the authentic Arabic text.</Text> : null}
         <View style={styles.row}><Text style={[textStyle, styles.flex]}>Hide Arabic and translation for recall</Text><Switch value={hidden} onValueChange={setHidden} /></View>
       </>}
+      </>}
     </QuranSurface>}
     {questions.length && questionIndex >= questions.length ? <QuranSurface><Text style={[styles.title, { color: theme.colors.text }]}>Session complete</Text><Text style={textStyle}>{questions.length} passages reviewed by you. This is not an automatic recitation assessment.</Text></QuranSurface> : <QuranSurface>
       <Text style={{ color: theme.colors.teal, fontWeight: "700", marginBottom: 12 }}>{mode === "test" && question ? `Question ${questionIndex + 1} of ${questions.length} · ${chapter.id}:${question}` : `Passage ${passageId(passage)}`}</Text>
@@ -104,8 +120,8 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
         {showText && library.library.preferences.showTranslation ? <Text style={textStyle}>{displayVerse.translation}</Text> : null}
         {showText ? <Text style={{ color: theme.colors.subtle, fontSize: 12, marginTop: 12 }}>{displayVerse.translationName}</Text> : null}
         <View style={styles.row}>
-          <AppButton label={mode === "test" ? "Reveal ayah" : hidden ? "Reveal" : "Hide"} variant="secondary" icon="eye-outline" onPress={() => mode === "test" ? setRevealed(true) : setHidden(!hidden)} />
-          {mode === "test" ? <AppButton label="Word hint" variant="secondary" disabled={revealed || hints >= displayVerse.textUthmani.trim().split(/\s+/).length} onPress={() => setHints((n) => n + 1)} /> : null}
+          <AppButton label={mode === "test" ? revealed ? "Hide ayah" : "Reveal ayah" : hidden ? "Reveal" : "Hide"} variant="secondary" icon="eye-outline" onPress={() => mode === "test" ? setRevealed(!revealed) : setHidden(!hidden)} />
+          {!showText ? <AppButton label="Word hint" variant="secondary" disabled={hints >= displayVerse.textUthmani.trim().split(/\s+/).length} onPress={() => setHints((n) => n + 1)} /> : null}
           <AppButton label="Listen to reference" variant="secondary" icon="headset-outline" disabled={!displayVerse.audioUrl || practiceBusy} onPress={() => void listen(true)} />
         </View>
         {mode === "test" && question ? <View style={styles.row}>
@@ -115,7 +131,9 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       </> : null}
     </QuranSurface>}
     {error ? <QuranMessage message={error} /> : null}
-    {assistEnabled && current && valid ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+    {assistEnabled && library.ready && current && valid && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+      recognitionMode={library.library.preferences.recognitionMode} onReview={remember} saveAudio={library.library.preferences.saveAssistAudio}
+      onRecording={(record, allowReview) => recording.accept(record, library.library.preferences.recordingRetention !== "session", allowReview)}
       onAdvance={mode !== "test" && selectedAyah < passage.to ? async (signal) => {
         const next = selectedAyah + 1; const verse = await getVerse(next);
         if (signal.aborted) return;
@@ -123,23 +141,24 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       } : undefined} /></Suspense> : null}
     <QuranSurface>
       <Text style={[styles.subtitle, { color: theme.colors.text }]}>Listen to your own recitation</Text>
-      <Text style={{ ...textStyle, color: theme.colors.muted }}>Microphone is used only after you tap Record. Recordings stay on this device. Maximum five minutes; recording stops when you leave the app.</Text>
-      <AppButton label={recording.phase === "recording" ? "Stop and save recording" : recording.phase === "saving" ? "Saving recording…" : recording.phase === "preparing" ? "Preparing microphone…" : "Record my recitation"}
-        icon={recording.phase === "recording" ? "stop-circle-outline" : "mic-outline"} disabled={!valid || assistBusy || (recordingBusy && recording.phase !== "recording")}
+      <Text style={{ ...textStyle, color: theme.colors.muted }}>Microphone is used only when you start. No audio is uploaded. Manual recordings are limited to five minutes; Recite Assist reviews to two minutes.</Text>
+      <AppButton label={recordingOptionsOpen ? "Close recording options" : "Recording options"} variant="ghost" disabled={practiceBusy} onPress={() => setRecordingOptionsOpen(!recordingOptionsOpen)} />
+      {recordingOptionsOpen ? <>
+      <View style={styles.row}><Text style={[textStyle, styles.flex]}>Keep recordings after this session</Text><Switch accessibilityLabel="Keep recordings after this session" disabled={practiceBusy} value={library.library.preferences.recordingRetention !== "session"} onValueChange={keep => void update(s => ({ ...s, preferences: { ...s.preferences, recordingRetention: keep ? "keep" : "session" } })).catch(() => {})} /></View>
+      {assistEnabled ? <View style={styles.row}><Text style={[textStyle, styles.flex]}>Record Recite Assist sessions too</Text><Switch accessibilityLabel="Record Recite Assist sessions" disabled={practiceBusy} value={library.library.preferences.saveAssistAudio} onValueChange={saveAssistAudio => void update(s => ({ ...s, preferences: { ...s.preferences, saveAssistAudio } })).catch(() => {})} /></View> : null}
+      </> : null}
+      <Text style={{ ...textStyle, color: theme.colors.muted }}>{library.library.preferences.recordingRetention === "session" ? "Review-only recordings are deleted when you leave this screen, unless you choose Keep." : "Saved privately on this device. Delete individual recordings from My Library."}</Text>
+      <AppButton label={recording.phase === "recording" ? "Stop and review recording" : recording.phase === "saving" ? "Preparing review…" : recording.phase === "preparing" ? "Preparing microphone…" : "Record my recitation"}
+        icon={recording.phase === "recording" ? "stop-circle-outline" : "mic-outline"} disabled={!library.ready || !valid || assistBusy || (recordingBusy && recording.phase !== "recording")}
         onPress={() => void (recording.phase === "recording" ? recording.stop() : recording.start())} />
       {recording.error ? <Text accessibilityRole="alert" style={{ ...textStyle, color: theme.colors.danger }}>{recording.error}</Text> : null}
-      {records.map((item) => <View key={item.id} style={styles.record}>
-        <Text style={textStyle}>Ayahs {item.from}–{item.to} · {new Date(item.createdAt).toLocaleDateString()} · {Math.ceil(item.durationMillis / 1000)}s</Text>
-        <View style={styles.row}><AppButton label="Play recording" icon="play-outline" variant="secondary" disabled={practiceBusy} onPress={() => void audio.playRecording(item.uri).catch(() => setError("Recording is no longer on this device."))} />
-          <AppButton label="Delete recording" icon="trash-outline" variant="ghost" disabled={practiceBusy} onPress={() => Alert.alert("Delete this recording?", "It will be removed from this device.", [
-            { text: "Keep", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
-              audio.stop(); void (async () => { await library.update((s) => ({ ...s, recordings: s.recordings.filter((r) => r.id !== item.id) }));
-                const dir = `${FileSystem.documentDirectory}quran-practice/`;
-                if (item.uri.startsWith(dir)) await FileSystem.deleteAsync(item.uri, { idempotent: true });
-              })().catch(() => setError("Recording could not be deleted. Please retry."));
-            } }
-          ])} /></View>
-      </View>)}
+      {recording.temporary ? <View style={styles.record}><Text style={textStyle}>Session-only review · {Math.ceil(recording.temporary.durationMillis / 1000)}s</Text><View style={styles.row}>
+        <AppButton label="Play temporary recording" variant="secondary" disabled={practiceBusy} onPress={() => void audio.playRecording(recording.temporary!.uri).catch(() => setError("Temporary recording could not play."))} />
+        <AppButton label="Keep this recording" variant="secondary" disabled={practiceBusy} onPress={() => void recording.keepTemporary().catch(() => setError("Recording could not be kept."))} />
+        <AppButton label="Discard temporary recording" variant="ghost" disabled={practiceBusy} onPress={() => { audio.stop(); void recording.eraseTemporary().catch(() => setError("Recording could not be deleted.")); }} />
+      </View></View> : null}
+      <Text style={{ ...textStyle, color: theme.colors.muted }}>{library.library.recordings.length} kept recordings in My Library</Text>
+      {onReviewLibrary ? <AppButton label="Open My Library · recordings and word review" variant="ghost" onPress={onReviewLibrary} disabled={practiceBusy} /> : null}
     </QuranSurface>
     {mode !== "test" ? <QuranSurface><Text style={[styles.subtitle, { color: theme.colors.text }]}>My Memorization Progress</Text><Text style={{ ...textStyle, color: theme.colors.muted }}>Self-reported. A teacher can help assess your recitation.</Text>
       <View style={styles.row}>{(["not_started", "practising", "memorized", "needs_revision"] as const).map((status) => <Pressable key={status} accessibilityRole="radio" accessibilityLabel={memorizationLabels[status]}
