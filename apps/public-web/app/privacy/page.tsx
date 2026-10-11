@@ -136,6 +136,19 @@ export default async function PrivacyPage() {
               </p>
             </section>
 
+            <section id="delete-account">
+              <h2>Request account or data deletion — Masjid Bilal / HBIC</h2>
+              <p>
+                To request deletion of your Masjid Bilal / HBIC account and associated information, email <a href={`mailto:${privacyContactEmail}?subject=Masjid%20Bilal%20account%20deletion`}>{privacyContactEmail}</a> from your registered email with the subject “Masjid Bilal account deletion”. You may also request deletion of a specific submission or challenge data without deleting your account. Do not send a password, card number or identity document.
+              </p>
+              <p>
+                HBIC staff verify that you own the account, remove the authentication account and information that is no longer needed, including your public challenge nickname and standing, and explain any records that must be retained. Necessary tuition, donation, receipt, audit and safeguarding records may be retained for their applicable legal or operational retention period; deleting an account does not erase a completed financial transaction or automatically refund it. Ask staff to confirm any remaining Academy renewal is stopped as part of the request. This is a staff-handled deletion request, not an immediate automatic deletion.
+              </p>
+              <p>
+                Your microphone recordings and personal word reviews are only on your device. Delete recordings from My Library; remove the app to clear its local data. HBIC cannot remotely retrieve or delete those recordings.
+              </p>
+            </section>
+
             <section id="choices">
               <h2>Your choices</h2>
               <ul>
