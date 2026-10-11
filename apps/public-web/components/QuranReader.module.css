@@ -111,3 +111,70 @@
 @media(max-width:1000px){.preferenceGrid{grid-template-columns:1fr}.preferences .controls{flex-wrap:wrap;white-space:normal}}
 @media(max-width:700px){.modeNavigation{padding:14px;gap:6px}.modeNavigation button{font-size:12px;padding:8px 11px;min-height:39px}.preferences{margin:14px;padding:12px}.readingNavigation{padding-inline:14px}.featurePanel{padding:22px 16px}.featurePanel h2{font-size:31px}.practiceCard,.assist{padding:18px 15px;border-radius:18px}.actionRow{margin-inline:16px}.actionRow button{flex-grow:1}.pageNavigation button{padding:7px}.pageNavigation b{font-size:14px}.mushafPanel{padding-inline:10px}.finePrint{margin-inline:16px}.resumeReading{width:auto;margin:0 16px 10px}.statusChoices{gap:7px}.statusChoices button{padding:9px}.practiceCard .arabic{line-height:1.9}.audioPlayer{bottom:12px}.localRecording audio{min-width:0}}
 @media(prefers-color-scheme:dark){.assist{background:#173540;border-color:#52675e}.assist h3{color:#f5f0e3}.assist p,.assist .consent{color:#cfdddc}.assist>small{color:#a8c3b5}.assist .controls button{background:#254a53;color:#f5f0e3;border-color:#5d7774}.assistWords span{color:#c5d5d1}.assistWords [data-state=matched]{color:#d7f7e9;background:#255b4b}.assistWords [data-state=possible_difference]{color:#ffe5b2;background:#675232}.assistWords [data-state=uncertain]{color:#c5d5d1;border-color:#93aaa2}}
+
+/* Calm reading surfaces; glass is limited to navigation and the audio player. */
+.shell{--reader-ink:#173b46;--reader-muted:#526970;--reader-surface:#fffdf8;--reader-soft:#edf4f0;--reader-line:rgba(9,77,81,.17);--reader-accent:#096d74;padding-bottom:calc(140px + env(safe-area-inset-bottom));color:var(--reader-ink);color-scheme:light}
+.shell *{min-width:0}
+.hero>div{min-width:0}.hero h1{overflow-wrap:normal}.hero>span{max-width:100%}
+.reader{isolation:isolate;background:var(--reader-surface);border-color:var(--reader-line)}
+.reader aside{align-self:stretch}.chapterList{max-height:min(850px,75dvh);overscroll-behavior:contain;padding:3px}
+.chapterList button{min-height:72px}.chapterList button span{white-space:normal;line-height:1.4}.chapterList button em{max-width:100px;overflow-wrap:normal}
+.surahSearch{display:grid;gap:8px;margin:0 15px 18px;font-size:12px;font-weight:700;color:#d9e8ea}
+.surahSearch input,.mobileSurahPicker select{width:100%;min-height:44px;padding:10px 12px;border:1px solid #648391;border-radius:12px;background:#173e50;color:#fff;font:inherit}
+.surahSearch input::placeholder{color:#bfd0d7}.mobileSurahPicker{display:none}.surahStatus{padding:12px 15px;color:#d9e8ea;font-size:13px;line-height:1.6}
+.modeNavigation{background:var(--reader-soft);border-color:var(--reader-line);gap:8px}
+.modeNavigation button,.layoutChoice button,.controls button,.actionRow button,.pageNavigation button,.jumpForm button,.readingNavigation button,.statusChoices button,.empty button,.notice button,.assist button{min-height:44px;max-width:100%;font-family:inherit;font-size:13px;font-weight:750;line-height:1.5;white-space:normal;overflow-wrap:anywhere;background:var(--reader-surface);color:var(--reader-ink);border-color:var(--reader-line)}
+.modeNavigation button[aria-pressed=true],.layoutChoice button[aria-pressed=true],.statusChoices button[aria-pressed=true]{background:var(--reader-accent);border-color:var(--reader-accent);color:#fff}
+.preferences{background:var(--reader-surface);color:var(--reader-ink);border-color:var(--reader-line)}.preferences summary{min-height:28px}
+.preferenceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.preferenceGrid .controls{flex-wrap:wrap;white-space:normal;gap:8px}
+.preferenceGrid input,.preferenceGrid select,.actionRow input,.actionRow select,.fieldLabel input,.jumpForm input,.readingNavigation input{font-family:inherit;font-size:16px;font-weight:400;line-height:1.5;background:var(--reader-surface);color:var(--reader-ink);border-color:var(--reader-line)}
+.preferenceGrid label,.actionRow label,.fieldLabel,.jumpForm label{color:var(--reader-muted)}
+.toolbar{position:relative;top:auto;background:transparent;backdrop-filter:none;z-index:auto;padding-block:8px}
+.toolbar form{min-width:0;background:var(--reader-surface);border-color:var(--reader-line);border-radius:16px;padding:6px;gap:8px}.toolbar form svg{margin-left:5px}.toolbar input{width:0;background:transparent;min-height:44px;font-size:16px;line-height:1.5;color:var(--reader-ink)}.toolbar input::placeholder{color:var(--reader-muted)}.toolbar button{min-height:44px;border-radius:11px;background:var(--reader-accent)}
+.readingNavigation form{flex:1;max-width:330px}.readingNavigation{gap:7px}.readingNavigation>button{flex-shrink:0;padding:10px}
+.layoutChoice{flex-wrap:wrap}.chapterHeader{padding-top:35px}.chapterHeader h2{overflow-wrap:anywhere;line-height:1.12}.chapterHeader p{color:var(--reader-muted)}.chapterHeader small{display:block;overflow-wrap:anywhere;letter-spacing:.09em}
+.verse{scroll-margin-top:220px}.verseTop{flex-wrap:wrap;gap:12px}.verseTop button{width:44px;height:44px;background:var(--reader-surface);color:var(--reader-accent);border-color:var(--reader-line)}.verseTop>span{background:var(--reader-soft);color:var(--reader-accent)}
+.arabic{overflow-wrap:anywhere;letter-spacing:normal;word-break:normal}.translation p{color:var(--reader-muted);overflow-wrap:anywhere}.translation small{display:block;line-height:1.6;color:#87642c}
+.featurePanel h2,.practiceCard h3,.assist h3{color:var(--reader-ink)}.featurePanel>p,.practiceCard p,.assist p,.finePrint{color:var(--reader-muted);overflow-wrap:anywhere}
+.practiceCard{background:var(--reader-surface);border-color:var(--reader-line)}.featurePanel,.practiceCard,.assist{min-width:0}.actionRow{gap:10px}.actionRow label{flex:1 1 130px}.actionRow select{width:100%}.actionRow b{overflow-wrap:anywhere}
+.empty,.sourceNote,.concealed{background:var(--reader-soft);color:var(--reader-muted)}.empty{padding:clamp(20px,4vw,40px)}.empty p,.sourceNote{overflow-wrap:anywhere}.concealed{color:var(--reader-ink)}
+.recordingList button{color:var(--reader-ink);gap:12px}.recordingList button b{overflow-wrap:anywhere}.recordingList button svg{flex-shrink:0}.recordingList button small{color:var(--reader-muted)}
+.bookmarkRow button{color:var(--reader-accent)}.pageNavigation b{overflow-wrap:anywhere}.pageNavigation small{color:var(--reader-muted)}.checkLabel,.consent{color:var(--reader-muted)}
+.localRecording audio{min-width:0}.localRecording a{overflow-wrap:anywhere}.statusChoices{grid-template-columns:repeat(2,minmax(0,1fr))}.progressList p{flex-wrap:wrap}
+.audioPlayer{bottom:calc(14px + env(safe-area-inset-bottom));padding:12px 14px;backdrop-filter:blur(18px);background:rgba(8,40,59,.96)}.audioPlayer button{width:44px;height:44px}.audioPlayer small{overflow-wrap:anywhere}
+.compass{width:min(400px,100%)}.qibla{scroll-margin-top:210px}.qibla h2{overflow-wrap:normal}
+.shell :is(button,a,input,select,summary):focus-visible{outline:3px solid #b68a3c;outline-offset:3px}.toolbar form:focus-within{outline:2px solid var(--reader-accent);outline-offset:2px}
+@media(max-width:1100px){.preferenceGrid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){
+  .shell{width:calc(100% - 24px)}.hero{padding:30px 22px 52px;gap:20px}.hero h1{font-size:clamp(43px,13vw,70px);line-height:1.02;letter-spacing:-.045em}.hero>span{font-size:clamp(31px,9vw,42px)}
+  .quick{width:calc(100% - 18px);gap:7px;margin-bottom:28px}.quick a{flex-direction:column;font-size:11px;line-height:1.4;text-align:center;min-height:74px}
+  .reader{min-height:0;border-radius:24px}.reader aside{padding:18px}.reader aside h2{margin:0 0 12px;font-size:18px}.resumeReading{margin:0 0 12px;max-width:100%}
+  .mobileSurahPicker{display:grid;gap:7px;font-size:12px;font-weight:700;color:#d9e8ea}.surahSearch,.chapterList{display:none}
+  .modeNavigation{padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:7px}.modeNavigation button{padding:9px 6px;font-size:12px;overflow-wrap:normal}
+  .toolbar{padding-inline:14px}.toolbar form svg{display:none}.toolbar input{padding-left:6px}.toolbar button{padding-inline:12px}
+  .readingNavigation{padding-inline:14px;flex-wrap:wrap}.readingNavigation form{min-width:120px}.readingNavigation input{padding-inline:8px;font-size:14px}
+  .chapterHeader{padding:28px 16px 22px}.chapterHeader h2{font-size:36px}.verse{margin-inline:18px}.verseTop>div{gap:6px}.translation p{font-size:17px}
+  .layoutChoice button{flex:1 1 100px}
+  .featurePanel h2{font-size:30px}.practiceCard,.assist{padding:18px 14px}.qibla{padding:34px 22px;gap:30px}.qibla h2{font-size:clamp(38px,11vw,56px)}.compass{width:min(315px,100%)}
+}
+@media(max-width:860px){
+  /* Keep the live prayer control accessible without laying it over Quran text. */
+  :global(.site):has(.shell) :global(.prayer-mobile-rail){position:relative;top:auto;right:auto;transform:none;justify-content:flex-start;align-items:flex-start;flex-direction:row;margin:12px 16px 0;max-width:calc(100% - 32px);z-index:1}
+  :global(.site):has(.shell) :global(.prayer-mobile-panel){width:min(260px,calc(100vw - 105px));transform-origin:left top}
+  :global(.site):has(.shell) :global(.prayer-mobile-panel)[aria-hidden=true]{display:none}
+}
+@media(prefers-color-scheme:dark){
+  .shell{--reader-ink:#e8f1ee;--reader-muted:#b7ccc8;--reader-surface:#112e39;--reader-soft:#1a3b44;--reader-line:rgba(173,204,198,.25);--reader-accent:#0b757d;color-scheme:dark}
+  .reader{box-shadow:0 20px 55px rgba(0,0,0,.14)}.chapterHeader small,.translation small{color:#e0c18d}.reading .arabic{color:var(--reader-ink)}.mushafPage{color-scheme:light}
+  .actionRow b,.recordingList h3,.recordingList button>span,.recordingList button>svg,.finePrint a,.bookmarkRow button,.localRecording a{color:#9ce1d8}.sourceNote{color:var(--reader-muted)}
+  .verseTop>span,.verseTop button{color:#9ce1d8}.assist h3{color:var(--reader-ink)}.assist p,.assist .consent{color:var(--reader-muted)}.toolbar form svg{color:#9ce1d8}
+}
+@media(prefers-reduced-motion:reduce){.shell *{scroll-behavior:auto!important;transition:none!important}}
+@media(prefers-reduced-transparency:reduce){.quick a{backdrop-filter:none;background:#fcfefc}.audioPlayer{backdrop-filter:none;background:#08283b}}
+@media(max-width:360px){
+  :global(.site):has(.shell) :global(.nav){gap:8px}
+  :global(.site):has(.shell) :global(.nav .brand){font-size:13px;gap:5px}
+  :global(.site):has(.shell) :global(.nav .brand img){width:34px;height:34px}
+  :global(.site):has(.shell) :global(.mobile-nav-actions){gap:4px}
+  :global(.site):has(.shell) :global(.mobile-app-link),:global(.site):has(.shell) :global(.mobile-menu summary){font-size:11px;padding-inline:8px}
+}

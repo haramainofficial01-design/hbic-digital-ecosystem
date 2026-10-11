@@ -24,6 +24,18 @@ export function PrayerRail() {
   const hidden = path === "/prayer-times" || path.startsWith("/display");
 
   useEffect(() => {
+    if (!open || hidden) return;
+    const openedAt = window.scrollY;
+    const mobile = window.matchMedia("(max-width: 860px)");
+    // Only page scrolling collapses the mobile panel; its own list stays scrollable.
+    const minimizeOnScroll = () => {
+      if (mobile.matches && Math.abs(window.scrollY - openedAt) > 12) setOpen(false);
+    };
+    window.addEventListener("scroll", minimizeOnScroll, { passive: true });
+    return () => window.removeEventListener("scroll", minimizeOnScroll);
+  }, [open, hidden]);
+
+  useEffect(() => {
     if (hidden) return;
     let disposed = false;
     const refresh = async () => {

@@ -1,9 +1,9 @@
 "use client";
 
-import { calculateQiblaBearing, emptyQuranState, isAlignedWithQibla, markRead, parseAyahReference, qiblaRotation, versePage,
+import { calculateQiblaBearing, emptyQuranState, isAlignedWithQibla, markRead, normalizeSearch, parseAyahReference, qiblaRotation, versePage,
   type QuranChapter, type QuranPage, type QuranResources, type QuranState, type QuranVerse } from "@hbic/shared";
 import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, LocateFixed, Pause, Play, Search, Square, Trash2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approvedWebQuranResources, restoreWebQuranState, webQuranClient, webQuranStorageKey } from "../lib/quranBrowser";
 import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, useWebQuranAudio } from "./QuranReaderTools";
 import styles from "./QuranReader.module.css";
@@ -18,6 +18,7 @@ export function QuranReader() {
   const [library, setLibrary] = useState<QuranState>(emptyQuranState), [ready, setReady] = useState(false);
   const [mode, setMode] = useState<QuranMode>("read");
   const [query, setQuery] = useState("");
+  const [chapterQuery, setChapterQuery] = useState("");
   const [searchMode, setSearchMode] = useState(false), [searchTitle, setSearchTitle] = useState("");
   const [loading, setLoading] = useState(false), [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,10 @@ export function QuranReader() {
   const list = useRef<HTMLDivElement>(null), audio = useWebQuranAudio();
   const { preferences, bookmarks } = library;
   const currentChapter = chapters.find((item) => item.id === chapterId) ?? data?.chapter;
+  const matchingChapters = useMemo(() => {
+    const term = normalizeSearch(chapterQuery);
+    return chapters.filter((item) => normalizeSearch(`${item.id} ${item.nameSimple} ${item.nameArabic} ${item.translatedName.name}`).includes(term));
+  }, [chapters, chapterQuery]);
   const update = useCallback((transform: (state: QuranState) => QuranState) => setLibrary((state) => transform(state)), []);
   const onRead = useCallback((key: string) => { const ref = parseAyahReference(key); if (ref) update((state) => markRead(state, ref.chapter, ref.ayah)); }, [update]);
 
@@ -146,7 +151,13 @@ export function QuranReader() {
     </section>
     <div className={styles.quick}><a href="#reader"><BookOpen />Read</a><a href="#qibla"><Compass />Qibla</a><a href="https://sunnah.com" target="_blank" rel="noreferrer"><ExternalLink />Hadith Library</a></div>
     <section className={styles.reader} id="reader">
-      <aside><h2>Surahs</h2>{library.lastRead ? <button className={styles.resumeReading} onClick={() => open(library.lastRead!.chapter, library.lastRead!.ayah)}>Continue at {library.lastRead.chapter}:{library.lastRead.ayah}</button> : null}<div className={styles.chapterList}>{chapters.map((item) => <button key={item.id} className={item.id === chapterId ? styles.selected : undefined} aria-current={item.id === chapterId ? "true" : undefined} onClick={() => open(item.id)}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}</div></aside>
+      <aside aria-label="Surah navigation">
+        <h2>Surahs</h2>
+        {library.lastRead ? <button className={styles.resumeReading} onClick={() => open(library.lastRead!.chapter, library.lastRead!.ayah)}>Continue at {library.lastRead.chapter}:{library.lastRead.ayah}</button> : null}
+        <label className={styles.mobileSurahPicker}>Choose a surah<select aria-label="Choose a surah" value={chapterId} disabled={!chapters.length} onChange={(event) => open(Number(event.target.value))}>{chapters.length ? chapters.map((item) => <option key={item.id} value={item.id}>{item.id}. {item.nameSimple} · {item.nameArabic}</option>) : <option value={chapterId}>{catalogError ? "Surah index unavailable" : "Loading surahs…"}</option>}</select></label>
+        <label className={styles.surahSearch}>Find a surah<input type="search" value={chapterQuery} maxLength={100} onChange={(event) => setChapterQuery(event.target.value)} placeholder="Name or number" /></label>
+        <div className={styles.chapterList}>{matchingChapters.map((item) => <button key={item.id} className={item.id === chapterId ? styles.selected : undefined} aria-current={item.id === chapterId ? "true" : undefined} onClick={() => open(item.id)}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}{chapters.length && !matchingChapters.length ? <p className={styles.surahStatus} role="status">No matching surahs. Try a name or number.</p> : !chapters.length ? <p className={styles.surahStatus} role="status">{catalogError ? "Surah index unavailable. Retry the connection in the reader." : "Loading surahs…"}</p> : null}</div>
+      </aside>
       <div className={styles.reading}>
         <nav className={styles.modeNavigation} aria-label="Quran tools">{modes.map((item) => <button key={item.id} aria-pressed={mode === item.id} onClick={() => changeMode(item.id)}>{item.label}{item.id === "bookmarks" && bookmarks.length ? ` (${bookmarks.length})` : ""}</button>)}</nav>
         <details className={styles.preferences}><summary>Reading and reference audio preferences</summary><div className={styles.preferenceGrid}>
@@ -161,7 +172,7 @@ export function QuranReader() {
         {["practice", "memorize", "test"].includes(mode) ? currentChapter ? <QuranWebPractice key={`${mode}:${chapterId}`} mode={mode as "practice" | "memorize" | "test"} chapter={currentChapter} preferences={preferences} getVerse={getVerse} library={library} update={update} audio={audio} startAyah={Math.min(target, currentChapter.versesCount)} /> : <div className={styles.empty}>Load the surah index to start practising.</div> : null}
         {mode === "bookmarks" ? <div className={styles.featurePanel}><h2>Your bookmarks</h2><p>Saved in this browser. Choose an ayah to continue reading.</p>{bookmarks.map((key) => <div className={styles.bookmarkRow} key={key}><button onClick={() => openKey(key)}><Bookmark size={18} />Ayah {key}</button><button onClick={() => toggleBookmark(key)} aria-label={`Remove bookmark ${key}`}><Trash2 size={17} /></button></div>)}{!bookmarks.length ? <p>No bookmarks yet. Save an ayah from the reader.</p> : null}</div> : null}
         {mode === "read" ? <>
-        <div className={styles.toolbar}><form onSubmit={search}><Search size={18} /><input value={query} maxLength={120} onChange={(event) => setQuery(event.target.value)} placeholder="Search Arabic, English, or 2:255" aria-label="Search the Quran" /><button disabled={query.trim().length < 2 || searching || !resources}>Search</button></form></div>
+        <div className={styles.toolbar}><form role="search" aria-label="Quran search" onSubmit={search}><Search size={18} aria-hidden="true" /><input value={query} maxLength={120} onChange={(event) => setQuery(event.target.value)} placeholder="Arabic, English, or 2:255" aria-label="Search the Quran" /><button disabled={query.trim().length < 2 || searching || !resources}>{searching ? "Searching…" : "Search"}</button></form></div>
         <div className={styles.readingNavigation}><button aria-label="Previous surah" disabled={chapterId === 1} onClick={() => open(chapterId - 1)}><ChevronLeft size={18} /></button><form onSubmit={(event) => { event.preventDefault(); const ref = parseAyahReference(jump.includes(":") || jump.includes("：") ? jump : `${chapterId}:${jump}`); if (ref) open(ref.chapter, ref.ayah); else setError("Enter a valid ayah or surah:ayah reference."); }}><input value={jump} onChange={(event) => setJump(event.target.value)} placeholder="Go to ayah or 2:255" aria-label="Jump to ayah" maxLength={10} /><button>Go</button></form><button aria-label="Next surah" disabled={chapterId === 114} onClick={() => open(chapterId + 1)}><ChevronRight size={18} /></button></div>
         <div className={styles.layoutChoice} role="group" aria-label="Reading layout"><button aria-pressed={preferences.layout === "ayah"} onClick={() => setPreference({ layout: "ayah" })}>Ayah View</button><button aria-pressed={preferences.layout === "madinah"} onClick={() => setPreference({ layout: "madinah" })}>Madinah · 15 lines</button></div>
         <header className={styles.chapterHeader}><small>{searchMode ? `SEARCH RESULTS FOR “${searchTitle}”` : currentChapter?.revelationPlace ?? "QURAN FOUNDATION"}</small><h2>{searchMode ? "Verified results" : currentChapter?.nameSimple ?? "Quran Reader"}</h2><p>{searchMode ? "" : currentChapter ? `${currentChapter.translatedName?.name} · ${currentChapter.versesCount} ayahs` : ""}</p></header>
@@ -204,8 +215,8 @@ function QiblaFinder() {
   }, [bearing]);
   async function locate() {
     try {
-      const device = DeviceOrientationEvent as typeof DeviceOrientationEvent & { requestPermission?: () => Promise<"granted" | "denied"> };
-      if (device.requestPermission && await device.requestPermission() !== "granted") setMessage("Compass permission was denied. The static bearing will still be shown.");
+      const device = window.DeviceOrientationEvent as (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<"granted" | "denied"> }) | undefined;
+      if (device?.requestPermission && await device.requestPermission() !== "granted") setMessage("Compass permission was denied. The static bearing will still be shown.");
       if (!navigator.geolocation) throw new Error("Location is unavailable in this browser.");
       navigator.geolocation.getCurrentPosition((position) => {
         setBearing(calculateQiblaBearing(position.coords));
