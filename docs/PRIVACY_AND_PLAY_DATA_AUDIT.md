@@ -1,6 +1,22 @@
 # Masjid Bilal Privacy and Google Play Data Audit
 
-Last verified: August 8, 2026
+Historical baseline: August 8, 2026. See the October 11, 2026 addendum below;
+the historical account and direct-collection statements do not describe 1.7.5.
+
+## October 11, 2026 release addendum
+
+- Canonical public policy: `https://hbic.ca/privacy`.
+- Optional verified-account challenge participation collects account email/UID
+  through Firebase, an adult's chosen nickname, consent, practice-time totals
+  and bounded duplicate-credit session receipts for app functionality.
+- Only nickname, time and rank are intentionally public after separate consent.
+  Leaving removes the participant entry. Session receipts are not publicly exposed.
+- Microphone recordings, personal word-review flags and reading preferences stay
+  on-device and are not uploaded. Session-only recordings are discarded on exit
+  or background. Kept recordings can be individually replayed/deleted.
+- No analytics, advertising, tracking or recitation-accuracy prize claims were added.
+- Store declarations must include the optional authentication/participation data;
+  the old "No direct in-app collection" row below is a historical baseline only.
 
 ## Canonical policy
 

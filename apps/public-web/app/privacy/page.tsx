@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  privacyContactEmail,
-  privacyPolicyEffectiveDate
+  privacyContactEmail
 } from "@hbic/shared";
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
@@ -28,7 +27,7 @@ export default async function PrivacyPage() {
           <p>
             This policy explains how Hazrat Bilal Islamic Centre handles information through the Masjid Bilal mobile app and this website.
           </p>
-          <p className="legal-updated">Effective and last updated: {privacyPolicyEffectiveDate}</p>
+          <p className="legal-updated">Effective and last updated: October 11, 2026</p>
         </header>
 
         <div className="legal-layout">
@@ -80,10 +79,18 @@ export default async function PrivacyPage() {
 
               <h3>Quran reading, recordings and Recite Assist</h3>
               <p>
-                Quran bookmarks, reading preferences and self-reported memorization progress stay on your device or in your browser. Microphone access is optional and starts only when you choose recording, on-device voice search or Recite Assist. HBIC does not upload your microphone audio or use it to train a model. App recordings remain on your device until you delete them. Browser recordings can be reviewed locally or downloaded only when you choose; leaving or backgrounding the page discards the browser recording. Recite Assist keeps a bounded audio window in memory and erases it when stopped or backgrounded. Its early-preview feedback is not a verified recitation or Tajweed assessment.
+                Quran bookmarks, reading preferences, personal word-review flags and self-reported memorization progress stay on your device or in your browser. Microphone access is optional and starts only when you choose recording, on-device voice search or Recite Assist. HBIC does not upload your microphone audio or use it to train a model. In the app, you can choose to keep selected recordings privately on the device, replay them and delete them from your Library. Session-only recordings are discarded when you leave or background the practice screen. Browser recordings can be reviewed locally or downloaded only when you choose; leaving or backgrounding the page discards the browser recording. Recite Assist keeps a bounded audio window in memory and erases it when stopped or backgrounded. Its early-preview feedback is not a verified recitation or Tajweed assessment.
               </p>
               <p>
                 Quran Foundation supplies Quran text, meaning translations and Mushaf fonts; MP3Quran supplies credited streaming recordings. Recite Assist downloads public, integrity-checked model data from Hugging Face only after your consent. These providers receive standard connection information for requested downloads or streams, not your microphone audio. Quran reading does not require an account.
+              </p>
+
+              <h3>Optional community practice challenges</h3>
+              <p>
+                Joining a community challenge is separate and optional. It requires a verified account and adult consent to publish a nickname and active practice-time total. Firebase handles the account email and account identifier for authentication. HBIC stores your account identifier, chosen nickname, challenge consent, credited practice time and limited session receipts to prevent duplicate credit. Only your nickname, time and rank appear in public standings; your email, account identifier, recordings and word-review history are not displayed. Rankings measure credited practice time, not recitation accuracy or proof of attention. Event dates, rules and any prizes must be published by authorized HBIC staff.
+              </p>
+              <p>
+                You can leave a challenge from its screen to remove your nickname and standing. Private session records may remain for duplicate-credit protection and operational troubleshooting. Contact <a href={`mailto:${privacyContactEmail}`}>{privacyContactEmail}</a> from your account email for access, correction or deletion requests. Leaving a challenge does not cancel an Academy enrollment or alter its payment history.
               </p>
 
               <h3>Information we do not collect in the current app</h3>
