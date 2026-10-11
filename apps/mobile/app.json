@@ -3,7 +3,7 @@
     "name": "Masjid Bilal",
     "slug": "hbic-calgary-app",
     "scheme": "hbiccalgary",
-    "version": "1.7.4",
+    "version": "1.7.5",
     "orientation": "default",
     "icon": "./assets/brand/hbic-app-icon.png",
     "userInterfaceStyle": "automatic",
