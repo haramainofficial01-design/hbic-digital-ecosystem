@@ -36,6 +36,19 @@ test("optimization is registered in the actual Expo production configuration", (
   assert.equal(config.expo.extra.eas.projectId, "79283015-cb87-48ef-9761-81ab87641205");
 });
 
+test("foreground-only Quran audio does not request unused background service permissions", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "../app.json"), "utf8")).expo;
+  for (const permission of ["android.permission.ACTIVITY_RECOGNITION", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"]) {
+    assert.ok(config.android.blockedPermissions.includes(permission), permission);
+  }
+  const audio = fs.readFileSync(path.join(__dirname, "../src/quran/useQuranAudio.ts"), "utf8");
+  assert.match(audio, /shouldPlayInBackground: false/);
+  assert.ok(!audio.includes("setActiveForLockScreen"));
+  const audioPlugin = config.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === "expo-audio");
+  assert.equal(audioPlugin[1].recordAudioAndroid, true);
+  assert.equal(audioPlugin[1].enableBackgroundRecording, false);
+});
+
 test("preserves Expo's manifest-loaded background loader without disabling other obfuscation", () => {
   const original = "-keep class com.swmansion.reanimated.** { *; }\n";
   const result = preserveReflectiveLoader(original);
