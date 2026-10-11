@@ -47,10 +47,17 @@ upload is not equivalent to a completed review or public availability.
   purpose strings, signing and latest bundled feature markers verified.
   Apple upload `8d88bb05-fc91-43fb-9309-f7f00be573b1` finished; App Store
   Connect processed build `ccdbbbf8-0990-4040-a3fe-b4ac2ecd91aa` as `VALID`.
-- iOS review draft `8e9dfbab-48b8-464c-b369-1ca0ea4dc54c` is
-  `READY_FOR_REVIEW`, not yet submitted. The expired Apple browser session
-  prevents correcting the old “Data Not Collected” label; a signed-in owner
-  session is required before submission. API signing/upload access works.
+- iOS review submission `8e9dfbab-48b8-464c-b369-1ca0ea4dc54c` is
+  `WAITING_FOR_REVIEW`. Apple accepted the existing 1.7.5 build 34 for review;
+  version `9a967fda-66c7-40be-9c85-a5873156a720` also reports
+  `WAITING_FOR_REVIEW`. Release is automatic after approval, not yet public.
+- The authenticated Apple privacy page now publishes ten applicable data types
+  for App Functionality, linked to identity and not used for tracking: name,
+  email, phone, payment information, other user content, user and device IDs,
+  purchase history, product interaction and other data. Publication was checked
+  after a full page reload; no unfinished data-type setup remained. Audio and
+  precise location are not transmitted. The existing canonical privacy link
+  remains `https://hbic.ca/privacy`.
 - 32 Apple asset placements prepared: eight medium iPhone, five large iPhone,
   five iPad, three Watch, nine Duo (including open/partial positions), header
   and search creative assets. Three new native Release captures were inspected
@@ -71,11 +78,12 @@ upload is not equivalent to a completed review or public availability.
   `c658e916519c6a2073882d4c5e2dc157767251420c55e5d6055059c2e23d538e`.
   Google Play accepted versionCode 39 with the exact artifact checksum. The
   existing production track now specifies 39 as a completed full rollout.
-  Publishing overview confirms “Changes in review” with production 1.7.5 (39),
-  six actual phone screenshots, updated privacy URL and data safety together.
-  Google quick checks are running and will automatically forward the submission
-  when successful. Managed publishing is off. This is submission acceptance,
-  not a claim that Google review has finished or users already have the update.
+  Google completed review and the October 11 publishing overview now reports
+  “App update published. Users should see changes immediately, but this may
+  take longer.” The production track was rechecked as completed versionCode
+  39. All six phone screenshots still match the actual captured file checksums.
+  Managed publishing is off; the Android update is published, subject to
+  Google Play propagation to individual users.
 - Google data safety has been corrected and saved, covering optional account,
   Academy/payment, challenge and notification data. Privacy and deletion-request
   URLs use the live `hbic.ca` policy. These listing changes are included in the
