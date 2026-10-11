@@ -63,11 +63,24 @@ upload is not equivalent to a completed review or public availability.
   confirms manifest-merge removal directives.
 - Replacement Android 1.7.5 versionCode 39: EAS
   `02d9b149-f701-414e-85c1-74a78dd6966f`, source `ceef024`.
-  At this checkpoint it is building and is not yet submitted to Play.
+  Build finished. The actual signed AAB has 88.4% R8-renamed classes and
+  verified 16 KB alignment for all 42 arm64/x86_64 libraries. Its merged
+  manifest has no unused foreground-service permission and still has
+  `RECORD_AUDIO`. Latest feature markers and absence of private credentials
+  verified in the actual JS bundle, not only source. SHA-256:
+  `c658e916519c6a2073882d4c5e2dc157767251420c55e5d6055059c2e23d538e`.
+  Google Play accepted versionCode 39 with the exact artifact checksum. The
+  existing production track now specifies 39 as a completed full rollout.
+  Publishing overview confirms “Changes in review” with production 1.7.5 (39),
+  six actual phone screenshots, updated privacy URL and data safety together.
+  Google quick checks are running and will automatically forward the submission
+  when successful. Managed publishing is off. This is submission acceptance,
+  not a claim that Google review has finished or users already have the update.
 - Google data safety has been corrected and saved, covering optional account,
   Academy/payment, challenge and notification data. Privacy and deletion-request
-  URLs use the live `hbic.ca` policy. These listing changes are ready for review,
-  not yet sent. Local microphone audio is not transmitted. No tracking/ads added.
+  URLs use the live `hbic.ca` policy. These listing changes are included in the
+  accepted Google submission. Local microphone audio is not transmitted. No
+  tracking/ads added.
 
 No Live Stripe test charge, false cash receipt, new signing credential, domain
 change, or fabricated leaderboard/prize was performed during this rollout.
