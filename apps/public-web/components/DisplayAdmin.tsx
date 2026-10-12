@@ -4,7 +4,6 @@ import {
   defaultContent,
   normalizeContent,
   isIqamahOverrideActive,
-  iqamahOverrideWeekEndsAt,
   prayerLabels,
   validateContent,
   type HbicContent,
@@ -188,7 +187,8 @@ export function DisplayAdmin() {
             ...(current.iqamahTime.overrides?.[prayer] ?? {}),
             enabled: true,
             value: formatted,
-            endsAt: iqamahOverrideWeekEndsAt(new Date(updatedAt)),
+            persistent: true,
+            endsAt: undefined,
             updatedAt
           }
         },
@@ -241,7 +241,7 @@ export function DisplayAdmin() {
         <section className={styles.card}>
           <div className={styles.sectionTitle}>
             <div><span>Canonical schedule</span><h2>Prayer &amp; iqamah</h2></div>
-            <small>Published edits update the shared schedule everywhere. Overrides expire Sunday at midnight, Calgary time, then return to the backend timetable.</small>
+            <small>Adhan: Iqamah.ca. HBIC iqamah stays until changed.</small>
           </div>
           <div className={styles.prayerRows}>
             {content.prayerTime && (["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"] as const).map((prayer) => {
@@ -259,7 +259,7 @@ export function DisplayAdmin() {
                   <strong>{prayerLabels[prayer]}</strong>
                   <label><span>Adhan</span><input value={content.prayerTime[prayer]} readOnly /></label>
                   <label className={!editable ? styles.hiddenIqamah : undefined}>
-                    <span>{editable ? "Automatic" : ""}</span>
+                    <span>{editable ? "Saved HBIC iqamah" : ""}</span>
                     <input readOnly value={automatic ?? ""} />
                   </label>
                   <label className={!editable ? styles.hiddenIqamah : undefined}>

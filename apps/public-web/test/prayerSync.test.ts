@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent, iqamahOverrideWeekEndsAt, isIqamahOverrideActive } from "@hbic/shared";
 import { boundPrayerOverrides } from "../lib/prayerOverrides";
 import { changedIqamahTimes, applyPrayerSync, isOverrideActive, resolveEffectivePrayerSchedule, retainPrayerScheduleDuringOutage, type PrayerFeed } from "../lib/prayerSync";
@@ -123,4 +124,13 @@ test("weekly comparison includes only changed iqamah, not daily adhan drift", ()
   const before = structuredClone(defaultContent.iqamahTime);
   assert.deepEqual(changedIqamahTimes(before, { ...before, asrIqamah: "4:30 PM" }), [{ prayer: "asr", oldTime: before.asrIqamah, newTime: "4:30 PM" }]);
   assert.deepEqual(changedIqamahTimes(before, before), []); assert.deepEqual(changedIqamahTimes(undefined, before), []);
+});
+
+test("both prayer editors create persistent overrides without weekly expiry wording", () => {
+  for (const file of [new URL("../components/DisplayAdmin.tsx", import.meta.url), new URL("../../admin-web/components/AdminDashboard.tsx", import.meta.url)]) {
+    const source = readFileSync(file, "utf8");
+    assert.ok(source.includes("persistent: true")); assert.ok(source.includes("endsAt: undefined"));
+    assert.equal(source.includes("Overrides expire Sunday"), false);
+    assert.equal(source.includes("endsAt: iqamahOverrideWeekEndsAt"), false);
+  }
 });
