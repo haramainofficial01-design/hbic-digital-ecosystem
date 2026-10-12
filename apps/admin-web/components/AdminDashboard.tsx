@@ -1599,7 +1599,7 @@ function CommunityAdminPanel({
   );
 }
 
-function PushPanel({
+export function PushPanel({
   adminRequest,
   disabled
 }: {
@@ -1614,24 +1614,51 @@ function PushPanel({
   const [eventId, setEventId] = useState("");
   const [message, setMessage] = useState("");
   const [lastLogId, setLastLogId] = useState("");
+  const [sending, setSending] = useState(false);
+  const [deviceCode, setDeviceCode] = useState("");
+  const [requestId, setRequestId] = useState("");
+  const [requestContent, setRequestContent] = useState("");
+  const [testRequestId, setTestRequestId] = useState("");
+  const [results, setResults] = useState<{ accepted: number; delivered: number; failed: number; pending: number } | null>(null);
 
   async function sendNotification() {
+    if (sending) return;
+    if (!window.confirm(`Send “${title}” to ${audience}?`)) return;
+    const fingerprint = JSON.stringify({ title, body, audience, route, type, eventId });
+    const id = fingerprint === requestContent && requestId ? requestId : crypto.randomUUID();
+    setRequestId(id); setRequestContent(fingerprint); setSending(true);
     setMessage("");
     try {
       const data = await adminRequest("/api/admin/notifications/send", {
         method: "POST",
-        body: JSON.stringify({ title, body, audience, route, type, eventId: route === "/events" ? eventId : undefined })
+        body: JSON.stringify({ title, body, audience, route, type, eventId: route === "/events" ? eventId : undefined, requestId: id })
       });
       const result = data.result ?? {};
       setLastLogId(result.logId ?? "");
-      setMessage(`Accepted: ${result.successCount ?? 0}. Failed: ${result.failureCount ?? 0}. Target devices: ${result.tokenCount ?? 0}.`);
+      setResults({ accepted: result.acceptedCount ?? result.successCount ?? 0, delivered: 0, failed: result.failureCount ?? 0, pending: result.pendingCount ?? 0 });
+      setMessage(result.status === "dispatch_unknown" || result.status === "dispatching" ? "Dispatch is uncertain. Check delivery; do not send a new announcement." : result.replayed ? "Existing send request shown. No duplicate was sent." : result.status === "no_tokens" ? "No eligible registered devices. Nothing was sent." : "Expo response recorded. Check delivery receipts.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to send notification.");
-    }
+    } finally { setSending(false); }
+  }
+
+  async function sendMyDeviceTest() {
+    if (sending) return;
+    setSending(true); setMessage("");
+    const id = testRequestId || crypto.randomUUID(); setTestRequestId(id);
+    try {
+      const data = await adminRequest("/api/admin/notifications/test", { method: "POST", body: JSON.stringify({ code: deviceCode, requestId: id }) });
+      const result = data.result ?? {}; setLastLogId(result.logId ?? "");
+      setResults({ accepted: result.acceptedCount ?? 0, delivered: 0, failed: result.failureCount ?? 0, pending: result.pendingCount ?? 0 });
+      setMessage(result.replayed ? "Existing private test shown; no duplicate sent." : "Private test sent only to the device paired by your code. Check receipts and confirm the banner on your phone.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Private test failed."); }
+    finally { setSending(false); }
   }
 
   async function checkDelivery() {
     if (!lastLogId) return;
+    if (sending) return;
+    setSending(true);
     setMessage("");
     try {
       const data = await adminRequest("/api/admin/notifications/receipts", {
@@ -1639,10 +1666,11 @@ function PushPanel({
         body: JSON.stringify({ logId: lastLogId })
       });
       const result = data.result ?? {};
-      setMessage(`Delivered: ${result.deliveredCount ?? 0}. Failed: ${result.failedCount ?? 0}. Pending: ${result.pendingCount ?? 0}.`);
+      setResults({ accepted: result.acceptedCount ?? 0, delivered: result.deliveredCount ?? 0, failed: result.failedCount ?? 0, pending: result.pendingCount ?? 0 });
+      setMessage(result.status === "dispatch_unknown" || result.status === "dispatching" ? "Dispatch uncertain. Do not resend." : "Delivered means APNs/FCM accepted the notification—not confirmation that the phone displayed it.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to check notification delivery.");
-    }
+    } finally { setSending(false); }
   }
 
   return (
@@ -1663,8 +1691,8 @@ function PushPanel({
           {route === "/events" ? <Field label="Event ID (optional)" value={eventId} onChange={setEventId} /> : null}
         </div>
         <div className="actions">
-          <button className="primary" onClick={sendNotification} disabled={disabled}>Send notification</button>
-          {lastLogId ? <button onClick={checkDelivery} disabled={disabled}>Check delivery</button> : null}
+          <button className="primary" onClick={sendNotification} disabled={disabled || sending}>Send notification</button>
+          {lastLogId ? <button onClick={checkDelivery} disabled={disabled || sending}>Check delivery</button> : null}
         </div>
         {message ? <p className="muted">{message}</p> : null}
       </div>
@@ -1675,8 +1703,14 @@ function PushPanel({
         </div>
       ))}
       <div className="card full">
+        <h2>Private device test</h2><p className="muted">In the Masjid Bilal app, open Notifications → Create Private Test Code. Enter that code here. Only that device receives the test.</p>
+        <Field label="My device test code" value={deviceCode} onChange={value => { setDeviceCode(value.toUpperCase()); setTestRequestId(""); }} />
+        <button className="primary" disabled={disabled || sending || !/^[A-F0-9]{12}$/.test(deviceCode.trim())} onClick={sendMyDeviceTest}>Send Test to My Device</button>
+      </div>
+      <div className="card full">
         <h2>Delivery status</h2>
-        <p className="muted">Accepted is not delivered. Check delivery for final status.</p>
+        {results ? <p role="status">Accepted: {results.accepted} · Delivered: {results.delivered} · Failed: {results.failed} · Pending: {results.pending}</p> : <p className="muted">No send selected.</p>}
+        <p className="muted">Accepted = Expo queued it. Delivered = APNs/FCM receipt. Banner, sound and tap behavior must be checked on the phone.</p>
       </div>
     </div>
   );

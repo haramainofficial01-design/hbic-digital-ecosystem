@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       route?: NotificationRoute;
       type?: NotificationType;
       eventId?: string;
+      requestId?: string;
     };
 
     if (!body.title?.trim()) return jsonResponse({ ok: false, error: "Notification title is required." }, { status: 400 });
@@ -31,9 +32,8 @@ export async function POST(request: Request) {
       audience: body.audience ?? "All",
       route: body.route ?? "/",
       type: body.type ?? "announcement",
-      data: body.route === "/events" && body.eventId?.trim()
-        ? { eventId: body.eventId.trim().slice(0, 160) }
-        : undefined
+      ...(body.route === "/events" && body.eventId?.trim() ? { data: { eventId: body.eventId.trim().slice(0, 160) } } : {}),
+      ...(body.requestId ? { requestId: body.requestId, actorKey: auth.actor.email } : {})
     });
 
     return jsonResponse({ ok: true, result });

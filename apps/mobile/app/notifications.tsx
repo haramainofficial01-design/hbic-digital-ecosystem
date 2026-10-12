@@ -19,6 +19,7 @@ import { usePublishedContent } from "../src/services/content";
 import {
   adhanAudioStatus,
   getNotificationDiagnosticsAsync,
+  createPrivateNotificationTestCodeAsync,
   loadNotificationSettings,
   openNotificationSystemSettingsAsync,
   reconcilePrayerNotificationsAsync,
@@ -245,6 +246,16 @@ export default function NotificationsScreen() {
     }
   }
 
+  async function createPrivateTestCode() {
+    setBusy(true);
+    try {
+      const result = await createPrivateNotificationTestCodeAsync();
+      setStatus(`Private test code: ${result.code}. Valid for 15 minutes. Enter it in HBIC admin → Push Notifications → Send Test to My Device.`);
+      await refreshDiagnostics();
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Private test code unavailable."); }
+    finally { setBusy(false); }
+  }
+
   async function previewAdhan() {
     try {
       await adhanPreviewPlayer.seekTo(0);
@@ -400,6 +411,7 @@ export default function NotificationsScreen() {
         <DiagnosticRow label="Adhan audio" value={diagnostics?.adhanAudio ?? adhanAudioStatus.status} />
         <View style={styles.buttonStack}>
           <AppButton label="Test Prayer Notification" icon="notifications" onPress={testPrayerAlert} disabled={busy} />
+          <AppButton label="Create Private Test Code" icon="phone-portrait" variant="secondary" onPress={createPrivateTestCode} disabled={busy} />
           <AppButton label="Refresh Notification Schedule" icon="refresh" variant="secondary" onPress={refreshSchedule} disabled={busy} />
           <AppButton label="Open System Settings" icon="settings" variant="secondary" onPress={() => openNotificationSystemSettingsAsync()} />
           {diagnostics?.androidChannelId ? (

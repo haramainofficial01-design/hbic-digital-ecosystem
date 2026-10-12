@@ -594,6 +594,19 @@ export async function getNotificationDiagnosticsAsync(): Promise<NotificationDia
   };
 }
 
+/** Pair this installation privately without exposing its push token in admin UI. */
+export async function createPrivateNotificationTestCodeAsync() {
+  const token = await registerForPushNotificationsAsync({ requestPermission: true });
+  if (!token) throw new Error("Enable notifications for this phone before creating a private test code.");
+  const response = await fetch(`${apiBase}/api/notifications/test-code`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, installationId: await installationId() })
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "Private device code could not be created.");
+  return result as { code: string; expiresAt: string };
+}
+
 export async function openNotificationSystemSettingsAsync(channelId?: string) {
   if (Platform.OS === "android") {
     const appId = Application.applicationId || "ca.hbic.calgary.app";

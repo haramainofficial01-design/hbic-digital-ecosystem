@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent, iqamahOverrideWeekEndsAt, isIqamahOverrideActive } from "@hbic/shared";
 import { boundPrayerOverrides } from "../lib/prayerOverrides";
-import { changedIqamahTimes, applyPrayerSync, isOverrideActive, resolveEffectivePrayerSchedule, retainPrayerScheduleDuringOutage, type PrayerFeed } from "../lib/prayerSync";
+import { defaultMaghribIqamah, changedIqamahTimes, applyPrayerSync, isOverrideActive, resolveEffectivePrayerSchedule, retainPrayerScheduleDuringOutage, type PrayerFeed } from "../lib/prayerSync";
 import { iqamahCaAdhanUrl, parseIqamahCaAdhan } from "../lib/iqamahCaAdhan";
 import { deriveDisplayFocus } from "../lib/tvDisplay";
 
@@ -11,6 +11,22 @@ const now = new Date("2026-10-06T18:00:00Z"), sourceUpdatedAt = "2026-10-06T17:5
 const baseFeed: PrayerFeed = { salah_fajr: "6:18 AM", salah_sunrise: "7:48 AM", salah_zuhr: "1:23 PM", salah_asr: "4:25 PM", salah_maghrib: "7:03 PM", salah_isha: "8:33 PM",
   iqamah_asr: "6:00 PM", nw_i_fajr: "6:50M", nw_i_asr: "4:45 PM", jummah: "1:45/2:30PM" };
 const sourceText = `const SALAH_SCHEDULE = { "2026-10-06": { fajr: "6:18 AM", sunrise: "7:48 AM", zuhr: "1:23 PM", asr: "4:25 PM", maghrib: "7:03 PM", isha: "8:33 PM" } };`;
+
+test("Maghrib is today's official adhan plus ten minutes unless staff explicitly override it", () => {
+  const content = overridden(); content.iqamahTime.maghribIqamah = "7:40 PM";
+  const feed = { ...baseFeed, salah_maghrib: "6:43 PM", iqamah_maghrib: "8:00 PM" };
+  const resolved = resolveEffectivePrayerSchedule(content, feed, "live", "2026-10-06", sourceUpdatedAt, now).content;
+  assert.equal(resolved.iqamahTime.maghribIqamah, "6:53 PM");
+  assert.equal(resolved.iqamahTime.automaticIqamah?.maghrib, "6:53 PM");
+  content.iqamahTime.overrides = { maghrib: { enabled: true, value: "7:20 PM" } };
+  assert.equal(resolveEffectivePrayerSchedule(content, feed, "live", "2026-10-06", sourceUpdatedAt, now).content.iqamahTime.maghribIqamah, "7:20 PM");
+  content.iqamahTime.overrides.maghrib!.enabled = false;
+  assert.equal(resolveEffectivePrayerSchedule(content, feed, "live", "2026-10-06", sourceUpdatedAt, now).content.iqamahTime.maghribIqamah, "6:53 PM");
+  assert.equal(retainPrayerScheduleDuringOutage(resolved, now).iqamahTime.maghribIqamah, "6:53 PM");
+  assert.equal(defaultMaghribIqamah("11:55 PM"), "12:05 AM");
+  assert.equal(defaultMaghribIqamah("12:00 PM"), "12:10 PM");
+  assert.equal(defaultMaghribIqamah("invalid"), "");
+});
 function overridden() {
   return normalizeContent({ ...structuredClone(defaultContent), iqamahTime: { ...structuredClone(defaultContent.iqamahTime),
     fajrIqamah: "6:40 AM", dhuhrIqamah: "2:00 PM", asrIqamah: "5:00 PM", maghribIqamah: "7:13 PM", ishaIqamah: "8:45 PM",

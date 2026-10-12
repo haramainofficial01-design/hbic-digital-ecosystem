@@ -1,4 +1,5 @@
 import type { NotificationRoute, NotificationType } from "@hbic/shared";
+import { notificationDocument } from "./notificationDocument";
 
 export const communityNotificationChannelId = "community_updates_v1";
 
@@ -64,11 +65,11 @@ export function buildVisibleExpoPushMessage(token: string, input: VisibleNotific
     sound: "default",
     priority: "high",
     interruptionLevel: "active",
-    data: {
+    data: notificationDocument({
+      ...(input.data ?? {}),
       route: input.route ?? "/",
-      type: input.type ?? "announcement",
-      ...(input.data ?? {})
-    }
+      type: input.type ?? "announcement"
+    })
   };
 }
 
@@ -81,13 +82,13 @@ export function buildContentUpdateExpoPushMessage(
     priority: "high",
     contentAvailable: true,
     ttl: 300,
-    data: {
+    data: notificationDocument({
       type: "contentUpdate",
       route: "/",
       contentVersion: input.contentVersion,
       publicationRevision: input.publicationRevision,
       scheduleRevision: input.scheduleRevision,
       publishedAt: input.publishedAt
-    }
+    })
   };
 }

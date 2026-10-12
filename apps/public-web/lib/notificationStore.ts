@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   defaultNotificationPreferences,
   notificationPreferenceKeyByType,
@@ -8,6 +8,7 @@ import {
   type NotificationType
 } from "@hbic/shared";
 import { getDatabase } from "./contentStore";
+import { notificationDocument } from "./notificationDocument";
 import {
   assertRemoteNotificationType,
   buildContentUpdateExpoPushMessage,
@@ -46,6 +47,8 @@ type SendNotificationInput = {
   type?: NotificationType;
   data?: Record<string, unknown>;
   privateTest?: boolean;
+  requestId?: string;
+  actorKey?: string;
 };
 
 type ExpoPushTicket = {
@@ -56,6 +59,8 @@ type ExpoPushTicket = {
 };
 
 type StoredTicket = { id: string; tokenId: string };
+export type PushSendResult = { logId: string; successCount: number; failureCount: number; tokenCount: number; receiptCount: number; status: string;
+  acceptedCount?: number; pendingCount?: number; replayed?: boolean };
 
 export class NotificationInputError extends Error {}
 
@@ -122,7 +127,7 @@ export async function registerPushToken(input: {
   token.environment = normalizeEnvironment(input.environment);
   if (installationIdHash) token.installationIdHash = installationIdHash;
 
-  await currentRef.set(token, { merge: true });
+  await currentRef.set(notificationDocument(token), { merge: true });
 
   if (input.previousToken && input.previousToken !== input.token) {
     const previousRef = db.collection("pushTokens").doc(tokenId(input.previousToken));
@@ -159,7 +164,9 @@ function audienceMatches(token: RegisteredPushToken, audience: SendNotificationI
   if (audience === "All" || audience === "Everyone") return true;
   if (audience === "Android") return token.platform === "android";
   if (audience === "iOS") return token.platform === "ios";
-  return true;
+  // These audiences have no verified membership mapping in pushTokens.
+  // Never silently broadcast a targeted message to Everyone.
+  return false;
 }
 
 function hasEnabledPreference(token: RegisteredPushToken, type: NotificationType | undefined) {
@@ -178,12 +185,13 @@ async function sendExpoMessageBatch(messages: ExpoPushMessage[]) {
     const response = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(messages)
+      body: JSON.stringify(messages), signal: AbortSignal.timeout(20000)
     });
     lastStatus = response.status;
     const result = (await response.json().catch(() => null)) as { data?: ExpoPushTicket[] } | null;
-    if (response.ok && result?.data) return result.data;
-    if (response.status !== 429 && response.status < 500) break;
+    if (response.ok && Array.isArray(result?.data)) return result.data;
+    // A timeout/5xx may follow dispatch. Retrying could duplicate an alert.
+    if (response.status !== 429) break;
     if (attempt < 2) await retryDelay(attempt === 0 ? 250 : 1_000);
   }
   throw new Error(`Expo push service returned HTTP ${lastStatus || "unknown"}.`);
@@ -193,66 +201,84 @@ async function deliverExpoPushMessages({
   tokens,
   messages,
   logData,
-  logCollection = "pushNotificationLogs"
+  logCollection = "pushNotificationLogs",
+  deduplicationKey
 }: {
   tokens: RegisteredPushToken[];
   messages: ExpoPushMessage[];
   logData: Record<string, unknown>;
   logCollection?: "pushNotificationLogs" | "contentPropagationLogs";
-}) {
+  deduplicationKey?: string;
+}): Promise<PushSendResult> {
   const db = getDatabase();
   if (!db) throw new Error("Notification storage is not configured.");
   const now = new Date().toISOString();
-  const logRef = db.collection(logCollection).doc();
+  const safeLog = notificationDocument(logData);
+  const fingerprint = createHash("sha256").update(JSON.stringify({ ...safeLog, requestId: undefined, actorKey: undefined })).digest("hex");
+  const logRef = deduplicationKey ? db.collection(logCollection).doc(deduplicationKey) : db.collection(logCollection).doc();
+  const existing = await db.runTransaction(async tx => {
+    const previous = await tx.get(logRef);
+    if (previous.exists) {
+      if (previous.data()?.fingerprint !== fingerprint) throw new NotificationInputError("This send request was already used for different content.");
+      return previous.data();
+    }
+    // Durable intent FIRST. Any serialization/storage failure happens before Expo.
+    tx.create(logRef, notificationDocument({ ...safeLog, fingerprint, sentAt: now, status: tokens.length ? "dispatching" : "no_tokens", tokenCount: tokens.length,
+      successCount: 0, failureCount: 0, pendingCount: tokens.length, tickets: [] }));
+    return null;
+  });
+  const responseSummary = (record: Record<string, unknown>, replayed = false) => ({ logId: logRef.id, successCount: Number(record.successCount ?? 0), acceptedCount: Number(record.successCount ?? 0),
+    failureCount: Number(record.failureCount ?? 0), tokenCount: Number(record.tokenCount ?? tokens.length), receiptCount: Array.isArray(record.tickets) ? record.tickets.length : 0,
+    pendingCount: Number(record.pendingCount ?? tokens.length), status: String(record.status ?? "dispatch_unknown"), replayed });
+  if (existing) return responseSummary(existing, true);
 
   if (!tokens.length) {
-    await logRef.set({ ...logData, sentAt: now, successCount: 0, failureCount: 0, tokenCount: 0, status: "no_tokens" });
-    return { logId: logRef.id, successCount: 0, failureCount: 0, tokenCount: 0, receiptCount: 0, status: "no_tokens" };
+    return responseSummary({ successCount: 0, failureCount: 0, pendingCount: 0, tickets: [], status: "no_tokens" });
   }
 
   let successCount = 0;
   let failureCount = 0;
   const disabledTokens: string[] = [];
   const tickets: StoredTicket[] = [];
+  const ticketErrors: { code: string; message: string }[] = [];
 
   try {
     for (let batchIndex = 0; batchIndex < messages.length; batchIndex += 100) {
       const messageBatch = messages.slice(batchIndex, batchIndex + 100);
       const tokenBatch = tokens.slice(batchIndex, batchIndex + 100);
+      await logRef.set({ currentBatch: batchIndex / 100, status: "dispatching" }, { merge: true });
       const result = await sendExpoMessageBatch(messageBatch);
+      if (result.length !== messageBatch.length) throw new Error("Expo returned an incomplete ticket response. Dispatch status is uncertain; do not resend.");
       result.forEach((ticket, index) => {
         const target = tokenBatch[index];
         if (!target) return;
-        if (ticket.status === "ok") {
+        if (ticket.status === "ok" && ticket.id) {
           successCount += 1;
           if (ticket.id) tickets.push({ id: ticket.id, tokenId: tokenId(target.token) });
         } else {
           failureCount += 1;
+          ticketErrors.push({ code: ticket.details?.error ?? "UnknownTicketError", message: ticket.message ?? "Expo did not accept this notification." });
           if (ticket.details?.error === "DeviceNotRegistered") disabledTokens.push(target.token);
         }
       });
+      await logRef.set(notificationDocument({ successCount, failureCount, tickets, ticketErrors, pendingCount: tokens.length - failureCount }), { merge: true });
     }
   } catch (error) {
-    await logRef.set({
-      ...logData,
-      sentAt: now,
-      successCount,
-      failureCount: failureCount + tokens.length - successCount - failureCount,
-      tokenCount: tokens.length,
-      tickets,
-      status: "provider_error",
-      error: error instanceof Error ? error.message : "Expo push delivery failed."
-    });
-    throw error;
+    const uncertain = { successCount, failureCount, tickets, ticketErrors, pendingCount: tokens.length - failureCount, status: "dispatch_unknown",
+      error: "Dispatch may have occurred. Check this delivery record before sending again." };
+    await logRef.set(notificationDocument(uncertain), { merge: true }).catch(() => undefined);
+    return responseSummary(uncertain);
   }
 
   await Promise.all(
-    disabledTokens.map((token) => db.collection("pushTokens").doc(tokenId(token)).set({ enabled: false, updatedAt: now }, { merge: true }))
+    disabledTokens.map((token) => db.collection("pushTokens").doc(tokenId(token)).set({ enabled: false, updatedAt: now }, { merge: true }).catch(() => undefined))
   );
 
-  const status = failureCount ? "partial" : "accepted";
-  await logRef.set({ ...logData, sentAt: now, successCount, failureCount, tokenCount: tokens.length, tickets, status });
-  return { logId: logRef.id, successCount, failureCount, tokenCount: tokens.length, receiptCount: tickets.length, status };
+  const status = successCount ? failureCount ? "partial" : "accepted" : "failed";
+  const summary = { successCount, failureCount, tickets, ticketErrors, pendingCount: tickets.length, status };
+  try { await logRef.set(notificationDocument(summary), { merge: true }); }
+  catch { return responseSummary({ ...summary, status: "dispatch_unknown" }); }
+  return responseSummary(summary);
 }
 
 async function allEnabledTokens() {
@@ -265,6 +291,11 @@ async function allEnabledTokens() {
 
 export async function sendPushNotification(input: SendNotificationInput, targetTokens?: RegisteredPushToken[]) {
   assertRemoteNotificationType(input.type);
+  if (typeof input.title !== "string" || !input.title.trim() || input.title.length > 160 || typeof input.body !== "string" || !input.body.trim() || input.body.length > 2000) throw new NotificationInputError("Enter a notification title and body within the allowed length.");
+  if (input.type && !(input.type in notificationPreferenceKeyByType)) throw new NotificationInputError("Unknown notification type.");
+  if (input.route && !["/", "/prayer", "/events", "/donate", "/media", "/programs", "/youth", "/contact", "/more", "/community", "/halal-restaurants", "/notifications", "/quran-academy"].includes(input.route)) throw new NotificationInputError("Choose an app notification destination.");
+  if (!["All", "Everyone", "Android", "iOS"].includes(input.audience)) throw new NotificationInputError("This audience has no verified device membership. Choose Everyone, Android or iOS; no notification was sent.");
+  if (input.requestId && !/^[A-Za-z0-9_-]{16,100}$/.test(input.requestId)) throw new NotificationInputError("Invalid send request ID.");
   const tokens = targetTokens ?? (await allEnabledTokens())
     .filter((token) => audienceMatches(token, input.audience) && hasEnabledPreference(token, input.type));
   const messages = tokens.map((token) => buildVisibleExpoPushMessage(token.token, {
@@ -274,7 +305,8 @@ export async function sendPushNotification(input: SendNotificationInput, targetT
     // until that installation launches and re-registers.
     androidChannelId: token.appVersion ? undefined : "default"
   }));
-  return deliverExpoPushMessages({ tokens, messages, logData: input });
+  return deliverExpoPushMessages({ tokens, messages, logData: input,
+    deduplicationKey: input.requestId ? createHash("sha256").update(`${input.actorKey ?? "admin"}:${input.requestId}`).digest("hex") : undefined });
 }
 
 /** A device receives only the prayers it chose, with matching text and data. */
@@ -314,43 +346,58 @@ export async function sendContentUpdateSignal(input: {
   });
 }
 
-export async function sendPrivatePushTest(input: { token: string; platform: PushPlatform }) {
+export async function createPrivatePushTestCode(input: { token: string; installationId: string }) {
   assertExpoPushToken(input.token);
+  const db = getDatabase();
+  if (!db) throw new Error("Notification storage is not configured.");
+  const ref = db.collection("pushTokens").doc(tokenId(input.token)), token = (await ref.get()).data() as RegisteredPushToken | undefined;
+  if (!token?.enabled || !token.installationIdHash || token.installationIdHash !== hashInstallationId(input.installationId)) throw new NotificationInputError("This registered device could not be verified.");
+  if (Date.now() - Date.parse(String((await ref.get()).data()?.privateTestCodeCreatedAt ?? "")) < 30_000) throw new NotificationInputError("Please wait 30 seconds before creating another device code.");
+  const code = randomBytes(6).toString("hex").toUpperCase();
+  const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+  await db.collection("pushTestTargets").doc(createHash("sha256").update(code).digest("hex")).create({ tokenId: ref.id, platform: token.platform, expiresAt });
+  await ref.set({ privateTestCodeCreatedAt: new Date().toISOString() }, { merge: true });
+  return { code, expiresAt };
+}
+
+export async function sendPrivatePushTestCode(input: { code: string; requestId?: string; actorKey?: string }) {
+  const code = input.code.trim().toUpperCase();
+  if (!/^[A-F0-9]{12}$/.test(code)) throw new NotificationInputError("Enter the private test code shown on your device.");
+  const db = getDatabase();
+  if (!db) throw new Error("Notification storage is not configured.");
+  const target = (await db.collection("pushTestTargets").doc(createHash("sha256").update(code).digest("hex")).get()).data();
+  if (!target || Date.parse(target.expiresAt) <= Date.now()) throw new NotificationInputError("This device code expired. Create a new code on your phone.");
+  const token = (await db.collection("pushTokens").doc(target.tokenId).get()).data() as RegisteredPushToken | undefined;
+  if (!token?.enabled) throw new NotificationInputError("This device no longer has an active push registration.");
+  return sendPrivatePushTest({ token: token.token, platform: token.platform, requestId: input.requestId, actorKey: input.actorKey });
+}
+
+export async function sendPrivatePushTest(input: { token: string; platform: PushPlatform; requestId?: string; actorKey?: string }) {
+  assertExpoPushToken(input.token);
+  const db = getDatabase();
+  if (!db) throw new Error("Notification storage is not configured.");
+  const target = (await db.collection("pushTokens").doc(tokenId(input.token)).get()).data() as RegisteredPushToken | undefined;
+  if (!target?.enabled || target.platform !== input.platform) throw new NotificationInputError("Choose a registered, enabled device on the correct platform.");
   return sendPushNotification(
     {
       title: "Masjid Bilal Test",
-      body: "Sound, banner, and notification delivery are connected successfully.",
+      body: "Private delivery test. Please check the banner, sound and tap to open notification settings.",
       audience: "All",
       route: "/notifications",
       type: "announcement",
       data: { test: true },
-      privateTest: true
+      privateTest: true,
+      ...(input.requestId ? { requestId: input.requestId, actorKey: input.actorKey } : {})
     },
-    [{
-      token: input.token,
-      platform: input.platform,
-      appVersion: "1.5.0",
-      preferences: defaultNotificationPreferences,
-      enabled: true,
-      createdAt: "",
-      updatedAt: ""
-    }]
+    [target]
   );
-}
-
-export async function sendLatestRegisteredPrivatePushTest(platform: Extract<PushPlatform, "android" | "ios">) {
-  const tokens = (await allEnabledTokens())
-    .filter((token) => token.platform === platform)
-    .sort((left, right) => Date.parse(right.lastSeenAt || right.updatedAt || "") - Date.parse(left.lastSeenAt || left.updatedAt || ""));
-  const target = tokens[0];
-  if (!target) throw new Error(`No enabled ${platform} device is registered for a private notification test.`);
-  return sendPrivatePushTest({ token: target.token, platform });
 }
 
 export async function checkPushNotificationReceipts(logId: string, options?: { privateTestOnly?: boolean }) {
   const db = getDatabase();
   if (!db) throw new Error("Notification storage is not configured.");
 
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(logId)) throw new NotificationInputError("Invalid notification delivery ID.");
   const logRef = db.collection("pushNotificationLogs").doc(logId);
   const log = await logRef.get();
   if (!log.exists) throw new Error("Notification delivery record was not found.");
@@ -358,34 +405,45 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
     throw new Error("This delivery record is not available to the private test workflow.");
   }
 
-  const tickets = (log.data()?.tickets ?? []) as StoredTicket[];
+  const record = log.data()!;
+  const tickets = (record.tickets ?? []) as StoredTicket[];
+  const acceptedCount = Number(record.successCount ?? 0), immediateFailures = Number(record.failureCount ?? 0);
+  const receiptResults: Record<string, "ok" | "error"> = { ...(record.receiptResults ?? {}) };
   if (!tickets.length) {
-    return { logId, receiptCount: 0, deliveredCount: 0, failedCount: 0, pendingCount: 0, status: "no_receipts" };
+    return { logId, acceptedCount, receiptCount: 0, deliveredCount: 0, failedCount: immediateFailures,
+      pendingCount: record.status === "dispatching" || record.status === "dispatch_unknown" ? Number(record.tokenCount ?? 0) - immediateFailures : 0,
+      status: record.status, deliveryMeaning: "APNs/FCM receipt, not on-device display confirmation" };
   }
-
+  const pendingTickets = tickets.filter(ticket => !receiptResults[ticket.id]);
+  const receipts: Record<string, { status?: "ok" | "error"; details?: { error?: string } }> = {};
+  for (let offset = 0; offset < pendingTickets.length; offset += 1000) {
   const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ ids: tickets.map((ticket) => ticket.id) })
+    body: JSON.stringify({ ids: pendingTickets.slice(offset, offset + 1000).map((ticket) => ticket.id) }), signal: AbortSignal.timeout(20000)
   });
   if (!response.ok) throw new Error(`Expo receipt service returned HTTP ${response.status}.`);
 
   const result = (await response.json()) as {
     data?: Record<string, { status?: "ok" | "error"; message?: string; details?: { error?: string } }>;
   };
+  if (!result.data || typeof result.data !== "object") throw new Error("Expo returned an invalid receipt response.");
+  Object.assign(receipts, result.data);
+  }
   let deliveredCount = 0;
-  let failedCount = 0;
-  let pendingCount = 0;
+  let failedCount = immediateFailures;
+  let pendingCount = Math.max(0, Number(record.tokenCount ?? tickets.length) - acceptedCount - immediateFailures);
   const disabledTokenIds: string[] = [];
 
   tickets.forEach((ticket) => {
-    const receipt = result.data?.[ticket.id];
+    const receipt = receiptResults[ticket.id] ? { status: receiptResults[ticket.id] } : receipts[ticket.id];
     if (!receipt) pendingCount += 1;
-    else if (receipt.status === "ok") deliveredCount += 1;
-    else {
+    else if (receipt.status === "ok") { deliveredCount += 1; receiptResults[ticket.id] = "ok"; }
+    else if (receipt.status === "error") {
       failedCount += 1;
+      receiptResults[ticket.id] = "error";
       if (receipt.details?.error === "DeviceNotRegistered") disabledTokenIds.push(ticket.tokenId);
-    }
+    } else pendingCount += 1;
   });
 
   const checkedAt = new Date().toISOString();
@@ -393,6 +451,7 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
     disabledTokenIds.map((id) => db.collection("pushTokens").doc(id).set({ enabled: false, updatedAt: checkedAt }, { merge: true }))
   );
   const status = pendingCount ? "pending" : failedCount ? "failed" : "delivered";
-  await logRef.set({ receiptCheckedAt: checkedAt, deliveredCount, failedCount, pendingCount, status }, { merge: true });
-  return { logId, receiptCount: tickets.length, deliveredCount, failedCount, pendingCount, status };
+  await logRef.set(notificationDocument({ receiptCheckedAt: checkedAt, deliveredCount, failedCount, pendingCount, status, receiptResults }), { merge: true });
+  return { logId, acceptedCount, receiptCount: tickets.length, deliveredCount, failedCount, pendingCount, status,
+    deliveryMeaning: "APNs/FCM receipt, not on-device display confirmation" };
 }

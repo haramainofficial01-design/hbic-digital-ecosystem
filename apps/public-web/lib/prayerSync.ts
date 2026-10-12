@@ -123,6 +123,15 @@ function normalizeTime(value: string) {
     .replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase());
 }
 
+/** Maghrib follows today's official adhan, except for an explicit staff override. */
+export function defaultMaghribIqamah(adhan: string) {
+  const clock = parseClock(normalizeTime(adhan));
+  if (!clock) return "";
+  const minutes = (clock.hour * 60 + clock.minute + 10) % 1440;
+  const hour = Math.floor(minutes / 60);
+  return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
 export function isOverrideActive(override?: IqamahOverride | null, now = new Date(), fallbackUpdatedAt?: string) {
   return isIqamahOverrideActive(override, now, fallbackUpdatedAt);
 }
@@ -149,6 +158,7 @@ export function retainPrayerScheduleDuringOutage(content: HbicContent, nowDate =
         ? normalizeTime(overrides[prayer]!.value)
         : content.iqamahTime.automaticIqamah?.[prayer] ?? "";
     }
+    if (!active.includes("maghrib")) retainedIqamah.maghribIqamah = defaultMaghribIqamah(content.prayerTime.maghrib);
     return normalizeContent({
       ...content,
       prayerTime: {
@@ -234,12 +244,13 @@ export function resolveEffectivePrayerSchedule(
     lastUpdated: updatedAt
   };
 
-  // Adhan is automatic; iqamah belongs to HBIC staff, not IISC or the retired
+  // Adhan is automatic; other iqamah belongs to HBIC staff, not IISC or the retired
   // AWS next-week feed. No weekly rollover is allowed to overwrite staff times.
   const automaticIqamah: IqamahScheduleValues = Object.fromEntries(
     (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[]).map(prayer =>
       [prayer, content.iqamahTime[iqamahFieldByPrayer[prayer]]])
   ) as IqamahScheduleValues;
+  automaticIqamah.maghrib = defaultMaghribIqamah(prayerTime.maghrib);
 
   const overrides = content.iqamahTime.overrides ?? {};
   const activeOverrides = (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[]).filter((prayer) => isOverrideActive(overrides[prayer], now, content.iqamahTime.updatedAt));
