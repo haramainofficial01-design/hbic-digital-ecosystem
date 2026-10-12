@@ -23,13 +23,9 @@ final class HBICQuranUITests: XCTestCase {
     func capture(_ name: String) throws {
         let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HBIC_QA_OUTPUT"] ?? NSTemporaryDirectory())
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        #if os(visionOS)
-        // Compatible-window app snapshots can crop a scaled compositor layer.
-        // Capture the real simulator display, including the complete window.
-        let screenshot = XCUIScreen.main.screenshot()
-        #else
+        // Vision app snapshots crop a scaled compositor layer on this SDK;
+        // inspect the full display separately with simctl, not as store assets.
         let screenshot = app.screenshot()
-        #endif
         try screenshot.pngRepresentation.write(to: folder.appendingPathComponent("\(name).png"))
     }
     @objc func testReaderFocusAndContextualTools() throws {
