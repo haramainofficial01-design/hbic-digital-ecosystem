@@ -47,4 +47,25 @@ new hosting project is required.
   Attendance save/group change and exemption confirmation tested without live writes.
 - Phone and desktop screenshots use synthetic test records only.
 
-Deployment and live alias verification are recorded after completion.
+## Production verification
+
+- Release source: `348bdb735909220146092641bcd4bf508868debe`.
+- Public/backend: `dpl_6FMeEvAeXMgr8fNSwqRvd3w65JkE`, READY production,
+  existing `hbic.ca` and aliases preserved, `npm run build:web` confirmed.
+- Admin: `dpl_FbPk5k8d6AJxX25aSRP2sbD3XHNK`, READY production,
+  existing `hbic-calgary-admin.vercel.app` preserved, `npm run build:admin`
+  confirmed. Both deployment metadata records identify the exact release SHA.
+- Public Firebase remains `hbic-calgary-prod`, live billing remains live,
+  and existing sensitive server environment values were preserved, not replaced
+  by placeholders or preview credentials.
+- Fresh no-cache HTTP 200 with actual content: website, Academy, admin and
+  `/api/display`. The new exemption route returns 401 before any write for an
+  unauthenticated request, rather than 404 or public access.
+- Verified through the existing signed-in production Chrome session: records
+  load in live mode; existing exempt-family records appear; the exemptions tab,
+  actual cash/card breakdown, non-exempt tuition breakdown and correction preview
+  are present; separate attendance rosters, group selectors and valid class dates
+  render. No live exemption, attendance, receipt or card change was submitted.
+- The focused regression suite has 45 tests, plus the 104 browser checks.
+
+Mobile/store binaries were not rebuilt; this is a dashboard/backend restoration.
