@@ -82,3 +82,22 @@ admin and mobile typechecks passed; both web builds passed. The added phone
 pairing-code UI still requires a store build: existing 1.7.6 iOS build 35 is
 WAITING_FOR_REVIEW and Android code 40 is the submitted production release.
 These existing builds must not be represented as containing the new pairing UI.
+
+Final production source `42f6443` is confirmed READY on both existing aliases:
+
+- Public: `dpl_AzBzzgGnHUZsDe3amKS5vkRNC584`.
+- Admin: `dpl_5KtUSoyGmo33oMw2jqZr31hkqqNg`.
+
+The authenticated live receipt endpoint now reports partial, 170 successful,
+seven failed, zero pending, with DeviceNotRegistered = six and BadDeviceToken =
+one. All seven invalid registrations are disabled; six opted-out registrations
+were not included in the test. Repeating the exact actor-scoped request returns
+the original log with replayed = true and does not send again.
+
+Store builds for the pairing-code UI were queued with existing frozen signing
+credentials, without changing app identifiers, permissions or app version:
+Android code 41 `31c3d5e2-ca2b-4508-a467-757f09666907`, iOS/Watch build 36
+`2e640f17-e6b6-4240-aa39-bf87a5a4b8bf`. Build completion, signed-artifact verification,
+upload, submission and store approval are separate states; none is implied by
+queueing these builds. The existing build-35 Apple review remains untouched
+until its replacement is processed and verified.
