@@ -2,7 +2,7 @@
 
 import { calculateQiblaBearing, emptyQuranState, isAlignedWithQibla, markRead, normalizeSearch, parseAyahReference, qiblaRotation, versePage,
   type QuranChapter, type QuranPage, type QuranResources, type QuranState, type QuranVerse } from "@hbic/shared";
-import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, LocateFixed, Pause, Play, Search, Square, Trash2 } from "lucide-react";
+import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, Headphones, LocateFixed, Mic, Pause, Play, Repeat, Search, Sparkles, Square, Trash2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approvedWebQuranResources, restoreWebQuranState, webQuranClient, webQuranStorageKey } from "../lib/quranBrowser";
 import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, useWebQuranAudio } from "./QuranReaderTools";
@@ -10,6 +10,7 @@ import styles from "./QuranReader.module.css";
 
 type QuranMode = "read" | "listen" | "practice" | "memorize" | "test" | "bookmarks";
 const modes: { id: QuranMode; label: string }[] = [{ id: "read", label: "Read" }, { id: "listen", label: "Listen" }, { id: "practice", label: "Practise" }, { id: "memorize", label: "Memorization" }, { id: "test", label: "Test yourself" }, { id: "bookmarks", label: "Bookmarks" }];
+const modeIcons = { read: BookOpen, listen: Headphones, practice: Mic, memorize: Repeat, test: Sparkles, bookmarks: Bookmark };
 
 export function QuranReader() {
   const [chapters, setChapters] = useState<QuranChapter[]>([]), [resources, setResources] = useState<QuranResources | null>(null);
@@ -159,7 +160,7 @@ export function QuranReader() {
         <div className={styles.chapterList}>{matchingChapters.map((item) => <button key={item.id} className={item.id === chapterId ? styles.selected : undefined} aria-current={item.id === chapterId ? "true" : undefined} onClick={() => open(item.id)}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}{chapters.length && !matchingChapters.length ? <p className={styles.surahStatus} role="status">No matching surahs. Try a name or number.</p> : !chapters.length ? <p className={styles.surahStatus} role="status">{catalogError ? "Surah index unavailable. Retry the connection in the reader." : "Loading surahs…"}</p> : null}</div>
       </aside>
       <div className={styles.reading}>
-        <nav className={styles.modeNavigation} aria-label="Quran tools">{modes.map((item) => <button key={item.id} aria-pressed={mode === item.id} onClick={() => changeMode(item.id)}>{item.label}{item.id === "bookmarks" && bookmarks.length ? ` (${bookmarks.length})` : ""}</button>)}</nav>
+        <nav className={styles.modeNavigation} aria-label="Quran tools">{modes.map((item) => { const Icon = modeIcons[item.id]; return <button key={item.id} aria-pressed={mode === item.id} onClick={() => changeMode(item.id)}><Icon size={18} aria-hidden="true" /><span>{item.label}{item.id === "bookmarks" && bookmarks.length ? ` (${bookmarks.length})` : ""}</span></button>; })}</nav>
         <details className={styles.preferences}><summary>Reading and reference audio preferences</summary><div className={styles.preferenceGrid}>
           <label>Reference reciter<select aria-label="Reference reciter" value={preferences.reciter} disabled={!resources?.reciters.length} onChange={(event) => setPreference({ reciter: Number(event.target.value) })}>{resources?.reciters.length ? resources.reciters.map((item) => <option key={item.id} value={item.id}>{item.name}{item.style ? ` · ${item.style}` : ""}</option>) : <option value={preferences.reciter}>Reciter catalog unavailable</option>}</select></label>
           <label>Translation of the meaning<select aria-label="Quran translation" value={preferences.translation} disabled={!resources?.translations.length} onChange={(event) => setPreference({ translation: Number(event.target.value) })}>{resources?.translations.length ? resources.translations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>) : <option value={preferences.translation}>Approved translation unavailable</option>}</select></label>

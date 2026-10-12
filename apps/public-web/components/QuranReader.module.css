@@ -178,3 +178,40 @@
   :global(.site):has(.shell) :global(.mobile-nav-actions){gap:4px}
   :global(.site):has(.shell) :global(.mobile-app-link),:global(.site):has(.shell) :global(.mobile-menu summary){font-size:11px;padding-inline:8px}
 }
+
+/* Compact workspace: navigation has glass depth; Quran text stays calm and opaque. */
+.hero{min-height:180px;padding:30px 38px;gap:26px;border-radius:28px;box-shadow:0 12px 32px rgba(3,28,41,.12)}
+.hero h1{font-family:inherit;font-size:clamp(30px,3.5vw,48px);font-weight:700;line-height:1.15;letter-spacing:-.035em;margin:10px 0 12px}
+.hero p{font-size:16px;line-height:1.6;max-width:550px}.hero>span{font-size:clamp(32px,4vw,56px)}
+.quick{width:100%;margin:16px 0 24px;gap:10px}.quick a{min-height:50px;border-radius:16px;font-size:13px;box-shadow:0 4px 16px rgba(7,51,62,.05)}
+.reader{grid-template-columns:280px minmax(0,1fr);border-radius:28px;box-shadow:0 12px 36px rgba(7,48,57,.07)}
+.reader aside{background:var(--reader-soft);color:var(--reader-ink);border-right:1px solid var(--reader-line);padding:22px 12px}
+.reader aside h2{font-size:18px}.chapterList button{color:var(--reader-ink);border-radius:12px;min-height:70px;gap:8px}
+.chapterList button>b{border-color:var(--reader-line);background:var(--reader-surface);color:var(--reader-accent)}
+.chapterList button small,.surahStatus,.surahSearch,.mobileSurahPicker{color:var(--reader-muted)}
+.chapterList button em{color:var(--reader-ink);font-size:17px;max-width:84px}
+.chapterList button:hover,.chapterList button.selected{background:var(--reader-surface);box-shadow:inset 0 0 0 1px var(--reader-line)}
+.surahSearch input,.mobileSurahPicker select{background:var(--reader-surface);border-color:var(--reader-line);color:var(--reader-ink)}
+.surahSearch input::placeholder{color:var(--reader-muted)}
+.resumeReading{background:var(--reader-surface);border-color:var(--reader-line);color:var(--reader-accent);font-size:13px}
+.modeNavigation{padding:14px 18px;background:var(--reader-soft);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+.modeNavigation button{flex-direction:column;gap:5px;padding:9px 4px;background:transparent;border-color:transparent;border-radius:14px;font-size:12px;overflow-wrap:normal}
+.modeNavigation button[aria-pressed=true]{background:var(--reader-surface);border-color:var(--reader-line);color:var(--reader-ink);box-shadow:0 3px 10px rgba(7,48,57,.07)}
+.modeNavigation button svg{flex-shrink:0;color:var(--reader-accent)}
+.preferences{margin:12px 20px;padding:10px 14px;background:var(--reader-soft);border-color:transparent}
+.preferences summary{font-size:12px;min-height:24px}.toolbar{padding-top:0;border-bottom:0}
+.readingNavigation{padding-block:10px}.layoutChoice{margin-top:4px;gap:4px;padding:4px;border-radius:16px;background:var(--reader-soft)}
+.layoutChoice button{flex:1;border:0;background:transparent;min-height:42px}.layoutChoice button[aria-pressed=true]{background:var(--reader-surface);color:var(--reader-ink);box-shadow:0 2px 8px rgba(7,48,57,.08)}
+.chapterHeader{padding:26px 18px 22px}.chapterHeader h2{font-family:inherit;font-size:30px;font-weight:700;letter-spacing:-.03em}
+.verse{max-width:760px;margin-inline:auto;padding:30px 24px;border-color:var(--reader-line)}
+.translation p{font-family:inherit;font-size:17px;line-height:1.85}.verseTop>span{padding:8px 12px;border-radius:999px}
+.verseTop button{border-color:transparent;background:var(--reader-soft)}
+@media(max-width:1100px){.reader{grid-template-columns:230px minmax(0,1fr)}.modeNavigation{grid-template-columns:repeat(3,minmax(0,1fr))}.chapterList button em{max-width:60px}}
+@media(max-width:700px){
+  .shell{padding-top:12px}.hero{min-height:0;padding:22px;grid-template-columns:1fr;gap:14px;border-radius:22px}.hero h1{font-size:30px;margin-block:8px}.hero p{font-size:14px}.hero>span{font-size:30px;line-height:1.4}
+  .quick{width:100%;margin:12px 0 16px;gap:6px}.quick a{min-height:52px;font-size:11px;flex-direction:row;padding:6px;border-radius:14px}
+  .reader{display:block;border-radius:22px}.reader aside{padding:14px;border-right:0;border-bottom:1px solid var(--reader-line)}.reader aside h2{display:none}.mobileSurahPicker{gap:5px}.resumeReading{margin-bottom:10px}
+  .modeNavigation{padding:10px;gap:4px}.modeNavigation button{min-height:52px;font-size:11px;padding:7px 4px;gap:4px}
+  .preferences{margin:10px 14px}.chapterHeader h2{font-size:27px}.verse{padding-inline:18px;margin-inline:0}.translation p{font-size:16px}
+}
+@media(prefers-color-scheme:dark){.chapterList button>b,.resumeReading{color:#9ce1d8}.modeNavigation button svg{color:#9ce1d8}.quick a{background:#173b46;color:#e8f1ee;border-color:var(--reader-line)}.quick svg{color:#9ce1d8}}

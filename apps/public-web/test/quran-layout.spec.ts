@@ -49,7 +49,7 @@ async function fits(page: Page) {
 
 test.beforeEach(async ({ page }) => { await fixtures(page); });
 
-for (const width of [320, 390, 700, 768, 1024, 1440]) for (const colorScheme of ["light", "dark"] as const) {
+for (const width of [320, 390, 700, 768, 1024, 1440, 1920]) for (const colorScheme of ["light", "dark"] as const) {
   test(`${width}px ${colorScheme}: all Quran tools fit`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
@@ -74,6 +74,9 @@ for (const width of [320, 390, 700, 768, 1024, 1440]) for (const colorScheme of 
     }
     await tools.getByRole("button", { name: "Read", exact: true }).click();
     if (width === 390 || width === 1440) {
+      await page.getByText("Reading and reference audio preferences", { exact: true }).click();
+      await page.locator("#reader").scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `output/quran-web-layout/reader-${width}-${colorScheme}.png` });
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: `output/quran-web-layout/quran-${width}-${colorScheme}.png`, fullPage: true });
     }
