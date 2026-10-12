@@ -23,7 +23,14 @@ final class HBICQuranUITests: XCTestCase {
     func capture(_ name: String) throws {
         let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["HBIC_QA_OUTPUT"] ?? NSTemporaryDirectory())
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try app.screenshot().pngRepresentation.write(to: folder.appendingPathComponent("\(name).png"))
+        #if os(visionOS)
+        // Compatible-window app snapshots can crop a scaled compositor layer.
+        // Capture the real simulator display, including the complete window.
+        let screenshot = XCUIScreen.main.screenshot()
+        #else
+        let screenshot = app.screenshot()
+        #endif
+        try screenshot.pngRepresentation.write(to: folder.appendingPathComponent("\(name).png"))
     }
     @objc func testReaderFocusAndContextualTools() throws {
         // A Simulator deep link can require confirmation before activation.
@@ -41,7 +48,8 @@ final class HBICQuranUITests: XCTestCase {
         app.launch()
         if control("Skip introduction").waitForExistence(timeout: 3) { try tap("Skip introduction") }
         if !control("Quran home").exists && !control("Back to More").exists {
-            try tap("More"); try tap("Quran & Recite")
+            try tap("More")
+            try tap(control("Quran").waitForExistence(timeout: 3) ? "Quran" : "Quran & Recite")
         }
         try tap("Read")
         try check(app.staticTexts["Al-Fatihah"].waitForExistence(timeout: 30), "Real Quran chapter did not load")
