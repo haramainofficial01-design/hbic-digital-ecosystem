@@ -44,6 +44,7 @@ test("ordinary/nested notification logs are valid before Expo, audiences are saf
     receipts = { "ticket-1-0": { status: "ok" }, "ticket-1-1": { status: "error", details: { error: "DeviceNotRegistered" } } };
     const checked = await module.checkPushNotificationReceipts(first.logId);
     assert.equal(checked.deliveredCount, 1); assert.equal(checked.failedCount, 1); assert.equal(checked.pendingCount, 0);
+    assert.equal(checked.status, "partial"); assert.deepEqual(checked.errorCounts, { DeviceNotRegistered: 1 });
     receipts = {}; assert.equal((await module.checkPushNotificationReceipts(first.logId)).deliveredCount, 1, "final receipts retained after Expo expiry");
     for (const audience of ["Youth", "Sisters", "Volunteers", "Admins", "invalid"]) await assert.rejects(module.sendPushNotification({ ...input, audience }), /audience/);
     const androidId = Buffer.from(tokens[1].token).toString("base64url"); fake.docs.get(`pushTokens/${androidId}`).enabled = true;
@@ -56,6 +57,26 @@ test("ordinary/nested notification logs are valid before Expo, audiences are saf
     const uncertain = await module.sendPushNotification({ ...input, requestId: "fixture-request-0004" });
     assert.equal(uncertain.status, "dispatch_unknown"); assert.equal(uncertain.failureCount, 0);
     const after = sends; await module.sendPushNotification({ ...input, requestId: "fixture-request-0004" }); assert.equal(sends, after);
+  } finally { globalThis.fetch = original; delete (globalThis as any).__notificationTestDb; }
+});
+
+test("invalid APNs device tokens are retired, not shared provider credentials; receipt errors survive replay", async () => {
+  const module = await store(), fake = database(); (globalThis as any).__notificationTestDb = fake.db;
+  const ids = ["bad-device", "provider-error"].map(name => Buffer.from(`ExponentPushToken[${name}]`).toString("base64url"));
+  for (const id of ids) fake.docs.set(`pushTokens/${id}`, { enabled: true, platform: "ios" });
+  fake.docs.set("pushNotificationLogs/apns-fixture", { successCount: 2, failureCount: 0, tokenCount: 2, tickets: ids.map((tokenId, index) => ({ id: `apns-${index}`, tokenId })) });
+  const original = globalThis.fetch; let reads = 0;
+  globalThis.fetch = async () => { reads++; return Response.json({ data: {
+    "apns-0": { status: "error", details: { error: "DeveloperError", apns: { reason: "BadDeviceToken", statusCode: 400 } } },
+    "apns-1": { status: "error", details: { error: "InvalidCredentials" } }
+  } }); };
+  try {
+    const first = await module.checkPushNotificationReceipts("apns-fixture");
+    assert.equal(fake.docs.get(`pushTokens/${ids[0]}`).enabled, false);
+    assert.equal(fake.docs.get(`pushTokens/${ids[1]}`).enabled, true);
+    assert.deepEqual(first.errorCounts, { BadDeviceToken: 1, InvalidCredentials: 1 });
+    const replay = await module.checkPushNotificationReceipts("apns-fixture");
+    assert.equal(reads, 1); assert.deepEqual(replay.errorCounts, first.errorCounts); assert.equal(replay.failedCount, 2);
   } finally { globalThis.fetch = original; delete (globalThis as any).__notificationTestDb; }
 });
 

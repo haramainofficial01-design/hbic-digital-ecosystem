@@ -1619,7 +1619,7 @@ export function PushPanel({
   const [requestId, setRequestId] = useState("");
   const [requestContent, setRequestContent] = useState("");
   const [testRequestId, setTestRequestId] = useState("");
-  const [results, setResults] = useState<{ accepted: number; delivered: number; failed: number; pending: number } | null>(null);
+  const [results, setResults] = useState<{ accepted: number; delivered: number; failed: number; pending: number; errorCounts?: Record<string, number> } | null>(null);
 
   async function sendNotification() {
     if (sending) return;
@@ -1666,7 +1666,7 @@ export function PushPanel({
         body: JSON.stringify({ logId: lastLogId })
       });
       const result = data.result ?? {};
-      setResults({ accepted: result.acceptedCount ?? 0, delivered: result.deliveredCount ?? 0, failed: result.failedCount ?? 0, pending: result.pendingCount ?? 0 });
+      setResults({ accepted: result.acceptedCount ?? 0, delivered: result.deliveredCount ?? 0, failed: result.failedCount ?? 0, pending: result.pendingCount ?? 0, errorCounts: result.errorCounts });
       setMessage(result.status === "dispatch_unknown" || result.status === "dispatching" ? "Dispatch uncertain. Do not resend." : "Delivered means APNs/FCM accepted the notification—not confirmation that the phone displayed it.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to check notification delivery.");
@@ -1710,6 +1710,7 @@ export function PushPanel({
       <div className="card full">
         <h2>Delivery status</h2>
         {results ? <p role="status">Accepted: {results.accepted} · Delivered: {results.delivered} · Failed: {results.failed} · Pending: {results.pending}</p> : <p className="muted">No send selected.</p>}
+        {results?.errorCounts && Object.keys(results.errorCounts).length ? <p className="muted">{Object.entries(results.errorCounts).map(([code, count]) => `${code}: ${count}`).join(" · ")}</p> : null}
         <p className="muted">Accepted = Expo queued it. Delivered = APNs/FCM receipt. Banner, sound and tap behavior must be checked on the phone.</p>
       </div>
     </div>

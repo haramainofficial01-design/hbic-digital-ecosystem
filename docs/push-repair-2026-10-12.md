@@ -46,7 +46,39 @@ permission, deep-link, prayer sync and weekly scheduling regression tests remain
 required. Headless admin UI checks exercise private targeting, request retry,
 status labels and narrow layout. These are not real-device banner/sound tests.
 
-Production deployment IDs, current store statuses and authorized-device delivery
-results must be appended only when actually verified. Real phone testing still
-needs the owner's explicitly paired iPhone/Android; arbitrary registered parents
-must not receive test messages.
+## Live verification
+
+The owner explicitly waived physical-phone testing and authorized one new,
+clearly labelled test to Everyone. The failed earlier announcement was not
+replayed. Announcement opt-outs remained respected. The new test was dispatched
+once at 2026-10-12T21:55:55Z, with a durable actor-scoped request ID.
+
+- Expo accepted 177 messages; none were rejected at submission.
+- APNs receipts: 71 OK, one BadDeviceToken (HTTP 400).
+- FCM receipts: 99 OK, six DeviceNotRegistered.
+- Total: 170 provider-confirmed handoffs, seven failed, zero pending.
+- Expired registrations are disabled, not retried. A BadDeviceToken retires only
+  that invalid registration; unrelated provider/credential errors do not disable
+  otherwise-valid devices. Reopening the installed app can register its current
+  token. No new provider credentials or Firebase permissions were added.
+- Receipt error causes persist privately; admin receives only aggregate counts.
+  A mixed result is labelled partial, not an all-device failure or success.
+- Actual phone banners, sound and tap behavior remain unverified, as requested.
+
+Initial production release of source `41865b1` was confirmed READY:
+public `dpl_3JnN6xy4vsWEW42syjBPjrP23qzH`, admin
+`dpl_94JpyX8f384nEvVTifeajX5em5zw`. Both existing aliases returned 200; anonymous
+send and private-test calls returned 401. The served admin bundle includes the
+private device-test control. Admin deployment must package the entire monorepo
+with its existing admin build configuration, not just the app folder.
+
+The authenticated production diagnostics confirmed Iqamah.ca as the sole adhan
+provider and no Maghrib override. Today's public snapshot shows 6:50 PM adhan and
+7:00 PM iqamah. Additional regressions cover subsequent weeks, DST and January;
+an explicit manual Maghrib override persists until staff clears it.
+
+47 focused tests passed, including the real headless admin component; public,
+admin and mobile typechecks passed; both web builds passed. The added phone
+pairing-code UI still requires a store build: existing 1.7.6 iOS build 35 is
+WAITING_FOR_REVIEW and Android code 40 is the submitted production release.
+These existing builds must not be represented as containing the new pairing UI.

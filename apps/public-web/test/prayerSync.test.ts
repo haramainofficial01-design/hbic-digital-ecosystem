@@ -34,6 +34,16 @@ function overridden() {
   } });
 }
 
+test("Maghrib follows each day's adhan plus ten across every week until an explicit persistent override", () => {
+  const content = overridden();
+  for (const [date, adhan, expected] of [["2026-10-11", "6:52 PM", "7:02 PM"], ["2026-10-18", "6:37 PM", "6:47 PM"], ["2026-11-01", "5:08 PM", "5:18 PM"], ["2027-01-10", "4:55 PM", "5:05 PM"]]) {
+    const instant = new Date(`${date}T19:00:00Z`), feed = { ...baseFeed, salah_maghrib: adhan };
+    assert.equal(resolveEffectivePrayerSchedule(content, feed, "live", date, instant.toISOString(), instant).content.iqamahTime.maghribIqamah, expected);
+    const manual = structuredClone(content); manual.iqamahTime.overrides!.maghrib = { enabled: true, value: "7:30 PM", updatedAt: sourceUpdatedAt, persistent: true };
+    assert.equal(resolveEffectivePrayerSchedule(manual, feed, "live", date, instant.toISOString(), instant).content.iqamahTime.maghribIqamah, "7:30 PM");
+  }
+});
+
 test("staff overrides persist across midnight, following weeks and timezone transition", () => {
   for (const date of ["2026-10-11T05:59:59Z", "2026-10-11T06:00:00Z", "2026-10-18T06:00:00Z", "2026-11-01T08:00:00Z", "2027-01-10T06:00:00Z"]) {
     const instant = new Date(date), resolved = resolveEffectivePrayerSchedule(overridden(), baseFeed, "live", date.slice(0,10), date, instant);

@@ -409,13 +409,16 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
   const tickets = (record.tickets ?? []) as StoredTicket[];
   const acceptedCount = Number(record.successCount ?? 0), immediateFailures = Number(record.failureCount ?? 0);
   const receiptResults: Record<string, "ok" | "error"> = { ...(record.receiptResults ?? {}) };
+  const receiptErrors: Record<string, string> = { ...(record.receiptErrors ?? {}) };
   if (!tickets.length) {
     return { logId, acceptedCount, receiptCount: 0, deliveredCount: 0, failedCount: immediateFailures,
       pendingCount: record.status === "dispatching" || record.status === "dispatch_unknown" ? Number(record.tokenCount ?? 0) - immediateFailures : 0,
       status: record.status, deliveryMeaning: "APNs/FCM receipt, not on-device display confirmation" };
   }
-  const pendingTickets = tickets.filter(ticket => !receiptResults[ticket.id]);
-  const receipts: Record<string, { status?: "ok" | "error"; details?: { error?: string } }> = {};
+  // Older logs kept the terminal error but not its cause. Recover available
+  // error details without replaying the notification or discarding old receipts.
+  const pendingTickets = tickets.filter(ticket => !receiptResults[ticket.id] || (receiptResults[ticket.id] === "error" && !receiptErrors[ticket.id]));
+  const receipts: Record<string, { status?: "ok" | "error"; details?: { error?: string; apns?: { reason?: string; statusCode?: number } } }> = {};
   for (let offset = 0; offset < pendingTickets.length; offset += 1000) {
   const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
     method: "POST",
@@ -425,7 +428,7 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
   if (!response.ok) throw new Error(`Expo receipt service returned HTTP ${response.status}.`);
 
   const result = (await response.json()) as {
-    data?: Record<string, { status?: "ok" | "error"; message?: string; details?: { error?: string } }>;
+    data?: Record<string, { status?: "ok" | "error"; message?: string; details?: { error?: string; apns?: { reason?: string; statusCode?: number } } }>;
   };
   if (!result.data || typeof result.data !== "object") throw new Error("Expo returned an invalid receipt response.");
   Object.assign(receipts, result.data);
@@ -442,7 +445,9 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
     else if (receipt.status === "error") {
       failedCount += 1;
       receiptResults[ticket.id] = "error";
-      if (receipt.details?.error === "DeviceNotRegistered") disabledTokenIds.push(ticket.tokenId);
+      const details = receipts[ticket.id]?.details;
+      if (details) receiptErrors[ticket.id] = details.apns?.reason ?? details.error ?? "UnknownReceiptError";
+      if (receiptErrors[ticket.id] === "DeviceNotRegistered" || receiptErrors[ticket.id] === "BadDeviceToken") disabledTokenIds.push(ticket.tokenId);
     } else pendingCount += 1;
   });
 
@@ -450,8 +455,10 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
   await Promise.all(
     disabledTokenIds.map((id) => db.collection("pushTokens").doc(id).set({ enabled: false, updatedAt: checkedAt }, { merge: true }))
   );
-  const status = pendingCount ? "pending" : failedCount ? "failed" : "delivered";
-  await logRef.set(notificationDocument({ receiptCheckedAt: checkedAt, deliveredCount, failedCount, pendingCount, status, receiptResults }), { merge: true });
+  const status = pendingCount ? "pending" : failedCount ? deliveredCount ? "partial" : "failed" : "delivered";
+  const errorCounts = Object.values(receiptErrors).reduce<Record<string, number>>((counts, code) => ({ ...counts, [code]: (counts[code] ?? 0) + 1 }), {});
+  await logRef.set(notificationDocument({ receiptCheckedAt: checkedAt, deliveredCount, failedCount, pendingCount, status, receiptResults, receiptErrors }), { merge: true });
   return { logId, acceptedCount, receiptCount: tickets.length, deliveredCount, failedCount, pendingCount, status,
+    errorCounts,
     deliveryMeaning: "APNs/FCM receipt, not on-device display confirmation" };
 }
