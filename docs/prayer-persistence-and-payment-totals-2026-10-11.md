@@ -19,9 +19,18 @@ Overview now uses the same actual cash/card receipt breakdown as Payments, with 
 
 ## Verification before rollout
 
-- 77 focused tests passed: prayer resolver, persistent overrides, source parser, AWS disconnection, outage backoff, canonical TV/Watch/widget contract, weekly notification window/idempotency, prayer notification preferences, admin copy and Academy payment summaries.
+- 78 focused tests passed: prayer resolver, persistent overrides, source parser, AWS disconnection, outage backoff, canonical TV/Watch/widget contract, both prayer editors, weekly notification window/idempotency, prayer notification preferences, admin copy and Academy payment summaries.
 - 104 actual Academy component layout checks passed, including synthetic Overview/Payments receipt equality; no live financial writes.
 - 12 admin workspace browser tests passed across five widths, light/dark modes, reduced motion and accessible navigation.
 - Public/admin typechecks and production builds passed. Existing unrelated lint/CSS warnings remain non-blocking.
 
-Production deployment IDs and live checks are recorded after rollout below.
+## Production rollout
+
+- Public: `dpl_CJinFsSB3QWkTTbrEAcXT1MxPHvo`, READY, source `e3eca3e962314204329b15baefe4b879b7574c7b` (deployment metadata uses its short SHA).
+- Admin: `dpl_5jfq6onVeBjRR8KtYmc1tDdEDPHx`, READY, source `c64a2b99abc6072c5ed68c4e369f66bf71b4cae7`. This contains the full receipt-total and main prayer editor changes; the later public-only follow-up updates the separate display editor wording/persistence.
+- The admin CLI reported an inherited public-alias conflict after its build completed. Independently checked the deployment and actual alias ownership: the admin alias points to the new admin build; public aliases remain on the public project. No domains/DNS were changed or transferred.
+- Confirmed `hbic.ca`, `/prayer-times`, `/display`, `/display-admin`, `/quran-academy`, `/api/display?verify=final` and the admin production alias return HTTP 200 with real content.
+- Compared all six live adhan times against the actual Iqamah.ca date record: exact match. Published iqamah and the display snapshot also match; no obsolete upcoming-week iqamah is exposed.
+- Signed-in main admin's protected draft read shows the existing staff overrides as “Active — until changed.” No draft was saved or published during verification.
+- Signed-in Academy Overview and Payments show identical real received totals, month and cash/card amounts. Non-exempt tuition remains a separately labelled allocation report. No family/payment/receipt records were modified to test this.
+- Production weekly cron is enabled on the final public deployment with schedule `0 6 * * 0`; existing Academy jobs remain. Unauthenticated notification invocation returns 401. The Sunday clock window, changed-only behavior, concurrent/replayed job safety and ambiguous delivery failure handling are covered by isolated tests; a real future Sunday device delivery has not yet been observed.
