@@ -6,6 +6,7 @@ import path from "node:path";
 import os from "node:os";
 const adb = process.env.HBIC_QA_ADB || path.join(process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), "Library/Android/sdk"), "platform-tools/adb");
 const device = process.env.HBIC_QA_ANDROID_DEVICE || "emulator-5554";
+if (!/^emulator-\d+$/.test(device)) throw Error("Native Quran QA must use a dedicated emulator, never a parent's phone");
 const root = path.resolve(import.meta.dirname, "../../.."), output = path.join(root, "output/quran-optimization");
 mkdirSync(output, { recursive: true });
 const call = (...args) => execFileSync(adb, ["-s", device, ...args], { encoding: "utf8", timeout: 20000 });
@@ -20,7 +21,7 @@ function nodes(xml) { return [...xml.matchAll(/<node\s+([^>]+)>/g)].map(m => Obj
 const size = call("shell", "wm", "size").match(/(\d+)x(\d+)/), width = Number(size[1]), height = Number(size[2]);
 async function tap(label, prefix = false, press = true) {
   let direction = "up";
-  const fixed = ["Read", "Listen", "Practise", "Library", "Quran home", "Quran preferences", "Search Quran", "Pause audio", "Resume audio", "Stop audio"].includes(label);
+  const fixed = ["Skip introduction", "Read", "Listen", "Practise", "Library", "Quran home", "Quran preferences", "Search Quran", "Focus reading", "Leave focus", "Pause audio", "Resume audio", "Stop audio"].includes(label);
   const match = n => n.clickable === "true" && n.enabled === "true" && [n["content-desc"], n.text].some(v => prefix ? v?.startsWith(label) : v?.toLowerCase() === label.toLowerCase());
   for (let i = 0; i < 12; i++) {
     const item = nodes(ui()).find(match);
@@ -53,9 +54,11 @@ async function waitForText(text, timeout = 5000) {
 function screenshot(name) { writeFileSync(path.join(output, `${name}.png`), execFileSync(adb, ["-s", device, "exec-out", "screencap", "-p"])); }
 call("emu", "avd", "hostmicoff");
 call("shell", "cmd", "uimode", "night", "no");
+call("shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", "hbiccalgary://quran", "ca.hbic.calgary.app"); await wait(2000);
 let xml = ui(); if (xml.includes('content-desc="Skip introduction"')) await tap("Skip introduction");
-call("shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", "hbiccalgary://quran", "ca.hbic.calgary.app"); await wait(1500);
 await tap("Read"); check(ui().includes("Al-Fatihah"), "Canonical surah did not load"); screenshot("android-reader");
+await tap("Focus reading"); check(!ui().includes('content-desc="Quran preferences"'), "Preferences obscured focus mode");
+await tap("Leave focus"); check(ui().includes('content-desc="Quran preferences"'), "Focus mode could not be exited");
 await tap("Library"); check(ui().includes("Recordings (0)"), "Use a clean QA emulator; no existing recordings were modified");
 await tap("Word review (0)"); check(ui().includes("No possible-word flags to review."), "Empty review state missing"); screenshot("android-private-library");
 await tap("Practise"); await tap("Hide"); await tap("Word hint"); await tap("Reveal"); screenshot("android-practice");
@@ -76,10 +79,40 @@ await tap("Reveal ayah"); await tap("Recalled · next"); check(ui().includes('co
 await tap("Listen"); if (ui().includes('content-desc="Choose another reciter"')) await tap("Choose another reciter");
 await tap("Find a reciter"); call("shell", "input", "text", "Mishary"); await wait(500);
 await tap("Select reciter Mishary", true); await tap("Play Al-Fatihah by ", true);
-check(ui().includes('content-desc="Pause audio"'), "Verified reciter stream did not start"); screenshot("android-streaming-player");
+check(await waitForText('content-desc="Pause audio"', 20000), "Verified reciter stream did not start");
+const audioDeadline = Date.now() + 20000;
+let progressed = false;
+while (Date.now() < audioDeadline) {
+  progressed = nodes(ui()).some(n => /^\d+:\d{2} \/ \d+:\d{2}$/.test(n.text)
+    && !n.text.startsWith("0:00 / ") && !n.text.endsWith(" / 0:00"));
+  if (progressed) break; await wait(500);
+}
+check(progressed, "Native stream did not load a duration and advance playback"); screenshot("android-streaming-player");
 await tap("Pause audio"); await tap("Resume audio");
 call("shell", "input", "keyevent", "3"); await wait(500); call("shell", "am", "start", "-W", "-n", "ca.hbic.calgary.app/.MainActivity"); await wait(500);
 check(await waitForText('content-desc="Resume audio"'), "Background interruption did not pause playback");
 await tap("Resume audio"); await tap("Stop audio");
 call("shell", "cmd", "uimode", "night", "yes"); await tap("Read"); await wait(500); screenshot("android-reader-dark");
 console.log("ANDROID NATIVE RELEASE QA PASS: canonical reader, private library, hide/hint/reveal, self-test, emulator-silence recording, temporary playback, keep/replay/delete, background capture cleanup, real reciter stream/pause/resume/stop, interruption stays paused, dark reader. No cloud signup or Academy/payment actions.");
+
+if (process.env.HBIC_QA_RECITE_LIFECYCLE === "1") {
+  // Optional explicit QA download, only on the disposable, host-mic-disabled
+  // emulator. Silence validates lifecycle/resource handling, never accuracy.
+  check(/^emulator-\d+$/.test(device), "Recognition lifecycle requires a dedicated emulator");
+  await tap("Practise"); await tap("Start Recite Assist"); await tap("Continue");
+  check(await waitForText('content-desc="Pause Recite Assist"', 120000), "Current native recognition model could not prepare");
+  await wait(4000);
+  check(!ui().includes("Following the recited words.") && !ui().includes("Possible word difference. Reveal and review"), "Emulator silence was incorrectly assessed");
+  await tap("Pause Recite Assist"); check(await waitForText("The microphone is off"), "Pause did not release native capture");
+  await tap("Resume Recite Assist"); check(await waitForText('content-desc="Pause Recite Assist"'), "Resume did not restart capture");
+  await tap("Stop Recite Assist"); check(await waitForText("Session review"), "Stop did not produce a session summary");
+  check(ui().includes("0 listening observations") && ui().includes("not saved or uploaded"), "Silence triggered inference or unexpected audio retention");
+  screenshot("android-recognition-silence-review");
+  await tap("Start Recite Assist"); await tap("Continue");
+  check(await waitForText('content-desc="Pause Recite Assist"', 30000), "Recognition could not restart after release");
+  call("shell", "input", "keyevent", "3"); await wait(700);
+  call("shell", "am", "start", "-W", "-n", "ca.hbic.calgary.app/.MainActivity"); await wait(1000);
+  check(await waitForText('content-desc="Start Recite Assist"'), "Background did not stop native recognition capture");
+  check(!ui().includes('content-desc="Pause Recite Assist"'), "Recognition capture survived background exit");
+  console.log("ANDROID CURRENT RECITE LIFECYCLE PASS: real native model preparation, PCM silence, zero inference on silence, pause/resume, stop/review, restart, background cleanup. No human-acoustic, recognition-accuracy or thermal claim.");
+}

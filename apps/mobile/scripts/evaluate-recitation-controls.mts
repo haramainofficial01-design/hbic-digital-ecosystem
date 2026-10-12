@@ -8,8 +8,8 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { TextCTCDecoder, detectSpeech, normalizeArabicForJudge, type AsrTranscribeResult } from "@tilawi/quran-asr";
-import { acousticQuality, compactQuietPausesWithTimeline, type ReciteFeedback } from "../src/quran/reciteAssistFeedback";
-import { decodeRecitationWords, RecitationTracker, recitationDisplayWords, recitationLexeme, type RecitationObservation, type RecitationWord } from "../src/quran/recitationTracking";
+import { compactQuietPausesWithTimeline, type ReciteFeedback } from "../src/quran/reciteAssistFeedback";
+import { decodeRecitationEvidence, RecitationTracker, recitationDisplayWords, recitationLexeme, type RecitationObservation, type RecitationWord } from "../src/quran/recitationTracking";
 
 const dataset = "sobolev210/quran-recitation-errors", revision = "d196cd3132c69cd361d28cf6a8b442ae4e0bf0b4";
 const base = `https://huggingface.co/datasets/${dataset}/resolve/${revision}/`;
@@ -89,8 +89,10 @@ async function recognize(pcm: Float32Array, startSample: number): Promise<Recita
     const output = await native.run({audio_signal: new ort.Tensor("float32", compact.pcm, [1, compact.pcm.length]), length: new ort.Tensor("int64", BigInt64Array.from([BigInt(compact.pcm.length)]), [1])});
     const tensor = output[native.outputNames[0]], acoustic = {logprobs: tensor.data as Float32Array, timeSteps: tensor.dims[1], vocabSize: tensor.dims[2], blankId: 1024};
     const result: AsrTranscribeResult = {...decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize), acoustic};
-    return {text: result.text, quality: acousticQuality(result), startSample, endSample: startSample + pcm.length,
-      words: decodeRecitationWords(result, vocab, compact.pcm.length, compact.spans, startSample, pcm.length)};
+    // Use the production engine's single-pass quality/word decoder rather than
+    // separately calculating confidence with an older diagnostic helper.
+    const evidence = decodeRecitationEvidence(result, vocab, compact.pcm.length, compact.spans, startSample, pcm.length);
+    return {text: result.text, quality: evidence.quality, startSample, endSample: startSample + pcm.length, words: evidence.words};
   } finally {compact.pcm.fill(0);}
 }
 function concat(parts: Float32Array[]) { const result = new Float32Array(parts.reduce((sum, part) => sum + part.length, 0)); let at = 0; for (const part of parts) {result.set(part, at); at += part.length;} return result; }

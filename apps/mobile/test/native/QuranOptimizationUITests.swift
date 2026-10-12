@@ -15,7 +15,7 @@ final class HBICQuranUITests: XCTestCase {
             if item.isHittable { break }
             // Hint/reveal changes ayah height. A control can be above OR below
             // the viewport on a returning visit; never keep scrolling past it.
-            if item.frame.minY < 190 { app.swipeDown() } else { app.swipeUp() }
+            if item.frame.minY < app.frame.minY + app.frame.height * 0.27 { app.swipeDown() } else { app.swipeUp() }
         }
         try check(item.isHittable, "Off-screen control: \(label)"); item.tap()
     }
@@ -24,15 +24,20 @@ final class HBICQuranUITests: XCTestCase {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         try app.screenshot().pngRepresentation.write(to: output.appendingPathComponent("\(name).png"))
     }
-    @objc func testReaderListeningPracticeAndPrivatePreferences() throws {
+    func openQuran() throws {
         app.launch()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         if springboard.buttons["Open"].waitForExistence(timeout: 2) { springboard.buttons["Open"].tap() }
         if app.buttons["Skip introduction"].waitForExistence(timeout: 5) { app.buttons["Skip introduction"].tap() }
         if app.buttons["Open Quran & Recite"].waitForExistence(timeout: 4) { try tap("Open Quran & Recite") }
         else if !app.buttons["Back to More"].exists && !app.buttons["Quran home"].exists {
-            try tap("More"); try tap("Quran & Recite")
+            try tap("More")
+            let currentLabel = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Quran")).firstMatch
+            try tap(currentLabel.waitForExistence(timeout: 3) ? "Quran" : "Quran & Recite")
         }
+    }
+    @objc func testReaderListeningPracticeAndPrivatePreferences() throws {
+        try openQuran()
         try tap("Read")
         try check(app.staticTexts["Al-Fatihah"].waitForExistence(timeout: 25), app.debugDescription)
         try screenshot("iphone15-reader")
@@ -59,6 +64,14 @@ final class HBICQuranUITests: XCTestCase {
         let surah = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Play Al-Fatihah by ")).firstMatch
         try check(surah.waitForExistence(timeout: 20), "Verified surah recording unavailable"); try tap(surah.label)
         try check(app.buttons["Pause audio"].waitForExistence(timeout: 20), app.debugDescription)
+        let advancingAudio = NSPredicate { _, _ in
+            self.app.staticTexts.allElementsBoundByIndex.contains {
+                $0.label.range(of: "^[0-9]+:[0-9]{2} / [0-9]+:[0-9]{2}$", options: .regularExpression) != nil
+                    && !$0.label.hasPrefix("0:00 / ") && !$0.label.hasSuffix(" / 0:00")
+            }
+        }
+        try check(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: advancingAudio, object: nil)], timeout: 20) == .completed,
+                  "Native stream did not load a duration and advance playback")
         try screenshot("iphone15-streaming-player")
         try tap("Pause audio")
         try tap("Resume audio")
@@ -106,7 +119,7 @@ final class HBICQuranUITests: XCTestCase {
         try check(!app.buttons["Play temporary recording"].exists, "Session-only recording survived background exit")
     }
     @objc func testSelfTestHintsAndReveal() throws {
-        app.activate()
+        try openQuran()
         try tap("Practise")
         try tap("Test yourself")
         try tap("Start self-test")
@@ -117,5 +130,22 @@ final class HBICQuranUITests: XCTestCase {
         try tap("Reveal ayah")
         try tap("Recalled · next")
         try check(app.buttons["Reveal ayah"].waitForExistence(timeout: 10), "Self-test did not advance")
+    }
+    @objc func testDeclinedMicrophonePreservesReadingAndListening() throws {
+        // Revoke only this QA app's simulator microphone permission before
+        // running this test. Never approve the Mac's microphone permission.
+        try openQuran()
+        try tap("Practise")
+        try tap("Record my recitation")
+        let declined = NSPredicate { _, _ in
+            self.app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "microphone")).allElementsBoundByIndex
+                .contains { $0.exists && ($0.label.contains("Settings") || $0.label.contains("permission")) }
+        }
+        try check(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: declined, object: nil)], timeout: 10) == .completed,
+                  "Denied microphone has no recoverable explanation")
+        try check(!app.buttons["Stop and review recording"].exists, "Recording started without consent")
+        try tap("Read")
+        try check(app.staticTexts["Al-Fatihah"].waitForExistence(timeout: 10), "Denied microphone blocked reading")
+        try screenshot("iphone15-microphone-declined-reader")
     }
 }
