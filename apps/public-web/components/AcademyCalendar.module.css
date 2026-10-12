@@ -1,0 +1,22 @@
+.calendar{margin:22px 0;padding:clamp(16px,3vw,24px);border:1px solid #b9d7d2;border-radius:22px;background:#f6fbf9;scroll-margin-top:110px;min-width:0;overflow-wrap:anywhere}
+.calendar:focus{outline:3px solid #11766f;outline-offset:3px}
+.heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.heading h3{font:800 22px/1.25 system-ui;margin:0!important;color:#153341}
+.refresh,.expand{font:700 14px/1.4 system-ui;cursor:pointer;border-radius:12px;min-height:44px;padding:10px 14px;color:#125a54}
+.refresh{background:transparent;border:1px solid #b9d7d2}.refresh:disabled{opacity:.6;cursor:wait}
+.calendar .rhythm{margin:8px 0 16px;color:#395c58;font-weight:700;line-height:1.5}.rhythm span{display:block;font-size:13px;font-weight:500}
+.next{display:grid;gap:7px;padding:18px;border-radius:16px;background:#123b42;color:white}
+.next strong{font:750 clamp(18px,2vw,23px)/1.35 system-ui}.next>span:last-child{color:#e2f3ef;font-size:15px}
+.eyebrow{font-size:11px;letter-spacing:.12em;font-weight:800;color:#bbebe1}
+.month h4{font:750 16px/1.5 system-ui;color:#254d49;margin:22px 0 8px}
+.dates{list-style:none;padding:0;margin:0}.calendar .dateRow{display:flex;gap:14px;padding:16px 0;margin:0;border-top:1px solid #d4e5df;align-items:flex-start}
+.dateChip{flex:0 0 52px;border:1px solid #d4e5df;border-radius:12px;background:white;display:grid;text-align:center;padding:8px 4px;color:#254d49;line-height:1.2}
+.dateChip span{font:750 11px/1.5 system-ui;text-transform:uppercase}.dateChip strong{font:800 24px/1.2 system-ui}
+.detail{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1;color:#526f6b;font:500 14px/1.5 system-ui}.detail>strong{color:#153341;font-size:16px}
+.calendar .detail p{margin:3px 0 0;font:400 14px/1.5 system-ui;color:#526f6b}
+.badge{align-self:flex-start;font:750 11px/1.4 system-ui;border-radius:7px;padding:4px 8px}
+.class{color:#135b4d;background:#def1e9}.special{color:#674609;background:#fff0c7}.closure{color:#843326;background:#ffe9e2}.changed{color:#60400c;background:#fff0c7}.event{color:#345875;background:#e6eff8}
+.expand{width:100%;margin-top:12px;background:#e3f1ec;border:1px solid #b9d7d2}
+.calendar .term{font:500 13px/1.6 system-ui;color:#526f6b;margin:16px 0 0}.calendar .empty{color:#526f6b}.calendar .warning{color:#7b410d;font-size:14px}
+.calendar button:focus-visible{outline:3px solid #11766f;outline-offset:2px}
+@media(max-width:380px){.calendar{padding:14px}.calendar .dateRow{gap:10px}.next{padding:14px}}

@@ -7,3 +7,6 @@
 .verificationSecondary{font-size:14px;color:#64817d;margin:0 0 8px}
 .secondary{border:1px solid #9dbdae;border-radius:14px;background:#f4f7f5;color:#174439;font:800 16px inherit;padding:15px 24px;min-height:52px;cursor:pointer;margin-top:10px}
 .secondary:disabled{opacity:.55;cursor:wait}
+.parentHero{padding:24px 30px;gap:24px;border-radius:24px}.parentHero .academySeal{width:88px}.parentHero .academySeal svg{font-size:14px}.parentHero h1{font:500 clamp(25px,3vw,38px)/1.15 Georgia,serif;letter-spacing:-.025em;margin:8px 0}.calendarLink{display:inline-flex;align-items:center;min-height:44px;padding:8px 0;color:#fff1cf;font-weight:800;text-decoration:underline;text-underline-offset:4px}.calendarLink:focus-visible{outline:3px solid #fff1cf;outline-offset:4px;border-radius:4px}
+@media(max-width:700px){.parentHero{flex-direction:row;align-items:center;padding:20px;gap:16px}.parentHero .academySeal{width:72px}.parentHero .eyebrow{font-size:10px;letter-spacing:.08em}.parentHero h1{font-size:25px}}
+@media(max-width:380px){.parentHero .academySeal{display:none}}

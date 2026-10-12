@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 import { ACADEMY_TUITION_POLICY, ACADEMY_TUITION_POLICY_VERSION, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, dateStringInTimeZone, masjidTimeZone, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getAcademyClientAuth } from "../lib/academyFirebaseClient";
 import { requestAcademyPasswordReset } from "../lib/academyParentActions";
+import { AcademyCalendar } from "./AcademyCalendar";
+import type { ParentCalendarItem } from "../lib/academyCalendarView";
 import styles from "./AcademyParent.module.css";
 
 const blankChild = () => ({ name: "", age: 8, level: "not_sure" as const });
 const money = (cents: number | null) => cents === null ? "Tuition pending" : new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
-type AcademyContent = { classes: { id: string; name: string; dayOfWeek: number; startTime: string; room: string }[]; calendar: { id: string; title: string; date: string; type: string }[]; announcements: { id: string; title: string; message: string; priority: string }[] };
+type AcademyContent = { classes: { id: string; name: string; dayOfWeek: number; startTime: string; room: string }[]; calendar: ParentCalendarItem[]; announcements: { id: string; title: string; message: string; priority: string }[] };
 type AcademyPayment = { period: string; method: "cash" | "card"; status: string; amountCents: number | null; paidAt: string | null; invoiceUrl: string | null };
 type PendingRegistration = { registrationId: string; enrollmentStartPeriod: string; guardianName: string; phone: string; email: string; whatsappConsent: boolean; emailUpdates: boolean; children: AcademyRegistrationInput["children"]; paymentChoice: "card"; startChoice: "current" | "next"; policyVersion: AcademyRegistrationInput["policyVersion"]; policyAccepted: true; recurringAuthorized: true; checkoutStarted: boolean; createdAt: string };
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -47,6 +49,7 @@ export function AcademyParent() {
   const [receipts, setReceipts] = useState<{ number: string; period: string; amountCents: number; receivedAt: string; billingMode: "test" | "live" }[]>([]);
   const [payments, setPayments] = useState<AcademyPayment[]>([]);
   const [content, setContent] = useState<AcademyContent | null>(null);
+  const [calendarError, setCalendarError] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [verificationEmailSent, setVerificationEmailSent] = useState(false);
@@ -60,9 +63,18 @@ export function AcademyParent() {
   const cashReminder = family?.paymentChoice === "cash" ? academyCashReminderStage(new Date(), family.cashReminderEligible, family.paymentState) : null;
   const calgaryToday = dateStringInTimeZone(new Date(), masjidTimeZone);
   const nextStartPeriod = academyNextMonthEnrollmentOpen() && calgaryToday.slice(0, 7) < ACADEMY_LAST_BILLING_MONTH ? academyEnrollmentStartPeriod("next") : null;
-  const classStart = family?.enrollmentStartPeriod && `${family.enrollmentStartPeriod}-01` > calgaryToday ? `${family.enrollmentStartPeriod}-01` : calgaryToday;
-  const nextClass = content?.calendar.find((item) => item.date >= classStart && item.type === "class");
-  const nextClosure = content?.calendar.find((item) => item.date >= calgaryToday && (item.type === "holiday" || item.type === "no_class"));
+  const parentHome = Boolean(user && verified && family && family.enrollmentState !== "withdrawn");
+
+  async function refreshCalendar() {
+    if (!user || !verified || !family) return;
+    try {
+      const response = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+      if (!response.ok) throw new Error("Calendar unavailable");
+      const data = await response.json();
+      setContent(data.content);
+      setCalendarError(false);
+    } catch { setCalendarError(true); }
+  }
 
   useEffect(() => {
     setInsideApp(Boolean(window.ReactNativeWebView));
@@ -163,6 +175,8 @@ export function AcademyParent() {
   }, [resendCooldown]);
 
   useEffect(() => {
+    setContent(null);
+    setCalendarError(false);
     if (!user || !verified) return;
     let cancelled = false;
     let inFlight = false;
@@ -215,9 +229,9 @@ export function AcademyParent() {
         const contentResponse = await fetch("/api/academy/content", { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" });
         if (contentResponse.ok) {
           const contentData = await contentResponse.json();
-          if (!cancelled) setContent(contentData.content);
-        }
-      } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : "Could not load Academy details."); }
+          if (!cancelled) { setContent(contentData.content); setCalendarError(false); }
+        } else if (!cancelled) setCalendarError(true);
+      } catch (error) { if (!cancelled) { setCalendarError(true); setStatus(error instanceof Error ? error.message : "Could not load Academy details."); } }
       finally { inFlight = false; lastRefresh = Date.now(); }
     };
     void refresh();
@@ -390,17 +404,17 @@ export function AcademyParent() {
   }
 
   return <main className={styles.shell}>
-    <div className={styles.hero}>
+    <div className={`${styles.hero} ${parentHome ? styles.parentHero : ""}`}>
       <div className={styles.academySeal} aria-label="HBIC Qur’an Academy · Masjid Bilal">
         <svg viewBox="0 0 220 220" aria-hidden="true"><defs><path id="academy-seal-top" d="M 19,110 A 91,91 0 0,1 201,110" /><path id="academy-seal-bottom" d="M 19,110 A 91,91 0 0,0 201,110" /></defs>
           <text><textPath href="#academy-seal-top" startOffset="50%" textAnchor="middle">HBIC QUR’AN ACADEMY</textPath></text>
           <text><textPath href="#academy-seal-bottom" startOffset="50%" textAnchor="middle">MASJID BILAL · CALGARY</textPath></text></svg>
         <img src="/brand/hbic-logo.png" alt="Masjid Bilal logo" />
       </div>
-      <div><span className={styles.eyebrow}>MASJID BILAL · CALGARY</span><h1>HBIC Qur’an Academy</h1><p>A simple home for your children&apos;s Quran learning, class information, and Academy payments.</p></div>
+      <div><span className={styles.eyebrow}>MASJID BILAL · CALGARY</span><h1>HBIC Qur’an Academy</h1>{parentHome ? <a className={styles.calendarLink} href="#academy-calendar">Academy Calendar ↓</a> : <p>A simple home for your children&apos;s Quran learning, class information, and Academy payments.</p>}</div>
     </div>
     <div className={styles.layout}>
-      <section className={styles.panel}>
+      <section className={styles.panel} id="academy-account" tabIndex={-1}>
         {!user ? <><h2>{registerAccount && registrationOpen ? "Create your parent account" : "Sign in to continue your Quran Academy registration."}</h2><p>Only you and authorized HBIC staff can see your family&apos;s details.</p>
           <label>Email<input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <label>Password<input type="password" autoComplete={registerAccount ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
@@ -435,14 +449,12 @@ export function AcademyParent() {
           {form.paymentChoice === "card" ? <label className={styles.check}><input type="checkbox" checked={form.recurringAuthorized} onChange={(e) => setForm({ ...form, recurringAuthorized: e.target.checked })} /> I authorize recurring monthly tuition charges for my enrolled children until cancelled under this policy.</label> : null}
           <button className={styles.primary} disabled={busy || !form.policyAccepted || (form.paymentChoice === "card" && (!cardAvailable || !form.recurringAuthorized))} onClick={() => void submit()}>{pendingRegistration && form.paymentChoice === "cash" ? "Switch to cash at HBIC" : form.paymentChoice === "card" ? "Continue to secure Checkout" : "Send registration"}</button>
         </> : <><div className={styles.familyHeading}><div><span className={styles.eyebrow}>YOUR ACADEMY HOME</span><h2>{family.guardianName}</h2><p>{family.reference} · {family.enrollmentState === "awaiting_checkout" ? "Awaiting card confirmation — finish secure Stripe Checkout" : family.enrollmentState === "submitted" ? "Conditional enrollment — payment or placement pending" : family.enrollmentState}</p>{family.enrollmentStartPeriod ? <p>Enrollment starts {family.enrollmentStartPeriod}-01</p> : null}</div><button className={styles.textButton} onClick={() => void signOutAcademy()}>Sign out</button></div>
+          <AcademyCalendar items={content?.calendar ?? null} today={calgaryToday} enrollmentStartPeriod={family.enrollmentStartPeriod} error={calendarError} onRefresh={refreshCalendar} />
           <div className={styles.summary}><div><small>ACADEMY UPDATES</small><strong>Join the parent WhatsApp group</strong><span>Join now for class and holiday announcements, including while your enrollment is conditional.</span><a href="https://chat.whatsapp.com/IZhuemIDjR10DTluYIiSQq?mode=gi_t" target="_blank" rel="noopener noreferrer">Join the HBIC Quran Academy WhatsApp group ↗</a></div></div>
           {insideApp ? <div className={styles.summary}><div><small>APP UPDATES</small><strong>Class changes on your phone</strong><span>Opt in for Academy announcements, closures, and cash tuition reminders on this device.</span><button className={styles.secondary} type="button" onClick={() => void enableAppUpdates()}>Enable Academy app notifications</button></div></div> : null}
           {cashReminder ? <p className={styles.terms} role="status">{cashReminder === "due" ? "Academy cash tuition is due today, the 1st. Please pay at HBIC; staff will record your receipt." : "Academy cash tuition for next month is due on the 1st. Please plan to pay in person at HBIC."}</p> : null}
-          {nextClass ? <div className={styles.summary}><div><small>NEXT CLASS</small><strong>{nextClass.title}</strong><span>{nextClass.date} · 5:30–7:00 p.m.</span></div>
-            {nextClosure ? <div><small>UPCOMING CLOSURE</small><strong>{nextClosure.title}</strong><span>{nextClosure.date}</span></div> : null}</div> : null}
           <div className={styles.summary}><div><small>CHILDREN</small><strong>{family.children.map((child) => child.name).join(" · ")}</strong><span>Class placement will appear here when confirmed.</span></div>
             <div><small>TUITION · {family.billingPeriod}</small><strong>{family.paymentState === "paid" ? family.billingMethod === "card" ? "Card paid" : "Cash paid" : family.paymentState === "past_due" ? "Past due — please contact HBIC" : family.paymentState === "cash_due" ? "Cash due on the 1st" : family.paymentState === "card_attention" ? "Payment needs attention" : family.paymentState === "scheduled" ? family.cardSetupComplete ? `Card ready · first charge ${family.billingPeriod}-01` : `Card setup pending · first charge ${family.billingPeriod}-01` : family.paymentState === "not_due" ? "No tuition due" : "Tuition pending"}</strong><span>{money(family.amountCents)}</span></div></div>
-          <h3>Class rhythm</h3><p>Monday and Thursday · 5:30–7:00 p.m. through February 1, 2027. One Thursday each month is a special activity with games and an Islamic presentation; food or prizes may be offered occasionally. Check the Academy calendar for the exact date. No classes after February 1 through the Ramadan and Eid al-Fitr break; resumption after Eid will be announced. HBIC will confirm your child&apos;s class placement and any schedule changes.</p>
           <h3>Enrollment</h3><ul>{family.children.map((child) => <li key={child.id}>{child.name}{child.cancelEffectiveAt ? ` · Ends ${new Date(child.cancelEffectiveAt).toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })}` : <button className={styles.textButton} disabled={busy} onClick={() => void cancelChild(child.id, child.name)}>Cancel this child&apos;s enrollment</button>}</li>)}</ul>
           {family.paymentChoice === "card" && cardAvailable ? <button className={styles.primary} onClick={() => void beginBilling(family.cardSetupComplete ? "portal" : "checkout").catch((error) => setStatus(error instanceof Error ? error.message : "Billing unavailable."))}>{family.cardSetupComplete ? "Update payment card" : "Complete secure card setup"}</button> : null}
           <h3>Payment method</h3><p>Current method: {family.paymentChoice === "card" ? "Card" : "Cash at HBIC"}. Changes apply to the next unpaid month; already-paid tuition is not charged again.</p>
@@ -453,7 +465,6 @@ export function AcademyParent() {
           <details className={styles.policy}><summary>Tuition &amp; Payment Policy</summary>{ACADEMY_TUITION_POLICY.map((term) => <p key={term.title}><strong>{term.title}.</strong> {term.body}</p>)}<small>Accepted {family.policyVersion ?? "earlier terms"}{family.policyAcceptedAt ? ` · ${new Date(family.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</small></details>
           {content?.classes.length ? <><h3>My classes</h3><ul>{content.classes.map((item) => <li key={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime} · {item.room}</li>)}</ul></> : null}
           {content?.announcements.length ? <><h3>Announcements</h3><ul>{content.announcements.slice(0, 3).map((item) => <li key={item.id}><strong>{item.title}</strong> — {item.message}</li>)}</ul></> : null}
-          {content?.calendar.length ? <><h3>Calendar</h3><ul>{content.calendar.filter((item) => item.date >= new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })).slice(0, 5).map((item) => <li key={item.id}>{item.date} · {item.title} ({item.type.replace("_", " ")})</li>)}</ul></> : null}
           <h3>Academy pass</h3><p>Show this code at the desk. Staff scan the live record; a screenshot&apos;s printed payment status is never proof of payment.</p>
           {family.passToken ? qrUrl ? <img className={styles.qr} src={qrUrl} alt="Private Academy pass QR code for HBIC staff scanning" /> : <p>Preparing your pass…</p> : <p>This pass is inactive. Please contact HBIC.</p>}
           <p className={styles.reference}>Registration {family.reference}</p>
