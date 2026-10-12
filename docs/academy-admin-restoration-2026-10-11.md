@@ -69,3 +69,15 @@ new hosting project is required.
 - The focused regression suite has 45 tests, plus the 104 browser checks.
 
 Mobile/store binaries were not rebuilt; this is a dashboard/backend restoration.
+
+## Label-led wording follow-up
+
+Admin-only source `b6152ba911c79bbbb7a9e681b3c70c2b7327147e` is deployed as
+`dpl_8KxUVomqoWvCTT3egH4CoDit3icr` on the same admin alias. Repetitive section
+introductions and obvious instructions were removed or shortened. Essential
+payment/consent warnings, publishing effects, override expiry, timezone guidance,
+error feedback and all restored controls remain. Feature explanations are optional
+collapsed details. No backend, prayer/billing data, public deployment or mobile
+binary changed. Admin typecheck/build, seven targeted tests, twelve workspace
+browser tests and 104 Academy layout checks passed. Live HTTP 200, source SHA,
+signed-in workspace, shorter copy and retained Academy navigation verified.
