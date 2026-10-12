@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, FlatList, Keyboard, Pressable, StyleSheet, View, type ViewToken } from "react-native";
+import { ActivityIndicator, Animated, FlatList, Keyboard, Pressable, StyleSheet, View, useWindowDimensions, type ViewToken } from "react-native";
 import { Text, TextInput } from "../i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
@@ -28,6 +28,8 @@ import { useQuranReader } from "./useQuranReader";
 import { useQuranTransition } from "./useQuranTransition";
 import type { QuranMode } from "./types";
 import { useQuranChallengePractice } from "./useQuranChallengePractice";
+import { QuranSidebar } from "./QuranSidebar";
+import { quranWorkspaceLayout } from "./workspaceLayout";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const QuranChallenges = lazy(() => Promise.resolve({ default: require("./QuranChallenges").QuranChallenges as typeof import("./QuranChallenges").QuranChallenges }));
 type Row = { kind: "chapter"; chapter: QuranChapter } | { kind: "verse"; verse: QuranVerse } | { kind: "bookmark"; key: string };
@@ -35,6 +37,8 @@ const titles: Record<QuranMode, string> = { home: "Quran & Recite", read: "Reade
 export default function QuranReaderScreen() {
   const router = useRouter(), params = useLocalSearchParams<{ chapter?: string; ayah?: string; view?: string }>();
   const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const workspace = quranWorkspaceLayout(width);
   const [fontLoaded] = useFonts({ QuranNaskh: require("../../assets/fonts/NotoNaskhArabic.ttf") });
   const library = useQuranLibrary(), audio = useQuranAudio();
   const { update: updateLibrary, bookmark: toggleBookmark } = library;
@@ -163,12 +167,15 @@ export default function QuranReaderScreen() {
     {reader.loading || busy || searching ? <ActivityIndicator color={theme.colors.teal} style={{ padding: 18 }} accessibilityLabel="Loading Quran content" /> : null}
   </View>;
   return <SafeAreaView onTouchStart={practiceInteraction} style={{ flex: 1, backgroundColor: theme.colors.background }} edges={["top", "bottom"]}>
+    <View style={styles.workspace}>
+    {workspace.sidebar ? <QuranSidebar chapters={reader.chapters} chapterId={chapterId} mode={mode} onMode={onMode} onOpen={open} /> : null}
+    <View style={styles.readerPane}>
     <View style={[styles.navigation, { borderBottomColor: theme.colors.border }]}><QuranIconButton label={mode === "home" ? "Back to More" : "Quran home"} icon="chevron-back" onPress={() => { if (mode === "home") { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/more"); } else onMode("home"); }} />
       <Text numberOfLines={1} style={[styles.navTitle, { color: theme.colors.text }]}>{titles[mode]}</Text><QuranIconButton label="Search Quran" icon="search-outline" onPress={() => onMode("search")} /><QuranIconButton label="Quran preferences" icon="options-outline" onPress={() => onMode("settings")} /></View>
-    <View accessibilityRole="tablist" style={{ flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border, paddingHorizontal: 8, gap: 4 }}>
+    <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
       {([{ mode: "read", label: "Read", icon: "book-outline" }, { mode: "listen", label: "Listen", icon: "headset-outline" }, { mode: "practice", label: "Practise", icon: "mic-outline" }, { mode: "review", label: "Library", icon: "albums-outline" }] as const).map(item => {
         const selected = mode === item.mode || item.mode === "practice" && (mode === "test" || mode === "memorize");
-        return <Pressable key={item.mode} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => onMode(item.mode)} style={{ flex: 1, minHeight: 60, justifyContent: "center", alignItems: "center", paddingVertical: 8, gap: 4 }}>
+        return <Pressable key={item.mode} accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected }} onPress={() => onMode(item.mode)} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 52, borderRadius: 16, backgroundColor: selected ? theme.colors.tintSoft : "transparent", opacity: pressed ? .65 : 1, justifyContent: "center", alignItems: "center", paddingVertical: 7, gap: 4 })}>
           <Ionicons name={item.icon} size={20} color={selected ? theme.colors.teal : theme.colors.muted} /><Text style={{ color: selected ? theme.colors.teal : theme.colors.muted, fontSize: 12, fontWeight: "600" }}>{item.label}</Text>
         </Pressable>;
       })}
@@ -179,7 +186,7 @@ export default function QuranReaderScreen() {
     {mode === "challenges" ? <Suspense fallback={<ActivityIndicator color={theme.colors.teal} />}><QuranChallenges /></Suspense> : mode === "review" ? <QuranReviewLibrary library={library} audio={audio} onPractise={(chapter, ayah) => { setChapterId(chapter); setTarget(ayah); onMode("practice"); }} /> : mode === "listen" ? <QuranListening chapters={reader.chapters} audio={audio} library={library} />
       : mode === "read" && library.library.preferences.layout === "madinah" ? <QuranMushaf reference={`${chapterId}:${target}`} library={library} audio={audio} onOpenAyah={(key) => {
         void updateLibrary((s) => ({ ...s, preferences: { ...s.preferences, layout: "ayah" } })).then(() => { const ref = parseAyahReference(key)!; open(ref.chapter, ref.ayah); }).catch(() => {});
-      }} /> : <FlatList ref={list} data={rows} key={`${mode}:${chapterId}`} style={styles.list} contentContainerStyle={styles.listContent} ListHeaderComponent={header}
+      }} /> : <FlatList ref={list} data={rows} key={`${mode}:${chapterId}`} style={styles.list} contentContainerStyle={[styles.listContent, { maxWidth: workspace.readingWidth, paddingHorizontal: workspace.horizontalPadding }]} ListHeaderComponent={header}
       keyboardShouldPersistTaps="handled" onScrollBeginDrag={practiceInteraction} initialNumToRender={8} maxToRenderPerBatch={6} windowSize={5}
       keyExtractor={(row) => row.kind === "chapter" ? `chapter:${row.chapter.id}` : row.kind === "verse" ? row.verse.verseKey : row.key}
       onViewableItemsChanged={onVisible} viewabilityConfig={{ itemVisiblePercentThreshold: 30, minimumViewTime: 400 }}
@@ -191,9 +198,14 @@ export default function QuranReaderScreen() {
       ListFooterComponent={<View style={{ gap: 12, paddingVertical: 24 }}>{mode === "read" && reader.pages.at(-1)?.hasMore ? <AppButton label="Load next ayahs" variant="secondary" onPress={() => void reader.loadPage(reader.pages.at(-1)!.page + 1).catch(() => setError("More ayahs could not load."))} /> : null}<Text style={{ color: theme.colors.subtle, fontSize: 12, lineHeight: 20, textAlign: "center" }}>{resources?.contentSource === "tanzil" ? "Quran text: Tanzil Project · Uthmani 1.1 · CC BY 3.0" : quranAttribution}{"\n"}Arabic is shown exactly as supplied. Translations convey the meaning.</Text>{resources?.contentSource === "tanzil" ? <AppButton label="Tanzil source and updates" variant="ghost" icon="open-outline" onPress={() => void Linking.openURL("https://tanzil.net")} /> : null}</View>} />}
     </Animated.View>
     <QuranMiniPlayer audio={audio} reciter={resources?.reciters.find((r) => r.id === library.library.preferences.reciter)?.name ?? "Reference recitation"} />
+    </View>
+    </View>
   </SafeAreaView>;
 }
 const styles = StyleSheet.create({
+  workspace: { flex: 1, flexDirection: "row", width: "100%", maxWidth: 1600, alignSelf: "center" },
+  readerPane: { flex: 1, minWidth: 0 },
+  tabs: { flexDirection: "row", borderWidth: StyleSheet.hairlineWidth, padding: 4, marginHorizontal: 14, marginVertical: 10, gap: 4, borderRadius: 20 },
   navigation: { paddingHorizontal: 10, minHeight: 62, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth },
   navTitle: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: "700" }, list: { flex: 1 }, listContent: { width: "100%", maxWidth: 840, alignSelf: "center", padding: 18, paddingBottom: 28 },
   headerContent: { gap: 14 }, search: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 56, borderRadius: 24, paddingHorizontal: 16, borderWidth: StyleSheet.hairlineWidth },
