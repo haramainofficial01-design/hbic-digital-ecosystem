@@ -14,7 +14,9 @@ test("dashboard removes generic introductions while keeping labels and publishin
 test("Academy remains label-led without removing essential features or confirmations", () => {
   const source = component("AcademyPanel");
   for (const removed of ["Without a camera, type the entire", "Every confirmed ACTIVE student appears here", "Card registrations await Stripe Checkout confirmation", "Confirmed students, including tuition-exempt students, are listed below"]) assert.equal(source.includes(removed), false);
-  for (const label of ["Tuition exemptions", "Tuition exempt", '"Boys"', '"Girls"', "Actual cash and card receipts", "Monthly payment breakdown", "Mark cash received", "Confirm enrollment / check in", "Class date", "Payment status"]) assert.ok(source.includes(label), label);
+  for (const label of ["Tuition exemptions", "Tuition exempt", '"Boys"', '"Girls"', "Paid tuition", "Monthly payment breakdown", "Mark cash received", "Confirm enrollment / check in", "Class date", "Payment status"]) assert.ok(source.includes(label), label);
+  assert.equal(source.includes("ledgerPaymentBreakdown"), false, "Operational UI must not include exempt historical receipts in totals");
+  assert.equal(source.includes("Actual cash and card receipts"), false);
   for (const safety of ["Confirm that", "cash was received", "parent's payment-method request", "Charges only the remaining agreed tuition", "Saved closures notify opted-in parents.", "Card setup requires parent authorization."]) assert.ok(source.includes(safety), safety);
   assert.ok(source.includes('window.confirm(exempt ?'), "Exemption impact is still confirmed before any write");
 });

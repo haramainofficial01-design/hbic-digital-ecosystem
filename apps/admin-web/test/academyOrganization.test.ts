@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { AcademyPublicFamily } from "@hbic/shared";
-import { ledgerPaymentBreakdown, tuitionFamilies, tuitionChildren, tuitionReportCents, tuitionPaidStudents, tuitionPaymentBreakdown } from "../lib/academyOrganization";
+import { familyHasTuition, ledgerPaymentBreakdown, tuitionFamilies, tuitionChildren, tuitionReportCents, tuitionPaidStudents, tuitionPaymentBreakdown } from "../lib/academyOrganization";
 
 test("exempt students remain enrolled but are excluded from operational payment views", () => {
   const exempt = { id: "exempt", enrollmentState: "active", noTuitionDue: true, paymentState: "paid", amountCents: 10000,
@@ -45,4 +45,21 @@ test("actual receipts include previously paid exemptions and withdrawals, withou
     billingPeriod: "2026-10", billingMethod: "cash", paymentChoice: "card", children: [{ name: "Exempt", tuitionExempt: true }] } as AcademyPublicFamily;
   assert.deepEqual(ledgerPaymentBreakdown([paid, paid, { ...paid, id: "future", billingPeriod: "2026-11" },
     { ...paid, id: "due", paymentState: "cash_due" }], "2026-10"), { cash: { count: 1, cents: 10000 }, card: { count: 0, cents: 0 } });
+});
+
+test("operational tuition ignores fully exempt records even without legacy noTuitionDue flag", () => {
+  const exempt = { id: "exempt", enrollmentState: "active", paymentState: "paid", amountCents: 10000,
+    billingPeriod: "2026-10", billingMethod: "cash", children: [{ name: "Exempt", tuitionExempt: true }] } as AcademyPublicFamily;
+  assert.equal(familyHasTuition(exempt), false);
+  assert.deepEqual(tuitionFamilies([exempt]), []);
+  assert.deepEqual(tuitionPaymentBreakdown([exempt], "2026-10"), { cash: { count: 0, cents: 0 }, card: { count: 0, cents: 0 } });
+  assert.equal(exempt.enrollmentState, "active"); assert.equal(exempt.amountCents, 10000);
+});
+
+test("non-exempt totals deduplicate paid family-months and do not count mixed-family exempt tuition", () => {
+  const mixed = { id: "mixed", enrollmentState: "active", paymentState: "paid", amountCents: 10000,
+    billingPeriod: "2026-10", billingMethod: "cash", children: [{ name: "Paying" }, { name: "Exempt", tuitionExempt: true }] } as AcademyPublicFamily;
+  assert.equal(familyHasTuition(mixed), true);
+  assert.deepEqual(tuitionPaymentBreakdown([mixed, mixed], "2026-10"), { cash: { count: 1, cents: 5000 }, card: { count: 0, cents: 0 } });
+  assert.equal(mixed.amountCents, 10000, "Stored receipt stays intact");
 });
