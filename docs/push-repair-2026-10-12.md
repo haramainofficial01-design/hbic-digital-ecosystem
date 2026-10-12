@@ -77,7 +77,7 @@ provider and no Maghrib override. Today's public snapshot shows 6:50 PM adhan an
 7:00 PM iqamah. Additional regressions cover subsequent weeks, DST and January;
 an explicit manual Maghrib override persists until staff clears it.
 
-47 focused tests passed, including the real headless admin component; public,
+48 focused tests passed, including the real headless admin component; public,
 admin and mobile typechecks passed; both web builds passed. The added phone
 pairing-code UI still requires a store build: existing 1.7.6 iOS build 35 is
 WAITING_FOR_REVIEW and Android code 40 is the submitted production release.
@@ -101,3 +101,17 @@ Android code 41 `31c3d5e2-ca2b-4508-a467-757f09666907`, iOS/Watch build 36
 upload, submission and store approval are separate states; none is implied by
 queueing these builds. The existing build-35 Apple review remains untouched
 until its replacement is processed and verified.
+
+Receipt retirement now uses a transaction: it cannot recreate deleted tokens or
+disable registrations refreshed after the original dispatch. Replaying stored
+receipts retains their historical failure count without disabling an app that
+has since re-registered. Dedicated fresh-receipt and cached-receipt regressions
+cover this behavior.
+
+iOS/Watch build 36 completed and its signed IPA passed all four target identity,
+privacy-purpose, keychain, embedded Watch Quran and new pairing-UI checks. Apple
+processed it VALID as `b58d53c5-7bec-469b-9308-03334a9ffd71`. Only then was the older
+build-35 queue superseded. New review `8cc549e6-e90b-4281-ad7d-d58e774ebde2` is
+WAITING_FOR_REVIEW. Existing screenshots, contact details, privacy listing and
+automatic-after-approval release settings remain; no public Apple approval is
+claimed. Android code 41 is still compiling at this checkpoint.

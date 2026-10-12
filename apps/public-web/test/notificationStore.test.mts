@@ -21,7 +21,7 @@ function database() {
   });
   const collection = (name: string) => ({ doc: (id?: string) => ref(name, id ?? `log-${++next}`), where: (field: string, op: string, value: any) => ({ get: async () => ({ docs: [...docs].filter(([id, data]) => id.startsWith(`${name}/`) && data[field] === value).map(([, data]) => ({ data: () => data })) }) }) });
   // Sequential transaction fixture; source uses real Firestore transaction locking.
-  const db = { collection, runTransaction: async (fn: any) => fn({ get: (ref: any) => ref.get(), create: (ref: any, data: any) => { strict(data); if (failWrites) throw Error("Storage unavailable"); events.push("intent"); docs.set(`pushNotificationLogs/${ref.id}`, data); } }) };
+  const db = { collection, runTransaction: async (fn: any) => fn({ get: (ref: any) => ref.get(), set: (ref: any, data: any, options: any) => ref.set(data, options), create: (ref: any, data: any) => { strict(data); if (failWrites) throw Error("Storage unavailable"); events.push("intent"); docs.set(`pushNotificationLogs/${ref.id}`, data); } }) };
   return { db, docs, events, fail: (value: boolean) => { failWrites = value; } };
 }
 test("ordinary/nested notification logs are valid before Expo, audiences are safe, and retry never redispatches", async () => {
@@ -75,8 +75,23 @@ test("invalid APNs device tokens are retired, not shared provider credentials; r
     assert.equal(fake.docs.get(`pushTokens/${ids[0]}`).enabled, false);
     assert.equal(fake.docs.get(`pushTokens/${ids[1]}`).enabled, true);
     assert.deepEqual(first.errorCounts, { BadDeviceToken: 1, InvalidCredentials: 1 });
+    fake.docs.set(`pushTokens/${ids[0]}`, { enabled: true, updatedAt: new Date().toISOString() });
     const replay = await module.checkPushNotificationReceipts("apns-fixture");
     assert.equal(reads, 1); assert.deepEqual(replay.errorCounts, first.errorCounts); assert.equal(replay.failedCount, 2);
+    assert.equal(fake.docs.get(`pushTokens/${ids[0]}`).enabled, true, "an old receipt cannot disable a newly refreshed registration");
+  } finally { globalThis.fetch = original; delete (globalThis as any).__notificationTestDb; }
+});
+
+test("a fresh old-error receipt cannot retire a registration updated after dispatch or recreate a deleted token", async () => {
+  const module = await store(), fake = database(); (globalThis as any).__notificationTestDb = fake.db;
+  fake.docs.set("pushTokens/refreshed", { enabled: true, updatedAt: "2026-10-12T21:02:00Z" });
+  fake.docs.set("pushNotificationLogs/old-send", { sentAt: "2026-10-12T21:00:00Z", successCount: 2, failureCount: 0, tokenCount: 2, tickets: [{ id: "fresh-error", tokenId: "refreshed" }, { id: "deleted-error", tokenId: "deleted" }] });
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ data: { "fresh-error": { status: "error", details: { error: "DeviceNotRegistered" } }, "deleted-error": { status: "error", details: { error: "DeviceNotRegistered" } } } });
+  try {
+    const result = await module.checkPushNotificationReceipts("old-send");
+    assert.equal(result.failedCount, 2); assert.equal(fake.docs.get("pushTokens/refreshed").enabled, true);
+    assert.equal(fake.docs.has("pushTokens/deleted"), false);
   } finally { globalThis.fetch = original; delete (globalThis as any).__notificationTestDb; }
 });
 

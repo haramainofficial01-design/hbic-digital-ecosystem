@@ -74,6 +74,18 @@ function tokenId(token: string) {
   return Buffer.from(token).toString("base64url");
 }
 
+async function retireInvalidRegistration(db: NonNullable<ReturnType<typeof getDatabase>>, id: string, sentAt: string, updatedAt: string) {
+  const ref = db.collection("pushTokens").doc(id);
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref), current = snapshot.data();
+    if (!snapshot.exists || current?.enabled === false) return;
+    // A later app launch may already have refreshed this registration. An old
+    // receipt must never disable its replacement or recreate a deleted token.
+    if (Date.parse(current?.updatedAt ?? "") > Date.parse(sentAt)) return;
+    transaction.set(ref, { enabled: false, updatedAt }, { merge: true });
+  });
+}
+
 function hashInstallationId(installationId?: string) {
   const normalized = installationId?.trim();
   return normalized ? createHash("sha256").update(normalized).digest("base64url") : undefined;
@@ -271,7 +283,7 @@ async function deliverExpoPushMessages({
   }
 
   await Promise.all(
-    disabledTokens.map((token) => db.collection("pushTokens").doc(tokenId(token)).set({ enabled: false, updatedAt: now }, { merge: true }).catch(() => undefined))
+    disabledTokens.map((token) => retireInvalidRegistration(db, tokenId(token), now, now).catch(() => undefined))
   );
 
   const status = successCount ? failureCount ? "partial" : "accepted" : "failed";
@@ -447,13 +459,13 @@ export async function checkPushNotificationReceipts(logId: string, options?: { p
       receiptResults[ticket.id] = "error";
       const details = receipts[ticket.id]?.details;
       if (details) receiptErrors[ticket.id] = details.apns?.reason ?? details.error ?? "UnknownReceiptError";
-      if (receiptErrors[ticket.id] === "DeviceNotRegistered" || receiptErrors[ticket.id] === "BadDeviceToken") disabledTokenIds.push(ticket.tokenId);
+      if (details && (details.error === "DeviceNotRegistered" || details.apns?.reason === "BadDeviceToken")) disabledTokenIds.push(ticket.tokenId);
     } else pendingCount += 1;
   });
 
   const checkedAt = new Date().toISOString();
   await Promise.all(
-    disabledTokenIds.map((id) => db.collection("pushTokens").doc(id).set({ enabled: false, updatedAt: checkedAt }, { merge: true }))
+    disabledTokenIds.map((id) => retireInvalidRegistration(db, id, record.sentAt ?? checkedAt, checkedAt))
   );
   const status = pendingCount ? "pending" : failedCount ? deliveredCount ? "partial" : "failed" : "delivered";
   const errorCounts = Object.values(receiptErrors).reduce<Record<string, number>>((counts, code) => ({ ...counts, [code]: (counts[code] ?? 0) + 1 }), {});
