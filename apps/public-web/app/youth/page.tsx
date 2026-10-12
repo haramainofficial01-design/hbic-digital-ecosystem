@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { getPublicEvents } from "@hbic/shared";
+import { getPublicEvents, publicEventImagePath } from "@hbic/shared";
 import Image from "next/image";
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
@@ -11,7 +11,6 @@ export default async function YouthPage() {
   const { settings } = content;
   const events = getPublicEvents(content);
   const youthEvents = events.filter((event) => event.category === "Youth");
-  const summerCamp = events.find((event) => event.id === "event-summer-camp-2026");
   const socialCards = [
     { label: "Instagram", href: settings.social.instagram, text: "Program updates, reminders, and community moments." },
     { label: "YouTube", href: settings.social.youtube, text: "Recitations, beneficial reminders, and youth media." },
@@ -47,15 +46,16 @@ export default async function YouthPage() {
 
       <section className="section">
         <h2>Featured Youth Programs</h2>
+        <div className="actions"><a className="button secondary" href="/events#past-events">Past Events &amp; Highlights</a></div>
         <div className="grid">
           {youthEvents.map((event) => (
             <article className="card image-card wide" key={event.id}>
-              <Image src="/photos/summer-camp-2026.jpeg" alt={`${event.title} flyer`} width={1200} height={800} />
+              {event.image ? <Image src={publicEventImagePath(event.image)} alt={`${event.title} flyer`} width={1200} height={800} style={{ width: "100%", height: "auto", objectFit: "contain" }} /> : null}
               <span className="kicker">Youth Program</span>
               <h3>{event.title}</h3>
               <p className="muted">{event.description}</p>
-              {summerCamp?.registrationLink ? (
-                <div className="actions"><a className="button primary" href={summerCamp.registrationLink}>Contact us</a></div>
+              {event.registrationLink ? (
+                <div className="actions"><a className="button primary" href={event.registrationLink}>Learn More</a></div>
               ) : null}
             </article>
           ))}

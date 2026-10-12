@@ -286,7 +286,7 @@ test("Jumu'ah notice never invents a time when neither structured nor legacy dat
   assert.equal(getEffectiveJumuahDoorNotice(schedule), null);
 });
 
-test("History of Fiqh is published without inventing calendar dates", () => {
+test("discontinued History of Fiqh cannot become current through an old publication flag", () => {
   const publishedContent = {
     ...defaultContent,
     events: defaultContent.events.map((event) => (
@@ -302,7 +302,7 @@ test("History of Fiqh is published without inventing calendar dates", () => {
       && event.date === "Sundays"
       && event.recurringSchedule === "Sundays at 8:30 PM"
     )),
-    true
+    false
   );
   assert.equal(
     getPublicEvents({
@@ -329,6 +329,8 @@ test("Watch snapshot includes only verified calendar-dated published events", ()
         ...defaultContent.events[0],
         id: "event-confirmed",
         title: "Confirmed Community Program",
+        archived: false,
+        lifecycle: "active" as const,
         date: "2026-07-11",
         startTime: "7:00 PM",
         status: "published" as const,

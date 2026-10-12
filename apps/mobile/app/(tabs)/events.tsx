@@ -1,4 +1,4 @@
-import { getPublicEvents, getPublicVolunteerOpportunities, type ProgramCategory } from "@hbic/shared";
+import { getPastEvents, getPublicEvents, getPublicVolunteerOpportunities, type ProgramCategory } from "@hbic/shared";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -25,6 +25,7 @@ export default function EventsScreen() {
   const { settings } = content;
   const volunteerOpportunities = getPublicVolunteerOpportunities(content.volunteerOpportunities);
   const publishedEvents = getPublicEvents(content);
+  const pastEvents = getPastEvents(content);
   const filters = useMemo<Filter[]>(() => (settings.ramadanMode ? [...baseFilters, "Ramadan"] : [...baseFilters]), [settings.ramadanMode]);
   const [filter, setFilter] = useState<Filter>("All");
   const events = useMemo(
@@ -34,7 +35,7 @@ export default function EventsScreen() {
 
   return (
     <AppScreen>
-      <SectionHeader title="Events & Programs" subtitle="Halaqah series, youth activities, summer camp, volunteer needs, and community gatherings." />
+      <SectionHeader title="Events & Programs" subtitle="Current classes, youth activities and community gatherings." />
       <View style={styles.chips}>
         {filters.map((item) => {
           const active = filter === item;
@@ -67,6 +68,8 @@ export default function EventsScreen() {
         <EmptyState title="No events in this category" message="Choose another category or check back for new community updates." />
       ) : null}
 
+      <SectionHeader title="Past Events & Highlights" />
+      <AdaptiveGrid>{pastEvents.map(event => <EventCard key={event.id} event={event} onPress={() => router.push({ pathname: "/event-detail", params: { id: event.id } } as never)} />)}</AdaptiveGrid>
       <SectionHeader title="Volunteer" subtitle="Help with Jumu'ah, youth, events, and general community support." />
       <AdaptiveGrid>
         {volunteerOpportunities.map((opportunity) => (

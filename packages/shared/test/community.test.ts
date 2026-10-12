@@ -96,16 +96,14 @@ test("expired or closed volunteer calls do not remain public", () => {
   assert.deepEqual(result.map((item) => item.id), ["open"]);
 });
 
-test("History of Fiqh remains visible in published event projections", () => {
+test("History of Fiqh is retained privately but excluded from current projections", () => {
   const event = getPublicEvents(defaultContent).find((item) => item.id === "event-history-of-fiqh");
 
-  assert.ok(event);
-  assert.equal(event.title, "History of Fiqh");
-  assert.equal(event.date, "Sundays");
-  assert.equal(event.startTime, "8:30 PM");
-  assert.equal(event.status, "published");
-  assert.equal(event.visible, true);
-  assert.equal(event.featured, true);
+  assert.equal(event, undefined);
+  const retained=defaultContent.events.find(item=>item.id==="event-history-of-fiqh")!;
+  assert.equal(retained.title,"History of Fiqh");
+  assert.equal(retained.archived,true);
+  assert.equal(retained.notificationEnabled,false);
 });
 
 test("public content projection strips private drafts and internal routing details", () => {

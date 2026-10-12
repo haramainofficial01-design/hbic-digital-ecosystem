@@ -7,16 +7,6 @@ import { getPublishedPageContent as getPublishedContent } from "../../lib/conten
 
 const youthHighlights = [
   {
-    title: "Heart Antidotes",
-    image: "/media/images/heart-antidotes.jpeg",
-    text: "Short reflections to uplift the heart and strengthen faith."
-  },
-  {
-    title: "Qur'an Reflections",
-    image: "/media/images/quran-reflections.jpeg",
-    text: "Lessons and guidance from the Qur'an shared with the community."
-  },
-  {
     title: "Youth Program Moments",
     image: "/media/images/youth-program.jpeg",
     text: "Program highlights from youth gatherings and beneficial activities."
@@ -108,6 +98,14 @@ export default async function MediaPage() {
         </div>
       </section>
 
+      <section className="section" id="past-highlights">
+        <h2>Past Events &amp; Highlights</h2>
+        <div className="grid">{mediaItems.filter(item => item.visible && item.type === "Past Events & Highlights").map(item => <article className="card image-card" key={item.id}>
+          <Image src={item.posterUrl} alt={item.title} width={1024} height={1280} style={{ height: "auto", objectFit: "contain" }} />
+          <span className="kicker">Completed · {item.year}</span><h3>{item.title}</h3><p className="muted">{item.description}</p>
+          <a className="button primary" href={item.videoUrl} target="_blank" rel="noreferrer">Watch Summer Camp 2026 Highlights</a>
+        </article>)}</div>
+      </section>
       <section className="section">
         <h2>HBIC Social Media</h2>
         <p>Follow HBIC Youth for reminders, clips, and program updates.</p>

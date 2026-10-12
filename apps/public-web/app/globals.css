@@ -12,6 +12,14 @@
   --shadow: 0 24px 80px rgba(3, 24, 39, 0.14);
 }
 
+@media(max-width:360px){
+  .site .nav{gap:8px}
+  .site .nav .brand{font-size:13px;gap:5px}
+  .site .nav .brand img{width:34px;height:34px}
+  .site .mobile-nav-actions{gap:4px}
+  .site .mobile-app-link,.site .mobile-menu summary{font-size:11px;padding-inline:8px}
+}
+
 .jumuah-site-accent {
   position: fixed;
   z-index: 48;

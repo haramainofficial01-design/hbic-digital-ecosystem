@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { Text, Image } from "../src/i18n/LocalizedText";
 
-import { getPublicEvents } from "@hbic/shared";
+import { getPastEvents, getPublicEvents, publicEventImagePath } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
 import { EmptyState } from "../src/components/EmptyState";
@@ -20,7 +20,7 @@ export default function EventDetailScreen() {
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
   const visibleEvents = getPublicEvents(content);
-  const event = visibleEvents.find((item) => item.id === id) ?? visibleEvents[0];
+  const event = [...visibleEvents, ...getPastEvents(content)].find((item) => item.id === id);
 
   if (!event) {
     return (
@@ -31,20 +31,22 @@ export default function EventDetailScreen() {
     );
   }
 
-  const image = event.image ? eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] : undefined;
+  const imagePath = event.image ? publicEventImagePath(event.image) : undefined;
+  const image = event.image ? eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] ?? { uri: imagePath?.startsWith("https://") ? imagePath : `https://hbic.ca${imagePath}` } : undefined;
+  const completed = event.lifecycle === "completed";
 
   return (
     <AppScreen>
       <AppButton label="Back" icon="chevron-back" variant="ghost" onPress={() => router.back()} />
       {image ? (
-        <Image source={image} style={styles.heroImage} />
+        <Image source={image} style={[styles.heroImage, event.id === "event-quran-academy" && { height: undefined, aspectRatio: 4 / 5 }]} resizeMode="contain" />
       ) : (
         <View style={[styles.brandHero, { backgroundColor: theme.colors.navy }]}>
           <Image source={brandAssets.appMark} style={styles.brandLogo} resizeMode="contain" />
           <Text style={[styles.brandName, { color: theme.colors.white }]}>Masjid Bilal</Text>
         </View>
       )}
-      <SectionHeader title={event.title} subtitle={`${event.category} · ${event.audience}`} />
+      <SectionHeader title={event.title} subtitle={`${completed ? "Completed" : event.category} · ${event.audience}`} />
       <GlassCard>
         <Text style={[styles.title, { color: theme.colors.text }]}>Details</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>{event.description}</Text>
@@ -52,18 +54,18 @@ export default function EventDetailScreen() {
       <GlassCard tone="teal">
         <Text style={[styles.title, { color: theme.colors.text }]}>Schedule</Text>
         <DetailRow label="Date" value={event.date} />
-        <DetailRow label="Time" value={event.endTime ? `${event.startTime} - ${event.endTime}` : event.startTime} />
+        {!completed ? <DetailRow label="Time" value={event.endTime ? `${event.startTime} - ${event.endTime}` : event.startTime} /> : null}
         <DetailRow label="Location" value={event.location} />
         <DetailRow label="Led by" value={event.speaker} />
       </GlassCard>
       <View style={styles.actions}>
-        <AppButton
-          label={event.registrationLink ? "Register / Contact" : "Email the Office"}
+        {!completed ? <AppButton
+          label={event.id === "event-quran-academy" ? "Register Now" : event.registrationLink ? "Register / Contact" : "Email the Office"}
           icon="mail"
-          onPress={() => Linking.openURL(event.registrationLink || `mailto:${content.settings.email}?subject=${encodeURIComponent(event.title)}`)}
+          onPress={() => event.id === "event-quran-academy" ? router.push("/quran-academy" as never) : Linking.openURL(event.registrationLink || `mailto:${content.settings.email}?subject=${encodeURIComponent(event.title)}`)}
           style={styles.flex}
-        />
-        <AppButton label="Notifications" icon="notifications" variant="secondary" onPress={() => router.push("/notifications" as never)} style={styles.flex} />
+        /> : event.highlightUrl ? <AppButton label="Watch Summer Camp 2026 Highlights" icon="play-circle" onPress={() => Linking.openURL(event.highlightUrl!)} style={styles.flex} /> : null}
+        {!completed ? <AppButton label="Notifications" icon="notifications" variant="secondary" onPress={() => router.push("/notifications" as never)} style={styles.flex} /> : null}
       </View>
     </AppScreen>
   );

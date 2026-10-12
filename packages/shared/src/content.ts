@@ -1,4 +1,5 @@
 import { hbicSettings } from "./constants";
+import { discontinuedEventIds } from "./eventLifecycle";
 import {
   getCurrentDailyBenefit,
   getPublishedLocalServices,
@@ -54,6 +55,8 @@ export interface HbicContent {
   eidSchedule: EidSchedule;
   announcements: Announcement[];
   events: EventItem[];
+  /** Public archive is separate so older clients never list it as upcoming. */
+  pastEvents?: EventItem[];
   programs: ServiceItem[];
   donationCategories: DonationCategory[];
   mediaItems: MediaItem[];
@@ -98,7 +101,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   askMasjidEnabled: false,
   dailyBenefitEnabled: false,
   seasonalModeEnabled: true,
-  historyOfFiqhEventEnabled: true
+  historyOfFiqhEventEnabled: false
 };
 
 export const defaultContent: HbicContent = {
@@ -161,11 +164,16 @@ export function getPublicEvents(content: Pick<HbicContent, "events" | "featureFl
   return content.events.filter((event) => {
     if (!isVisibleItem(event)) return false;
     if (event.status === "draft") return false;
-    if (event.id === "event-history-of-fiqh") {
-      return content.featureFlags.historyOfFiqhEventEnabled;
-    }
+    if (event.lifecycle === "completed" || event.lifecycle === "discontinued") return false;
+    if ((discontinuedEventIds as readonly string[]).includes(event.id)) return false;
     return true;
   });
+}
+
+export function getPastEvents(content: Pick<HbicContent, "events" | "pastEvents">) {
+  return [...new Map([...content.events, ...(content.pastEvents ?? [])]
+    .filter(event => event.visible !== false && event.status !== "draft" && event.lifecycle === "completed")
+    .map(event => [event.id, { ...event, registrationLink: "", notificationEnabled: false, featured: false }])).values()];
 }
 
 export function toPublicContent(content: HbicContent, now = new Date()): HbicContent {
@@ -194,6 +202,7 @@ export function toPublicContent(content: HbicContent, now = new Date()): HbicCon
       return !announcement.expiresAt || Date.parse(announcement.expiresAt) > currentTimestamp;
     }),
     events: getPublicEvents(content),
+    pastEvents: getPastEvents(content),
     programs: content.programs.filter(isVisibleItem),
     mediaItems: content.mediaItems.filter((item) => item.visible),
     volunteerOpportunities: getPublicVolunteerOpportunities(

@@ -927,6 +927,7 @@ function AnnouncementsPanel({ content, updateContent }: EditorPanelProps) {
 }
 
 function EventsPanel({ content, updateContent }: EditorPanelProps) {
+  const [archiveView, setArchiveView] = useState(false);
   function updateEvent(index: number, patch: Partial<EventItem>) {
     updateContent((current) => ({
       events: current.events.map((event, eventIndex) => eventIndex === index ? { ...event, ...patch } : event)
@@ -969,11 +970,13 @@ function EventsPanel({ content, updateContent }: EditorPanelProps) {
     <div className="grid">
       <div className="card full">
         <h2>Events and program cards</h2>
+        <div className="actions"><button className={archiveView ? "secondary" : "primary"} onClick={() => setArchiveView(false)}>Current &amp; Upcoming</button><button className={archiveView ? "primary" : "secondary"} onClick={() => setArchiveView(true)}>Archived &amp; Past</button></div>
         <div className="actions"><button className="primary" onClick={addEvent}>Add event</button></div>
       </div>
-      {content.events.map((event, index) => (
+      {content.events.map((event, index) => (Boolean(event.archived || event.lifecycle === "completed" || event.lifecycle === "discontinued") !== archiveView ? null :
         <div className="card full" key={event.id}>
           <h2>{event.title || "Event"}</h2>
+          <span className="kicker">{event.lifecycle === "completed" ? "Completed" : event.lifecycle === "discontinued" ? "Discontinued" : event.status === "draft" ? "Draft" : "Current / Upcoming"}</span>
           <div className="form-grid">
             <Field label="Title" value={event.title} onChange={(value) => updateEvent(index, { title: value })} />
             <Field label="Subtitle" value={event.subtitle ?? ""} onChange={(subtitle) => updateEvent(index, { subtitle })} />
@@ -990,6 +993,8 @@ function EventsPanel({ content, updateContent }: EditorPanelProps) {
             <Field label="Tags (comma separated)" value={(event.tags ?? []).join(", ")} onChange={(value) => updateEvent(index, { tags: value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
             <Field label="Social caption" value={event.caption ?? ""} textarea onChange={(caption) => updateEvent(index, { caption })} />
             <ChoiceField label="Content state" value={event.status ?? (event.visible === false ? "draft" : "published")} options={["draft", "published"]} onChange={(status) => updateEvent(index, { status: status as EventItem["status"], visible: status === "published" })} />
+            <ChoiceField label="Lifecycle" value={event.lifecycle ?? "active"} options={["active", "completed", "discontinued"]} onChange={(lifecycle) => updateEvent(index, { lifecycle: lifecycle as EventItem["lifecycle"], archived: lifecycle !== "active", ...(lifecycle !== "active" ? { featured: false, notificationEnabled: false, registrationLink: "" } : {}) })} />
+            <Field label="Highlight link" value={event.highlightUrl ?? ""} onChange={(highlightUrl) => updateEvent(index, { highlightUrl })} />
             <ToggleField label="Visible" checked={event.visible !== false} onChange={(checked) => updateEvent(index, { visible: checked })} />
             <ToggleField label="Featured" checked={event.featured === true} onChange={(checked) => updateEvent(index, { featured: checked })} />
             <Field label="Description" value={event.description} textarea onChange={(value) => updateEvent(index, { description: value })} />

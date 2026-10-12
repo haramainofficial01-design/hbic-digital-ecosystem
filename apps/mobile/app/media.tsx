@@ -42,6 +42,12 @@ export default function MediaScreen() {
         <AppButton label="Open Media Page" icon="play-circle" onPress={() => Linking.openURL(mediaPageUrl)} style={styles.button} />
       </GlassCard>
 
+      <SectionHeader title="Past Events & Highlights" />
+      {mediaItems.filter(item => item.visible && item.type === "Past Events & Highlights").map(item => <GlassCard key={item.id}>
+        <Image source={photoAssets.summerCamp} resizeMode="contain" style={{ width: "100%", aspectRatio: 4 / 5, borderRadius: 20, marginBottom: 14 }} />
+        <Text style={[styles.title, { color: theme.colors.text }]}>{item.title}</Text><Text style={[styles.body, { color: theme.colors.muted }]}>Completed · {item.year}. {item.description}</Text>
+        <AppButton label="Watch Summer Camp 2026 Highlights" icon="play-circle" onPress={() => Linking.openURL(item.videoUrl)} style={styles.button} />
+      </GlassCard>)}
       <SectionHeader title="HBIC Social Media" />
       <GlassCard>
         <Text style={[styles.title, { color: theme.colors.text }]}>Follow HBIC Youth</Text>

@@ -2,6 +2,7 @@ import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { Text, Image } from "../src/i18n/LocalizedText";
+import { getPastEvents } from "@hbic/shared";
 
 import { AppButton } from "../src/components/AppButton";
 import { AppScreen } from "../src/components/AppScreen";
@@ -16,8 +17,8 @@ export default function YouthScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
-  const { events, settings } = content;
-  const summerCamp = events.find((event) => event.id === "event-summer-camp-2026") ?? events[0];
+  const { settings } = content;
+  const summerCamp = getPastEvents(content).find((event) => event.id === "event-summer-camp-2026");
   const socialLinks = [
     ["Instagram", settings.social.instagram],
     ["YouTube", settings.social.youtube],
@@ -38,15 +39,15 @@ export default function YouthScreen() {
         </View>
       </GlassCard>
 
-      <SectionHeader title="Summer Camp" />
-      <GlassCard tone="gold">
+      <SectionHeader title="Past Events & Highlights" />
+      {summerCamp ? <GlassCard tone="gold">
         <Image source={photoAssets.summerCamp} style={styles.image} />
-        <Text style={[styles.title, { color: theme.colors.text }]}>Register your child today</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>{summerCamp.title}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]}>
-          Summer Camp 2026 welcomes boys and girls ages 7-12 for Islamic lessons, stories, crafts, sports, leadership activities, and a positive environment with caring instructors.
+          Completed · July–August 2026. A summer of Islamic learning, creative activities, sports and friendship.
         </Text>
         <View style={styles.actions}>
-          <AppButton label="Contact Us" icon="mail" onPress={() => Linking.openURL(summerCamp?.registrationLink || `mailto:${settings.email}`)} style={styles.flexButton} />
+          {summerCamp.highlightUrl ? <AppButton label="Watch Summer Camp 2026 Highlights" icon="play-circle" onPress={() => Linking.openURL(summerCamp.highlightUrl!)} style={styles.flexButton} /> : null}
           <AppButton
             label="Details"
             icon="open-outline"
@@ -55,7 +56,7 @@ export default function YouthScreen() {
             style={styles.flexButton}
           />
         </View>
-      </GlassCard>
+      </GlassCard> : null}
 
       <SectionHeader title="Program Highlights" />
       <GlassCard>

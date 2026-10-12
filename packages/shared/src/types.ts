@@ -504,6 +504,9 @@ export interface EventItem {
   tags?: string[];
   caption?: string;
   status?: "draft" | "published";
+  lifecycle?: "active" | "completed" | "discontinued";
+  archived?: boolean;
+  highlightUrl?: string;
   visible?: boolean;
   featured?: boolean;
   notificationEnabled: boolean;

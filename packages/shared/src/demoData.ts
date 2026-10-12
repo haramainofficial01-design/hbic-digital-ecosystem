@@ -1,4 +1,5 @@
 import { hbicSettings } from "./constants";
+import { correctApprovedEvent, academyEventDescription, academyEventTitle, academyPosterFile, summerCampHighlightUrl } from "./eventLifecycle";
 import type {
   Announcement,
   AuditLog,
@@ -99,7 +100,7 @@ export const demoAnnouncements: Announcement[] = [
   {
     id: "ann-quran",
     title: "Quran classes registration",
-    body: "Registration interest is open for weekday Quran classes. Contact the office for placement details.",
+    body: "HBIC Qur'an Academy: Mondays & Thursdays, 5:30–7:00 PM. $50 CAD per child/month. Register at hbic.ca/quran-academy; card online or cash at HBIC.",
     visible: true,
     archived: false,
     priority: "Normal",
@@ -111,7 +112,7 @@ export const demoAnnouncements: Announcement[] = [
   }
 ];
 
-export const demoEvents: EventItem[] = [
+const demoEventRecords: EventItem[] = [
   {
     id: "event-history-of-fiqh",
     title: "History of Fiqh",
@@ -160,16 +161,16 @@ export const demoEvents: EventItem[] = [
   },
   {
     id: "event-quran-academy",
-    title: "Kids Qur'an Classes",
+    title: academyEventTitle,
     summary: "Qur'an & Tajweed, Noorani Qa'idah, and beneficial Thursday activities.",
-    description: "Classes are running as usual Monday to Thursday. Children learn Qur'an & Tajweed, Noorani Qa'idah, and enjoy Fun Thursday activities including Prophet stories and Kahoot. Price: $50 per month.",
-    date: "Monday to Thursday",
-    startTime: "Contact HBIC for current class times",
-    endTime: "",
+    description: academyEventDescription,
+    date: "Mondays & Thursdays",
+    startTime: "5:30 PM",
+    endTime: "7:00 PM",
     location: "Hazrat Bilal Islamic Centre",
     category: "Classes",
-    image: "quran-academy.jpeg",
-    registrationLink: `mailto:${hbicSettings.email}?subject=Kids%20Quran%20Classes`,
+    image: academyPosterFile,
+    registrationLink: "https://hbic.ca/quran-academy",
     audience: "Children",
     speaker: "HBIC Qur'an Academy",
     visible: true,
@@ -255,6 +256,7 @@ export const demoEvents: EventItem[] = [
     updatedAt: new Date().toISOString()
   }
 ];
+export const demoEvents: EventItem[] = demoEventRecords.map(correctApprovedEvent);
 
 export const demoDonationCategories: DonationCategory[] = [
   { id: "general", title: "General Donation", description: "Support daily masjid operations and community services.", amountSuggestions: [25, 50, 100], icon: "heart" },
@@ -268,6 +270,7 @@ export const demoDonationCategories: DonationCategory[] = [
 ];
 
 export const demoMediaItems: MediaItem[] = [
+  { id: "summer-camp-2026-highlights", title: "HBIC Summer Camp 2026 Highlights", description: "A look back at a completed summer of learning, friendship and community activities.", type: "Past Events & Highlights", year: 2026, videoUrl: summerCampHighlightUrl, posterUrl: "/photos/summer-camp-2026.jpeg", platform: "Instagram", visible: true, featured: false, createdAt: "2026-10-07T05:05:17.000Z", updatedAt: "2026-10-12T02:30:00.000Z" },
   {
     id: "taraweeh-2025-recitation",
     title: "Taraweeh 2025 Recitation",
@@ -308,7 +311,7 @@ export const demoVolunteerOpportunities: VolunteerOpportunity[] = [
 ];
 
 export const demoServices: ServiceItem[] = [
-  { id: "quran-classes", title: "Kids Qur'an Classes", description: "Classes are running as usual Monday to Thursday with Qur'an & Tajweed, Noorani Qa'idah, and beneficial Thursday activities. Price: $50 per month.", image: "quran-academy.jpeg", href: "/events", visible: true, featured: true, contactMethod: "email" },
+  { id: "quran-classes", title: academyEventTitle, description: academyEventDescription, image: academyPosterFile, href: "/quran-academy", visible: true, featured: true, contactMethod: "form", formUrl: "https://hbic.ca/quran-academy" },
   { id: "youth", title: "Youth Programs", description: "Programs for youth connection, learning, service, and safe community growth.", image: "youth-program.jpeg", href: "/youth", visible: true, featured: true, contactMethod: "email" },
   { id: "sisters", title: "Sisters' Programs", description: "Programs and gatherings for sisters.", visible: true, featured: false, contactMethod: "email" },
   { id: "volunteer", title: "Volunteer Opportunities", description: "Help with Jumu'ah, events, youth programs, and general community support.", image: "community-jumuah.jpg", visible: true, featured: false, contactMethod: "form" },

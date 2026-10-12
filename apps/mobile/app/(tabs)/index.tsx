@@ -28,8 +28,8 @@ export default function HomeScreen() {
   const events = getPublicEvents(content);
   const { donationCategories, mediaItems, settings } = content;
   const announcement = announcements.find((item) => item.pinned) ?? announcements[0];
-  const summerCamp = events.find((event) => event.id === "event-summer-camp-2026") ?? events.find((event) => event.featured) ?? events[0];
-  const nextEvent = events.find((event) => event.id !== summerCamp?.id) ?? events[0];
+  const featuredEvent = events.find((event) => event.featured) ?? events[0];
+  const nextEvent = events.find((event) => event.id !== featuredEvent?.id);
   const featuredMedia = mediaItems.find((item) => item.visible && item.featured) ?? mediaItems.find((item) => item.visible);
 
   return (
@@ -71,26 +71,26 @@ export default function HomeScreen() {
         <AppButton label="Community Challenges" icon="trophy-outline" variant="ghost" onPress={() => router.push({ pathname: "/quran", params: { view: "challenges" } } as never)} />
       </View>
 
-      <GlassCard tone="gold">
-        <Image source={photoAssets.summerCamp} style={styles.spotlightImage} />
-        <Text style={[styles.cardKicker, { color: theme.colors.navy }]}>Summer Camp 2026</Text>
-        <Text style={[styles.spotlightTitle, { color: theme.colors.text }]}>{summerCamp?.title ?? "Register your child today"}</Text>
+      {featuredEvent ? <GlassCard tone="gold">
+        {featuredEvent.id === "event-quran-academy" ? <Image source={photoAssets.quranAcademy} resizeMode="contain" style={{ width: "100%", aspectRatio: 4 / 5, borderRadius: 20, marginBottom: 14 }} /> : null}
+        <Text style={[styles.cardKicker, { color: theme.colors.navy }]}>Current Program</Text>
+        <Text style={[styles.spotlightTitle, { color: theme.colors.text }]}>{featuredEvent.title}</Text>
         <Text style={[styles.body, { color: theme.colors.muted }]} numberOfLines={4}>
-          {summerCamp?.summary ?? summerCamp?.description ?? "A safe, engaging summer of faith, friendship, Qur'an, stories, crafts, sports, and beneficial activities."}
+          {featuredEvent.summary ?? featuredEvent.description}
         </Text>
         <View style={styles.rowButtons}>
-          <AppButton label="Contact Us" icon="mail" onPress={() => Linking.openURL(summerCamp?.registrationLink || `mailto:${settings.email}`)} style={styles.flexButton} />
+          <AppButton label={featuredEvent.id === "event-quran-academy" ? "Register Now" : "Learn More"} icon="open-outline" onPress={() => featuredEvent.id === "event-quran-academy" ? router.push("/quran-academy" as never) : router.push({ pathname: "/event-detail", params: { id: featuredEvent.id } } as never)} style={styles.flexButton} />
           <AppButton
             label="Details"
             icon="open-outline"
             variant="secondary"
-            onPress={() => router.push({ pathname: "/event-detail", params: { id: summerCamp?.id } } as never)}
+            onPress={() => router.push({ pathname: "/event-detail", params: { id: featuredEvent.id } } as never)}
             style={styles.flexButton}
           />
         </View>
-      </GlassCard>
+      </GlassCard> : null}
 
-      <SectionHeader title="Upcoming" subtitle="Current programs and gatherings." />
+      {nextEvent ? <SectionHeader title="Upcoming" subtitle="Current programs and gatherings." /> : null}
       {nextEvent ? (
         <EventCard event={nextEvent} compact onPress={() => router.push({ pathname: "/event-detail", params: { id: nextEvent.id } } as never)} />
       ) : null}

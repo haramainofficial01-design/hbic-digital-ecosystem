@@ -10,7 +10,7 @@ import Link from "next/link";
 export const revalidate = 300;
 
 function eventImagePath(image: string) {
-  return image === "summer-camp-2026.jpeg" || image === "quran-academy.jpeg" ? `/photos/${image}` : `/media/images/${image}`;
+  return image === "summer-camp-2026.jpeg" || image === "quran-academy.jpeg" || image === "HBIC_Quran_Academy_2026-27_Poster.jpeg" ? `/photos/${image}` : `/media/images/${image}`;
 }
 
 export default async function HomePage() {
@@ -115,13 +115,13 @@ export default async function HomePage() {
 
       {summerCamp ? <section className="section home-feature-event">
         <div className="promo-card">
-          {summerCamp.image ? <Image src={eventImagePath(summerCamp.image)} alt={`${summerCamp.title} flyer`} width={920} height={680} sizes="(max-width: 800px) 100vw, 50vw" /> : null}
+          {summerCamp.image ? <Image src={eventImagePath(summerCamp.image)} alt={`${summerCamp.title} flyer`} width={1024} height={1280} sizes="(max-width: 800px) 100vw, 50vw" style={{ objectFit: "contain", height: "auto" }} /> : null}
           <div>
             <span className="kicker">FEATURED · {summerCamp.category}</span>
             <h2>{summerCamp.title}</h2>
             <p>{summerCamp.summary ?? summerCamp.description}</p>
             <div className="actions">
-              <a className="button primary" href={summerCamp.registrationLink || "/contact"}>Learn more</a>
+              <a className="button primary" href={summerCamp.registrationLink || "/events"}>{summerCamp.id === "event-quran-academy" ? "Register Now" : "Learn More"}</a>
               <a className="button light" href="/events">All events</a>
             </div>
           </div>

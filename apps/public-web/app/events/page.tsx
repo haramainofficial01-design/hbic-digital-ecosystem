@@ -1,12 +1,8 @@
 import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
-import { getPublicEvents, getPublicVolunteerOpportunities } from "@hbic/shared";
+import { getPastEvents, getPublicEvents, getPublicVolunteerOpportunities, publicEventImagePath } from "@hbic/shared";
 import Image from "next/image";
 import type { CSSProperties } from "react";
-
-function eventImagePath(image: string) {
-  return image === "summer-camp-2026.jpeg" || image === "quran-academy.jpeg" ? `/photos/${image}` : `/media/images/${image}`;
-}
 
 export const revalidate = 300;
 
@@ -14,6 +10,7 @@ export default async function EventsPage() {
   const { content } = await getPublishedContent();
   const { settings } = content;
   const events = getPublicEvents(content);
+  const pastEvents = getPastEvents(content);
   const volunteerOpportunities = getPublicVolunteerOpportunities(content.volunteerOpportunities);
 
   return (
@@ -28,13 +25,14 @@ export default async function EventsPage() {
         <div className="grid">
           {events.map((event) => (
             <article className="card image-card" key={event.id}>
-              {event.image ? <Image src={eventImagePath(event.image)} alt={`${event.title} flyer`} width={1200} height={800} /> : null}
+              {event.image ? <a href={publicEventImagePath(event.image)} aria-label={`Open full-size ${event.title} poster`}><Image src={publicEventImagePath(event.image)} alt={`${event.title} flyer`} width={1024} height={1280} style={{ width: "100%", height: "auto", objectFit: "contain" }} /></a> : null}
               <span className="kicker">{event.category}</span>
               <h3>{event.title}</h3>
               <p className="muted">{event.date} · {event.startTime}{event.endTime ? ` · ${event.endTime}` : ""} · {event.location}</p>
-              <p className="muted">{event.description}</p>
+              <p className="muted">{event.summary ?? event.description}</p>
+              {event.summary ? <details><summary>Class details</summary><p className="muted">{event.description}</p></details> : null}
               {event.registrationLink ? (
-                <div className="actions"><a className="button primary" href={event.registrationLink}>Contact us</a></div>
+                <div className="actions"><a className="button primary" href={event.registrationLink}>{event.id === "event-quran-academy" ? "Register Now" : "Learn More"}</a></div>
               ) : null}
             </article>
           ))}
@@ -49,6 +47,16 @@ export default async function EventsPage() {
             </div>
           ))}
         </div>
+        {!events.length ? <p>No current events are scheduled. New gatherings will appear here when published.</p> : null}
+      </section>
+      <section className="section" id="past-events">
+        <span className="eyebrow">COMMUNITY MEMORIES</span><h2>Past Events &amp; Highlights</h2>
+        <div className="grid">{pastEvents.map(event => <article className="card image-card" key={event.id}>
+          {event.image ? <Image src={publicEventImagePath(event.image)} alt={`${event.title} original poster`} width={1024} height={1280} style={{ width: "100%", height: "auto", objectFit: "contain" }} /> : null}
+          <span className="kicker">Completed · {event.date}</span><h3>{event.title}</h3><p className="muted">{event.description}</p>
+          {event.highlightUrl ? <a className="button primary" href={event.highlightUrl} target="_blank" rel="noreferrer">Watch Summer Camp 2026 Highlights</a> : null}
+        </article>)}</div>
+        {!pastEvents.length ? <p>Past event highlights will appear here when published.</p> : null}
       </section>
     </SiteChrome>
   );
