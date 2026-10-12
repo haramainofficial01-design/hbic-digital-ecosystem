@@ -32,7 +32,7 @@ import {
   type ServiceItem,
   type VolunteerOpportunity
 } from "@hbic/shared";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { FirebaseAdminAuth } from "./FirebaseAdminAuth";
 import { AcademyPanel } from "./AcademyPanel";
 import { QuranChallengesPanel } from "./QuranChallengesPanel";
@@ -195,16 +195,6 @@ export function AdminDashboard() {
     setPage(nextPage);
     window.scrollTo({ top: 0, behavior: "auto" });
   }
-
-  const subtitle = useMemo(() => {
-    if (page === "Dashboard") return "Draft, preview, and publish Masjid Bilal content for the public website and mobile app.";
-    if (page === "Prayer & Iqamah") return "Manage the effective prayer and iqamah schedule shown across the website and app.";
-    if (page === "Prayer Display") return "Open the focused TV editor and live prayer-hall preview.";
-    if (page === "Push Notifications") return "Notification preferences and logs are shown separately from content publishing.";
-    if (page === "Diagnostics") return "Protected production health checks for publishing, prayer sync, and notifications.";
-    if (page === "Quran Academy") return "Families, attendance and tuition in one place. Academy actions save separately from website publishing.";
-    return "Edit draft content, save it, and publish when ready.";
-  }, [page]);
 
   const loadPublished = useCallback(async () => {
     try {
@@ -415,7 +405,6 @@ export function AdminDashboard() {
           <div>
             <span className="workspace-eyebrow">HBIC · Calgary</span>
             <h1>{page}</h1>
-            <p>{subtitle}</p>
           </div>
           <span className={`pill ${dirty ? "pill-dirty" : ""}`}>
             {dirty ? "Unsaved changes" : content.status === "published" ? `Published v${content.version}` : `Draft v${content.version}`}
@@ -429,14 +418,14 @@ export function AdminDashboard() {
             <summary>Connection & publication details</summary>
           <Field label="Public content API" value={apiBase} onChange={() => undefined} disabled />
           <p className="muted">
-            Backend mode: {backendMode}. Public pages and the mobile app read the published record. Draft edits stay private until Publish Changes succeeds.
+            Backend: {backendMode}
           </p>
           <p className="muted">
             Last published: {content.publishedAt ? new Date(content.publishedAt).toLocaleString() : "No published timestamp available"}.
           </p>
           {backendMode === "static-fallback" ? (
             <p className="muted">
-              Firestore credentials are not configured on the public web deployment yet. Save and publish will fail loudly until production credentials are added.
+              Publishing unavailable: database credentials missing.
             </p>
           ) : null}
           </details>
@@ -446,7 +435,7 @@ export function AdminDashboard() {
             <button className="primary" onClick={handleSaveDraft} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Save Draft"}</button>
             <button className="primary publish" onClick={handlePublish} disabled={busy || !draftLoaded}>{busy ? "Working..." : "Publish Changes"}</button>
           </div> : null}
-          {contentWorkspace && !draftLoaded ? <p className="muted">Sign in, then load the protected draft to edit website and app content.</p> : null}
+          {contentWorkspace && !draftLoaded ? <p className="muted">Load a draft to edit.</p> : null}
         </div>
 
         {savedMessage ? <div role="status" className={`notice notice-${messageTone}`}><strong>{savedMessage}</strong></div> : null}
@@ -491,19 +480,19 @@ export function AdminDashboard() {
 function DashboardPanel({ content, onNavigate }: { content: HbicContent; onNavigate: (page: Page) => void }) {
   return (
     <div className="grid">
-      <div className="card full"><h2>What would you like to manage?</h2><p className="muted">Go straight to the work you do most often.</p><div className="quick-actions">
+      <div className="card full"><h2>Shortcuts</h2><div className="quick-actions">
         {([ ["Quran Academy", "Families, attendance & tuition"], ["Prayer & Iqamah", "Timetable & weekly overrides"], ["Donations", "Donation categories & links"], ["Announcements", "Community updates"] ] as const).map(([destination, description]) => <button className="quick-action" type="button" key={destination} onClick={() => onNavigate(destination)}><strong>{destination}</strong><span>{description}</span><span className="quick-action-arrow" aria-hidden="true">↗</span></button>)}
       </div></div>
       {[
         ["Backend source", content.status, `Version ${content.version}`],
-        ["Announcements", String(content.announcements.length), "Published content count"],
-        ["Events", String(content.events.length), "Website and app event cards"],
-        ["Media cards", String(content.mediaItems.length), "Website and app media"]
+        ["Announcements", String(content.announcements.length), ""],
+        ["Events", String(content.events.length), ""],
+        ["Media cards", String(content.mediaItems.length), ""]
       ].map(([label, value, note]) => (
         <div className="card third" key={label}>
           <p className="muted">{label}</p>
           <h2>{value}</h2>
-          <p className="muted">{note}</p>
+          {note ? <p className="muted">{note}</p> : null}
         </div>
       ))}
       <div className="card full">
@@ -513,7 +502,6 @@ function DashboardPanel({ content, onNavigate }: { content: HbicContent; onNavig
             ? `Version ${content.version} was published ${new Date(content.publishedAt).toLocaleString()}.`
             : "This loaded record does not include a publication timestamp."}
         </p>
-        <p className="muted">Use Diagnostics for live database, prayer update, public API, and notification readiness checks.</p>
       </div>
     </div>
   );
@@ -525,7 +513,7 @@ function PrayerDisplayPanel() {
       <div className="card full">
         <h2>Prayer hall display</h2>
         <p className="muted">
-          The focused editor publishes the same canonical prayer, iqamah, and Jumu&apos;ah schedule used by the website, mobile apps, widgets, and Watch. TV-only settings are limited to presentation and one short notice.
+          TV layout settings do not change prayer times.
         </p>
         <div className="actions">
           <a className="primary link-button" href={`${apiBase}/display-admin`} target="_blank" rel="noreferrer">Open Prayer Display Admin</a>
@@ -659,7 +647,6 @@ function PrayerPanel({
     <div className="grid">
       <div className="card full">
         <h2>Prayer data status</h2>
-        <p className="muted">Iqamah.ca supplies the automatic timetable. The backend resolves each effective public value once, and the TV, website, apps, Watch, widgets, and complications consume that same schedule.</p>
         <div className="actions">
           <button className="secondary" onClick={() => loadSyncStatus(false)} disabled={disabled}>Refresh status</button>
           <button className="primary" onClick={() => loadSyncStatus(true)} disabled={disabled}>Sync now</button>
@@ -676,7 +663,6 @@ function PrayerPanel({
 
       <div className="card full">
         <h2>Live public adhan</h2>
-        <p className="muted">This section reads the published schedule directly. Protected draft edits are separate until published.</p>
         <div className="form-grid">
           {(["fajr", "dhuhr", "asr", "maghrib", "isha", "sunrise"] as const).map((key) => (
             <Field
@@ -693,7 +679,7 @@ function PrayerPanel({
       <div className="card full">
         <h2>Upcoming-week automatic iqamah</h2>
         <p className="muted">
-          These are the existing next-week values returned by the HBIC prayer-times API. Relative values remain relative because the source does not provide a dated next-week adhan timetable.
+          Next-week values may be relative.
         </p>
         <div className="form-grid">
           {iqamahOverridePrayers.map((prayer) => (
@@ -710,7 +696,7 @@ function PrayerPanel({
 
       <div className="card full">
         <h2>Manual iqamah overrides</h2>
-        <p className="muted">Publish an override to change that prayer everywhere. It expires Sunday at midnight, Calgary time, and the new week&apos;s backend timetable takes over automatically.</p>
+        <p className="muted">Overrides expire Sunday at midnight (Calgary).</p>
         {iqamahOverridePrayers.map((prayer) => {
           const override = iqamahTime.overrides?.[prayer] ?? { enabled: false, value: "" };
           const effectiveField = `${prayer}Iqamah` as "fajrIqamah" | "dhuhrIqamah" | "asrIqamah" | "maghribIqamah" | "ishaIqamah";
@@ -761,7 +747,6 @@ function PrayerPanel({
             updateContent((current) => ({ hijriSettings: { ...current.hijriSettings, adjustmentDays, updatedAt: new Date().toISOString() } }));
           }}
         />
-        <p className="muted">This adjustment is applied to the published Hijri date and White Days label across public clients.</p>
         <div className="actions">
           <button className="secondary" onClick={addHijriOverride} disabled={disabled}>Add date-specific override</button>
         </div>
@@ -853,7 +838,7 @@ function JumuahPanel({ content, updateContent }: EditorPanelProps) {
     <div className="grid">
       <div className="card full">
         <h2>Two Jumu&apos;ah prayers</h2>
-        <p className="muted">Editing these fields enables the HBIC Jumu&apos;ah override. Clear it to return the public schedule to Iqamah.ca.</p>
+        <p className="muted">Editing sets a manual override.</p>
         <div className="form-grid">
           <Field label="First khutbah" value={content.jumuahSchedule.firstKhutbahTime} onChange={(firstKhutbahTime) => updateSchedule({ firstKhutbahTime })} />
           <Field label="First iqamah" value={content.jumuahSchedule.firstIqamahTime} onChange={(firstIqamahTime) => updateSchedule({ firstIqamahTime })} />
@@ -867,7 +852,6 @@ function JumuahPanel({ content, updateContent }: EditorPanelProps) {
       </div>
       <div className="card full">
         <h2>First Jumu&apos;ah door notice</h2>
-        <p className="muted">This independent notice appears only while enabled and within its optional effective dates. Date exceptions can change or suppress it without altering prayer times.</p>
         <div className="form-grid">
           <ToggleField
             label="Public feature enabled"
@@ -1255,7 +1239,7 @@ function HalalAdminPanel({
     <div className="grid">
       <div className="card full">
         <h2>Directory feature controls</h2>
-        <p className="muted">The coming-soon page, private intake, and public listings are separate controls. Public listings remain disabled until approved records exist.</p>
+        <p className="muted">Only approved listings are public.</p>
         <div className="form-grid">
           <ToggleField label="Coming-soon page" checked={content.featureFlags.halalComingSoonEnabled} onChange={(halalComingSoonEnabled) => updateContent((current) => ({ featureFlags: { ...current.featureFlags, halalComingSoonEnabled } }))} />
           <ToggleField label="Restaurant interest form" checked={content.featureFlags.restaurantInterestFormEnabled} onChange={(restaurantInterestFormEnabled) => updateContent((current) => ({ featureFlags: { ...current.featureFlags, restaurantInterestFormEnabled } }))} />
@@ -1314,7 +1298,7 @@ function HalalAdminPanel({
             <ToggleField label="Media authorization confirmed" checked={restaurant.media.authorizationConfirmed} onChange={(authorizationConfirmed) => updateRestaurant(index, (item) => ({ ...item, media: { ...item.media, authorizationConfirmed } }))} />
             <ToggleField label="Sponsored listing" checked={restaurant.commercial.sponsored} onChange={(sponsored) => updateRestaurant(index, (item) => ({ ...item, commercial: { ...item.commercial, sponsored } }))} />
           </div>
-          <p className="muted">Sponsorship is stored separately and never changes verification status.</p>
+          <p className="muted">Sponsorship does not change halal verification.</p>
           <div className="actions">
             <button className="primary" onClick={() => saveRestaurant(restaurant)} disabled={disabled}>Save Private Restaurant Record</button>
           </div>
@@ -1500,7 +1484,7 @@ function CommunityAdminPanel({
       <div className="card full">
         <h2>Community publishing controls</h2>
         <p className="muted">
-          Draft records stay private. A module appears publicly only when its feature flag is enabled and it contains an approved published record.
+          Only approved records are published.
         </p>
       </div>
 
@@ -1679,7 +1663,6 @@ function PushPanel({
     <div className="grid">
       <div className="card full">
         <h2>Send push notification</h2>
-        <p className="muted">This sends through the protected server endpoint to registered Expo push tokens. Keep messages respectful and useful.</p>
         <div className="form-grid">
           <Field label="Title" value={title} onChange={setTitle} />
           <Field label="Body" value={body} textarea onChange={setBody} />
@@ -1703,12 +1686,11 @@ function PushPanel({
         <div className="card third" key={item.type}>
           <h3>{item.label}</h3>
           <p className="muted">{item.description}</p>
-          <p className="muted">{item.respectfulUse}</p>
         </div>
       ))}
       <div className="card full">
         <h2>Delivery status</h2>
-        <p className="muted">Each send is recorded. After the provider accepts it, use Check delivery to confirm the final receipt and automatically disable invalid device registrations.</p>
+        <p className="muted">Accepted is not delivered. Check delivery for final status.</p>
       </div>
     </div>
   );
@@ -1736,7 +1718,6 @@ function DiagnosticsPanel({ adminRequest }: { adminRequest: (path: string, init?
     <div className="grid">
       <div className="card full">
         <h2>Production diagnostics</h2>
-        <p className="muted">Protected status for publishing, database, prayer sync, public API, and notification readiness.</p>
         <div className="actions"><button className="primary" onClick={loadDiagnostics}>Refresh status</button></div>
         {message ? <p className="muted">{message}</p> : null}
       </div>
@@ -1813,7 +1794,7 @@ function FeatureFlagsPanel({ content, updateContent }: EditorPanelProps) {
     <div className="grid">
       <div className="card full">
         <h2>Public feature controls</h2>
-        <p className="muted">Flags are saved in the draft and become public only after Publish Changes succeeds. Hidden modules remain available for preparation in admin.</p>
+        <p className="muted">Changes go live after publishing.</p>
       </div>
       {labels.map(([key, label, description]) => (
         <div className="card third" key={key}>
@@ -1824,7 +1805,7 @@ function FeatureFlagsPanel({ content, updateContent }: EditorPanelProps) {
               featureFlags: { ...current.featureFlags, [key]: checked }
             }))}
           />
-          <p className="muted">{description}</p>
+          <details className="connection-details"><summary>Details</summary><p className="muted">{description}</p></details>
         </div>
       ))}
     </div>
@@ -1837,7 +1818,6 @@ function UsersPanel() {
       {Object.entries(adminRoleLabels).map(([key, label]) => (
         <div className="card third" key={key}>
           <h2>{label}</h2>
-          <p className="muted">Role label reserved for Firebase Auth custom claims and admin permissions.</p>
         </div>
       ))}
     </div>

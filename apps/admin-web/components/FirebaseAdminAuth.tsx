@@ -40,7 +40,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   const [sharedPassword, setSharedPassword] = useState("");
   const [code, setCode] = useState("");
   const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
-  const [status, setStatus] = useState("Sign in with your personal administrator account.");
+  const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [auth, setAuth] = useState<Auth | null>(null);
   const handlingAuth = useRef(false);
@@ -90,7 +90,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       return;
     }
     onSession(`Bearer ${idToken}`, user.email ?? undefined);
-    setStatus(`Signed in as ${user.email}. You can load the protected draft and Academy records.`);
+    setStatus("Signed in.");
     } catch {
       onSession(null);
       setStatus("Could not finish administrator sign-in. Sign out and try again.");
@@ -141,7 +141,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
     setBusy(true);
     try {
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      setStatus("Password setup email sent. Set a private password from your inbox, then return here.");
+      setStatus("Password setup email sent. Check your inbox.");
     } catch {
       setStatus("The setup email could not be sent yet. Confirm activation and try again.");
     } finally {
@@ -180,7 +180,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       onSession(token, sharedEmail.trim().toLowerCase());
       setSharedReady(true);
       setSharedPassword("");
-      setStatus("Shared HBIC access verified for publishing. Private Academy family records require an approved personal account.");
+      setStatus("Shared publishing access verified.");
     } catch {
       sharedSession.current = false;
       sharedToken.current = null;
@@ -203,7 +203,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Personal account activation failed.");
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      setStatus("Approved personal account activated. Check its inbox for the private password setup link, then sign in.");
+      setStatus("Account activated. Check your inbox for password setup.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Personal account activation failed. Contact the HBIC administrator.");
     } finally {
@@ -214,7 +214,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   if (resolver) return (
     <div className="firebase-auth-panel" id="admin-auth">
       <strong>Existing authenticator on this account</strong>
-      <p>New approved accounts need only their email and password. This account already has an authenticator enrolled, so Firebase still requires its code until that factor is removed.</p>
+      <p>This account requires an authenticator code.</p>
       <AuthField label="Six-digit authenticator code" value={code} onChange={(value) => setCode(value.replace(/\D/g, "").slice(0, 6))} />
       <button className="primary" type="button" onClick={verifyMfa} disabled={busy || code.length !== 6}>Verify & sign in</button>
       <p role="status">{status}</p>
@@ -223,7 +223,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
 
   if (auth?.currentUser && auth.currentUser.emailVerified) return (
     <div className="firebase-auth-panel firebase-auth-ready" id="admin-auth">
-      <div><strong>{auth.currentUser.email}</strong><p role="status">{status}</p></div>
+      <div><strong>{auth.currentUser.email}</strong>{status && status !== "Signed in." ? <p role="status">{status}</p> : null}</div>
         <button className="secondary" type="button" onClick={() => void signOut(auth)}>Sign out</button>
     </div>
   );
@@ -231,7 +231,7 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
   if (auth?.currentUser && !auth.currentUser.emailVerified) return (
     <div className="firebase-auth-panel" id="admin-auth">
       <strong>Verify your personal email</strong>
-      <p>Open the Firebase verification email for {auth.currentUser.email}. An approved, verified email and private password are required for Academy records.</p>
+      <p>Check the verification email sent to {auth.currentUser.email}.</p>
       <div className="firebase-auth-actions">
         <button className="primary" type="button" onClick={() => void refreshVerifiedEmail()} disabled={busy}>I verified my email</button>
         <button className="secondary" type="button" onClick={() => void sendEmailVerification(auth.currentUser!)} disabled={busy}>Resend verification</button>
@@ -255,10 +255,10 @@ export function FirebaseAdminAuth({ onSession }: { onSession: (token: string | n
         <AuthField label="Shared administrator email" value={sharedEmail} type="email" onChange={setSharedEmail} />
         <AuthField label="Shared administrator password" value={sharedPassword} type="password" onChange={setSharedPassword} />
         <button className="secondary" type="button" onClick={() => void verifySharedAccess()} disabled={busy || !sharedEmail.trim() || !sharedPassword}>Use shared access</button>
-        {sharedReady ? <div className="firebase-auth-actions"><p>Shared publishing is active. Academy family records require an approved personal administrator account.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
+        {sharedReady ? <div className="firebase-auth-actions"><p>Shared access: publishing only.</p><button className="secondary" type="button" onClick={() => void activatePersonalAccount()} disabled={busy || !auth || !email.trim()}>Activate approved personal account</button></div> : null}
         </div>
       </details>
-      <p>To open private Academy records, sign in with a verified, approved personal email and private password. New personal accounts must first be approved by HBIC; shared access is for publishing only.</p>
+      <p>Approved personal accounts only. Shared access is for publishing.</p>
       <p role="status">{status}</p>
     </div>
   );

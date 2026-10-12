@@ -20,7 +20,7 @@ try {
     return route.abort();
   });
   await page.goto('http://academy.fixture/');
-  await page.getByText('Current Academy families loaded · 6', { exact: true }).waitFor();
+  await page.getByText('6 families', { exact: true }).waitFor();
   const nav = page.getByRole('navigation', { name: 'Quran Academy areas' });
   await nav.getByRole('button', { name: 'Tuition exemptions', exact: true }).click();
   await page.getByRole('heading', { name: 'Tuition-exempt students and families', exact: true }).waitFor();
