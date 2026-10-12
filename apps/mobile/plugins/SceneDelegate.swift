@@ -26,7 +26,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       let factory = appDelegate.reactNativeFactory
     else { return }
 
-    let window = UIWindow(windowScene: windowScene)
+    let window = MasjidSceneWindow(windowScene: windowScene)
     // A folding/multi-display scene can differ from UIScreen.main. Size the
     // React Native host to its own scene, including after a display transition.
     window.frame = windowScene.coordinateSpace.bounds
@@ -81,5 +81,43 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       continue: userActivity,
       restorationHandler: { _ in }
     )
+  }
+}
+
+/// Desktop commands are active only while the Quran workspace is mounted.
+/// Phone, tablet, prayer, Academy and embedded web screens keep their commands.
+private final class MasjidSceneWindow: UIWindow {
+  private var quranCommandsEnabled = false
+  private var commandObserver: NSObjectProtocol?
+
+  override init(windowScene: UIWindowScene) {
+    super.init(windowScene: windowScene)
+    guard ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp else { return }
+    commandObserver = NotificationCenter.default.addObserver(
+      forName: Notification.Name("ca.hbic.quran.commands.enabled"), object: nil, queue: .main
+    ) { [weak self] notification in
+      self?.quranCommandsEnabled = notification.userInfo?["enabled"] as? Bool ?? false
+    }
+  }
+
+  required init?(coder: NSCoder) { super.init(coder: coder) }
+  deinit { if let commandObserver { NotificationCenter.default.removeObserver(commandObserver) } }
+
+  override var keyCommands: [UIKeyCommand]? {
+    guard quranCommandsEnabled else { return super.keyCommands }
+    let commands: [(String, String, String)] = [
+      ("1", "Read", "read"), ("2", "Listen", "listen"),
+      ("3", "Practise", "practice"), ("4", "Library", "review"),
+      ("f", "Search Quran", "search"), (",", "Quran Preferences", "preferences"),
+      ("\\", "Toggle Sidebar", "sidebar")
+    ]
+    return commands.map { input, title, command in
+      UIKeyCommand(title: title, action: #selector(quranCommand(_:)), input: input, modifierFlags: .command, propertyList: command)
+    }
+  }
+
+  @objc private func quranCommand(_ sender: UIKeyCommand) {
+    guard quranCommandsEnabled, let command = sender.propertyList as? String else { return }
+    NotificationCenter.default.post(name: Notification.Name("ca.hbic.quran.command"), object: nil, userInfo: ["command": command])
   }
 }

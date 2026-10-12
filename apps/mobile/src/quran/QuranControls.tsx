@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../i18n/LocalizedText";
 import { useAppTheme } from "../theme/ThemeProvider";
+import { isMacQuranHost } from "./macRuntime";
 export function QuranSurface({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
   const { theme } = useAppTheme();
   // Reading/practice content stays on an opaque surface. Repeated live blur
@@ -14,7 +15,7 @@ export function QuranIconButton({ label, icon, onPress, disabled = false, active
 }) {
   const { theme } = useAppTheme();
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected: active }} disabled={disabled}
-    onPress={onPress} style={({ pressed }) => [styles.icon, { backgroundColor: active ? theme.colors.tintSoft : "transparent", opacity: disabled ? .4 : pressed ? .65 : 1 }]}>
+    onPress={onPress} onAccessibilityTap={isMacQuranHost && !disabled ? onPress : undefined} style={({ pressed }) => [styles.icon, { backgroundColor: active ? theme.colors.tintSoft : "transparent", opacity: disabled ? .4 : pressed ? .65 : 1 }]}>
     <Ionicons name={icon} size={23} color={active ? theme.colors.teal : theme.colors.text} />
   </Pressable>;
 }

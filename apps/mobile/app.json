@@ -24,6 +24,9 @@
         "NSSpeechRecognitionUsageDescription": "Use on-device speech only when you choose Quran voice search. HBIC does not store or upload your voice search."
       },
       "entitlements": {
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)ca.hbic.calgary.app"
+        ],
         "com.apple.security.application-groups": [
           "group.ca.hbic.calgary.app"
         ]

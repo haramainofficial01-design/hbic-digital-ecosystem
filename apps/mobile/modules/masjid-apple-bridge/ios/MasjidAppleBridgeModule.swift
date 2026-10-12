@@ -53,8 +53,34 @@ private struct BridgePrayerSnapshot: Decodable {
 }
 
 public final class MasjidAppleBridgeModule: Module {
+  private var quranCommandObserver: NSObjectProtocol?
+
+  private func stopQuranCommands() {
+    if let observer = quranCommandObserver { NotificationCenter.default.removeObserver(observer) }
+    quranCommandObserver = nil
+    NotificationCenter.default.post(name: Notification.Name("ca.hbic.quran.commands.enabled"), object: nil, userInfo: ["enabled": false])
+  }
+
   public func definition() -> ModuleDefinition {
     Name("MasjidAppleBridge")
+
+    Constants([
+      "isIOSAppOnMac": ProcessInfo.processInfo.isiOSAppOnMac,
+      "isMacCatalyst": ProcessInfo.processInfo.isMacCatalystApp
+    ])
+    Events("onMacQuranCommand")
+    OnStartObserving {
+      guard ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp else { return }
+      self.quranCommandObserver = NotificationCenter.default.addObserver(
+        forName: Notification.Name("ca.hbic.quran.command"), object: nil, queue: .main
+      ) { [weak self] notification in
+        guard let command = notification.userInfo?["command"] as? String else { return }
+        self?.sendEvent("onMacQuranCommand", ["command": command])
+      }
+      NotificationCenter.default.post(name: Notification.Name("ca.hbic.quran.commands.enabled"), object: nil, userInfo: ["enabled": true])
+    }
+    OnStopObserving { self.stopQuranCommands() }
+    OnDestroy { self.stopQuranCommands() }
 
     Function("updatePrayerSnapshot") { (json: String) -> Bool in
       guard

@@ -12,7 +12,8 @@ test('Duo release and simulator use the current Duo-capable SDK', () => {
 });
 test('native window tracks its own scene instead of a different display', () => {
   const source = fs.readFileSync(path.join(root, 'plugins/SceneDelegate.swift'), 'utf8');
-  assert.ok(source.includes('UIWindow(windowScene: windowScene)'));
+  assert.ok(source.includes('MasjidSceneWindow(windowScene: windowScene)'));
+  assert.ok(source.includes('private final class MasjidSceneWindow: UIWindow'));
   assert.ok(source.includes('window.frame = windowScene.coordinateSpace.bounds'));
   assert.match(source, /func windowScene\([\s\S]*?didUpdate[\s\S]*?window\?\.frame = windowScene\.coordinateSpace\.bounds/);
   assert.ok(!source.includes('UIScreen.main.bounds'));
