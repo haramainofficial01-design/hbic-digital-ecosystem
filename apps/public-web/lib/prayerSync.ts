@@ -1,41 +1,25 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { createHash } from "node:crypto";
 import {
-  addDays,
   dateStringInTimeZone,
   masjidTimeZone,
   normalizeContent,
   parseClock,
   isIqamahOverrideActive,
   prayerOrder,
-  timeToDate,
   type HbicContent,
   type IqamahOverride,
   type IqamahPrayerName,
   type PrayerName
 } from "@hbic/shared";
 import { boundPrayerOverrides } from "./prayerOverrides";
+import { iqamahCaAdhanUrl, parseIqamahCaAdhan } from "./iqamahCaAdhan";
 
-/** Existing HBIC-specific adapter supplied for the Iqamah.ca timetable. */
-const DEFAULT_IQAMAH_CA_HBIC_ENDPOINT =
-  "https://eyrn3ii2aj.execute-api.us-west-2.amazonaws.com/dev/hbic-update-times-dev-api";
 const PRAYER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const providerName = "Iqamah.ca" as const;
 
 function configuredPrayerEndpoint() {
-  const configured = (process.env.IQAMAH_CA_HBIC_SOURCE_URL || process.env.HBIC_PRAYER_SOURCE_URL)
-    ?.trim()
-    .replace(/^['"]|['"]$/g, "");
-  if (!configured) return DEFAULT_IQAMAH_CA_HBIC_ENDPOINT;
-
-  try {
-    const parsed = new URL(configured);
-    if (parsed.protocol === "https:") return parsed.href;
-  } catch {
-    // Ignore malformed deployment overrides and use the existing HBIC adapter.
-  }
-
-  return DEFAULT_IQAMAH_CA_HBIC_ENDPOINT;
+  // The retired AWS adapter/env overrides must never be contacted again.
+  return iqamahCaAdhanUrl;
 }
 
 const CACHE_COLLECTION = "integrations";
@@ -104,13 +88,7 @@ type CachedPrayerSync = {
   lastSuccessfulSync?: string;
   lastAttemptedSync?: string;
   lastError?: string | null;
-  rollover?: WeekRollover;
-};
-
-type WeekRollover = {
-  weekStart: string;
-  previous: IqamahScheduleValues;
-  next: IqamahScheduleValues;
+  notificationBaseline?: HbicContent["iqamahTime"];
 };
 
 const iqamahFieldByPrayer: Record<IqamahPrayerName, `${IqamahPrayerName}Iqamah`> = {
@@ -129,28 +107,6 @@ export function changedIqamahTimes(previous: HbicContent["iqamahTime"] | undefin
     .map((prayer) => ({ prayer, oldTime: String(previous[iqamahFieldByPrayer[prayer]]), newTime: String(current[iqamahFieldByPrayer[prayer]]) }));
 }
 
-async function announceIqamahChange(db: Firestore | null, effectiveDate: string, previous: HbicContent["iqamahTime"] | undefined, current: HbicContent["iqamahTime"]) {
-  if (!db) return;
-  const changes = changedIqamahTimes(previous, current);
-  if (!changes.length) return;
-  try {
-    const fingerprint = createHash("sha256").update(JSON.stringify({ effectiveDate, changes })).digest("hex");
-    const claim = db.collection("prayerChangeNotifications").doc(fingerprint);
-    const shouldSend = await db.runTransaction(async (tx) => {
-      if ((await tx.get(claim)).exists) return false;
-      tx.create(claim, { effectiveDate, changes, createdAt: new Date().toISOString(), status: "claimed" });
-      return true;
-    });
-    if (!shouldSend) return;
-    const { sendIqamahChangeNotification } = await import("./notificationStore");
-    const result = await sendIqamahChangeNotification(effectiveDate, changes);
-    await claim.update({ status: "sent", result, sentAt: new Date().toISOString() });
-  } catch (error) {
-    // A notification failure must never break the canonical prayer response.
-    console.error("Iqamah change notification failed", error);
-  }
-}
-
 function endpointHost() {
   try {
     return new URL(configuredPrayerEndpoint()).host;
@@ -165,49 +121,6 @@ function normalizeTime(value: string) {
     .replace(/\s+/g, " ")
     .replace(/([0-9])([AP]M)$/i, "$1 $2")
     .replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase());
-}
-
-function parseClockToMinutes(value: string) {
-  const match = normalizeTime(value).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!match) return null;
-  let hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const meridiem = match[3].toUpperCase();
-  if (meridiem === "PM" && hour !== 12) hour += 12;
-  if (meridiem === "AM" && hour === 12) hour = 0;
-  return hour * 60 + minute;
-}
-
-function formatMinutesAsTime(totalMinutes: number) {
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  const hour24 = Math.floor(normalized / 60);
-  const minute = normalized % 60;
-  const meridiem = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 || 12;
-  return `${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
-}
-
-function resolveIqamahValue(value: string | undefined, prayerValue: string) {
-  if (!value) return "";
-  const normalized = normalizeTime(value);
-  const relative = normalized.match(/^\+(\d+)\s*MINS?$/i);
-  if (!relative) return normalized;
-
-  const base = parseClockToMinutes(prayerValue);
-  if (base === null) return normalized;
-  return formatMinutesAsTime(base + Number(relative[1]));
-}
-
-function parseJumuah(value: string | undefined) {
-  if (!value) return null;
-  const normalized = value.replace(/\s+/g, "").toUpperCase();
-  const [firstRaw, secondRaw] = normalized.split("/");
-  if (!firstRaw || !secondRaw) return null;
-
-  const secondMeridiem = secondRaw.endsWith("AM") ? "AM" : "PM";
-  const first = normalizeTime(/[AP]M$/i.test(firstRaw) ? firstRaw : `${firstRaw}${secondMeridiem}`);
-  const second = normalizeTime(secondRaw);
-  return { first, second };
 }
 
 export function isOverrideActive(override?: IqamahOverride | null, now = new Date(), fallbackUpdatedAt?: string) {
@@ -245,7 +158,8 @@ export function retainPrayerScheduleDuringOutage(content: HbicContent, nowDate =
       },
       iqamahTime: {
         ...retainedIqamah,
-        source: "Last confirmed Iqamah.ca schedule",
+        upcomingWeekIqamah: undefined,
+        source: "HBIC staff timetable",
         manualOverride: active.length > 0,
         adjustmentNotes: active.length ? "Active admin iqamah override." : ""
       }
@@ -278,6 +192,7 @@ export function retainPrayerScheduleDuringOutage(content: HbicContent, nowDate =
     },
     iqamahTime: {
       ...content.iqamahTime,
+      upcomingWeekIqamah: undefined,
       date,
       fajrIqamah: overrideValue("fajr"),
       dhuhrIqamah: overrideValue("dhuhr"),
@@ -299,8 +214,7 @@ export function resolveEffectivePrayerSchedule(
   sourceState: PrayerSyncStatus["sourceState"],
   serviceDate = dateStringInTimeZone(new Date(), masjidTimeZone),
   sourceUpdatedAt = new Date().toISOString(),
-  now = new Date(),
-  carriedRollover?: WeekRollover
+  now = new Date()
 ) {
   content = boundPrayerOverrides(content, undefined, now);
   const updatedAt = sourceUpdatedAt;
@@ -320,35 +234,11 @@ export function resolveEffectivePrayerSchedule(
     lastUpdated: updatedAt
   };
 
-  const baseIqamah = {
-    fajr: resolveIqamahValue(feed.iqamah_fajr, prayerTime.fajr),
-    dhuhr: resolveIqamahValue(feed.iqamah_zuhr, prayerTime.dhuhr),
-    asr: resolveIqamahValue(feed.iqamah_asr, prayerTime.asr),
-    maghrib: resolveIqamahValue(feed.iqamah_maghrib, prayerTime.maghrib),
-    isha: resolveIqamahValue(feed.iqamah_isha, prayerTime.isha)
-  };
-
-  const resolvedUpcomingWeekIqamah: IqamahScheduleValues = {
-    fajr: resolveIqamahValue(feed.nw_i_fajr, prayerTime.fajr),
-    dhuhr: resolveIqamahValue(feed.nw_i_zuhr, prayerTime.dhuhr),
-    asr: resolveIqamahValue(feed.nw_i_asr, prayerTime.asr),
-    maghrib: resolveIqamahValue(feed.nw_i_maghrib, prayerTime.maghrib),
-    isha: resolveIqamahValue(feed.nw_i_isha, prayerTime.isha)
-  };
-  const weekday = new Date(`${serviceDate}T12:00:00Z`).getUTCDay();
-  const ishaInstant = timeToDate(serviceDate, prayerTime.isha, masjidTimeZone);
-  const saturdayAfterIsha = weekday === 6 && Boolean(ishaInstant && now.getTime() >= ishaInstant.getTime());
-  const newRollover: WeekRollover | undefined = saturdayAfterIsha && Object.values(resolvedUpcomingWeekIqamah).some(Boolean)
-    ? { weekStart: addDays(serviceDate, 1), previous: baseIqamah, next: resolvedUpcomingWeekIqamah }
-    : undefined;
-  const rollover = newRollover ?? carriedRollover;
-  const carryApplies = Boolean(rollover && serviceDate >= rollover.weekStart && serviceDate <= addDays(rollover.weekStart, 6));
-  const upcomingWeekEffective = saturdayAfterIsha || carryApplies;
+  // Adhan is automatic; iqamah belongs to HBIC staff, not IISC or the retired
+  // AWS next-week feed. No weekly rollover is allowed to overwrite staff times.
   const automaticIqamah: IqamahScheduleValues = Object.fromEntries(
-    (Object.keys(baseIqamah) as IqamahPrayerName[]).map((prayer) => [prayer,
-      saturdayAfterIsha ? resolvedUpcomingWeekIqamah[prayer] || baseIqamah[prayer]
-        : carryApplies && rollover && baseIqamah[prayer] === rollover.previous[prayer]
-          ? rollover.next[prayer] || baseIqamah[prayer] : baseIqamah[prayer]])
+    (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[]).map(prayer =>
+      [prayer, content.iqamahTime[iqamahFieldByPrayer[prayer]]])
   ) as IqamahScheduleValues;
 
   const overrides = content.iqamahTime.overrides ?? {};
@@ -356,31 +246,21 @@ export function resolveEffectivePrayerSchedule(
   const iqamahTime = {
     ...content.iqamahTime,
     date: serviceDate,
-    upcomingWeekIqamah: resolvedUpcomingWeekIqamah,
+    upcomingWeekIqamah: undefined,
     automaticIqamah,
     fajrIqamah: activeOverrides.includes("fajr") ? normalizeTime(overrides.fajr?.value ?? "") : automaticIqamah.fajr || content.iqamahTime.fajrIqamah,
     dhuhrIqamah: activeOverrides.includes("dhuhr") ? normalizeTime(overrides.dhuhr?.value ?? "") : automaticIqamah.dhuhr || content.iqamahTime.dhuhrIqamah,
     asrIqamah: activeOverrides.includes("asr") ? normalizeTime(overrides.asr?.value ?? "") : automaticIqamah.asr || content.iqamahTime.asrIqamah,
     maghribIqamah: activeOverrides.includes("maghrib") ? normalizeTime(overrides.maghrib?.value ?? "") : automaticIqamah.maghrib || content.iqamahTime.maghribIqamah,
     ishaIqamah: activeOverrides.includes("isha") ? normalizeTime(overrides.isha?.value ?? "") : automaticIqamah.isha || content.iqamahTime.ishaIqamah,
-    source: sourceState === "live" ? "Iqamah.ca" : "Iqamah.ca (last confirmed)",
+    source: "HBIC staff timetable",
     sourceUrl: "",
     manualOverride: activeOverrides.length > 0,
     adjustmentNotes: activeOverrides.length ? "Active admin iqamah override." : "",
     updatedAt
   };
 
-  const jumuah = parseJumuah(feed.jummah);
-  const jumuahSchedule = jumuah && !content.jumuahSchedule.manualOverride
-    ? {
-        ...content.jumuahSchedule,
-        firstKhutbahTime: jumuah.first,
-        firstIqamahTime: jumuah.first,
-        secondKhutbahTime: jumuah.second,
-        secondIqamahTime: jumuah.second,
-        updatedAt
-      }
-    : content.jumuahSchedule;
+  const jumuahSchedule = content.jumuahSchedule;
 
   const resolvedContent = normalizeContent({ ...content, prayerTime, iqamahTime, jumuahSchedule });
   const automaticAdhan: AdhanScheduleValues = {
@@ -391,14 +271,6 @@ export function resolveEffectivePrayerSchedule(
     maghrib: prayerTime.maghrib,
     isha: prayerTime.isha
   };
-  const upcomingWeekIqamah: IqamahScheduleValues = {
-    fajr: normalizeTime(feed.nw_i_fajr ?? ""),
-    dhuhr: normalizeTime(feed.nw_i_zuhr ?? ""),
-    asr: normalizeTime(feed.nw_i_asr ?? ""),
-    maghrib: normalizeTime(feed.nw_i_maghrib ?? ""),
-    isha: normalizeTime(feed.nw_i_isha ?? "")
-  };
-  const hasUpcomingWeekIqamah = Object.values(upcomingWeekIqamah).some(Boolean);
   const effectiveIqamah: IqamahScheduleValues = {
     fajr: resolvedContent.iqamahTime.fajrIqamah,
     dhuhr: resolvedContent.iqamahTime.dhuhrIqamah,
@@ -409,12 +281,12 @@ export function resolveEffectivePrayerSchedule(
   return {
     content: resolvedContent,
     activeOverrides,
-    rollover: newRollover,
     schedule: {
       provider: providerName,
       serviceDate,
-      upcomingWeekEffective,
-      automatic: { adhan: automaticAdhan, iqamah: automaticIqamah, ...(jumuah ? { jumuah } : {}) },
+      upcomingWeekEffective: false,
+      upcomingWeek: undefined,
+      automatic: { adhan: automaticAdhan, iqamah: automaticIqamah },
       effective: {
         adhan: automaticAdhan,
         iqamah: effectiveIqamah,
@@ -423,12 +295,11 @@ export function resolveEffectivePrayerSchedule(
           second: resolvedContent.jumuahSchedule.secondIqamahTime
         }
       },
-      ...(hasUpcomingWeekIqamah ? { upcomingWeek: { iqamah: upcomingWeekIqamah } } : {})
     } satisfies ResolvedPrayerScheduleView
   };
 }
 
-async function fetchOfficialFeed(): Promise<PrayerFeed> {
+async function fetchOfficialFeed(serviceDate: string): Promise<PrayerFeed> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -437,10 +308,10 @@ async function fetchOfficialFeed(): Promise<PrayerFeed> {
     const response = await fetch(url, {
       cache: "no-store",
       signal: controller.signal,
-      headers: { accept: "application/json", "cache-control": "no-cache" }
+      headers: { accept: "text/javascript", "cache-control": "no-cache" }
     });
     if (!response.ok) throw new Error(`Prayer source returned HTTP ${response.status}.`);
-    return (await response.json()) as PrayerFeed;
+    return parseIqamahCaAdhan(await response.text(), serviceDate);
   } finally {
     clearTimeout(timeout);
   }
@@ -488,6 +359,17 @@ export async function applyPrayerSync(
   const now = nowDate.toISOString();
   const serviceDate = dateStringInTimeZone(nowDate, masjidTimeZone);
   const cached = await readCache(db);
+  // Freeze the prior public iqamah for Sunday's notification comparison.
+  // Public/draft reads never send visible alerts or advance this baseline.
+  if (!options.preview && db && !cached?.notificationBaseline) {
+    const ref = db.collection(CACHE_COLLECTION).doc(CACHE_DOC);
+    await db.runTransaction(async tx => {
+      const state = await tx.get(ref);
+      if (!state.data()?.notificationBaseline) tx.set(ref, stripUndefined({
+        notificationBaseline: cached?.normalizedContent?.iqamahTime ?? boundPrayerOverrides(content).iqamahTime
+      }), { merge: true });
+    });
+  }
 
   let sourceState: PrayerSyncStatus["sourceState"] = "unavailable";
   let resolution: ReturnType<typeof resolveEffectivePrayerSchedule> | null = null;
@@ -504,13 +386,9 @@ export async function applyPrayerSync(
       sourceState,
       serviceDate,
       cached!.lastSuccessfulSync ?? cached!.lastAttemptedSync ?? now,
-      nowDate,
-      cached?.rollover
+      nowDate
     );
     synced = resolution.content;
-    if (!options.preview && resolution.rollover && JSON.stringify(resolution.rollover) !== JSON.stringify(cached?.rollover)) {
-      try { await writeCache(db, { rollover: resolution.rollover }); } catch { /* Public response still uses the confirmed feed. */ }
-    }
   } else if (!options.force && !cached?.feed && cached?.lastError && cached.lastAttemptedSync &&
     nowDate.getTime() - Date.parse(cached.lastAttemptedSync) >= 0 &&
     nowDate.getTime() - Date.parse(cached.lastAttemptedSync) < PRAYER_REFRESH_INTERVAL_MS) {
@@ -519,9 +397,9 @@ export async function applyPrayerSync(
     // timestamp, so this is a bounded retry delay, not a sliding indefinite one.
   } else {
     try {
-      const feed = await fetchOfficialFeed();
+      const feed = await fetchOfficialFeed(serviceDate);
       sourceState = "live";
-      resolution = resolveEffectivePrayerSchedule(content, feed, sourceState, serviceDate, now, nowDate, cached?.rollover);
+      resolution = resolveEffectivePrayerSchedule(content, feed, sourceState, serviceDate, now, nowDate);
       synced = resolution.content;
       lastError = undefined;
       lastSuccessfulSync = now;
@@ -537,8 +415,7 @@ export async function applyPrayerSync(
           } } : {}),
           lastSuccessfulSync,
           lastAttemptedSync,
-          lastError: null,
-          ...(resolution.rollover ? { rollover: resolution.rollover } : {})
+          lastError: null
         });
       } catch {
         // Live values are still authoritative for this response; cache persistence can recover later.
@@ -555,8 +432,7 @@ export async function applyPrayerSync(
           sourceState,
           cached.serviceDate ?? cached.normalizedContent?.prayerTime.date ?? serviceDate,
           cached.lastSuccessfulSync ?? cached.lastAttemptedSync ?? now,
-          nowDate,
-          cached.rollover
+          nowDate
         );
         synced = resolution.content;
       } else if (cached?.normalizedContent) {
@@ -580,11 +456,7 @@ export async function applyPrayerSync(
     }
   }
 
-  // Compare the effective public values in both live and cached-feed paths.
-  // This catches a manual override, its removal, and the Sunday next-week
-  // rollover without notifying for adhan's ordinary daily drift.
-  if (!options.preview && sourceState !== "unavailable" && changedIqamahTimes(cached?.normalizedContent?.iqamahTime, synced.iqamahTime).length) {
-    await announceIqamahChange(db, resolution?.rollover?.weekStart ?? serviceDate, cached?.normalizedContent?.iqamahTime, synced.iqamahTime);
+  if (!options.preview && changedIqamahTimes(cached?.normalizedContent?.iqamahTime, synced.iqamahTime).length) {
     if (sourceState === "cached") {
       try { await writeCache(db, { normalizedContent: {
         prayerTime: synced.prayerTime, iqamahTime: synced.iqamahTime, jumuahSchedule: synced.jumuahSchedule
@@ -625,8 +497,7 @@ export async function getPrayerSyncStatus(content: HbicContent, db: Firestore | 
         "cached",
         cached.serviceDate ?? dateStringInTimeZone(now, masjidTimeZone),
         cached.lastSuccessfulSync ?? cached.lastAttemptedSync ?? now.toISOString(),
-        now,
-        cached.rollover
+        now
       )
     : null;
 

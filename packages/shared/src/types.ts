@@ -60,6 +60,8 @@ export interface PrayerTime {
 export interface IqamahOverride {
   enabled: boolean;
   value: string;
+  /** Staff times remain in effect until explicitly changed or disabled. */
+  persistent?: boolean;
   startsAt?: string;
   endsAt?: string;
   note?: string;

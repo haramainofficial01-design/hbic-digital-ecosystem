@@ -24,19 +24,14 @@ export function getIqamahForPrayer(prayer: PrayerName, iqamah: IqamahTime): stri
   return iqamah[key] as string;
 }
 
-/** Sunday uses the feed's next-week iqamah when Saturday's final prayer has passed. */
+/** Staff iqamah persists across dates; obsolete upstream next-week values are ignored. */
 export function getIqamahForPrayerDate(
   prayer: PrayerName, iqamah: IqamahTime, targetDate: string, targetInstant: Date, now = new Date(), timeZone = masjidTimeZone
 ): string | undefined {
-  const today = dateStringInTimeZone(now, timeZone);
-  const targetDay = new Date(`${targetDate}T12:00:00Z`).getUTCDay();
-  const todayDay = new Date(`${today}T12:00:00Z`).getUTCDay();
-  if (prayer === "sunrise" || todayDay !== 6 || targetDay !== 0 || targetDate !== addDays(today, 1)) {
-    return getIqamahForPrayer(prayer, iqamah);
-  }
+  if (prayer === "sunrise") return undefined;
   const override = iqamah.overrides?.[prayer];
   if (isIqamahOverrideActive(override, targetInstant, iqamah.updatedAt)) return override!.value.trim();
-  return iqamah.upcomingWeekIqamah?.[prayer] || getIqamahForPrayer(prayer, iqamah);
+  return getIqamahForPrayer(prayer, iqamah);
 }
 
 export function parseClock(time: string): ClockTime | null {
@@ -125,7 +120,7 @@ export function timeToDate(date: string, time: string, timeZone = masjidTimeZone
   return result;
 }
 
-/** A manual iqamah belongs to one Sunday–Saturday Calgary week, never forever. */
+/** Week boundary used for weekly notifications, not manual override expiry. */
 export function iqamahOverrideWeekEndsAt(anchor: Date, timeZone = masjidTimeZone): string {
   const date = dateStringInTimeZone(anchor, timeZone);
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -133,20 +128,17 @@ export function iqamahOverrideWeekEndsAt(anchor: Date, timeZone = masjidTimeZone
 }
 
 export function iqamahOverrideExpiresAt(override?: IqamahOverride | null, fallbackUpdatedAt?: string): string | undefined {
-  if (!override) return undefined;
-  const anchor = override.updatedAt || fallbackUpdatedAt || override.startsAt;
-  const weekEnd = anchor && Number.isFinite(Date.parse(anchor))
-    ? Date.parse(iqamahOverrideWeekEndsAt(new Date(anchor))) : undefined;
+  // Persist-until-changed overrides ignore legacy auto-generated weekly ends.
+  if (!override || override.persistent) return undefined;
   const requestedEnd = override.endsAt ? Date.parse(override.endsAt) : undefined;
-  if (requestedEnd !== undefined && !Number.isFinite(requestedEnd)) return undefined;
-  const ends = [weekEnd, requestedEnd].filter((value): value is number => value !== undefined);
-  return ends.length ? new Date(Math.min(...ends)).toISOString() : undefined;
+  return requestedEnd !== undefined && Number.isFinite(requestedEnd) ? new Date(requestedEnd).toISOString() : undefined;
 }
 
 export function isIqamahOverrideActive(override?: IqamahOverride | null, now = new Date(), fallbackUpdatedAt?: string): boolean {
   if (!override?.enabled || !override.value?.trim()) return false;
   const expires = iqamahOverrideExpiresAt(override, fallbackUpdatedAt);
-  if (!expires || now.getTime() >= Date.parse(expires)) return false;
+  if (override.endsAt && !override.persistent && !expires) return false;
+  if (expires && now.getTime() >= Date.parse(expires)) return false;
   const starts = override.startsAt ? Date.parse(override.startsAt) : undefined;
   return starts === undefined || (Number.isFinite(starts) && now.getTime() >= starts);
 }

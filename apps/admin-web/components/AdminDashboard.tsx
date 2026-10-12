@@ -7,7 +7,6 @@ import {
   normalizeContent,
   isIqamahOverrideActive,
   iqamahOverrideExpiresAt,
-  iqamahOverrideWeekEndsAt,
   prayerLabels,
   validateContent,
   type Announcement,
@@ -111,9 +110,9 @@ function overrideStatusLabel(override?: IqamahOverride | null, now = new Date())
   if (!override.value?.trim()) return "Incomplete — add a time";
   const startsAt = override.startsAt ? Date.parse(override.startsAt) : null;
   const expires = iqamahOverrideExpiresAt(override);
-  if (!expires || now.getTime() >= Date.parse(expires)) return "Expired — automatic timetable";
+  if (expires && now.getTime() >= Date.parse(expires)) return "Expired";
   if (startsAt && now.getTime() < startsAt) return "Future — scheduled";
-  return "Active";
+  return "Active — until changed";
 }
 
 function Field({
@@ -481,7 +480,7 @@ function DashboardPanel({ content, onNavigate }: { content: HbicContent; onNavig
   return (
     <div className="grid">
       <div className="card full"><h2>Shortcuts</h2><div className="quick-actions">
-        {([ ["Quran Academy", "Families, attendance & tuition"], ["Prayer & Iqamah", "Timetable & weekly overrides"], ["Donations", "Donation categories & links"], ["Announcements", "Community updates"] ] as const).map(([destination, description]) => <button className="quick-action" type="button" key={destination} onClick={() => onNavigate(destination)}><strong>{destination}</strong><span>{description}</span><span className="quick-action-arrow" aria-hidden="true">↗</span></button>)}
+        {([ ["Quran Academy", "Families, attendance & tuition"], ["Prayer & Iqamah", "Timetable & manual iqamah"], ["Donations", "Donation categories & links"], ["Announcements", "Community updates"] ] as const).map(([destination, description]) => <button className="quick-action" type="button" key={destination} onClick={() => onNavigate(destination)}><strong>{destination}</strong><span>{description}</span><span className="quick-action-arrow" aria-hidden="true">↗</span></button>)}
       </div></div>
       {[
         ["Backend source", content.status, `Version ${content.version}`],
@@ -570,7 +569,8 @@ function PrayerPanel({
           value: "",
           ...(current.iqamahTime.overrides?.[prayer] ?? {}),
           ...patch,
-          endsAt: iqamahOverrideWeekEndsAt(new Date(updatedAt)),
+          persistent: true,
+          endsAt: undefined,
           updatedAt
         }
       };
@@ -677,26 +677,8 @@ function PrayerPanel({
       </div>
 
       <div className="card full">
-        <h2>Upcoming-week automatic iqamah</h2>
-        <p className="muted">
-          Next-week values may be relative.
-        </p>
-        <div className="form-grid">
-          {iqamahOverridePrayers.map((prayer) => (
-            <Field
-              key={prayer}
-              label={`${prayerLabels[prayer]} next week`}
-              value={syncStatus?.schedule?.upcomingWeek?.iqamah[prayer] || "Not supplied by source"}
-              onChange={() => undefined}
-              disabled
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="card full">
         <h2>Manual iqamah overrides</h2>
-        <p className="muted">Overrides expire Sunday at midnight (Calgary).</p>
+        <p className="muted">Times stay until changed. Weekly change alerts: Sunday midnight (Calgary).</p>
         {iqamahOverridePrayers.map((prayer) => {
           const override = iqamahTime.overrides?.[prayer] ?? { enabled: false, value: "" };
           const effectiveField = `${prayer}Iqamah` as "fajrIqamah" | "dhuhrIqamah" | "asrIqamah" | "maghribIqamah" | "ishaIqamah";
@@ -706,13 +688,12 @@ function PrayerPanel({
             <div className="card full" key={prayer}>
               <h3>{prayerLabels[prayer]}</h3>
               <div className="form-grid">
-                <Field label="Automatic Iqamah.ca value" value={automatic} onChange={() => undefined} disabled />
+                <Field label="Saved HBIC iqamah" value={automatic} onChange={() => undefined} disabled />
                 <Field label="Currently public" value={effective} onChange={() => undefined} disabled />
                 <Field label="Override status" value={overrideStatusLabel(override)} onChange={() => undefined} disabled />
                 <ToggleField label="Override enabled" checked={Boolean(override.enabled)} onChange={(enabled) => updateOverride(prayer, { enabled })} />
                 <Field label="Override time" value={override.value ?? ""} onChange={(value) => updateOverride(prayer, { value })} />
                 <Field label="Starts at (optional ISO/local text)" value={override.startsAt ?? ""} onChange={(startsAt) => updateOverride(prayer, { startsAt })} />
-                <Field label="Automatically expires (Calgary Sunday midnight)" value={iqamahOverrideExpiresAt(override) ?? "Set an override time"} onChange={() => undefined} disabled />
                 <Field label="Internal note" value={override.note ?? ""} onChange={(note) => updateOverride(prayer, { note })} />
               </div>
               <div className="actions">

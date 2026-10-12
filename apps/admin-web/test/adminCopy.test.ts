@@ -7,7 +7,7 @@ const component = (name: string) => readFileSync(new URL(`../components/${name}.
 test("dashboard removes generic introductions while keeping labels and publishing controls", () => {
   const source = component("AdminDashboard");
   for (const removed of ["<p>{subtitle}</p>", "Go straight to the work you do most often.", "Use Diagnostics for live database", "This sends through the protected server endpoint", "Role label reserved for Firebase Auth"]) assert.equal(source.includes(removed), false);
-  for (const label of ["Save Draft", "Publish Changes", "Refresh status", "Check delivery", "Manual iqamah overrides", "Overrides expire Sunday at midnight (Calgary).", "Editing sets a manual override."]) assert.ok(source.includes(label), label);
+  for (const label of ["Save Draft", "Publish Changes", "Refresh status", "Check delivery", "Manual iqamah overrides", "Times stay until changed.", "Editing sets a manual override."]) assert.ok(source.includes(label), label);
   assert.ok(source.includes('<summary>Details</summary>'), "Optional feature explanations stay collapsed");
 });
 

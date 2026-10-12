@@ -22,6 +22,9 @@ try {
   await page.goto('http://academy.fixture/');
   await page.getByText('6 families', { exact: true }).waitFor();
   const nav = page.getByRole('navigation', { name: 'Quran Academy areas' });
+  const overviewReceipts = page.locator('.academy-admin-stats > div').filter({ hasText: 'Actual tuition received' });
+  assert.match(await overviewReceipts.innerText(), /\$275\.00/);
+  assert.match(await overviewReceipts.innerText(), /Cash \$225\.00 · Card \$50\.00/);
   await nav.getByRole('button', { name: 'Tuition exemptions', exact: true }).click();
   await page.getByRole('heading', { name: 'Tuition-exempt students and families', exact: true }).waitFor();
   assert.equal(await page.locator('.academy-admin-family-list button').count(), 2);

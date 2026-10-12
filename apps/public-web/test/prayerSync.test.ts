@@ -1,234 +1,126 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent, iqamahOverrideWeekEndsAt } from "@hbic/shared";
+import { createWidgetPrayerSnapshot, defaultContent, normalizeContent, toPublicContent, iqamahOverrideWeekEndsAt, isIqamahOverrideActive } from "@hbic/shared";
 import { boundPrayerOverrides } from "../lib/prayerOverrides";
-import {
-  changedIqamahTimes,
-  applyPrayerSync,
-  isOverrideActive,
-  resolveEffectivePrayerSchedule,
-  retainPrayerScheduleDuringOutage,
-  type PrayerFeed
-} from "../lib/prayerSync";
+import { changedIqamahTimes, applyPrayerSync, isOverrideActive, resolveEffectivePrayerSchedule, retainPrayerScheduleDuringOutage, type PrayerFeed } from "../lib/prayerSync";
+import { iqamahCaAdhanUrl, parseIqamahCaAdhan } from "../lib/iqamahCaAdhan";
 import { deriveDisplayFocus } from "../lib/tvDisplay";
 
-const now = new Date("2026-09-08T18:00:00.000Z");
-const sourceUpdatedAt = "2026-09-08T17:59:00.000Z";
-
-test("an unavailable upstream with no feed has bounded retry backoff, while force sync still retries", async () => {
-  const original = globalThis.fetch;
-  let attempts = 0, writes = 0;
-  globalThis.fetch = async () => { attempts++; throw new Error("isolated upstream outage"); };
-  const db = { collection: () => ({ doc: () => ({
-    get: async () => ({ exists: true, data: () => ({ lastAttemptedSync: sourceUpdatedAt, lastError: "isolated upstream outage" }) }),
-    set: async () => { writes++; }
-  }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
-  try {
-    const result = await applyPrayerSync(defaultContent, db, { now });
-    assert.equal(result.status.sourceState, "unavailable");
-    assert.equal(result.status.lastAttemptedSync, sourceUpdatedAt);
-    assert.equal(attempts, 0); assert.equal(writes, 0);
-    await applyPrayerSync(defaultContent, db, { now, force: true });
-    assert.equal(attempts, 1); assert.equal(writes, 1);
-    await applyPrayerSync(defaultContent, db, { now: new Date("2026-09-08T18:04:00Z") });
-    assert.equal(attempts, 2);
-  } finally { globalThis.fetch = original; }
-});
-const baseFeed: PrayerFeed = {
-  salah_fajr: "5:31 AM",
-  salah_sunrise: "7:01 AM",
-  salah_zuhr: "1:34 PM",
-  salah_asr: "5:09 PM",
-  salah_maghrib: "8:06 PM",
-  salah_isha: "9:36 PM",
-  iqamah_fajr: "5:50 AM",
-  iqamah_zuhr: "2:00 PM",
-  iqamah_asr: "6:00 PM",
-  iqamah_maghrib: "+10 MINS",
-  iqamah_isha: "+5 MINS",
-  nw_i_fajr: "6:00 AM",
-  nw_i_zuhr: "2:00 PM",
-  nw_i_asr: "5:45 PM",
-  nw_i_maghrib: "+10 MINS",
-  nw_i_isha: "+5 MINS",
-  jummah: "1:45/2:30PM"
-};
-
-test("weekly overrides end exactly at Calgary Sunday midnight, not UTC midnight", () => {
-  const content = contentWithAsrOverride();
-  const end = iqamahOverrideWeekEndsAt(now);
-  assert.equal(end, "2026-09-13T06:00:00.000Z");
-  assert.equal(isOverrideActive(content.iqamahTime.overrides?.asr, new Date("2026-09-13T05:59:59Z")), true);
-  assert.equal(isOverrideActive(content.iqamahTime.overrides?.asr, new Date(end)), false);
-  const sunday = resolveEffectivePrayerSchedule(content, { ...baseFeed, iqamah_asr: "5:45 PM" }, "live", "2026-09-13", end, new Date(end));
-  assert.equal(sunday.content.iqamahTime.asrIqamah, "5:45 PM");
-  assert.equal(sunday.content.iqamahTime.manualOverride, false);
-  assert.equal(createWidgetPrayerSnapshot(sunday.content, new Date(end)).prayers.find(p => p.key === "asr")?.iqamah, "5:45 PM");
-});
-
-test("server bounds expiry and only actual override edits renew its week", () => {
-  const original = contentWithAsrOverride();
-  original.iqamahTime.overrides!.asr!.endsAt = "2099-01-01T00:00:00Z";
-  const bounded = boundPrayerOverrides(original, undefined, now);
-  assert.equal(bounded.iqamahTime.overrides!.asr!.endsAt, "2026-09-13T06:00:00.000Z");
-  const later = new Date("2026-09-15T18:00:00Z");
-  const unchanged = boundPrayerOverrides(bounded, original, later);
-  assert.equal(unchanged.iqamahTime.overrides!.asr!.updatedAt, sourceUpdatedAt);
-  assert.equal(isOverrideActive(unchanged.iqamahTime.overrides?.asr, later), false);
-  const edited = structuredClone(unchanged);
-  edited.iqamahTime.overrides!.asr!.value = "5:55 PM";
-  const renewed = boundPrayerOverrides(edited, unchanged, later);
-  assert.equal(renewed.iqamahTime.overrides!.asr!.updatedAt, later.toISOString());
-  assert.equal(renewed.iqamahTime.overrides!.asr!.endsAt, "2026-09-20T06:00:00.000Z");
-  assert.equal(isOverrideActive(renewed.iqamahTime.overrides?.asr, later), true);
-});
-
-test("expired override cannot survive an outage or malformed legacy timestamp", () => {
-  const confirmed = resolveEffectivePrayerSchedule(contentWithAsrOverride(), baseFeed, "live", "2026-09-08", sourceUpdatedAt, now).content;
-  const retained = retainPrayerScheduleDuringOutage(confirmed, new Date("2026-09-13T06:00:00Z"));
-  assert.equal(retained.iqamahTime.asrIqamah, "6:00 PM");
-  assert.equal(retained.iqamahTime.manualOverride, false);
-  const invalid = contentWithAsrOverride();
-  invalid.iqamahTime.overrides!.asr!.updatedAt = "invalid";
-  assert.equal(isOverrideActive(boundPrayerOverrides(invalid).iqamahTime.overrides?.asr, now), false);
-});
-
-test("draft preview never overwrites the public comparison snapshot or sends prayer alerts", async () => {
-  const previous = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-09-08", sourceUpdatedAt, now).content;
-  const writes: unknown[] = [];
-  const db = { collection: () => ({ doc: () => ({
-    get: async () => ({ exists: true, data: () => ({ feed: baseFeed, serviceDate: "2026-09-08", lastAttemptedSync: sourceUpdatedAt, normalizedContent: previous }) }),
-    set: async (value: unknown) => { writes.push(value); }
-  }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
-  const preview = await applyPrayerSync(contentWithAsrOverride(), db, { now, preview: true });
-  assert.equal(preview.content.iqamahTime.asrIqamah, "6:15 PM");
-  assert.equal(writes.length, 0);
-});
-
-test("visible change alerts include only changed iqamah prayers", () => {
-  const before = structuredClone(defaultContent.iqamahTime);
-  const after = { ...before, fajrIqamah: "6:20 AM", asrIqamah: "5:30 PM" };
-  assert.deepEqual(changedIqamahTimes(before, after), [
-    { prayer: "fajr", oldTime: before.fajrIqamah, newTime: "6:20 AM" },
-    { prayer: "asr", oldTime: before.asrIqamah, newTime: "5:30 PM" }
-  ]);
-  assert.deepEqual(changedIqamahTimes(undefined, after), []);
-});
-
-function contentWithAsrOverride(value = "6:15 PM") {
-  return normalizeContent({
-    ...structuredClone(defaultContent),
-    iqamahTime: {
-      ...structuredClone(defaultContent.iqamahTime),
-      overrides: { asr: { enabled: true, value, updatedAt: sourceUpdatedAt } }
-    }
-  });
+const now = new Date("2026-10-06T18:00:00Z"), sourceUpdatedAt = "2026-10-06T17:59:00Z";
+const baseFeed: PrayerFeed = { salah_fajr: "6:18 AM", salah_sunrise: "7:48 AM", salah_zuhr: "1:23 PM", salah_asr: "4:25 PM", salah_maghrib: "7:03 PM", salah_isha: "8:33 PM",
+  iqamah_asr: "6:00 PM", nw_i_fajr: "6:50M", nw_i_asr: "4:45 PM", jummah: "1:45/2:30PM" };
+const sourceText = `const SALAH_SCHEDULE = { "2026-10-06": { fajr: "6:18 AM", sunrise: "7:48 AM", zuhr: "1:23 PM", asr: "4:25 PM", maghrib: "7:03 PM", isha: "8:33 PM" } };`;
+function overridden() {
+  return normalizeContent({ ...structuredClone(defaultContent), iqamahTime: { ...structuredClone(defaultContent.iqamahTime),
+    fajrIqamah: "6:40 AM", dhuhrIqamah: "2:00 PM", asrIqamah: "5:00 PM", maghribIqamah: "7:13 PM", ishaIqamah: "8:45 PM",
+    overrides: { asr: { enabled: true, value: "5:00 PM", updatedAt: sourceUpdatedAt, endsAt: iqamahOverrideWeekEndsAt(now) } }
+  } });
 }
 
-test("A: Iqamah.ca values become the effective schedule when no override exists", () => {
-  const resolved = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.deepEqual(resolved.schedule.effective.adhan, resolved.schedule.automatic.adhan);
-  assert.deepEqual(resolved.schedule.effective.iqamah, resolved.schedule.automatic.iqamah);
-  assert.equal(resolved.content.iqamahTime.maghribIqamah, "8:16 PM");
-  assert.deepEqual(resolved.schedule.upcomingWeek?.iqamah, {
-    fajr: "6:00 AM",
-    dhuhr: "2:00 PM",
-    asr: "5:45 PM",
-    maghrib: "+10 MINS",
-    isha: "+5 MINS"
-  });
+test("staff overrides persist across midnight, following weeks and timezone transition", () => {
+  for (const date of ["2026-10-11T05:59:59Z", "2026-10-11T06:00:00Z", "2026-10-18T06:00:00Z", "2026-11-01T08:00:00Z", "2027-01-10T06:00:00Z"]) {
+    const instant = new Date(date), resolved = resolveEffectivePrayerSchedule(overridden(), baseFeed, "live", date.slice(0,10), date, instant);
+    assert.equal(resolved.content.iqamahTime.asrIqamah, "5:00 PM");
+    assert.equal(resolved.content.iqamahTime.overrides?.asr?.endsAt, undefined);
+    assert.equal(resolved.content.iqamahTime.overrides?.asr?.persistent, true);
+    assert.equal(isOverrideActive(resolved.content.iqamahTime.overrides?.asr, instant), true);
+    assert.equal(createWidgetPrayerSnapshot(resolved.content, instant).prayers.find(p => p.key === "asr")?.iqamah, "5:00 PM");
+  }
 });
 
-test("A2: next-week values never replace the current automatic iqamah", () => {
-  const resolved = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.equal(resolved.schedule.automatic.iqamah.fajr, "5:50 AM");
-  assert.equal(resolved.schedule.upcomingWeek?.iqamah.fajr, "6:00 AM");
-  assert.equal(resolved.content.iqamahTime.fajrIqamah, "5:50 AM");
+test("server preserves legacy times and stamps only actual staff changes", () => {
+  const original = overridden(), bounded = boundPrayerOverrides(original, undefined, now), later = new Date("2026-10-20T18:00:00Z");
+  assert.equal(bounded.iqamahTime.overrides?.asr?.endsAt, undefined);
+  const unchanged = boundPrayerOverrides(bounded, original, later);
+  assert.equal(unchanged.iqamahTime.overrides?.asr?.updatedAt, sourceUpdatedAt);
+  const edited = structuredClone(unchanged); edited.iqamahTime.overrides!.asr!.value = "4:30 PM";
+  const saved = boundPrayerOverrides(edited, unchanged, later);
+  assert.equal(saved.iqamahTime.overrides?.asr?.updatedAt, later.toISOString());
+  assert.equal(saved.iqamahTime.overrides?.asr?.value, "4:30 PM");
+  assert.equal(isOverrideActive(saved.iqamahTime.overrides?.asr, new Date("2026-12-01T18:00:00Z")), true);
 });
 
-test("A3: a missing current value does not promote next week's value into today", () => {
-  const feed = { ...baseFeed, iqamah_fajr: undefined, nw_i_fajr: "6:00 AM" };
-  const resolved = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.equal(resolved.schedule.automatic.iqamah.fajr, "");
-  assert.notEqual(resolved.content.iqamahTime.fajrIqamah, "6:00 AM");
-  assert.equal(resolved.schedule.upcomingWeek?.iqamah.fajr, "6:00 AM");
+test("staff iqamah survives provider outage; obsolete upcoming values cannot leak to old apps", () => {
+  const content = overridden(); content.iqamahTime.upcomingWeekIqamah = { asr: "4:45 PM", fajr: "6:50M" };
+  const confirmed = resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-06", sourceUpdatedAt, now).content;
+  const retained = retainPrayerScheduleDuringOutage(confirmed, new Date("2026-10-18T06:00:00Z"));
+  assert.equal(retained.iqamahTime.asrIqamah, "5:00 PM"); assert.equal(retained.iqamahTime.manualOverride, true);
+  assert.equal(retained.iqamahTime.upcomingWeekIqamah, undefined);
 });
 
-test("B/E: one override wins while upstream values and other prayers keep updating", () => {
-  const changedFeed = { ...baseFeed, iqamah_asr: "6:05 PM", iqamah_fajr: "5:55 AM" };
-  const resolved = resolveEffectivePrayerSchedule(contentWithAsrOverride(), changedFeed, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.equal(resolved.schedule.automatic.iqamah.asr, "6:05 PM");
-  assert.equal(resolved.schedule.effective.iqamah.asr, "6:15 PM");
-  assert.equal(resolved.schedule.effective.iqamah.fajr, "5:55 AM");
+test("provider updates adhan only; saved staff iqamah and Jumuah never change automatically", () => {
+  const content = overridden(), resolved = resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-06", sourceUpdatedAt, now);
+  assert.equal(resolved.content.prayerTime.asr, "4:25 PM"); assert.equal(resolved.content.iqamahTime.asrIqamah, "5:00 PM");
+  assert.equal(resolved.content.iqamahTime.fajrIqamah, content.iqamahTime.fajrIqamah);
+  assert.deepEqual(resolved.content.jumuahSchedule, content.jumuahSchedule);
+  assert.equal(resolved.content.iqamahTime.upcomingWeekIqamah, undefined); assert.equal(resolved.schedule.upcomingWeek, undefined);
   assert.deepEqual(resolved.activeOverrides, ["asr"]);
 });
 
-test("C: removing an override immediately returns to the current upstream value", () => {
-  const overridden = contentWithAsrOverride();
-  overridden.iqamahTime.overrides = {};
-  const resolved = resolveEffectivePrayerSchedule(overridden, { ...baseFeed, iqamah_asr: "6:05 PM" }, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.equal(resolved.schedule.effective.iqamah.asr, "6:05 PM");
-  assert.equal(resolved.activeOverrides.length, 0);
+test("clear override returns to saved HBIC iqamah, never the retired AWS feed", () => {
+  const content = overridden(); content.iqamahTime.overrides = {};
+  const resolved = resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-06", sourceUpdatedAt, now);
+  assert.equal(resolved.content.iqamahTime.asrIqamah, content.iqamahTime.asrIqamah);
+  assert.notEqual(resolved.content.iqamahTime.asrIqamah, baseFeed.iqamah_asr); assert.equal(resolved.activeOverrides.length, 0);
 });
 
-test("C2: scheduled and expired overrides are not treated as currently public", () => {
-  assert.equal(isOverrideActive({ enabled: true, value: "6:15 PM", startsAt: "2026-09-09T18:00:00.000Z" }, now), false);
-  assert.equal(isOverrideActive({ enabled: true, value: "6:15 PM", endsAt: "2026-09-08T17:00:00.000Z" }, now), false);
-  assert.equal(isOverrideActive({ enabled: true, value: "6:15 PM", startsAt: "2026-09-08T17:00:00.000Z", endsAt: "2026-09-08T19:00:00.000Z" }, now), true);
+test("scheduled overrides wait for start; shared explicitly timed overrides stay supported", () => {
+  assert.equal(isOverrideActive({ enabled: true, value: "5:00 PM", startsAt: "2026-10-07T18:00:00Z" }, now), false);
+  assert.equal(isIqamahOverrideActive({ enabled: true, value: "5:00 PM", endsAt: "2026-10-06T17:00:00Z" }, now), false);
+  assert.equal(isIqamahOverrideActive({ enabled: true, value: "5:00 PM", endsAt: "invalid" }, now), false);
+  assert.equal(isIqamahOverrideActive({ enabled: true, value: "5:00 PM" }, now), true);
 });
 
-test("D: an upstream change updates the canonical effective schedule", () => {
-  const original = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-09-08", sourceUpdatedAt, now);
-  const changed = resolveEffectivePrayerSchedule(defaultContent, { ...baseFeed, iqamah_asr: "6:05 PM" }, "live", "2026-09-08", sourceUpdatedAt, now);
-  assert.notEqual(original.schedule.effective.iqamah.asr, changed.schedule.effective.iqamah.asr);
+test("public, TV and mobile/Watch/widget snapshots agree across Saturday to Sunday", () => {
+  const saturday = new Date("2026-10-11T05:30:00Z"), content = overridden();
+  content.iqamahTime.upcomingWeekIqamah = { fajr: "6:50 AM", asr: "4:45 PM" };
+  assert.equal(createWidgetPrayerSnapshot(content, saturday).nextIqamah, content.iqamahTime.fajrIqamah, "even legacy cached next-week data cannot replace staff times");
+  const resolved = resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-10", saturday.toISOString(), saturday);
+  const publicContent = toPublicContent(resolved.content, saturday), snapshot = createWidgetPrayerSnapshot(resolved.content, saturday);
+  assert.equal(publicContent.iqamahTime.asrIqamah, "5:00 PM"); assert.equal(publicContent.iqamahTime.upcomingWeekIqamah, undefined);
+  assert.equal(snapshot.prayers.find(p => p.key === "asr")?.iqamah, "5:00 PM");
+  assert.equal(snapshot.nextIqamah, content.iqamahTime.fajrIqamah);
+  assert.equal(deriveDisplayFocus(snapshot, saturday)?.iqamahDate?.toISOString(), snapshot.nextIqamahDate);
 });
 
-test("F: an outage retains the last valid public schedule and every override", () => {
-  const previous = resolveEffectivePrayerSchedule(contentWithAsrOverride(), baseFeed, "live", "2026-09-08", sourceUpdatedAt, now).content;
-  const retained = retainPrayerScheduleDuringOutage(previous, new Date("2026-09-08T18:06:00.000Z"));
-  assert.equal(retained.prayerTime.asr, "5:09 PM");
-  assert.equal(retained.iqamahTime.asrIqamah, "6:15 PM");
-  assert.equal(retained.iqamahTime.overrides?.asr?.value, "6:15 PM");
+test("Iqamah.ca parsing is date-exact, validated and never executes remote code", () => {
+  assert.deepEqual(parseIqamahCaAdhan(sourceText, "2026-10-06"), Object.fromEntries(Object.entries(baseFeed).filter(([k]) => k.startsWith("salah_"))));
+  assert.throws(() => parseIqamahCaAdhan(sourceText, "2026-10-07"), /no adhan schedule/);
+  assert.throws(() => parseIqamahCaAdhan(sourceText.replace("6:18 AM", "99:18 AM"), "2026-10-06"), /invalid fajr/);
+  assert.throws(() => parseIqamahCaAdhan("<html>Challenge</html>", "2026-10-06"), /no adhan schedule/);
 });
 
-test("G: public content and TV/mobile/Watch/widget snapshot share identical values", () => {
-  const resolved = resolveEffectivePrayerSchedule(contentWithAsrOverride(), baseFeed, "live", "2026-09-08", sourceUpdatedAt, now);
-  const publicContent = toPublicContent(resolved.content, now);
-  const snapshot = createWidgetPrayerSnapshot(resolved.content, now);
-  const asr = snapshot.prayers.find((entry) => entry.key === "asr");
-  assert.equal(publicContent.prayerTime.asr, resolved.schedule.effective.adhan.asr);
-  assert.equal(publicContent.iqamahTime.asrIqamah, resolved.schedule.effective.iqamah.asr);
-  assert.equal(asr?.adhan, resolved.schedule.effective.adhan.asr);
-  assert.equal(asr?.iqamah, resolved.schedule.effective.iqamah.asr);
+test("direct sync never calls AWS even when its legacy environment variable exists", async () => {
+  const original = globalThis.fetch, old = process.env.HBIC_PRAYER_SOURCE_URL, urls: string[] = [];
+  process.env.HBIC_PRAYER_SOURCE_URL = "https://retired.execute-api.us-west-2.amazonaws.com/unused";
+  globalThis.fetch = async input => { urls.push(String(input)); return new Response(sourceText); };
+  try {
+    const result = await applyPrayerSync(overridden(), null, { now, force: true });
+    assert.equal(result.status.sourceState, "live"); assert.equal(result.status.endpointHost, "iqamah.ca");
+    assert.equal(result.content.prayerTime.fajr, "6:18 AM"); assert.equal(result.content.iqamahTime.asrIqamah, "5:00 PM");
+    assert.equal(new URL(urls[0]).origin + new URL(urls[0]).pathname, iqamahCaAdhanUrl);
+  } finally { globalThis.fetch = original; if (old === undefined) delete process.env.HBIC_PRAYER_SOURCE_URL; else process.env.HBIC_PRAYER_SOURCE_URL = old; }
 });
 
-test("Saturday after Isha promotes next-week Fajr and Asr across the public schedule", () => {
-  const lateSaturday = new Date("2026-09-27T04:30:00.000Z");
-  const feed = { ...baseFeed, salah_fajr: "5:59 AM", salah_isha: "8:55 PM", iqamah_fajr: "6:20 AM", nw_i_fajr: "6:30 AM", nw_i_asr: "5:15 PM" };
-  const resolved = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-26", lateSaturday.toISOString(), lateSaturday);
-  const snapshot = createWidgetPrayerSnapshot(resolved.content, lateSaturday);
-  assert.equal(resolved.schedule.upcomingWeekEffective, true);
-  assert.equal(resolved.schedule.automatic.iqamah.fajr, "6:30 AM");
-  assert.equal(resolved.content.iqamahTime.asrIqamah, "5:15 PM");
-  assert.equal(snapshot.serviceDate, "2026-09-26");
-  assert.equal(snapshot.prayers.find((entry) => entry.key === "fajr")?.iqamah, "6:30 AM");
-  assert.equal(snapshot.nextPrayerKey, "fajr");
-  assert.equal(snapshot.nextIqamah, "6:30 AM");
-  assert.equal(snapshot.nextIqamahDate, "2026-09-27T12:30:00.000Z");
-  assert.equal(deriveDisplayFocus(snapshot, lateSaturday)?.iqamahDate?.toISOString(), "2026-09-27T12:30:00.000Z");
+test("unavailable upstream retains bounded retry backoff while forced sync retries", async () => {
+  const original = globalThis.fetch; let attempts = 0, writes = 0;
+  globalThis.fetch = async () => { attempts++; throw new Error("isolated upstream outage"); };
+  const db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ notificationBaseline: defaultContent.iqamahTime, lastAttemptedSync: sourceUpdatedAt, lastError: "isolated upstream outage" }) }), set: async () => { writes++; } }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
+  try {
+    const result = await applyPrayerSync(defaultContent, db, { now }); assert.equal(result.status.sourceState, "unavailable"); assert.equal(attempts, 0); assert.equal(writes, 0);
+    await applyPrayerSync(defaultContent, db, { now, force: true }); assert.equal(attempts, 1); assert.equal(writes, 1);
+    await applyPrayerSync(defaultContent, db, { now: new Date("2026-10-06T18:04:00Z") }); assert.equal(attempts, 2);
+  } finally { globalThis.fetch = original; }
 });
 
-test("Sunday keeps Saturday's published rollover if the source has not switched yet", () => {
-  const lateSaturday = new Date("2026-09-27T04:30:00.000Z");
-  const sunday = new Date("2026-09-27T13:00:00.000Z");
-  const feed = { ...baseFeed, salah_fajr: "5:59 AM", salah_isha: "8:55 PM", iqamah_fajr: "6:20 AM", iqamah_asr: "5:30 PM", nw_i_fajr: "6:30 AM", nw_i_asr: "5:15 PM" };
-  const saturday = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-26", lateSaturday.toISOString(), lateSaturday);
-  assert.equal(saturday.rollover?.weekStart, "2026-09-27");
-  const staleSunday = resolveEffectivePrayerSchedule(defaultContent, feed, "live", "2026-09-27", sunday.toISOString(), sunday, saturday.rollover);
-  assert.equal(staleSunday.content.iqamahTime.fajrIqamah, "6:30 AM");
-  assert.equal(staleSunday.content.iqamahTime.asrIqamah, "5:15 PM");
-  const updatedSunday = resolveEffectivePrayerSchedule(defaultContent,
-    { ...feed, iqamah_fajr: "6:35 AM", iqamah_asr: "5:10 PM" }, "live", "2026-09-27", sunday.toISOString(), sunday, saturday.rollover);
-  assert.equal(updatedSunday.content.iqamahTime.fajrIqamah, "6:35 AM");
-  assert.equal(updatedSunday.content.iqamahTime.asrIqamah, "5:10 PM");
+test("draft preview never changes public comparison snapshot or notification baseline", async () => {
+  const previous = resolveEffectivePrayerSchedule(defaultContent, baseFeed, "live", "2026-10-06", sourceUpdatedAt, now).content, writes: unknown[] = [];
+  const db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ feed: baseFeed, serviceDate: "2026-10-06", lastAttemptedSync: sourceUpdatedAt, normalizedContent: previous }) }), set: async (v: unknown) => { writes.push(v); } }) }) } as unknown as NonNullable<Parameters<typeof applyPrayerSync>[1]>;
+  const result = await applyPrayerSync(overridden(), db, { now, preview: true }); assert.equal(result.content.iqamahTime.asrIqamah, "5:00 PM"); assert.equal(writes.length, 0);
+});
+
+test("weekly comparison includes only changed iqamah, not daily adhan drift", () => {
+  const before = structuredClone(defaultContent.iqamahTime);
+  assert.deepEqual(changedIqamahTimes(before, { ...before, asrIqamah: "4:30 PM" }), [{ prayer: "asr", oldTime: before.asrIqamah, newTime: "4:30 PM" }]);
+  assert.deepEqual(changedIqamahTimes(before, before), []); assert.deepEqual(changedIqamahTimes(undefined, before), []);
 });
