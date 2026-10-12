@@ -5,7 +5,7 @@ import { calculateQiblaBearing, emptyQuranState, isAlignedWithQibla, markRead, n
 import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, Headphones, LocateFixed, Maximize2, Minimize2, Mic, Pause, Play, Repeat, Search, Sparkles, Square, Trash2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approvedWebQuranResources, restoreWebQuranState, webQuranClient, webQuranStorageKey } from "../lib/quranBrowser";
-import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, useWebQuranAudio } from "./QuranReaderTools";
+import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, QuranPlaybackOptions, useWebQuranAudio } from "./QuranReaderTools";
 import styles from "./QuranReader.module.css";
 
 type QuranMode = "read" | "listen" | "practice" | "memorize" | "test" | "bookmarks";
@@ -167,7 +167,7 @@ export function QuranReader() {
     window.addEventListener("keydown", shortcuts);
     return () => { cancelAnimationFrame(focusFrame); window.removeEventListener("keydown", shortcuts); };
   }, []);
-  return <main className={`${styles.shell}${focused ? ` ${styles.focused}` : ""}`}>
+  return <main className={`${styles.shell}${focused ? ` ${styles.focused}` : ""}${audio.playback.phase !== "idle" ? ` ${styles.audioActive}` : ""}`}>
     <section className={styles.hero}>
       <div><small>A QUIET PLACE TO READ</small><h1>Quran &amp; Recite</h1><p>Read the Madinah Mushaf, listen to authentic recitations, and practise at your own pace.</p></div>
       <span lang="ar" dir="rtl" translate="no">ٱلْقُرْآنُ ٱلْكَرِيمُ</span>
@@ -223,7 +223,7 @@ export function QuranReader() {
         </> : null}
       </div>
     </section>
-    {audio.playback.phase !== "idle" ? <div className={styles.audioPlayer} role="region" aria-label="Quran audio player"><div><b>{audio.playback.title}</b><small role="status">{audio.playback.error ?? (audio.playback.phase === "loading" ? "Preparing audio…" : audio.playback.phase === "paused" ? "Paused" : "Playing")}</small></div>{audio.playback.phase === "playing" ? <button aria-label="Pause recitation" onClick={audio.pause}><Pause size={20} /></button> : audio.playback.phase === "paused" ? <button aria-label="Resume recitation" onClick={() => void audio.resume()}><Play size={20} /></button> : null}<button aria-label="Stop recitation" onClick={audio.stop}><Square size={19} /></button></div> : null}
+    {audio.playback.phase !== "idle" ? <div className={styles.audioPlayer} role="region" aria-label="Quran audio player"><div className={styles.audioHeading}><div><b>{audio.playback.title}</b><small role="status">{audio.playback.error ?? (audio.playback.phase === "loading" ? "Preparing audio…" : audio.playback.phase === "paused" ? "Paused" : "Playing")}</small></div>{audio.playback.phase === "playing" ? <button aria-label="Pause recitation" onClick={audio.pause}><Pause size={20} /></button> : audio.playback.phase === "paused" ? <button aria-label="Resume recitation" onClick={() => void audio.resume()}><Play size={20} /></button> : null}<button aria-label="Replay current recording" disabled={audio.playback.phase === "loading" || audio.playback.phase === "error"} onClick={() => void audio.replayCurrent()}><Repeat size={19} /></button><button aria-label="Stop recitation" onClick={audio.stop}><Square size={19} /></button></div><QuranPlaybackOptions speed={audio.speed} loop={audio.loopCurrent} onSpeed={audio.setSpeed} onLoop={audio.setLoopCurrent} disabled={audio.playback.phase === "error"} /></div> : null}
     <QiblaFinder />
   </main>;
 }

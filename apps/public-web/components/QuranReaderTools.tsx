@@ -1,6 +1,6 @@
 "use client";
 
-import { createSelfTest, memorizationLabels, normalizeSearch, parseAyahReference, passageId, repeatSequence, validAudioUrl, validMushafPageNumber,
+import { createSelfTest, memorizationLabels, normalizeSearch, parseAyahReference, passageId, repeatSequence, validAudioUrl, validMushafPageNumber, QURAN_PLAYBACK_SPEEDS, validQuranPlaybackSpeed,
   type MemorizationStatus, type MushafPage, type QuranChapter, type QuranPassage, type QuranPreferences, type QuranState, type QuranVerse } from "@hbic/shared";
 import { Bookmark, ChevronLeft, ChevronRight, Mic, Pause, Play, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,9 +16,12 @@ const idlePlayback: Playback = { phase: "idle", key: null, title: "", error: nul
 
 export function useWebQuranAudio() {
   const [playback, setPlayback] = useState<Playback>(idlePlayback);
+  const [speed, setSpeedState] = useState(1), [loopCurrent, setLoopState] = useState(false);
+  const options = useRef({ speed: 1, loop: false });
   const player = useRef<HTMLAudioElement | null>(null), epoch = useRef(0);
   const stop = useCallback(() => {
     ++epoch.current;
+    options.current.loop = false; setLoopState(false);
     if (player.current) { player.current.pause(); player.current.removeAttribute("src"); player.current.load(); player.current = null; }
     setPlayback(idlePlayback);
   }, []);
@@ -32,8 +35,9 @@ export function useWebQuranAudio() {
     if (!validAudioUrl(url) && !validListeningUrl(url)) throw new Error("This recording source could not be verified.");
     if (player.current) { player.current.onended = null; player.current.onerror = null; player.current.pause(); player.current.removeAttribute("src"); player.current.load(); }
     const next = new Audio(url); player.current = next;
+    next.playbackRate = options.current.speed; next.preservesPitch = true; next.loop = options.current.loop;
     setPlayback({ phase: "loading", title, key, error: null });
-    next.onended = () => { if (run === epoch.current && player.current === next) { if (ended) ended(); else setPlayback(idlePlayback); } };
+    next.onended = () => { if (run === epoch.current && player.current === next && !next.loop) { if (ended) ended(); else setPlayback(idlePlayback); } };
     next.onerror = () => { if (run === epoch.current && player.current === next) { ++epoch.current; next.pause(); setPlayback({ phase: "error", title, key, error: "This recording could not play. Please retry." }); } };
     await next.play();
     if (run === epoch.current) setPlayback({ phase: "playing", title, key, error: null }); else next.pause();
@@ -63,9 +67,26 @@ export function useWebQuranAudio() {
     try { await player.current?.play(); if (run === epoch.current && player.current) setPlayback((state) => ({ ...state, phase: "playing" })); }
     catch { if (run === epoch.current) setPlayback((state) => ({ ...state, phase: "error", error: "Playback could not resume. Please retry." })); }
   }
-  return { playback, stop, start, playStream, pause, resume };
+  function setSpeed(rate: number) {
+    if (!validQuranPlaybackSpeed(rate)) return;
+    options.current.speed = rate;
+    if (player.current) { player.current.playbackRate = rate; player.current.preservesPitch = true; }
+    setSpeedState(rate);
+  }
+  function setLoopCurrent(value: boolean) { options.current.loop = value; if (player.current) player.current.loop = value; setLoopState(value); }
+  async function replayCurrent() { if (player.current) { player.current.currentTime = 0; await resume(); } }
+  return { playback, stop, start, playStream, pause, resume, speed, setSpeed, loopCurrent, setLoopCurrent, replayCurrent };
 }
 export type WebQuranAudio = ReturnType<typeof useWebQuranAudio>;
+
+export function QuranPlaybackOptions({ speed, loop, onSpeed, onLoop, disabled = false }: {
+  speed: number; loop: boolean; onSpeed: (rate: number) => void; onLoop: (loop: boolean) => void; disabled?: boolean;
+}) {
+  return <div className={styles.playbackOptions}>
+    <button type="button" aria-pressed={loop} disabled={disabled} onClick={() => onLoop(!loop)}>Loop {loop ? "On" : "Off"}</button>
+    <label>Speed<select aria-label="Playback speed" disabled={disabled} value={speed} onChange={event => onSpeed(Number(event.target.value))}>{QURAN_PLAYBACK_SPEEDS.map(rate => <option key={rate} value={rate}>{rate}×{rate === 1 ? " · Normal" : ""}</option>)}</select></label>
+  </div>;
+}
 
 export function QuranListeningLibrary({ chapters, library, update, audio }: {
   chapters: QuranChapter[]; library: QuranState; update: (transform: (state: QuranState) => QuranState) => void; audio: WebQuranAudio;
@@ -167,6 +188,7 @@ function QuranPrivateRecording({ blocked, stopPlayback, onBusyChange, passage }:
 }) {
   const [consented, setConsented] = useState(false), [state, setState] = useState<BrowserRecordingState>(idleRecording);
   const [supported, setSupported] = useState(false);
+  const [reviewSpeed, setReviewSpeed] = useState(1), [reviewLoop, setReviewLoop] = useState(false);
   const recorder = useRef<ReturnType<typeof createBrowserRecording> | null>(null);
   const ownAudio = useRef<HTMLAudioElement>(null);
   useEffect(() => {
@@ -188,6 +210,8 @@ function QuranPrivateRecording({ blocked, stopPlayback, onBusyChange, passage }:
   useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
   useEffect(() => { recorder.current?.erase(); setConsented(false); }, [passage]);
   useEffect(() => { if (blocked) ownAudio.current?.pause(); }, [blocked]);
+  useEffect(() => { setReviewLoop(false); }, [state.url]);
+  useEffect(() => { if (ownAudio.current) { ownAudio.current.playbackRate = reviewSpeed; ownAudio.current.preservesPitch = true; ownAudio.current.loop = reviewLoop; } }, [reviewSpeed, reviewLoop, state.url]);
   return <section className={styles.practiceCard}>
     <h3>Listen to your own recitation</h3><p>Your microphone is used only after you allow it below and press Record. No recording is uploaded. Stop to review in this browser, or download a copy to your device.</p>
     <p className={styles.finePrint}>Maximum five minutes. Leaving this page or putting it in the background discards the recording and releases the microphone. Downloads are kept only when you choose Download.</p>
@@ -197,7 +221,7 @@ function QuranPrivateRecording({ blocked, stopPlayback, onBusyChange, passage }:
         ownAudio.current?.pause(); stopPlayback(); if (state.phase === "recording") recorder.current?.stop(); else void recorder.current?.start();
       }}>{state.phase === "recording" ? <Square size={17} /> : <Mic size={17} />}{state.phase === "preparing" ? "Waiting for microphone…" : state.phase === "recording" ? "Stop and review" : "Record my recitation"}</button>
         {state.url ? <button onClick={() => { ownAudio.current?.pause(); recorder.current?.erase(); }}><Trash2 size={16} />Delete recording</button> : null}</div>
-      {state.url ? <div className={styles.localRecording}><audio ref={ownAudio} src={state.url} controls preload="metadata" onPlay={() => { if (blocked) ownAudio.current?.pause(); else stopPlayback(); }} aria-label={`Your recitation of ${passage}`} /><a href={state.url} download={`quran-${passage.replace(/[^\d-]/g, "-")}.${recordingExtension(state.mimeType ?? "")}`}>Download to my device</a></div> : null}
+      {state.url ? <div className={styles.localRecording}><audio ref={ownAudio} src={state.url} controls preload="metadata" onPlay={() => { if (blocked) ownAudio.current?.pause(); else stopPlayback(); }} aria-label={`Your recitation of ${passage}`} /><QuranPlaybackOptions speed={reviewSpeed} loop={reviewLoop} disabled={blocked || busy} onSpeed={rate => { if (validQuranPlaybackSpeed(rate)) setReviewSpeed(rate); }} onLoop={setReviewLoop} /><a href={state.url} download={`quran-${passage.replace(/[^\d-]/g, "-")}.${recordingExtension(state.mimeType ?? "")}`}>Download to my device</a></div> : null}
     </>}
     {state.error ? <p className={styles.notice} role="alert">{state.error}</p> : null}
   </section>;

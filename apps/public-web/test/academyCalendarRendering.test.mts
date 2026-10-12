@@ -58,8 +58,11 @@ test("actual signed-in parent UI has a prominent calendar, readable full schedul
           return calendar.compareDocumentPosition([...document.querySelectorAll("small")].find(node => node.textContent?.startsWith("TUITION"))!) & Node.DOCUMENT_POSITION_FOLLOWING;
         }), "calendar appears before tuition/payment controls");
         assert.equal(await calendar.getByText("Preparation day").count(), 0);
+        await calendar.getByRole("button", { name: "Thursday, October 15, 2026: Special Thursday", exact: true }).click();
         await calendar.getByText("Special Thursday", { exact: true }).waitFor();
+        await calendar.getByRole("button", { name: "Monday, October 19, 2026: No class", exact: true }).click();
         await calendar.getByText("Staff closure", { exact: true }).waitFor();
+        await calendar.getByRole("button", { name: "Thursday, October 22, 2026: Time changed", exact: true }).click();
         await calendar.getByText("Class starts at 6:00 PM.", { exact: true }).waitFor();
         if (width === 390 && process.env.HBIC_ACADEMY_CALENDAR_SCREENSHOTS === "1") {
           const directory = path.join(root, "output/academy-calendar-qa");
@@ -76,7 +79,7 @@ test("actual signed-in parent UI has a prominent calendar, readable full schedul
           await mkdir(directory, { recursive: true });
           await calendar.screenshot({ path: path.join(directory, "desktop-parent-calendar-fixture.png") });
         }
-        assert.equal(await calendar.getByRole("button", { name: "Show upcoming dates" }).getAttribute("aria-expanded"), "true");
+        assert.equal(await calendar.getByRole("button", { name: "Show selected date" }).getAttribute("aria-expanded"), "true");
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}`);
         assert.ok(await page.evaluate(() => [...document.querySelectorAll("#academy-calendar time")].every(node => {
           const rect = node.getBoundingClientRect(); return rect.width >= 50 && rect.height >= 40;
@@ -88,8 +91,15 @@ test("actual signed-in parent UI has a prominent calendar, readable full schedul
         await calendar.getByRole("button", { name: "Refresh Academy calendar" }).click();
         await calendar.getByRole("status").waitFor({ state: "detached" });
         assert.ok(await page.evaluate(() => (window as any).qaRequests.filter((request: any) => request.url === "/api/academy/content").every((request: any) => request.authorized)));
-        await calendar.getByRole("button", { name: "Show upcoming dates" }).click();
+        await calendar.getByRole("button", { name: "Show selected date" }).click();
         assert.equal(await calendar.getByRole("heading", { name: "February 2027" }).count(), 0);
+        await calendar.getByRole("button", { name: "Next calendar month" }).click();
+        await calendar.getByRole("group", { name: "November 2026 calendar" }).waitFor();
+        await calendar.getByRole("button", { name: "Monday, November 2, 2026: Class", exact: true }).click();
+        await calendar.getByText("Monday, November 2, 2026", { exact: true }).waitFor();
+        await calendar.getByRole("button", { name: "Previous calendar month" }).click();
+        await calendar.getByRole("group", { name: "October 2026 calendar" }).waitFor();
+        assert.equal(await calendar.getByRole("button", { name: "Previous calendar month" }).isDisabled(), true);
       } finally { await page.close(); }
     }
   } finally { await browser.close(); }

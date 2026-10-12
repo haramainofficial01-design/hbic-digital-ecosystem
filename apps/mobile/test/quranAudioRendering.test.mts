@@ -8,13 +8,15 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "../../..");
 const hook = path.join(root, "apps/mobile/src/quran/useQuranAudio.ts");
 const audioModule = `import {useEffect,useState} from 'react';
-const listeners=new Set();let status={isLoaded:true,isBuffering:false,playing:true,currentTime:0,duration:1000,didJustFinish:false,playbackRate:1};
+const listeners=new Set();let looping=false;let status={isLoaded:true,isBuffering:false,playing:true,currentTime:0,duration:1000,didJustFinish:false,playbackRate:1};
 export const player={get isLoaded(){return status.isLoaded},get duration(){return status.duration},get playing(){return status.playing},
-addListener(_,fn){listeners.add(fn);return {remove(){listeners.delete(fn)}}},replace(){},play(){status={...status,playing:true}},pause(){status={...status,playing:false}},async seekTo(){},setPlaybackRate(){}};
+get loop(){return looping},set loop(value){looping=value},addListener(_,fn){listeners.add(fn);return {remove(){listeners.delete(fn)}}},replace(){looping=false;status={...status,playbackRate:1}},play(){status={...status,playing:true}},pause(){status={...status,playing:false}},async seekTo(seconds){status={...status,currentTime:seconds}},setPlaybackRate(rate){status={...status,playbackRate:rate}}};
 export const useAudioPlayer=()=>player;export const setAudioModeAsync=async()=>{};
 export function useAudioPlayerStatus(){const [value,set]=useState(status);useEffect(()=>{listeners.add(set);return()=>listeners.delete(set)},[]);return value}
 window.emitStatus=()=>{status={...status,currentTime:status.currentTime+1};listeners.forEach(fn=>fn(status))};window.listenerCount=()=>listeners.size;
-window.nativeResume=()=>{status={...status,playing:true};listeners.forEach(fn=>fn(status))};window.nativePlaying=()=>status.playing;`;
+window.nativeResume=()=>{status={...status,playing:true};listeners.forEach(fn=>fn(status))};window.nativePlaying=()=>status.playing;
+window.nativeOptions=()=>({loop:looping,rate:status.playbackRate,pitch:player.shouldCorrectPitch,currentTime:status.currentTime});
+window.nativeFinish=()=>{status={...status,didJustFinish:true};listeners.forEach(fn=>fn(status))};`;
 async function bundle(before: boolean) {
   const old = before ? execFileSync("git", ["show", "fdd2e97:apps/mobile/src/quran/useQuranAudio.ts"], { cwd: root, encoding: "utf8" }) : readFileSync(hook, "utf8");
   const result = await build({ write: false, bundle: true, platform: "browser", format: "iife", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
@@ -76,6 +78,34 @@ test("leaving Quran rejects a stale native resume without waiting for app backgr
     await page.waitForFunction(() => (window as any).ready);
     await page.evaluate(async () => { await (window as any).audio.playStream("https://verified.example/reciter.mp3", "Reference", "Test adapter"); });
     await page.evaluate(() => { (window as any).blurQuran(); (window as any).nativeResume(); });
+    assert.equal(await page.evaluate(() => (window as any).nativePlaying()), false);
+    await page.evaluate(() => (window as any).dispose());
+    assert.equal(await page.evaluate(() => (window as any).listenerCount()), 0);
+  } finally { await browser.close(); }
+});
+
+test("stream and local recording loop/speed use native properties, survive interruption and reset looping on stop", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage(); await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
+    await page.waitForFunction(() => (window as any).ready);
+    await page.evaluate(async () => { await (window as any).audio.playStream("https://verified.example/reciter.mp3", "Reference", "Test adapter"); });
+    await page.evaluate(() => { (window as any).audio.setSpeed(.5); (window as any).audio.setLoopCurrent(true); });
+    assert.deepEqual(await page.evaluate(() => (window as any).nativeOptions()), { loop: true, rate: .5, pitch: true, currentTime: 0 });
+    await page.evaluate(() => (window as any).nativeFinish());
+    assert.equal(await page.evaluate(() => Boolean((window as any).audio.externalPlayback)), true);
+    await page.evaluate(() => { (window as any).appState("background"); (window as any).appState("active"); });
+    assert.equal(await page.evaluate(() => (window as any).nativePlaying()), false);
+    await page.evaluate(async () => { await (window as any).audio.togglePause(); await (window as any).audio.playRecording("file:///private/fixture-recording.m4a"); });
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().rate), .5);
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().loop), false, "new clip does not inherit looping");
+    await page.evaluate(() => { (window as any).audio.setSpeed(2); (window as any).audio.setLoopCurrent(true); (window as any).audio.setSpeed(99); });
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().rate), 2);
+    await page.evaluate(async () => { await (window as any).audio.seek(20); await (window as any).audio.togglePause(); await (window as any).audio.replayCurrent(); });
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().currentTime), 0);
+    assert.equal(await page.evaluate(() => (window as any).nativePlaying()), true);
+    await page.evaluate(() => (window as any).audio.stop());
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().loop), false);
     assert.equal(await page.evaluate(() => (window as any).nativePlaying()), false);
     await page.evaluate(() => (window as any).dispose());
     assert.equal(await page.evaluate(() => (window as any).listenerCount()), 0);

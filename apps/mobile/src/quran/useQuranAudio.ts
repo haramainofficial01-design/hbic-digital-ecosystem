@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useCallback } from "react";
 import { QuranAudioQueue, type QuranPlayback } from "./audioQueue";
-import type { QuranVerse } from "@hbic/shared";
+import { validQuranPlaybackSpeed, type QuranVerse } from "@hbic/shared";
 import { validListeningUrl } from "../services/quranListening";
 
 export function useQuranAudio() {
@@ -17,6 +17,14 @@ export function useQuranAudio() {
   const [externalPlayback, setExternalPlayback] = useState<{ kind: "recording" | "chapter"; title: string; subtitle: string } | null>(null);
   const [externalError, setExternalError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [speed, setSpeedState] = useState(1);
+  const [loopCurrent, setLoopState] = useState(false);
+  const options = useRef({ speed: 1, loop: false });
+  const applyOptions = useCallback(() => {
+    player.loop = options.current.loop;
+    player.shouldCorrectPitch = true;
+    player.setPlaybackRate(options.current.speed, "high");
+  }, [player]);
   const local = useRef(false);
   const explicitPause = useRef(false);
   const command = useRef(0);
@@ -30,8 +38,8 @@ export function useQuranAudio() {
       if (!(error instanceof Error) || !/shared object|NativeSharedObjectNotFound/i.test(error.message)) throw error;
     }
   }, [player]);
-  const queue = useMemo(() => new QuranAudioQueue({ replace: (uri) => player.replace({ uri }), play: () => player.play(),
-    pause: safePause, seekTo: (seconds) => player.seekTo(seconds) }, setPlayback), [player, safePause]);
+  const queue = useMemo(() => new QuranAudioQueue({ replace: (uri) => { player.replace({ uri }); applyOptions(); }, play: () => player.play(),
+    pause: safePause, seekTo: (seconds) => player.seekTo(seconds) }, setPlayback), [player, safePause, applyOptions]);
   const lastFinished = useRef(false);
   useEffect(() => {
     const subscription = player.addListener("playbackStatusUpdate", (status) => {
@@ -43,7 +51,7 @@ export function useQuranAudio() {
       previousLoad.current = { isLoaded: status.isLoaded, isBuffering: status.isBuffering };
       setLoadState(previousLoad.current);
     }
-    if (status.didJustFinish && !lastFinished.current) {
+    if (status.didJustFinish && !lastFinished.current && !options.current.loop) {
       if (local.current) { local.current = false; setExternalPlayback(null); }
       else void queue.finished();
     }
@@ -58,7 +66,7 @@ export function useQuranAudio() {
       if (state !== "active") { explicitPause.current = true; invalidate(); if (local.current) safePause(); else queue.interrupted(); }
       else if (explicitPause.current) safePause();
     });
-    return () => { explicitPause.current = true; invalidate(); queue.stop(); local.current = false; setExternalPlayback(null); subscription.remove(); };
+    return () => { explicitPause.current = true; invalidate(); queue.stop(); local.current = false; options.current.loop = false; setLoopState(false); setExternalPlayback(null); subscription.remove(); };
   }, [queue, safePause, invalidate]));
   useEffect(() => {
     if (playback.phase !== "playing" || (loadState.isLoaded && !loadState.isBuffering)) return;
@@ -72,6 +80,7 @@ export function useQuranAudio() {
   }, [externalPlayback, loadState.isLoaded, loadState.isBuffering, safePause]);
   const prepare = useCallback(async () => {
     local.current = false; setExternalPlayback(null); setExternalError(null);
+    options.current.loop = false; setLoopState(false);
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, shouldPlayInBackground: false,
       interruptionMode: "doNotMix", shouldRouteThroughEarpiece: false });
   }, []);
@@ -81,7 +90,7 @@ export function useQuranAudio() {
     if (epoch !== command.current || AppState.currentState !== "active") return;
     explicitPause.current = false;
     local.current = true; setExternalPlayback({ kind: "recording", title: "Your local recording", subtitle: "Private · on this device" });
-    player.replace({ uri });
+    player.replace({ uri }); applyOptions();
     if (startSeconds > 0) {
       await new Promise<void>((resolve, reject) => {
         const finish = (error?: Error) => { clearTimeout(timeout); subscription.remove(); cancelLoad.current = null; if (error) reject(error); else resolve(); };
@@ -97,15 +106,15 @@ export function useQuranAudio() {
       await player.seekTo(Math.max(0, Math.min(player.duration, startSeconds)));
     }
     if (epoch === command.current) player.play();
-  }, [queue, prepare, player, invalidate]);
+  }, [queue, prepare, player, invalidate, applyOptions]);
   const playStream = useCallback(async (uri: string, title: string, subtitle: string) => {
     if (!validListeningUrl(uri)) throw new Error("The recording source could not be verified.");
     const epoch = invalidate(); queue.stop(); await prepare();
     if (epoch !== command.current || AppState.currentState !== "active") return;
     explicitPause.current = false;
     local.current = true; setExternalPlayback({ kind: "chapter", title, subtitle });
-    player.replace({ uri }); player.play();
-  }, [queue, prepare, player, invalidate]);
+    player.replace({ uri }); applyOptions(); player.play();
+  }, [queue, prepare, player, invalidate, applyOptions]);
   const start = useCallback(async (sequence: number[], load: (ayah: number) => Promise<QuranVerse>) => {
       const epoch = invalidate(); queue.stop(); await prepare();
       if (epoch === command.current && AppState.currentState === "active") { explicitPause.current = false; await queue.start(sequence, load); }
@@ -120,9 +129,24 @@ export function useQuranAudio() {
     if (AppState.currentState !== "active") return;
     explicitPause.current = false; await queue[action]();
   }, [queue]);
-  const stop = useCallback(() => { explicitPause.current = true; invalidate(); queue.stop(); local.current = false; setExternalPlayback(null); setExternalError(null); }, [queue, invalidate]);
-  const setSpeed = useCallback((rate: number) => player.setPlaybackRate(rate, "high"), [player]);
+  const stop = useCallback(() => {
+    explicitPause.current = true; invalidate(); queue.stop(); local.current = false; options.current.loop = false;
+    try { player.loop = false; } catch (error) { if (!(error instanceof Error) || !/shared object|NativeSharedObjectNotFound/i.test(error.message)) throw error; }
+    setLoopState(false); setExternalPlayback(null); setExternalError(null);
+  }, [queue, invalidate, player]);
+  const setSpeed = useCallback((rate: number) => {
+    if (!validQuranPlaybackSpeed(rate)) return;
+    options.current.speed = rate; applyOptions(); setSpeedState(rate);
+  }, [applyOptions]);
+  const setLoopCurrent = useCallback((value: boolean) => { options.current.loop = value; player.loop = value; setLoopState(value); }, [player]);
   const seek = useCallback((seconds: number) => player.seekTo(Math.max(0, Math.min(player.duration, seconds))), [player]);
+  const replayCurrent = useCallback(async () => {
+    if (AppState.currentState !== "active") return;
+    if (!local.current) { explicitPause.current = false; await queue.replay(); return; }
+    const epoch = command.current;
+    await player.seekTo(0);
+    if (epoch === command.current && AppState.currentState === "active") { explicitPause.current = false; player.play(); }
+  }, [queue, player]);
   return useMemo(() => ({ queue, playback, player, prepare, playRecording, playStream, externalPlayback, externalError, expanded, setExpanded,
-    start, togglePause, navigate, stop, setSpeed, seek }), [queue, playback, player, prepare, playRecording, playStream, externalPlayback, externalError, expanded, start, togglePause, navigate, stop, setSpeed, seek]);
+    start, togglePause, navigate, stop, setSpeed, speed, loopCurrent, setLoopCurrent, replayCurrent, seek }), [queue, playback, player, prepare, playRecording, playStream, externalPlayback, externalError, expanded, start, togglePause, navigate, stop, setSpeed, speed, loopCurrent, setLoopCurrent, replayCurrent, seek]);
 }

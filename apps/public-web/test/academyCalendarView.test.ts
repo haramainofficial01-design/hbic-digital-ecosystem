@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarMonthLabel, academyParentCalendar } from "../lib/academyCalendarView";
+import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarMonthCells, academyCalendarMonths, academyCalendarMonthLabel, academyParentCalendar } from "../lib/academyCalendarView";
 import { academyRecurringClasses } from "../../../packages/shared/src/academy";
 
 const item = (date: string, type = "class", title = "Quran Academy class") => ({ id: `${date}-${type}`, date, type, title });
+
+test("month grids use real Gregorian days, Monday-first columns and leap-year dates", () => {
+  const october = academyCalendarMonthCells("2026-10");
+  assert.equal(october.length, 42);
+  assert.equal(october[0], null);
+  assert.equal(october[3], "2026-10-01");
+  assert.equal(october[14], "2026-10-12");
+  assert.equal(october.filter(Boolean).length, 31);
+  assert.equal(academyCalendarMonthCells("2028-02").filter(Boolean).length, 29);
+  assert.equal(academyCalendarMonthCells("2027-02").filter(Boolean).length, 28);
+  assert.deepEqual(academyCalendarMonthCells("bad"), []);
+  assert.deepEqual(academyCalendarMonths("2026-10", "2027-02"), ["2026-10", "2026-11", "2026-12", "2027-01", "2027-02"]);
+});
 
 test("parent schedule sorts actual API dates and excludes past/invalid dates without mutating input", () => {
   const input = [item("2026-10-15", "special_class"), item("2026-10-01", "no_class"), item("2026-10-12"), item("2026-02-30"), item("invalid")];

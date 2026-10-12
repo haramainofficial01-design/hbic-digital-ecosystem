@@ -13,8 +13,9 @@ holiday, notification, or database behavior is changed.
 - App: Quran Academy has a Calendar shortcut beneath its toolbar. It scrolls and
   focuses the same parent calendar; before sign-in it goes to the account panel.
   It is disabled outside the HBIC Academy page, including Stripe Checkout.
-- Both: next class, readable date/day, Calgary time, four upcoming entries and a
-  View full schedule button with dates grouped by month. Special Thursdays,
+- Both: next class, readable date/day, Calgary time and a Monday-first month grid
+  with previous/next month buttons. Tap a marked day for its schedule and notes.
+  A View full schedule button also groups all upcoming entries by month. Special Thursdays,
   explicit closures and changed times have distinct text labels, not just color.
   Staff notes remain visible. Past dates are excluded. A future enrollment start
   is respected for the next-class summary; shared notices remain available.
@@ -23,14 +24,15 @@ holiday, notification, or database behavior is changed.
 
 ## Verification
 
-Focused model tests cover sorting, calendar-only date formatting, past/invalid
+Focused model tests cover real month grids and leap years, sorting, calendar-only date formatting, past/invalid
 dates, next-month starts, explicit closures, special Thursday, Thanksgiving
 class, final class and break. Existing attendance tests verify schedule behavior
 remains unchanged.
 
 Headless Chromium renders the actual parent component and CSS at 320, 390, 768
 and 1280 pixels with an explicitly synthetic authenticated session. It verifies
-prominent placement before tuition, no horizontal overflow, expansion/collapse,
+prominent placement before tuition, no horizontal overflow, month navigation,
+day selection, expansion/collapse,
 staff changed-time notes and refresh failure/recovery. Authenticated content
 requests are retained. The app shortcut is exercised separately against a DOM
 adapter for HBIC, Stripe, reduced motion and missing targets.

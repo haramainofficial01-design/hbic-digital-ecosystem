@@ -17,6 +17,22 @@ export function academyCalendarMonthLabel(month: string) {
   return parsed ? new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "long", year: "numeric" }).format(parsed) : month;
 }
 
+export function academyCalendarMonthCells(month: string): (string | null)[] {
+  const first = calendarDate(`${month}-01`);
+  if (!first) return [];
+  const offset = (first.getUTCDay() + 6) % 7; // Monday first.
+  const count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return Array.from({ length: 42 }, (_, index) => index >= offset && index < offset + count ? `${month}-${String(index - offset + 1).padStart(2, "0")}` : null);
+}
+
+export function academyCalendarMonths(from: string, through: string) {
+  const first = calendarDate(`${from}-01`), last = calendarDate(`${through}-01`);
+  if (!first || !last) return [];
+  const months: string[] = [];
+  for (let date = first; date <= last && months.length < 24; date = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1))) months.push(date.toISOString().slice(0, 7));
+  return months;
+}
+
 export function academyCalendarKind(item: ParentCalendarItem) {
   if (item.type === "no_class" || item.type === "holiday") return "closure";
   if (item.type === "special_class" || item.type === "class" && /fun thursday|special activity/i.test(`${item.title} ${item.note ?? ""}`)) return "special";
