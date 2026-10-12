@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
+import { academyBillableChildCount, ACADEMY_LAST_BILLING_MONTH, academyCashReminderStage, calgaryBillingPeriod, defaultNotificationPreferences, nextCalgaryFirstBillingAnchor } from "@hbic/shared";
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { academyDb, getAcademyFamily } from "./academyStore";
 import { academyUpdateEmail, cashReminderEmail, dispatchAcademyEmails, enqueueAcademyEmail } from "./academyEmail";
@@ -83,7 +83,8 @@ export async function runAcademyCashReminders(now = new Date(), dependencies = {
       const month = await document.ref.collection("months").doc(period).get();
       if (month.data()?.status === "paid" || month.data()?.status === "not_due") continue;
       const dueTime = stage === "upcoming" ? nextCalgaryFirstBillingAnchor(now) * 1000 : now.getTime();
-      if (!family.children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > dueTime)) continue;
+      const childCount = academyBillableChildCount(family.children, dueTime);
+      if (childCount === 0) continue;
       const devices = await document.ref.collection("devices").where("enabled", "==", true).limit(20).get();
       const tokens: RegisteredPushToken[] = devices.docs.map((device) => device.data())
         .filter((device) => device.reminderDelivery === "server" && typeof device.token === "string" && /^(Exponent|Expo)PushToken\[[^\]]+\]$/.test(device.token))
@@ -94,7 +95,6 @@ export async function runAcademyCashReminders(now = new Date(), dependencies = {
       catch (error) { if ((error as { code?: number }).code === 6) { skipped += 1; continue; } throw error; }
       try {
         const pricing = await dependencies.pricing();
-        const childCount = family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > dueTime).length;
         const amountCents = Number(month.data()?.amountCents ?? pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1));
         if (!Number.isSafeInteger(amountCents) || amountCents <= 0) { skipped += 1; await marker.update({ status: "not_due" }); continue; }
         await dependencies.enqueueEmail(cashReminderEmail({ uid: document.id, reference: family.reference, email: family.email, name: family.guardianName, period, amountCents, stage, testMode: process.env.ACADEMY_STRIPE_BILLING_MODE !== "live" }));

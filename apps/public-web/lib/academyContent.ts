@@ -151,3 +151,21 @@ export async function assignAcademyChild(familyId: string, childId: string, clas
     tx.create(db.collection("academyAudit").doc(), { action: "class_assigned", familyId, childId, classId, actorUid, at: new Date().toISOString() });
   });
 }
+
+/** Staff choose roster groups explicitly; enrollment and tuition are unchanged. */
+export async function setAcademyAttendanceGroup(familyId: string, childId: string, group: unknown, actorUid: string) {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(familyId) || !/^[A-Za-z0-9_-]{1,128}$/.test(childId) ||
+      !["boys", "girls", "unassigned"].includes(String(group))) throw new AcademyError("Choose a student and attendance group.");
+  const db = academyDb(), ref = db.collection("academyFamilies").doc(familyId);
+  await db.runTransaction(async tx => {
+    const family = await tx.get(ref);
+    const children = family.data()?.children as { id: string; attendanceGroup?: string | null }[] | undefined;
+    const child = children?.find(child => child.id === childId);
+    if (!family.exists || !child) throw new AcademyError("Student not found.", 404);
+    const nextGroup = String(group);
+    if ((child.attendanceGroup ?? null) === nextGroup) return;
+    tx.update(ref, { children: children!.map(child => child.id === childId ? { ...child, attendanceGroup: nextGroup } : child), updatedAt: new Date().toISOString() });
+    tx.create(db.collection("academyAudit").doc(), { action: "attendance_group_changed", familyId, childId,
+      oldGroup: child.attendanceGroup ?? null, group: nextGroup, actorUid, at: new Date().toISOString() });
+  });
+}

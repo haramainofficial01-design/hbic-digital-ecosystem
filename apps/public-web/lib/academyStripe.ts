@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutLineItemPlan, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
+import { academyBillableChildCount, ACADEMY_LAST_BILLING_MONTH, ACADEMY_TERM_END_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCardEnrollmentConfirmed, academyCheckoutLineItemPlan, academyCheckoutTiming, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, timeToDate } from "@hbic/shared";
 import { activatePendingAcademyCardRegistration, academyDb, AcademyError, getAcademyFamily, getAcademyPricing } from "./academyStore";
 import { cardReceiptEmail, queueAcademyEmail } from "./academyEmail";
 import { academyCorrectedMonthPaidCents, existingAcademyUnderchargeInvoiceStatus } from "./academyCheckoutState";
@@ -65,7 +65,8 @@ export async function startAcademyCheckout(uid: string) {
   if (!config.cardAvailable) throw new AcademyError("Card setup is not ready.", 503);
   const stripe = academyStripe();
   const price = await stripe.prices.retrieve(config.stripePriceId);
-  const quantity = config.tuitionMode === "per_child" ? family.children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now()).length : 1;
+  const billable = academyBillableChildCount(family.children, Date.now());
+  const quantity = billable === 0 ? 0 : config.tuitionMode === "per_child" ? billable : 1;
   if (price.livemode !== (academyBillingMode() === "live") || price.currency !== "cad" || price.recurring?.interval !== "month" ||
       price.unit_amount !== config.monthlyCents || price.active !== true || quantity < 1) {
     throw new AcademyError("The approved tuition and Stripe monthly price do not match.", 409);
@@ -386,7 +387,7 @@ export async function previewAcademyUndercharges(period = academyTuitionPeriod(n
     const paidCents = Number(monthData.amountCents);
     if (!Number.isSafeInteger(paidCents) || paidCents <= 0) return null;
     const children = Array.isArray(data.children) ? data.children as { cancelEffectiveAt?: string | null }[] : [];
-    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const childCount = academyBillableChildCount(children, billingStart);
     // The former bug charged approximately $42 per child. Do not extrapolate
     // this correction to unrelated discounts or other anomalous amounts.
     if (pricing.tuitionMode !== "per_child" || paidCents < childCount * 4_200 || paidCents > childCount * 4_299) return null;
@@ -556,6 +557,70 @@ export async function collectAcademyUndercharges(actor: { uid: string; email: st
   return results;
 }
 
+export async function setAcademyTuitionExemption(uid: string, childId: string, exempt: boolean, actor: { uid: string; email: string }, reason = "Staff-approved tuition exemption", dependencies?: { stripe: () => Stripe }) {
+  const db = academyDb(), familyRef = db.collection("academyFamilies").doc(uid), lockRef = db.collection("academyBillingLocks").doc(uid);
+  const lockId = randomBytes(12).toString("hex"), now = new Date().toISOString();
+  const family = await db.runTransaction(async tx => {
+    const [f, lock] = await Promise.all([tx.get(familyRef), tx.get(lockRef)]);
+    if (!f.exists) throw new AcademyError("Academy registration was not found.", 404);
+    if (f.data()?.enrollmentState === "withdrawn") throw new AcademyError("Withdrawn registrations cannot receive tuition changes.", 409);
+    if (lock.exists && Number(lock.data()?.expiresAt ?? 0) > Date.now()) throw new AcademyError("Another billing change is in progress. Try again shortly.", 409);
+    const children = f.data()?.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[];
+    const selected = children.find(child => child.id === childId);
+    if (!selected || selected.cancelEffectiveAt && Date.parse(selected.cancelEffectiveAt) <= Date.now()) throw new AcademyError("Choose an enrolled child in this registration.", 404);
+    if ((selected.tuitionExempt === true) === exempt) return null;
+    tx.set(lockRef, { id: lockId, expiresAt: Date.now() + 120_000 });
+    return f.data()!;
+  });
+  if (!family) return getAcademyFamily(uid);
+  try {
+    const children = (family.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[]).map(child => child.id === childId ? { ...child, tuitionExempt: exempt } : child);
+    const quantity = children.filter(child => child.tuitionExempt !== true && !child.cancelEffectiveAt).length;
+    if (family.paymentChoice === "card") {
+      const stripe = dependencies?.stripe() ?? academyStripe();
+      if (typeof family.stripeSubscriptionId === "string") {
+        const subscription = await stripe.subscriptions.retrieve(family.stripeSubscriptionId);
+        if (subscription.livemode !== (academyBillingMode() === "live") || subscription.metadata.academyFamilyUid !== uid ||
+            family.registrationId && subscription.metadata.academyRegistrationId !== family.registrationId) throw new AcademyError("Stripe subscription does not match this registration.", 409);
+        if (subscription.status !== "canceled") {
+          const item = subscription.items.data[0];
+          if (!item || subscription.items.data.length !== 1) throw new AcademyError("Subscription items need review before exempting tuition.", 409);
+          await stripe.subscriptions.update(subscription.id, quantity === 0
+            ? { pause_collection: { behavior: "void" }, proration_behavior: "none" }
+            : { items: [{ id: item.id, quantity: family.stripeTuitionMode === "per_family" ? 1 : quantity }], pause_collection: "", proration_behavior: "none" },
+            { idempotencyKey: `academy-exemption-${lockId}` });
+        }
+      } else if (typeof family.stripeCheckoutSessionId === "string" && family.billingSetupState !== "ready") {
+        const session = await stripe.checkout.sessions.retrieve(family.stripeCheckoutSessionId);
+        if (session.client_reference_id !== uid || session.livemode !== (academyBillingMode() === "live")) throw new AcademyError("Checkout does not match this family.", 409);
+        if (session.status === "complete") throw new AcademyError("Let the completed card billing setup finish before changing its tuition.", 409);
+        if (session.status === "open") await stripe.checkout.sessions.expire(session.id);
+      }
+    }
+    const pricing = await getAcademyPricing(), currentPeriod = academyTuitionPeriod(new Date());
+    const period = typeof family.enrollmentStartPeriod === "string" && family.enrollmentStartPeriod > currentPeriod ? family.enrollmentStartPeriod : currentPeriod;
+    await db.runTransaction(async tx => {
+      const monthRef = familyRef.collection("months").doc(period);
+      const [f, lock, month] = await Promise.all([tx.get(familyRef), tx.get(lockRef), tx.get(monthRef)]);
+      if (!f.exists || f.data()?.registrationId !== family.registrationId || lock.data()?.id !== lockId) throw new AcademyError("Registration changed before exemption was saved.", 409);
+      const latestChildren = (f.data()?.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[]).map(child => child.id === childId
+        ? { ...child, tuitionExempt: exempt, tuitionExemptionReason: exempt ? reason.trim().slice(0, 200) : null, tuitionExemptionChangedAt: now, tuitionExemptionChangedBy: actor.uid } : child);
+      const billable = academyBillableChildCount(latestChildren, Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)) - 1, 1, 12));
+      const amountCents = billable === 0 || period > ACADEMY_LAST_BILLING_MONTH ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_family" ? 1 : billable);
+      tx.update(familyRef, { children: latestChildren, updatedAt: now });
+      if (month.exists && month.data()?.status !== "paid") tx.update(monthRef, { amountCents,
+        status: amountCents === 0 ? "not_due" : f.data()?.paymentChoice === "cash" ? "cash_due" : period > calgaryBillingPeriod(new Date()) ? "scheduled" : "card_attention", tuitionExemptionAppliedAt: now, updatedAt: now });
+      tx.create(db.collection("academyAudit").doc(), { action: exempt ? "tuition_exempted" : "tuition_exemption_removed",
+        familyId: uid, registrationId: family.registrationId ?? null, childId, reason: reason.trim().slice(0, 200), actorUid: actor.uid, actorEmail: actor.email, at: now });
+      tx.delete(lockRef);
+    });
+    return getAcademyFamily(uid);
+  } catch (error) {
+    await db.runTransaction(async tx => { if ((await tx.get(lockRef)).data()?.id === lockId) tx.delete(lockRef); });
+    throw error;
+  }
+}
+
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */
 export async function cancelAcademyChild(uid: string, childId: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(childId)) throw new AcademyError("Choose a valid child.");
@@ -573,11 +638,14 @@ export async function cancelAcademyChild(uid: string, childId: string) {
     return snapshot.data()!;
   });
   try {
-    const activeRenewals = (family.children as { cancelEffectiveAt?: string | null }[]).filter((child) => !child.cancelEffectiveAt).length;
+    const renewalChildren = family.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[];
+    const activeRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt).length;
+    const billableRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt && child.tuitionExempt !== true).length;
+    const exemptChild = renewalChildren.find(child => child.id === childId)?.tuitionExempt === true;
     const pricing = await getAcademyPricing();
     let effectiveAt = new Date(nextCalgaryFirstBillingAnchor(new Date()) * 1000).toISOString();
     let pendingCardSetup = false;
-    if (family.paymentChoice === "card") {
+    if (family.paymentChoice === "card" && !exemptChild) {
       if (!cardBillingConfigured()) throw new AcademyError("Card billing must be available before changing a subscription.", 503);
       const stripe = academyStripe();
       let subscriptionId = typeof family.stripeSubscriptionId === "string" ? family.stripeSubscriptionId : "";
@@ -595,14 +663,14 @@ export async function cancelAcademyChild(uid: string, childId: string) {
       const item = subscription.items.data[0];
       const perChild = family.stripeTuitionMode !== "per_family";
       if (subscription.livemode !== (academyBillingMode() === "live") || subscription.metadata.academyFamilyUid !== uid || !item || subscription.items.data.length !== 1 ||
-          item.quantity !== (perChild ? activeRenewals : 1) || !["active", "trialing", "past_due"].includes(subscription.status)) {
+          item.quantity !== (perChild ? billableRenewals : 1) || !["active", "trialing", "past_due"].includes(subscription.status)) {
         throw new AcademyError("Subscription details need review before a child can be canceled.", 409);
       }
       effectiveAt = new Date(item.current_period_end * 1000).toISOString();
-      if (activeRenewals === 1) {
+      if (billableRenewals === 1) {
         await stripe.subscriptions.update(subscription.id, { cancel_at_period_end: true }, { idempotencyKey: `academy-cancel-${uid}-${childId}` });
       } else if (perChild) {
-        await stripe.subscriptions.update(subscription.id, { items: [{ id: item.id, quantity: activeRenewals - 1 }], proration_behavior: "none" },
+        await stripe.subscriptions.update(subscription.id, { items: [{ id: item.id, quantity: billableRenewals - 1 }], proration_behavior: "none" },
           { idempotencyKey: `academy-cancel-${uid}-${childId}` });
       }
       }

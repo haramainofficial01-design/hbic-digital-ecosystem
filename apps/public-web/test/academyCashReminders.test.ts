@@ -98,3 +98,21 @@ test("a paid current month does not suppress the next unpaid month's advance rem
   const result = await runAcademyCashReminders(new Date("2026-10-29T19:00:00Z"), f.dependencies);
   assert.equal(result.acceptedPushTokens, 1); assert.equal(f.pushes[0].period, "2026-11");
 });
+
+test("fully exempt families receive no reminder even before the next month ledger exists", async () => {
+  const f = fixture(); f.enableDevice();
+  f.records.delete("academyFamilies/cash-parent/months/2026-11");
+  f.family.children.forEach(child => { child.tuitionExempt = true; });
+  const result = await runAcademyCashReminders(new Date("2026-10-29T19:00:00Z"), f.dependencies);
+  assert.equal(result.acceptedPushTokens, 0); assert.equal(f.emails.size, 0);
+});
+
+test("mixed-family advance reminder charges only the non-exempt child", async () => {
+  const f = fixture(); f.enableDevice();
+  f.records.delete("academyFamilies/cash-parent/months/2026-11");
+  f.family.children[0].tuitionExempt = true;
+  let text = "";
+  f.dependencies.enqueueEmail = async message => { text = message.text; return true; };
+  await runAcademyCashReminders(new Date("2026-10-29T19:00:00Z"), f.dependencies);
+  assert.match(text, /\$50\.00/); assert.doesNotMatch(text, /\$100\.00/);
+});

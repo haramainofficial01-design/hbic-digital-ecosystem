@@ -6,6 +6,11 @@ export type AcademyPaymentChoice = "cash" | "card";
 export type AcademyEnrollmentState = "awaiting_checkout" | "conditional" | "submitted" | "approved" | "waitlisted" | "active" | "paused" | "withdrawn";
 export type AcademyPaymentState = "awaiting_tuition" | "cash_due" | "paid" | "card_attention" | "past_due" | "scheduled" | "not_due";
 
+/** Staff exemptions affect tuition, never attendance or enrollment history. */
+export function academyBillableChildCount(children: readonly { tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[], at: number) {
+  return children.filter(child => child.tuitionExempt !== true && (!child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > at)).length;
+}
+
 /** HBIC's approved starting tuition; administrators can change future pricing. */
 export const ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD = 5_000;
 /** Server-side total for the approved per-child monthly price. */
@@ -111,6 +116,7 @@ export interface AcademyChildInput {
   name: string;
   age: number;
   level: AcademyLevel;
+  attendanceGroup?: "boys" | "girls" | "unassigned";
 }
 
 export interface AcademyRegistrationInput {
@@ -137,7 +143,7 @@ export interface AcademyPublicFamily {
   email: string;
   whatsappConsent: boolean;
   emailUpdates?: boolean;
-  children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null })[];
+  children: (AcademyChildInput & { id: string; classId: string | null; cancelEffectiveAt?: string | null; tuitionExempt?: boolean })[];
   paymentChoice: AcademyPaymentChoice;
   /** How the displayed tuition month was actually paid/marked due. */
   billingMethod?: AcademyPaymentChoice;
@@ -157,6 +163,7 @@ export interface AcademyPublicFamily {
   underchargeCorrectionStatus?: string | null;
   paymentState: AcademyPaymentState;
   cardSetupComplete?: boolean;
+  noTuitionDue?: boolean;
   passToken: string;
   cashReminderEligible: boolean;
   createdAt: string;
@@ -273,4 +280,22 @@ export function parseAcademyRegistration(input: unknown): AcademyRegistrationInp
     startChoice: selectedStart,
     policyVersion: legacyV2Current ? "academy-payment-policy-v2" : legacyV3 ? "academy-payment-policy-v3" : legacyV4 ? "academy-payment-policy-v4" : ACADEMY_TUITION_POLICY_VERSION,
     policyAccepted: true, recurringAuthorized: value.paymentChoice === "card" };
+}
+
+/** Monday/Thursday class dates only. Statutory holidays remain ordinary class dates. */
+export function academyAttendanceDateOpen(date: string, calendar: readonly { date: string; type: string; classIds?: readonly string[] }[] = [], classId?: string | null) {
+  const parsed = new Date(`${date}T12:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date ||
+      date < ACADEMY_FIRST_CLASS_DATE || date > ACADEMY_TERM_END_DATE || ![1, 4].includes(parsed.getUTCDay())) return false;
+  return !calendar.some(item => item.date === date && ["no_class", "holiday"].includes(item.type) &&
+    (!item.classIds?.length || !!classId && item.classIds.includes(classId)));
+}
+
+/** A roster suggestion only; an explicit staff selection always takes precedence. */
+export function academyAttendanceGroup(child: { name: string; attendanceGroup?: "boys" | "girls" | "unassigned" }) {
+  if (child.attendanceGroup === "boys" || child.attendanceGroup === "girls" || child.attendanceGroup === "unassigned") return child.attendanceGroup;
+  const name = child.name.toLowerCase().replace(/[^a-z ]/g, "").trim().split(/\s+/)[0];
+  if (["abdullah", "abdul", "abdur", "abdurrahman", "ahmad", "ahmed", "ali", "amir", "ameer", "anas", "bilal", "hamza", "hassan", "hasan", "hussain", "hussein", "ibrahim", "idris", "ismail", "kareem", "mohammad", "mohammed", "muhammad", "muhammed", "mohamed", "mohamad", "muaadh", "muadh", "maaz", "muaz", "mustafa", "mahad", "omar", "osman", "umar", "usman", "yusuf", "yousuf", "yousef", "zain", "zaid", "sahl", "sulaiman", "suleiman", "ruwais", "azlaan", "arslan", "hasanul", "zainul", "fadlullah"].includes(name)) return "boys" as const;
+  if (["aisha", "ayesha", "aishah", "amina", "aminah", "asma", "asiyah", "asiya", "fatima", "fatimah", "hafsa", "hafsah", "huda", "haniya", "haniyah", "hania", "eman", "imaan", "khadija", "khadijah", "mariam", "maryam", "mysha", "maisha", "mayesha", "sana", "sarah", "sara", "sumaya", "sumayya", "tasmia", "tasmiya", "zainab", "zaynab", "zahra", "zara"].includes(name)) return "girls" as const;
+  return "unassigned" as const;
 }

@@ -498,6 +498,9 @@ button, .link-button { transition: background-color .15s ease, box-shadow .15s e
 .academy-admin-tabs button[aria-current="page"] { background: #076b75; border-color: #076b75; }
 .academy-admin-card input, .academy-admin-card select, .academy-admin-card textarea { max-width: 100%; min-width: 0; color: var(--ink); background: var(--control); border-color: var(--line); min-height: 44px; }
 .academy-admin-card label { margin-bottom: 10px; }
+.academy-admin-card label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 10px; }
+.academy-admin-card input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; margin: 0; padding: 0; accent-color: var(--accent-ink); }
+.academy-attendance-rosters .academy-admin-family-list { max-height: none; overflow: visible; }
 .academy-admin-actions > label { flex: 1 1 160px; min-width: 0; }
 .academy-admin-actions select { width: 100%; }
 .academy-admin-payment { background: var(--surface-soft); }
@@ -552,3 +555,4 @@ button, .link-button { transition: background-color .15s ease, box-shadow .15s e
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
 @media (prefers-reduced-transparency: reduce) { .sidebar, .workspace-controls { backdrop-filter: none; -webkit-backdrop-filter: none; } .card, .academy-admin-card { background: var(--control); } }
+@media (max-width: 550px) { .academy-admin-actions > label { flex-basis: 100%; } }

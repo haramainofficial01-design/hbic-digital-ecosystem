@@ -85,7 +85,9 @@ export function academyTuitionSatisfiedForConfirmation(input: {
   amountCents: unknown;
   requiredCents: number;
   cashReceiptExists?: boolean;
+  tuitionExempt?: boolean;
 }) {
+  if (input.requiredCents === 0 && input.tuitionExempt === true) return true;
   if (!Number.isSafeInteger(input.requiredCents) || input.requiredCents <= 0 ||
       input.monthMethod !== input.method || input.monthStatus !== "paid" ||
       typeof input.amountCents !== "number" || input.amountCents < input.requiredCents) return false;

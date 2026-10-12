@@ -1,5 +1,5 @@
 import { academyAdmin, AcademyError } from "../../../../../lib/academyStore";
-import { assignAcademyChild, listAcademyContent, saveAcademyItem } from "../../../../../lib/academyContent";
+import { assignAcademyChild, setAcademyAttendanceGroup, listAcademyContent, saveAcademyItem } from "../../../../../lib/academyContent";
 import { sendAcademyUpdate } from "../../../../../lib/academyNotifications";
 import { createHash } from "node:crypto";
 import { jsonResponse, optionsResponse } from "../../../../../lib/api";
@@ -13,7 +13,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const actor = await academyAdmin(request);
-    const body = await request.json() as { kind?: unknown; item?: unknown; id?: unknown; familyId?: unknown; childId?: unknown; classId?: unknown };
+    const body = await request.json() as { kind?: unknown; item?: unknown; id?: unknown; familyId?: unknown; childId?: unknown; classId?: unknown; group?: unknown };
+    if (body.kind === "attendance_group") {
+      await setAcademyAttendanceGroup(String(body.familyId ?? ""), String(body.childId ?? ""), body.group, actor.uid);
+      return jsonResponse({ ok: true });
+    }
     if (body.kind === "assignment") {
       await assignAcademyChild(String(body.familyId ?? ""), String(body.childId ?? ""), String(body.classId ?? ""), actor.uid);
       return jsonResponse({ ok: true });

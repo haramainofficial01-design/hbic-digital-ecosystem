@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
+import { academyBillableChildCount, ACADEMY_DEFAULT_MONTHLY_CENTS_PER_CHILD, ACADEMY_LAST_BILLING_MONTH, academyEnrollmentStartPeriod, academyRegistrationOpen, academyTuitionPeriod, calgaryBillingPeriod, dateStringInTimeZone, masjidTimeZone, parseAcademyRegistration, type AcademyPublicFamily, type AcademyRegistrationInput } from "@hbic/shared";
 import { getFirebaseApp } from "./firebaseAdmin";
 import { requireAdminSecret } from "./api";
 import { cashReceiptEmail, enrollmentConfirmedEmail, registrationEmail, queueAcademyEmail } from "./academyEmail";
@@ -74,7 +74,7 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
   const children = data.children as AcademyPublicFamily["children"];
   const hasCurrentChild = children.some((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > Date.now());
   const rawEnrollment = String(data.enrollmentState ?? "conditional");
-  const enrollmentState = rawEnrollment === "conditional" && data.paymentChoice === "card" && !data.stripeSubscriptionId
+  const enrollmentState = rawEnrollment === "conditional" && data.paymentChoice === "card" && !data.stripeSubscriptionId && month?.status !== "not_due"
     ? "awaiting_checkout" : rawEnrollment === "submitted" || rawEnrollment === "approved" ? "conditional" : rawEnrollment;
   const period = String(month?.period ?? academyTuitionPeriod(new Date()));
   const today = dateStringInTimeZone(new Date(), masjidTimeZone);
@@ -106,6 +106,7 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     underchargeCorrectionPendingCents: Number.isSafeInteger(month?.underchargeCorrectionPendingCents) ? Number(month?.underchargeCorrectionPendingCents) : null,
     underchargeCorrectionStatus: typeof month?.underchargeCorrectionStatus === "string" ? month.underchargeCorrectionStatus : null,
     paymentState: paymentState as AcademyPublicFamily["paymentState"],
+    noTuitionDue: children.some(child => child.tuitionExempt === true) && academyBillableChildCount(children, Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)) - 1, 1, 12)) === 0,
     cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
@@ -133,13 +134,17 @@ async function currentMonth(db: Firestore, uid: string, family: Record<string, u
   const existing = await ref.get();
   const pricing = sharedPricing ?? await getAcademyPricing();
   const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
-  const childCount = Array.isArray(family.children) ? family.children.filter((child: { cancelEffectiveAt?: string | null }) =>
-    !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length : 0;
+  const childCount = Array.isArray(family.children) ? academyBillableChildCount(family.children, billingStart) : 0;
   const mode = pricing.tuitionMode;
   const unit = pricing.monthlyCents;
   const amountCents = childCount === 0 || period > ACADEMY_LAST_BILLING_MONTH ? 0 : Number.isSafeInteger(unit) && unit > 0 && (mode === "per_child" || mode === "per_family")
     ? unit * (mode === "per_child" ? childCount : 1) : null;
   if (existing.exists) {
+    // Restore staff exemptions without changing any paid receipt or history.
+    if (existing.data()?.status !== "paid" && Array.isArray(family.children) && family.children.some(child => child.tuitionExempt === true) && existing.data()?.amountCents !== amountCents) {
+      await ref.update({ amountCents, status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : calgaryBillingPeriod(new Date()) < period ? "scheduled" : "card_attention", updatedAt: new Date().toISOString() });
+      return (await ref.get()).data();
+    }
     if (existing.data()?.status !== "paid" && existing.data()?.method !== family.paymentChoice && amountCents !== null) {
       await ref.update({ method: family.paymentChoice, amountCents,
         status: amountCents === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : calgaryBillingPeriod(new Date()) < period ? "scheduled" : "card_attention",
@@ -646,15 +651,16 @@ export async function confirmAcademyEnrollment(uid: string, actor: { uid: string
     if (data.enrollmentState === "active") return;
     const monthRef = ref.collection("months").doc(period);
     const month = await tx.get(monthRef);
-    const children = Array.isArray(data.children) ? data.children as { id: string; name: string; cancelEffectiveAt?: string | null }[] : [];
+    const children = Array.isArray(data.children) ? data.children as { id: string; name: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[] : [];
     const billingStart = Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)) - 1, 1, 12);
-    const childCount = children.filter((child) => !child.cancelEffectiveAt || Date.parse(child.cancelEffectiveAt) > billingStart).length;
+    const childCount = academyBillableChildCount(children, billingStart);
     const requiredCents = childCount === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? childCount : 1);
     const receiptId = typeof month.data()?.receiptId === "string" ? month.data()!.receiptId : "";
     const receipt = receiptId ? await tx.get(db.collection("academyReceipts").doc(receiptId)) : null;
     if (!academyTuitionSatisfiedForConfirmation({
       method: data.paymentChoice === "card" ? "card" : "cash", monthMethod: month.data()?.method,
       monthStatus: month.data()?.status, amountCents: month.data()?.amountCents, requiredCents,
+      tuitionExempt: children.some(child => child.tuitionExempt === true) && childCount === 0,
       cashReceiptExists: Boolean(receipt?.exists && receipt.data()?.method === "cash" && receipt.data()?.familyId === uid && receipt.data()?.period === period)
     })) {
       throw new AcademyError(data.paymentChoice === "card"
