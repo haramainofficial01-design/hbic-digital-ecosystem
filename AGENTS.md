@@ -11,6 +11,7 @@ For future HBIC work in this checkout:
 - Never commit environment secrets, signing keys/certificates, service-account credentials, private records, generated native projects, local agent configuration, or local build/output caches.
 - Keep release commits and rollback references recoverable. Never force-push or rewrite existing release history without explicit authorization.
 - Do not change production hosting, configure automatic deployments, or create builds merely because code was pushed.
+- The user explicitly requires requested feature updates to be verified, deployed through the existing production workflow, and submitted to the existing app stores. A push alone is not task completion. Keep website deployment, store upload, review submission and public approval statuses distinct; do not claim release without confirmation or publish unverified capabilities as verified.
 - The real Expo app is `apps/mobile`, project `79283015-cb87-48ef-9761-81ab87641205`, owner `hbiccas-team`, bundle/package `ca.hbic.calgary.app`. Run mobile release commands only from that directory. Never use a root Expo project or initialize a new project.
 - Preserve the canonical prayer API/resolver/cache, manual overrides, TV flow, existing signing credentials, and Watch/widget identifiers.
 
