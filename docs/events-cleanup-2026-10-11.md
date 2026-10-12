@@ -20,7 +20,21 @@ Raw production draft/published/publication records were backed up privately befo
 - Public, admin and mobile typechecks passed.
 - Public and admin production builds passed.
 - Four browser layout checks passed at 320, 390, 768 and 1440 pixels. Academy details, poster aspect, registration, completed camp, matching Media permalink and absence of horizontal overflow were checked.
-- iOS simulator native Debug compilation/install/launch succeeded; content/navigation runtime qualification follows the CMS publication.
+- iOS simulator native Debug compilation/install/launch and live event/archive navigation passed. Actual rendered screenshots were inspected; the existing native registration entry and completed highlight entry are present, with no cash/payment/enrollment operation performed. Native Android runtime verification was unavailable because no Android SDK/emulator is installed at the usual location or on PATH.
+
+## Production verification
+
+Published CMS version **15**, publication revision **12**, device refresh signal **accepted**. Draft and published content agree. All seven original event records remain in the private CMS; only Academy is current, and Summer Camp is exposed separately as completed. The five discontinued programs have reminders disabled. No cancellation push was sent.
+
+Production website: `dpl_CKUBmWVcBHzPAJYS1h6k55SPr8BP`; admin: `dpl_Hb1DKb4bfXm2hNeaCddaQNDhM8m4`. Both existing production domains return 200 and resolve to these READY deployments, from source `7e2a4ed0f337cc432d92da6e4973b8a98016d9c6`.
+
+Twenty actual live-page layout checks passed across Events, Programs, Youth, Media and Home at four viewport widths. The served poster's original SHA-256 matches. The live public API exposes only Academy under current events and the camp under `pastEvents`, with the same verified reel in Media. The protected admin draft view separates five Discontinued records, one Completed camp and the active Academy.
+
+The existing publication workflow also normalizes legacy iqamah override expiry metadata to the already-approved persistent policy. Staff-selected prayer values and override timestamps remain unchanged; no prayer resolver or timing logic was edited for this task. All other non-target CMS fields compare unchanged.
+
+Live Academy Overview and Payments still agree: $1,150 non-exempt tuition, cash $750 and card $400. Thirty active students remain enrolled. No enrollment or financial record was modified.
+
+The final mobile pass fixed a bundled-image intrinsic-size overflow in the camp archive card by reusing the identical original poster served by the website. Academy's full title, concise summary and Mon/Thu badge remain readable. The final iOS navigation suite passed again and the rendered full camp poster was visually inspected. This mobile-only follow-up is not part of the already-live web binary and awaits a new approved mobile release.
 
 ## Mobile release boundary
 

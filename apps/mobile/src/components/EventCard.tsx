@@ -11,15 +11,17 @@ export function EventCard({ event, onPress, compact = false }: { event: EventIte
   const { theme } = useAppTheme();
   const parsedDate = new Date(event.date);
   const hasCalendarDate = !Number.isNaN(parsedDate.getTime());
-  const dateLabel = hasCalendarDate
+  const academy = event.id === "event-quran-academy";
+  const dateLabel = academy ? "Mon/Thu" : hasCalendarDate
     ? parsedDate.toLocaleDateString("en-CA", { month: "short" })
     : event.date.includes("July-August")
       ? "Summer"
       : event.date.split(" ")[0];
-  const dayLabel = hasCalendarDate ? String(parsedDate.getDate()) : event.date.match(/\d{4}/)?.[0] ?? "";
+  const dayLabel = academy ? "Class" : hasCalendarDate ? String(parsedDate.getDate()) : event.date.match(/\d{4}/)?.[0] ?? "";
   const timeLabel = event.endTime ? `${event.startTime} - ${event.endTime}` : event.startTime;
   const imagePath = event.image ? publicEventImagePath(event.image) : undefined;
-  const image = event.image ? eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] ?? { uri: imagePath?.startsWith("https://") ? imagePath : `https://hbic.ca${imagePath}` } : undefined;
+  const remoteImage = imagePath ? { uri: imagePath.startsWith("https://") ? imagePath : `https://hbic.ca${imagePath}` } : undefined;
+  const image = event.lifecycle === "completed" ? remoteImage : event.image ? eventPhotoAssets[event.image as keyof typeof eventPhotoAssets] ?? remoteImage : undefined;
 
   return (
     <Pressable
@@ -30,10 +32,10 @@ export function EventCard({ event, onPress, compact = false }: { event: EventIte
       disabled={!onPress}
     >
       <GlassCard tone={event.category === "Youth" ? "gold" : "light"} style={styles.card}>
-        {image && (event.id === "event-quran-academy" || event.lifecycle === "completed") ? <Image source={image} resizeMode="contain" style={{ width: "100%", aspectRatio: 4 / 5, borderRadius: 16, marginBottom: 14 }} /> : null}
+        {image && (academy || event.lifecycle === "completed") ? <Image source={image} resizeMode="contain" style={{ width: "100%", height: undefined, aspectRatio: academy ? 4 / 5 : 1090 / 1600, borderRadius: 16, marginBottom: 14 }} /> : null}
         <View style={styles.row}>
           <View style={[styles.datePill, { backgroundColor: theme.colors.navy }]}>
-            <Text style={[styles.month, { color: theme.colors.gold }]} numberOfLines={1}>{dateLabel}</Text>
+            <Text style={[styles.month, { color: theme.colors.gold }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{dateLabel}</Text>
             <Text style={styles.day} numberOfLines={1} adjustsFontSizeToFit>{dayLabel || "Event"}</Text>
           </View>
           <View style={styles.copy}>
@@ -41,8 +43,8 @@ export function EventCard({ event, onPress, compact = false }: { event: EventIte
               <Text style={[styles.category, { color: theme.colors.teal }]}>{event.lifecycle === "completed" ? "Completed" : event.category}</Text>
               {onPress ? <Ionicons name="chevron-forward" size={16} color={theme.colors.subtle} /> : null}
             </View>
-            <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={compact ? 1 : 2}>{event.title}</Text>
-            <Text style={[styles.description, { color: theme.colors.muted }]} numberOfLines={compact ? 2 : 3}>{event.description}</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={academy ? 3 : compact ? 1 : 2}>{event.title}</Text>
+            <Text style={[styles.description, { color: theme.colors.muted }]} numberOfLines={compact ? 2 : 3}>{event.summary ?? event.description}</Text>
             <Text style={[styles.meta, { color: theme.colors.teal }]} numberOfLines={compact ? 1 : 2}>
               {event.lifecycle === "completed" ? event.date : timeLabel} · {event.location}
             </Text>
