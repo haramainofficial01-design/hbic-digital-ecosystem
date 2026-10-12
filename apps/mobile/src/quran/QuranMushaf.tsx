@@ -12,7 +12,7 @@ import { QuranReadingLayout } from "./QuranReadingLayout";
 import { mushafDocument } from "./mushafDocument";
 import type { QuranLibrary, ReturnTypeQuranAudio } from "./types";
 
-export function QuranMushaf({ reference, library, audio, onOpenAyah }: { reference: string; library: QuranLibrary; audio: ReturnTypeQuranAudio; onOpenAyah: (key: string) => void }) {
+export function QuranMushaf({ reference, library, audio, onOpenAyah, focused = false }: { reference: string; library: QuranLibrary; audio: ReturnTypeQuranAudio; onOpenAyah: (key: string) => void; focused?: boolean }) {
   const { theme } = useAppTheme();
   const [page, setPage] = useState<number | null>(null), [data, setData] = useState<MushafPage | null>(null);
   const [error, setError] = useState<string | null>(null), [reload, setReload] = useState(0), [fontReady, setFontReady] = useState(false);
@@ -52,7 +52,7 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah }: { referen
   }
   const html = useMemo(() => data ? mushafDocument(data, theme.mode === "dark", selected.current) : "", [data, theme.mode]);
   return <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ padding: 14, gap: 10, width: "100%", maxWidth: 650, alignSelf: "center" }}>
-    <QuranReadingLayout library={library} onAyahView={() => onOpenAyah(selected.current)} />
+    {!focused ? <QuranReadingLayout library={library} onAyahView={() => onOpenAyah(selected.current)} /> : null}
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <QuranIconButton label="Previous Mushaf Page" icon="chevron-back" disabled={page === null || page === 1} onPress={() => changePage(page! - 1)} />
       <View style={{ flex: 1 }}><Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: "700", textAlign: "center" }} numberOfLines={1}>{data?.chapterNames.join(" · ") ?? "Madinah Mushaf"}</Text>

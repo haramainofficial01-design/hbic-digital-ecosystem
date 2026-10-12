@@ -2,14 +2,15 @@
 
 import { calculateQiblaBearing, emptyQuranState, isAlignedWithQibla, markRead, normalizeSearch, parseAyahReference, qiblaRotation, versePage,
   type QuranChapter, type QuranPage, type QuranResources, type QuranState, type QuranVerse } from "@hbic/shared";
-import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, Headphones, LocateFixed, Mic, Pause, Play, Repeat, Search, Sparkles, Square, Trash2 } from "lucide-react";
+import { Bookmark, BookOpen, ChevronLeft, ChevronRight, Compass, ExternalLink, Headphones, LocateFixed, Maximize2, Minimize2, Mic, Pause, Play, Repeat, Search, Sparkles, Square, Trash2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { approvedWebQuranResources, restoreWebQuranState, webQuranClient, webQuranStorageKey } from "../lib/quranBrowser";
 import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, useWebQuranAudio } from "./QuranReaderTools";
 import styles from "./QuranReader.module.css";
 
 type QuranMode = "read" | "listen" | "practice" | "memorize" | "test" | "bookmarks";
-const modes: { id: QuranMode; label: string }[] = [{ id: "read", label: "Read" }, { id: "listen", label: "Listen" }, { id: "practice", label: "Practise" }, { id: "memorize", label: "Memorization" }, { id: "test", label: "Test yourself" }, { id: "bookmarks", label: "Bookmarks" }];
+const modes: { id: QuranMode; label: string }[] = [{ id: "read", label: "Read" }, { id: "listen", label: "Listen" }, { id: "practice", label: "Practise" }, { id: "bookmarks", label: "Library" }];
+const practiceModes: { id: QuranMode; label: string }[] = [{ id: "practice", label: "Recite" }, { id: "memorize", label: "Memorization" }, { id: "test", label: "Test yourself" }];
 const modeIcons = { read: BookOpen, listen: Headphones, practice: Mic, memorize: Repeat, test: Sparkles, bookmarks: Bookmark };
 
 export function QuranReader() {
@@ -18,6 +19,8 @@ export function QuranReader() {
   const [data, setData] = useState<QuranPage | null>(null), [verses, setVerses] = useState<QuranVerse[]>([]);
   const [library, setLibrary] = useState<QuranState>(emptyQuranState), [ready, setReady] = useState(false);
   const [mode, setMode] = useState<QuranMode>("read");
+  const [focused, setFocused] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [chapterQuery, setChapterQuery] = useState("");
   const [searchMode, setSearchMode] = useState(false), [searchTitle, setSearchTitle] = useState("");
@@ -109,11 +112,11 @@ export function QuranReader() {
     const destination = chapters.find((item) => item.id === chapter);
     if (destination && destination.versesCount < ayah) { setError("That ayah is outside this surah."); return; }
     ++requestEpoch.current; searchRequest.current?.abort(); loadRequest.current?.abort(); audio.stop();
-    setChapterId(chapter); setTarget(ayah); setMode("read"); setQuery(""); setSearchMode(false); setError(null); setJump("");
+    setFocused(false); setChapterId(chapter); setTarget(ayah); setMode("read"); setQuery(""); setSearchMode(false); setError(null); setJump("");
     setNavigationRevision((n) => n + 1);
   }
   function openKey(key: string) { const ref = parseAyahReference(key); if (ref) open(ref.chapter, ref.ayah); }
-  function changeMode(next: QuranMode) { if (next === "read") { open(chapterId, target); return; } audio.stop(); setMode(next); setQuery(""); setSearchMode(false); setError(null); }
+  function changeMode(next: QuranMode) { setFocused(false); if (next === "read") { open(chapterId, target); return; } audio.stop(); setMode(next); setQuery(""); setSearchMode(false); setError(null); }
   async function loadMore() {
     if (!data?.hasMore || loading) return;
     const controller = new AbortController(); loadRequest.current = controller; const run = requestEpoch.current; setLoading(true);
@@ -145,7 +148,26 @@ export function QuranReader() {
   }
   function setPreference(change: Partial<QuranState["preferences"]>) { update((state) => ({ ...state, preferences: { ...state.preferences, ...change } })); }
   const connectionError = catalogError ?? error;
-  return <main className={styles.shell}>
+  const practising = ["practice", "memorize", "test"].includes(mode);
+  useEffect(() => { if (mode !== "read") setFocused(false); }, [mode]);
+  useEffect(() => {
+    let focusFrame = 0;
+    function shortcuts(event: KeyboardEvent) {
+      if (event.key === "Escape") { setFocused(false); return; }
+      const input = event.target instanceof HTMLElement && (event.target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(event.target.tagName));
+      if (!input && !event.altKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault(); setFocused(false); setMode("read"); setFindOpen(true);
+        cancelAnimationFrame(focusFrame);
+        focusFrame = requestAnimationFrame(() => {
+          const searchField = document.getElementById("quran-search");
+          if (searchField) { searchField.focus(); searchField.scrollIntoView({ block: "center", behavior: "auto" }); }
+        });
+      }
+    }
+    window.addEventListener("keydown", shortcuts);
+    return () => { cancelAnimationFrame(focusFrame); window.removeEventListener("keydown", shortcuts); };
+  }, []);
+  return <main className={`${styles.shell}${focused ? ` ${styles.focused}` : ""}`}>
     <section className={styles.hero}>
       <div><small>A QUIET PLACE TO READ</small><h1>Quran &amp; Recite</h1><p>Read the Madinah Mushaf, listen to authentic recitations, and practise at your own pace.</p></div>
       <span lang="ar" dir="rtl" translate="no">ٱلْقُرْآنُ ٱلْكَرِيمُ</span>
@@ -160,8 +182,13 @@ export function QuranReader() {
         <div className={styles.chapterList}>{matchingChapters.map((item) => <button key={item.id} className={item.id === chapterId ? styles.selected : undefined} aria-current={item.id === chapterId ? "true" : undefined} onClick={() => open(item.id)}><b>{item.id}</b><span>{item.nameSimple}<small>{item.translatedName?.name} · {item.versesCount} ayahs</small></span><em lang="ar" dir="rtl" translate="no">{item.nameArabic}</em></button>)}{chapters.length && !matchingChapters.length ? <p className={styles.surahStatus} role="status">No matching surahs. Try a name or number.</p> : !chapters.length ? <p className={styles.surahStatus} role="status">{catalogError ? "Surah index unavailable. Retry the connection in the reader." : "Loading surahs…"}</p> : null}</div>
       </aside>
       <div className={styles.reading}>
-        <nav className={styles.modeNavigation} aria-label="Quran tools">{modes.map((item) => { const Icon = modeIcons[item.id]; return <button key={item.id} aria-pressed={mode === item.id} onClick={() => changeMode(item.id)}><Icon size={18} aria-hidden="true" /><span>{item.label}{item.id === "bookmarks" && bookmarks.length ? ` (${bookmarks.length})` : ""}</span></button>; })}</nav>
-        <details className={styles.preferences}><summary>Reading and reference audio preferences</summary><div className={styles.preferenceGrid}>
+        <nav className={styles.modeNavigation} aria-label="Quran tools">
+          <div className={styles.primaryTools}>{modes.map((item) => { const Icon = modeIcons[item.id]; return <button key={item.id} aria-pressed={mode === item.id || item.id === "practice" && practising} onClick={() => changeMode(item.id)}><Icon size={19} aria-hidden="true" /><span>{item.label}{item.id === "bookmarks" && bookmarks.length ? ` (${bookmarks.length})` : ""}</span></button>; })}</div>
+          {practising ? <div className={styles.secondaryTools} aria-label="Practice tools">{practiceModes.map(item => <button key={item.id} aria-pressed={mode === item.id} onClick={() => changeMode(item.id)}>{item.label}</button>)}</div> : null}
+          {mode === "bookmarks" ? <div className={styles.secondaryTools}><button aria-pressed="true">Bookmarks{bookmarks.length ? ` (${bookmarks.length})` : ""}</button><span>Saved ayahs</span></div> : null}
+        </nav>
+        {mode === "read" ? <div className={styles.workspaceActions}><span><BookOpen size={16} aria-hidden="true" />{currentChapter?.nameSimple ?? "Quran Reader"}</span><button aria-pressed={focused} onClick={() => { setFocused(value => !value); document.getElementById("reader")?.scrollIntoView({ block: "start", behavior: "auto" }); }}>{focused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}{focused ? "Leave focus" : "Focus reading"}</button></div> : null}
+        <details className={styles.preferences}><summary>Reader settings</summary><div className={styles.preferenceGrid}>
           <label>Reference reciter<select aria-label="Reference reciter" value={preferences.reciter} disabled={!resources?.reciters.length} onChange={(event) => setPreference({ reciter: Number(event.target.value) })}>{resources?.reciters.length ? resources.reciters.map((item) => <option key={item.id} value={item.id}>{item.name}{item.style ? ` · ${item.style}` : ""}</option>) : <option value={preferences.reciter}>Reciter catalog unavailable</option>}</select></label>
           <label>Translation of the meaning<select aria-label="Quran translation" value={preferences.translation} disabled={!resources?.translations.length} onChange={(event) => setPreference({ translation: Number(event.target.value) })}>{resources?.translations.length ? resources.translations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>) : <option value={preferences.translation}>Approved translation unavailable</option>}</select></label>
           <div className={styles.controls}><button aria-label="Decrease Arabic size" onClick={() => setPreference({ arabicSize: Math.max(24, preferences.arabicSize - 2) })}>A−</button><button aria-label="Increase Arabic size" onClick={() => setPreference({ arabicSize: Math.min(48, preferences.arabicSize + 2) })}>A+</button><button onClick={() => setPreference({ showTranslation: !preferences.showTranslation })}>{preferences.showTranslation ? "Translation on" : "Translation off"}</button></div>
@@ -173,8 +200,10 @@ export function QuranReader() {
         {["practice", "memorize", "test"].includes(mode) ? currentChapter ? <QuranWebPractice key={`${mode}:${chapterId}`} mode={mode as "practice" | "memorize" | "test"} chapter={currentChapter} preferences={preferences} getVerse={getVerse} library={library} update={update} audio={audio} startAyah={Math.min(target, currentChapter.versesCount)} /> : <div className={styles.empty}>Load the surah index to start practising.</div> : null}
         {mode === "bookmarks" ? <div className={styles.featurePanel}><h2>Your bookmarks</h2><p>Saved in this browser. Choose an ayah to continue reading.</p>{bookmarks.map((key) => <div className={styles.bookmarkRow} key={key}><button onClick={() => openKey(key)}><Bookmark size={18} />Ayah {key}</button><button onClick={() => toggleBookmark(key)} aria-label={`Remove bookmark ${key}`}><Trash2 size={17} /></button></div>)}{!bookmarks.length ? <p>No bookmarks yet. Save an ayah from the reader.</p> : null}</div> : null}
         {mode === "read" ? <>
-        <div className={styles.toolbar}><form role="search" aria-label="Quran search" onSubmit={search}><Search size={18} aria-hidden="true" /><input value={query} maxLength={120} onChange={(event) => setQuery(event.target.value)} placeholder="Arabic, English, or 2:255" aria-label="Search the Quran" /><button disabled={query.trim().length < 2 || searching || !resources}>{searching ? "Searching…" : "Search"}</button></form></div>
+        <details className={styles.findTools} open={findOpen} onToggle={event => setFindOpen(event.currentTarget.open)}><summary><Search size={16} aria-hidden="true" />Find an ayah<span>Search &amp; jump</span></summary>
+        <div className={styles.toolbar}><form role="search" aria-label="Quran search" onSubmit={search}><Search size={18} aria-hidden="true" /><input id="quran-search" value={query} maxLength={120} onChange={(event) => setQuery(event.target.value)} placeholder="Arabic, English, or 2:255" aria-label="Search the Quran" /><button disabled={query.trim().length < 2 || searching || !resources}>{searching ? "Searching…" : "Search"}</button></form></div>
         <div className={styles.readingNavigation}><button aria-label="Previous surah" disabled={chapterId === 1} onClick={() => open(chapterId - 1)}><ChevronLeft size={18} /></button><form onSubmit={(event) => { event.preventDefault(); const ref = parseAyahReference(jump.includes(":") || jump.includes("：") ? jump : `${chapterId}:${jump}`); if (ref) open(ref.chapter, ref.ayah); else setError("Enter a valid ayah or surah:ayah reference."); }}><input value={jump} onChange={(event) => setJump(event.target.value)} placeholder="Go to ayah or 2:255" aria-label="Jump to ayah" maxLength={10} /><button>Go</button></form><button aria-label="Next surah" disabled={chapterId === 114} onClick={() => open(chapterId + 1)}><ChevronRight size={18} /></button></div>
+        </details>
         <div className={styles.layoutChoice} role="group" aria-label="Reading layout"><button aria-pressed={preferences.layout === "ayah"} onClick={() => setPreference({ layout: "ayah" })}>Ayah View</button><button aria-pressed={preferences.layout === "madinah"} onClick={() => setPreference({ layout: "madinah" })}>Madinah · 15 lines</button></div>
         <header className={styles.chapterHeader}><small>{searchMode ? `SEARCH RESULTS FOR “${searchTitle}”` : currentChapter?.revelationPlace ?? "QURAN FOUNDATION"}</small><h2>{searchMode ? "Verified results" : currentChapter?.nameSimple ?? "Quran Reader"}</h2><p>{searchMode ? "" : currentChapter ? `${currentChapter.translatedName?.name} · ${currentChapter.versesCount} ayahs` : ""}</p></header>
         {data?.availability?.note ? <p className={styles.sourceNote}>{data.availability.note} Quran and translation supplied by Quran Foundation / Quran.com.</p> : null}

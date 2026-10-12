@@ -12,7 +12,7 @@ const verse = (key: string) => {
   return { ...source.chapters[chapter - 1].verses[ayah - 1], audioUrl: "https://verses.quran.com/layout-fixture.wav" };
 };
 const resources = { reciters: [{ id: 7, name: "Mishary Rashid Alafasy" }], translations: [{ id: 20, name: "Saheeh International", author: "Saheeh International", language: "English" }] };
-const modes = ["Read", "Listen", "Practise", "Memorization", "Test yourself", "Bookmarks"];
+const modes = ["Read", "Listen", "Practise", "Memorization", "Test yourself", "Library"];
 
 async function fixtures(page: Page) {
   await page.route("**/api/quran?**", async route => {
@@ -57,7 +57,7 @@ for (const width of [320, 390, 700, 768, 1024, 1440, 1920]) for (const colorSche
     await page.goto("/quran");
     await expect(page.locator("#ayah-1-1")).toBeVisible();
     const tools = page.getByRole("navigation", { name: "Quran tools" });
-    await page.getByText("Reading and reference audio preferences", { exact: true }).click();
+    await page.getByText("Reader settings", { exact: true }).click();
     await page.getByRole("button", { name: "Increase Arabic size" }).click();
     for (const mode of modes) {
       await tools.getByRole("button", { name: mode, exact: true }).click();
@@ -74,7 +74,7 @@ for (const width of [320, 390, 700, 768, 1024, 1440, 1920]) for (const colorSche
     }
     await tools.getByRole("button", { name: "Read", exact: true }).click();
     if (width === 390 || width === 1440) {
-      await page.getByText("Reading and reference audio preferences", { exact: true }).click();
+      await page.getByText("Reader settings", { exact: true }).click();
       await page.locator("#reader").scrollIntoViewIfNeeded();
       await page.screenshot({ path: `output/quran-web-layout/reader-${width}-${colorScheme}.png` });
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -90,9 +90,10 @@ test("surah selection, search, bookmarks and Mushaf failure recovery remain usab
   await page.getByLabel("Choose a surah", { exact: true }).selectOption("112");
   await expect(page.locator("#ayah-112-1")).toBeVisible();
   await page.getByRole("button", { name: "Bookmark ayah 112:1", exact: true }).click();
-  await page.getByRole("navigation", { name: "Quran tools" }).getByRole("button", { name: "Bookmarks (1)", exact: true }).click();
+  await page.getByRole("navigation", { name: "Quran tools" }).getByRole("button", { name: "Library (1)", exact: true }).click();
   await page.getByRole("button", { name: "Ayah 112:1", exact: true }).click();
   await expect(page.locator("#ayah-112-1")).toBeVisible();
+  await page.locator("summary").filter({ hasText: "Find an ayah" }).click();
   await page.getByLabel("Search the Quran", { exact: true }).fill("2:255");
   await page.getByRole("search", { name: "Quran search" }).getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Verified results", exact: true })).toBeVisible();
@@ -111,6 +112,39 @@ test("desktop surah filtering does not alter provider Quran text", async ({ page
   await page.getByLabel("Find a surah", { exact: true }).fill("الإخلاص");
   await page.getByRole("complementary", { name: "Surah navigation" }).getByRole("button", { name: /112/ }).click();
   await expect(page.locator("#ayah-112-1 p[lang=ar]")).toHaveText(source.chapters[111].verses[0].textUthmani);
+});
+
+for (const width of [320, 390, 768, 1440]) test(`${width}px: reading focus preserves text, exits safely and restores keyboard search`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto("/quran");
+  const text = source.chapters[0].verses[0].textUthmani;
+  await expect(page.locator("#ayah-1-1 p[lang=ar]")).toHaveText(text);
+  await page.getByRole("button", { name: "Focus reading", exact: true }).click();
+  await expect(page.getByLabel("Search the Quran", { exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Leave focus", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Quran tools" })).toBeHidden();
+  await expect(page.locator("#ayah-1-1 p[lang=ar]")).toHaveText(text);
+  await fits(page);
+  if (width === 390 || width === 1440) await page.screenshot({ path: `output/quran-web-layout/focus-${width}.png` });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Focus reading", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Focus reading", exact: true }).click();
+  await page.keyboard.press("Control+k");
+  await expect(page.getByLabel("Search the Quran", { exact: true })).toBeFocused();
+  await fits(page);
+});
+
+test("primary tools stay compact while every practice and bookmark destination remains accessible", async ({ page }) => {
+  await page.goto("/quran");
+  const tools = page.getByRole("navigation", { name: "Quran tools" });
+  await expect(tools.getByRole("button")).toHaveCount(4);
+  await tools.getByRole("button", { name: "Practise", exact: true }).click();
+  await expect(tools.getByRole("button", { name: "Recite", exact: true })).toBeVisible();
+  await tools.getByRole("button", { name: "Test yourself", exact: true }).click();
+  await expect(tools.getByRole("button", { name: "Practise", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await tools.getByRole("button", { name: "Library", exact: true }).click();
+  await expect(tools.getByRole("button", { name: "Bookmarks", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your bookmarks", exact: true })).toBeVisible();
 });
 
 test("mobile prayer panel closes on page scrolling but not its internal scroll", async ({ page }) => {

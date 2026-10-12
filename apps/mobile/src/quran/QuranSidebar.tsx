@@ -11,7 +11,9 @@ const destinations: { mode: QuranMode; label: string; icon: keyof typeof Ionicon
   { mode: "bookmarks", label: "Bookmarks", icon: "bookmark-outline" },
   { mode: "memorize", label: "Memorize", icon: "repeat-outline" },
   { mode: "test", label: "Test Yourself", icon: "sparkles-outline" },
-  { mode: "challenges", label: "Community Challenges", icon: "trophy-outline" }
+  { mode: "challenges", label: "Community Challenges", icon: "trophy-outline" },
+  { mode: "search", label: "Search Quran", icon: "search-outline" },
+  { mode: "settings", label: "Preferences", icon: "options-outline" }
 ];
 
 export function QuranSidebar({ chapters, chapterId, mode, onMode, onOpen }: {
@@ -25,6 +27,8 @@ export function QuranSidebar({ chapters, chapterId, mode, onMode, onOpen }: {
     return chapters.filter(c => normalizeSearch(`${c.id} ${c.nameSimple} ${c.nameArabic} ${c.translatedName.name}`).includes(term));
   }, [chapters, query]);
   return <View accessibilityLabel="Quran navigation" style={[styles.sidebar, { backgroundColor: theme.colors.surface, borderRightColor: theme.colors.border }]}>
+    <FlatList style={{ flex: 1, minHeight: 0 }} data={matches} keyExtractor={item => String(item.id)} keyboardShouldPersistTaps="handled" initialNumToRender={10} maxToRenderPerBatch={8} windowSize={5}
+      ListHeaderComponent={<>
     <Text style={[styles.heading, { color: theme.colors.text }]}>Quran &amp; Recite</Text>
     {destinations.map(item => <Pressable key={item.mode} accessibilityRole="button" accessibilityState={{ selected: mode === item.mode }} onPress={() => onMode(item.mode)}
       style={({ pressed }) => [styles.destination, { backgroundColor: mode === item.mode ? theme.colors.tintSoft : "transparent", opacity: pressed ? .65 : 1 }]}>
@@ -33,7 +37,7 @@ export function QuranSidebar({ chapters, chapterId, mode, onMode, onOpen }: {
     <Text style={[styles.section, { color: theme.colors.muted }]}>Surahs</Text>
     <TextInput accessibilityLabel="Find a surah in sidebar" value={query} onChangeText={setQuery} placeholder="Name or number" placeholderTextColor={theme.colors.subtle} autoCorrect={false} maxLength={100}
       style={[styles.search, { backgroundColor: theme.colors.cardStrong, borderColor: theme.colors.border, color: theme.colors.text }]} />
-    <FlatList data={matches} keyExtractor={item => String(item.id)} keyboardShouldPersistTaps="handled" initialNumToRender={10} maxToRenderPerBatch={8} windowSize={5}
+      </>}
       renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.nameSimple}, ${item.versesCount} ayahs`} accessibilityState={{ selected: mode === "read" && chapterId === item.id }} onPress={() => onOpen(item.id)}
         style={({ pressed }) => [styles.surah, { backgroundColor: mode === "read" && chapterId === item.id ? theme.colors.tintSoft : "transparent", opacity: pressed ? .65 : 1 }]}>
         <Text style={{ color: theme.colors.teal, width: 28, fontSize: 12, fontWeight: "700" }}>{item.id}</Text>
