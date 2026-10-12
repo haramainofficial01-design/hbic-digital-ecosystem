@@ -115,3 +115,27 @@ build-35 queue superseded. New review `8cc549e6-e90b-4281-ad7d-d58e774ebde2` is
 WAITING_FOR_REVIEW. Existing screenshots, contact details, privacy listing and
 automatic-after-approval release settings remain; no public Apple approval is
 claimed. Android code 41 is still compiling at this checkpoint.
+
+## Completed rollout
+
+- Final public/backend deployment: `dpl_EwhJ1Yk2nyu1SEaNuUht7HUFn1sr`, source
+  `9b59c60`, READY and aliased to hbic.ca. The admin remains on verified
+  `dpl_5KtUSoyGmo33oMw2jqZr31hkqqNg` / `42f6443`; subsequent commits change only
+  backend retirement safety, tests and documentation, not admin/mobile code.
+- iOS/Watch: 1.7.6 build 36, VALID and submitted as review
+  `8cc549e6-e90b-4281-ad7d-d58e774ebde2`, WAITING_FOR_REVIEW.
+- Android: 1.7.6 code 41 completed, verified signed, 88.4% R8-renamed classes,
+  all 42 checked native libraries 16 KB aligned, no unused foreground-service
+  permission. Exact AAB checksum matched Google's accepted upload. Production
+  edit committed with changesNotSentForReview=false; all six verified existing
+  phone screenshots were retained. Store approval/public availability is not
+  inferred from production-track configuration.
+- Live receipt recheck: HTTP 200, 170 provider successes, seven failures, no
+  pending; historical request replay returns replayed=true without a new send.
+- Final public prayer snapshot remains fresh: October 12 Maghrib adhan 6:50 PM,
+  iqamah 7:00 PM. Other staff prayer overrides remain intact.
+
+The failed original announcement may already have dispatched before its logging
+exception; its exact recipients cannot be reconstructed from missing tickets.
+It was never resent. The owner-authorized new labelled test is separate. Physical
+phone banners, sounds and tap behavior were waived and are not claimed verified.
