@@ -1,4 +1,4 @@
-# Recite Assist qualification — updated 12 October 2026
+# Recite Assist qualification — updated 13 October 2026
 
 **Authorized only as an optional early preview, not a qualified assessment.**
 After reviewing the limitations, the user explicitly requested publishing the
@@ -7,6 +7,134 @@ download/microphone consent and prominent warnings that it misses many mistakes
 and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
+
+## 13 October: fresh alternative recognition, 99% still NOT established
+
+The unchanged current tracker remains at the 12 October measured **6/36
+controlled operations**, with **0/2 natural reviewed wording locations** found.
+This follow-up does not relabel those results as new inference or a 99% result.
+
+### Official Qwen3-ASR comparison (offline only, not shipped)
+
+Added explicit pinned-asset preparation and a strict waveform-only local worker
+for the official Apache-2.0
+[Qwen3-ASR models](https://github.com/QwenLM/Qwen3-ASR), using the
+[native Transformers implementation](https://huggingface.co/docs/transformers/model_doc/qwen3_asr).
+The recognizer receives only mono 16 kHz PCM and the Arabic language hint, never
+the expected ayah, its word list, a Quran prompt, grammar or forced alignment.
+The model does not provide validated Arabic word timestamps: the worker returns
+`null` for timestamps and acoustic confidence instead of fabricating them.
+
+All 48 existing calibration controls are measured, not a cherry-picked success
+subset: 18 approximate waveform mistakes and 30 negative controls. The raw
+transcript comparison checks the exact operation **and canonical word index**.
+Each additional predicted difference counts against precision. Missing or
+truncated inference fails the run; repeated inspected controls cannot become a
+fresh held-out qualification corpus. Generated reports retain model/revision,
+code hashes, original waveform hashes, transcripts, differences and runtime.
+They stay in ignored development output, with **no audio stored or uploaded**.
+
+| Actual 0.6B inference | MPS, bfloat16 | CPU, float32 |
+| --- | ---: | ---: |
+| Analyzed cases / failures | 48 / 0 | 48 / 0 |
+| Exact controlled operation detections | 10/18 | 10/18 |
+| Omission / repetition / substitution | 2/6 · 2/6 · 6/6 | 2/6 · 2/6 · 6/6 |
+| Negative controls with any raw difference | **28/30** | **27/30** |
+| Predicted raw differences | 116 | 114 |
+| Raw difference precision | **8.62%** | **8.77%** |
+| Script-reference word edits | 107/192 (55.73% WER) | 105/192 (54.69% WER) |
+| Desktop inference median / p95 | 260 / 711 ms | 386 / 498 ms |
+
+These are **diagnostics, not live-tracker or natural learner accuracy**. Splice
+boundaries are approximate, speeds change pitch, and the controls were selected
+using an earlier model's successful transcription. Neither recognizer/pipeline
+combination has passed 99%. Both precision variants fail the calibration screen:
+this is not merely low-precision arithmetic. The 0.6B candidate is rejected as
+a replacement; its high raw false-difference rate must not reach learners.
+
+Pinned 0.6B repository: `Qwen/Qwen3-ASR-0.6B-hf`, revision
+`7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c`, model SHA-256
+`d3f212dd20abecd315d830bc54ae3865e56ebfc3276484e57b771288ba27fd35`.
+Runtime: torch 2.10.0, numpy 2.3.4 and isolated Transformers 5.19.0, without
+upgrading the existing evaluation environment. No mobile model, browser worker,
+native dependency, public release flag, production setting or store build changed.
+
+The stronger official 1.7B model was then evaluated on those identical 48
+waveforms, in both precision modes, with zero inference failures:
+
+| Actual 1.7B inference | MPS, bfloat16 | CPU, float32 |
+| --- | ---: | ---: |
+| Exact controlled operation detections | **8/18** | **9/18** |
+| Omission / repetition / substitution | 1/6 · 1/6 · 6/6 | 2/6 · 1/6 · 6/6 |
+| Negative controls with any raw difference | **26/30** | **26/30** |
+| Raw difference precision | 8/93 (8.60%) | 9/90 (10.00%) |
+| Script-reference word edits | 80/192 (41.67% WER) | 78/192 (40.63% WER) |
+| Desktop inference median / p95 | 369 / 514 ms | 748 / 932 ms |
+
+It also fails calibration and is **not promoted or tested as a held-out
+qualification candidate**. The better script-reference transcription does not
+make its excessive false differences safe. Pinned repository
+`Qwen/Qwen3-ASR-1.7B-hf`, revision
+`bcd2b5b7f32b480ab5790554cfa8347f246a14f3`, model SHA-256
+`2db53c7d81bd9b8cbc6a074e89be2c968a0d373fb4ee68bb1b1e14f7042dfee1`.
+This is not mobile-compatible qualification or a natural accuracy measurement.
+
+The downloader verifies fixed byte lengths, Git blob hashes for small assets and
+SHA-256 for weights/tokenizer before loading. Large transfers use four bounded
+parallel byte ranges, written in order into a resumable contiguous prefix, not
+duplicate weight files. Transport regressions cover range/order failures and
+truncation; they are explicitly **not recognition-accuracy evidence**.
+Source-only RAM control serving now writes its own report rather than
+overwriting the prior inference report by default. One initial source-only run
+overwrote the ignored default `waveform-controls.json` before this guard was
+added; other frozen inference/replay reports remain. No report was reconstructed
+or passed off as the lost original.
+
+Reproduce with the public licensed RAM controls on loopback 3011:
+
+```sh
+node apps/mobile/scripts/prepare-qwen-recitation.mjs 0.6B
+npx tsx apps/mobile/scripts/evaluate-recitation-qwen.mts 0.6B auto
+npx tsx apps/mobile/scripts/evaluate-recitation-qwen.mts 0.6B cpu-f32
+node apps/mobile/scripts/prepare-qwen-recitation.mjs 1.7B
+npx tsx apps/mobile/scripts/evaluate-recitation-qwen.mts 1.7B auto
+npx tsx apps/mobile/scripts/evaluate-recitation-qwen.mts 1.7B cpu-f32
+```
+
+**Verification:** 92 mobile/shared and 19 browser/shared Quran regressions pass
+(111 total); mobile and public-web typechecks, strict evaluation-script typecheck,
+Python/Node syntax checks and diff checks pass. Browser tests use controlled
+worker observations for lifecycle/UI assertions, not real recognition accuracy.
+The unchanged qualification gate returns its expected **FAIL** on known controls.
+No app/backend production code changed here, and no new build/release is claimed.
+
+### Independent evidence access remains unresolved
+
+- [Quran-Lab's 600-clip benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark):
+  manual approval and research-only voice-data terms still required; requested
+  the user's authorized approval, without accessing gated audio or accepting terms.
+  This is an ASR benchmark, not automatically a double-reviewed lexical-error
+  corpus or proof of training-speaker exclusion for every third-party model.
+- [IqraEval QuranMB.v2](https://huggingface.co/datasets/IqraEval/QuranMB.v2),
+  revision `75afc3391e47ca005af286b2518d8a2edf98da5d`: no declared dataset
+  license and no grant for this HBIC use found. Its authors' related
+  [license discussion](https://huggingface.co/datasets/IqraEval/Iqra_train/discussions/1)
+  leaves the specific commercial-product evaluation and QuranMB questions
+  unanswered. Public availability is not permission; no audio downloaded.
+- [RetaSy's learner corpus](https://huggingface.co/datasets/RetaSy/quranic_audio_dataset),
+  revision `b1fcc39cbc045f367bb07e39025a0e3aaeabf34f`: the card lacks explicit
+  data licensing. Its six clip-level labels are not word-location transcripts.
+  The paper's license does not establish rights to the recordings. No new audio
+  imported or treated as verified word-error gold.
+- The September 2026
+  [transcript-event annotation study](https://arxiv.org/abs/2609.12085)
+  explicitly keeps its selected gold answers private. Text-only event annotation
+  is not acoustic accuracy or permission to use those private records.
+
+The unchanged qualification gate still fails on the existing evidence. Genuine
+progress requires both improved acoustics **and** permissioned, independently
+reviewed natural learner speech with a fresh representative held-out cohort;
+neither repeated tests nor a permissive threshold can establish 99% accuracy.
 
 ## 12 October follow-up: requested 99% accuracy is NOT established
 

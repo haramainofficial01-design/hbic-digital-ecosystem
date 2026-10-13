@@ -15,7 +15,8 @@ const dataset = "sobolev210/quran-recitation-errors", revision = "d196cd3132c69c
 const base = `https://huggingface.co/datasets/${dataset}/resolve/${revision}/`;
 const modelRevision = "e9448a0e84f3adb64c28b7a8db501dd8e0e59a84";
 const root = resolve(process.env.RECITE_MODEL_ASSETS ?? "output/quran-development/recognition/assets");
-const output = resolve(process.env.RECITE_CONTROLS_OUTPUT ?? "output/quran-development/qualification/waveform-controls.json");
+const serveOnly = process.env.RECITE_SERVE_ONLY === "1", serve = process.env.RECITE_SERVE === "1" || serveOnly;
+const output = resolve(process.env.RECITE_CONTROLS_OUTPUT ?? `output/quran-development/qualification/${serveOnly ? "waveform-controls-ram-source" : "waveform-controls"}.json`);
 const finishingContext = process.env.RECITE_FINISHING_CONTROLS === "1";
 const baselinePath = resolve(process.env.RECITE_BASELINE ?? "output/quran-development/qualification/baseline.json");
 if (!output.includes("/output/quran-development/") || !baselinePath.includes("/output/quran-development/")) throw Error("Use ignored development output only.");
@@ -70,7 +71,6 @@ const chosen = ["calibration", "heldout"].flatMap(split => {
   return groups.map(group => eligible.filter(r => r.group === group).sort((a, b) => a.id.localeCompare(b.id))[0]);
 });
 const selectedIds = chosen.map(row => row.id), sources: Source[] = [], exclusions: {id: string; reason: string}[] = [], failures: {id: string; category?: string; reason: string}[] = [], results: CaseResult[] = [];
-const serveOnly = process.env.RECITE_SERVE_ONLY === "1", serve = process.env.RECITE_SERVE === "1" || serveOnly;
 const servedCases: {name: string; category: Category; expected: Category | null; expectedIndex: number | null; index: number; text: string; sourceReference: string;
   sourceHash: string; groupHash: string; split: string; originalSamples: number; paddedTotalSamples: number; spokenGold: string[]; audioSha256: string; edit: Record<string, unknown>; pcm: Float32Array}[] = [];
 function retainCase(source: Source, variant: Variant, total: number) {
