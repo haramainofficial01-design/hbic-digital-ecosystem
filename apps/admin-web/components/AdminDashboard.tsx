@@ -5,6 +5,9 @@ import {
   defaultContent,
   notificationCategories,
   normalizeContent,
+  toPublicContent,
+  validRatingCampaignId,
+  isRatingCampaignOnlyChange,
   isIqamahOverrideActive,
   iqamahOverrideExpiresAt,
   prayerLabels,
@@ -271,12 +274,20 @@ export function AdminDashboard() {
   }, []);
 
   function updateContent(updater: (current: HbicContent) => Partial<HbicContent>) {
-    setContent((current) => normalizeContent({ ...current, ...updater(current), status: "draft" }));
+    setContent((current) => {
+      const edit = updater(current);
+      const normalized = normalizeContent({ ...current, ...edit, status: "draft" });
+      // Keep incomplete ID edits visible; never silently replace them with a
+      // different campaign. Save/publish validates before normalization.
+      if (edit.settings?.ratingCampaign) normalized.settings.ratingCampaign = edit.settings.ratingCampaign;
+      return normalized;
+    });
     setDirty(true);
   }
 
   async function saveDraft({ silent = false } = {}) {
     if (!draftLoaded) throw new Error("Load the protected draft before saving so private fields and newer edits are preserved.");
+    if (!validRatingCampaignId(content.settings.ratingCampaign?.id)) throw new Error("Enter a valid rating campaign ID before saving.");
     const errors = validateContent(content);
     if (errors.length) throw new Error(errors.join(" "));
 
@@ -329,11 +340,14 @@ export function AdminDashboard() {
       }
 
       const saved = await saveDraft({ silent: true });
+      const comparisonTime = new Date();
+      const ratingOnly = isRatingCampaignOnlyChange(toPublicContent(liveContent, comparisonTime), toPublicContent(content, comparisonTime));
       const data = await adminRequest("/api/admin/content/publish", {
         method: "POST",
         body: JSON.stringify({
           expectedDraftUpdatedAt: saved.draftUpdatedAt,
-          expectedPublishedVersion: liveContent.version
+          expectedPublishedVersion: liveContent.version,
+          signalDevices: !ratingOnly
         })
       });
       const publishedContent = normalizeContent(data.content);
@@ -353,10 +367,12 @@ export function AdminDashboard() {
       setDirty(false);
       setBackendMode(data?.backend?.mode ?? backendMode);
       const propagation = data.propagation ?? {};
-      const propagationHealthy = propagation.status === "accepted" || propagation.status === "no_tokens";
+      const propagationHealthy = propagation.status === "accepted" || propagation.status === "no_tokens" || propagation.status === "skipped_by_request";
       setMessageTone(propagationHealthy ? "success" : "error");
       setSavedMessage(
-        propagationHealthy
+        propagation.status === "skipped_by_request"
+          ? `Published v${verifiedContent.version} and verified. The rating campaign will be received on the next normal app refresh; no push was sent.`
+          : propagationHealthy
           ? `Published v${verifiedContent.version}, verified on the public API, and signalled ${propagation.successCount ?? 0} registered device(s). Web pages were revalidated.`
           : `Published v${verifiedContent.version} and verified on the public API, but device propagation needs attention: ${propagation.error ?? propagation.status ?? "unknown error"}.`
       );
@@ -1787,6 +1803,20 @@ function SettingsPanel({ content, updateContent }: EditorPanelProps) {
           <Field label="YouTube" value={content.settings.social.youtube} onChange={(value) => updateContent((current) => ({ settings: { ...current.settings, social: { ...current.settings.social, youtube: value } } }))} />
           <Field label="TikTok" value={content.settings.social.tiktok} onChange={(value) => updateContent((current) => ({ settings: { ...current.settings, social: { ...current.settings.social, tiktok: value } } }))} />
         </div>
+      </div>
+      <div className="card full">
+        <h2>App rating campaign</h2>
+        <ToggleField label="Enable one-time invitation" checked={content.settings.ratingCampaign?.enabled === true}
+          onChange={(enabled) => updateContent(current => ({ settings: { ...current.settings,
+            ratingCampaign: { id: current.settings.ratingCampaign?.id ?? "hbic-rating-2026-10", enabled }
+          } }))} />
+        <Field label="Campaign ID" value={content.settings.ratingCampaign?.id ?? "hbic-rating-2026-10"}
+          onChange={(id) => updateContent(current => ({ settings: { ...current.settings,
+            ratingCampaign: { id, enabled: current.settings.ratingCampaign?.enabled === true }
+          } }))} />
+        {!validRatingCampaignId(content.settings.ratingCampaign?.id ?? "hbic-rating-2026-10") ?
+          <p role="alert">Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.</p> : null}
+        <p className="muted">Publish to activate or stop. Keep the same ID to avoid inviting users again. iOS uses Apple’s native review prompt.</p>
       </div>
     </div>
   );

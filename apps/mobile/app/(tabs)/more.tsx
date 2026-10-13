@@ -14,6 +14,7 @@ import { usePublishedContent } from "../../src/services/content";
 import { spacing } from "../../src/theme/theme";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
 import { academyEnabled, quranReaderAvailable } from "../../src/config/releaseFeatures";
+import { RateAppButton } from "../../src/rating/RateAppButton";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -80,6 +81,7 @@ export default function MoreScreen() {
           </Pressable>
         ))}
       </AdaptiveGrid>
+      <RateAppButton />
     </AppScreen>
   );
 }

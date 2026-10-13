@@ -9,6 +9,7 @@ import { SectionHeader } from "../src/components/SectionHeader";
 import { useOnboarding } from "../src/onboarding/OnboardingProvider";
 import { type AppThemeMode, spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
+import { RateAppButton } from "../src/rating/RateAppButton";
 
 const themeOptions: { label: string; value: AppThemeMode; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: "System", value: "system", icon: "phone-portrait" },
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
         <SettingsAction title="Replay introduction" subtitle="See the Masjid Bilal app introduction again" onPress={startReplay} />
       </GlassCard>
 
+      <RateAppButton />
       {Platform.OS === "android" ? (
         <>
           <SectionHeader title="Wear OS" subtitle="Masjid Bilal on compatible Android smartwatches." />

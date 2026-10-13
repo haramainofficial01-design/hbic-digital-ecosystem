@@ -2,6 +2,8 @@ import ExpoModulesCore
 import Foundation
 import WatchConnectivity
 import WidgetKit
+import StoreKit
+import UIKit
 
 private enum MasjidAppleConstants {
   static let appGroup = "group.ca.hbic.calgary.app"
@@ -81,6 +83,22 @@ public final class MasjidAppleBridgeModule: Module {
     }
     OnStopObserving { self.stopQuranCommands() }
     OnDestroy { self.stopQuranCommands() }
+
+    AsyncFunction("requestAppReview") { (promise: Promise) in
+      Task { @MainActor in
+        guard let scene = UIApplication.shared.connectedScenes
+          .compactMap({ $0 as? UIWindowScene })
+          .first(where: { $0.activationState == .foregroundActive && $0.windows.contains(where: { $0.isKeyWindow }) })
+        else { promise.resolve(false); return }
+        if #available(iOS 18.0, *) {
+          AppStore.requestReview(in: scene)
+        } else {
+          SKStoreReviewController.requestReview(in: scene)
+        }
+        // A request is not proof that Apple displayed a prompt or received a review.
+        promise.resolve(true)
+      }
+    }.runOnQueue(.main)
 
     Function("updatePrayerSnapshot") { (json: String) -> Bool in
       guard

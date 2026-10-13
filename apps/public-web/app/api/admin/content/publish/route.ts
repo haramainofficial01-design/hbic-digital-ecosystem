@@ -17,14 +17,18 @@ export async function POST(request: Request) {
 
   try {
     const rawBody = await request.text();
-    const expected = readPublicationPreconditions(rawBody ? JSON.parse(rawBody) : {});
+    const body = rawBody ? JSON.parse(rawBody) : {};
+    const expected = readPublicationPreconditions(body);
+    if (body.signalDevices !== undefined && typeof body.signalDevices !== "boolean") {
+      throw new PublicationRequestError("The device refresh choice must be a boolean.");
+    }
     const published = await publishDraftContent(expected);
     publicRevalidationPaths.forEach((path) => revalidatePath(path));
     const prayerSnapshot = createWidgetPrayerSnapshot(published.content, new Date());
     const publication = published.publication;
     let propagation;
     try {
-      propagation = await sendContentUpdateSignal({
+      propagation = body.signalDevices === false ? { status: "skipped_by_request", successCount: 0, failureCount: 0 } : await sendContentUpdateSignal({
         contentVersion: published.content.version,
         publicationRevision: publication.revision,
         scheduleRevision: prayerSnapshot.scheduleRevision,
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return jsonResponse(
       { ok: false, error: error instanceof Error ? error.message : "Unable to publish draft." },
-      { status: error instanceof PublicationRequestError ? error.status : 500 }
+      { status: error instanceof PublicationRequestError ? error.status : error instanceof SyntaxError ? 400 : 500 }
     );
   }
 }

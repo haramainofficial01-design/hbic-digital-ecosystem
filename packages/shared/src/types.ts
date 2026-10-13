@@ -1,3 +1,5 @@
+import type { RatingCampaign } from "./ratingCampaign";
+
 export type PrayerName = "fajr" | "sunrise" | "dhuhr" | "asr" | "maghrib" | "isha";
 export type IqamahPrayerName = Exclude<PrayerName, "sunrise">;
 
@@ -27,6 +29,7 @@ export interface MasjidSettings {
   email: string;
   website: string;
   donationUrl: string;
+  ratingCampaign?: RatingCampaign;
   social: {
     youtube: string;
     instagram: string;

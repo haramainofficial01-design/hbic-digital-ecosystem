@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
-import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { ImageBackground, Pressable, StyleSheet, View } from "react-native";
 import { Text, Image } from "../../src/i18n/LocalizedText";
 
@@ -17,6 +17,8 @@ import { brandAssets, photoAssets } from "../../src/constants/assets";
 import { usePublishedContent } from "../../src/services/content";
 import { spacing } from "../../src/theme/theme";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
+import { RatingCampaignHost } from "../../src/rating/RatingCampaignHost";
+import { noteRatingHomeInteraction } from "../../src/rating/homeActivity";
 
 const etransferEmail = "bilalislamiccentrecalgary@gmail.com";
 
@@ -24,17 +26,20 @@ export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { content } = usePublishedContent();
+  const [homeLaidOut, setHomeLaidOut] = useState(false);
+  const [heroLoaded, setHeroLoaded] = useState(false);
   const announcements = content.announcements.filter(isVisibleItem);
   const events = getPublicEvents(content);
-  const { donationCategories, mediaItems, settings } = content;
+  const { donationCategories, mediaItems } = content;
   const announcement = announcements.find((item) => item.pinned) ?? announcements[0];
   const featuredEvent = events.find((event) => event.featured) ?? events[0];
   const nextEvent = events.find((event) => event.id !== featuredEvent?.id);
   const featuredMedia = mediaItems.find((item) => item.visible && item.featured) ?? mediaItems.find((item) => item.visible);
 
   return (
-    <AppScreen>
-      <ImageBackground source={photoAssets.exterior} resizeMode="cover" style={styles.hero} imageStyle={styles.heroImage}>
+    <AppScreen onReady={() => setHomeLaidOut(true)} onInteraction={() => noteRatingHomeInteraction()}>
+      <RatingCampaignHost homeReady={homeLaidOut && heroLoaded} />
+      <ImageBackground source={photoAssets.exterior} onLoadEnd={() => setHeroLoaded(true)} resizeMode="cover" style={styles.hero} imageStyle={styles.heroImage}>
         <LinearGradient colors={theme.gradients.hero} style={StyleSheet.absoluteFill} />
         <Image source={brandAssets.appMark} style={styles.logo} />
         <Text style={styles.heroTitle}>Masjid Bilal</Text>

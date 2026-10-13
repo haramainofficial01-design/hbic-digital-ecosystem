@@ -1,4 +1,5 @@
 export * from "./constants";
+export * from "./ratingCampaign";
 export * from "./donations";
 export * from "./content";
 export * from "./eventLifecycle";

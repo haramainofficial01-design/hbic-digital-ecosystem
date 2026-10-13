@@ -1,4 +1,5 @@
 import { hbicSettings } from "./constants";
+import { normalizeRatingCampaign } from "./ratingCampaign";
 import { discontinuedEventIds } from "./eventLifecycle";
 import {
   getCurrentDailyBenefit,
@@ -229,6 +230,7 @@ export function normalizeContent(input?: Partial<HbicContent> | null): HbicConte
     settings: {
       ...defaultContent.settings,
       ...(incoming.settings ?? {}),
+      ratingCampaign: normalizeRatingCampaign(incoming.settings?.ratingCampaign),
       social: {
         ...defaultContent.settings.social,
         ...(incoming.settings?.social ?? {})

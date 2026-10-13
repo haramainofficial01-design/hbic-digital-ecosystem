@@ -8,7 +8,11 @@ import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 
-export function AppScreen({ children, style }: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
+export function AppScreen({ children, style, onReady, onInteraction }: PropsWithChildren<{
+  style?: StyleProp<ViewStyle>;
+  onReady?: () => void;
+  onInteraction?: () => void;
+}>) {
   const { theme } = useAppTheme();
   const { isRtl } = useAppLanguage();
   const { width } = useWindowDimensions();
@@ -23,6 +27,9 @@ export function AppScreen({ children, style }: PropsWithChildren<{ style?: Style
     <View style={[styles.gradient, { backgroundColor: theme.colors.background }]}>
       <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
         <ScrollView
+          onLayout={onReady}
+          onTouchStart={onInteraction}
+          onScrollBeginDrag={onInteraction}
           contentContainerStyle={[styles.content, isWide && styles.wideContent, style]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.teal} />}
