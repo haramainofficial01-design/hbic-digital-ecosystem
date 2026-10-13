@@ -9,6 +9,30 @@ import { createHash } from "node:crypto";
 import { downloadQwenRanges, qwenComparisonDirectory, qwenRecitationModels, verifyPinnedRecitationAsset } from "../scripts/prepare-qwen-recitation.mjs";
 import { muaalemRecitationModel } from "../scripts/prepare-muaalem-recitation.mjs";
 import { whisperRecitationModel } from "../scripts/prepare-whisper-recitation.mjs";
+import { wav2vecQuranModel } from "../scripts/prepare-wav2vec-quran.mjs";
+import { zipformerRecitationModel, zipformerRecitationModels } from "../scripts/verify-zipformer-recitation.mjs";
+
+test("approved gated streaming assets retain their no-profit license and exact model pin", () => {
+  assert.equal(zipformerRecitationModel.approvalRequired, true);
+  assert.equal(zipformerRecitationModel.license, "Quran-Lab No-Profit License 1.2");
+  assert.equal(zipformerRecitationModel.revision, "3da514fc833b22c902ee466a7710cf399896f2f0");
+  assert.equal(zipformerRecitationModel.files["zipformer_p_arabic_v3.int8.onnx"].sha256, "6a5ddafa9c5e5c01260d30264031b341785bdc152e9ef1d569b41c8c278508eb");
+  assert.ok(zipformerRecitationModel.files.LICENSE.git);
+  assert.equal(zipformerRecitationModels["v3.1"].files["zipformer_p_arabic_v3.1.int8.onnx"].sha256, "31755836528da336a6192121cd7bc82cb41752dddb65566fd000b89c8686da6b");
+});
+
+test("the independent Quran character CTC experiment pins safe public assets", () => {
+  assert.equal(wav2vecQuranModel.repository, "rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final");
+  assert.equal(wav2vecQuranModel.license, "Apache-2.0");
+  assert.equal(wav2vecQuranModel.revision, "b03a268c6ba1a693752307325ab376c86c3b12da");
+  assert.equal(wav2vecQuranModel.files["model.safetensors"].sha256, "bf65674a26eb4ef7042cedade96c3c8f8cbd04f3a7d1a68eadceec8ed0f99ecb");
+  assert.equal(Object.keys(wav2vecQuranModel.files).length, 7);
+  for (const [name, pin] of Object.entries(wav2vecQuranModel.files)) {
+    assert.match(name, /^[a-z_]+\.(?:md|json|safetensors)$/i);
+    assert.ok(Number.isSafeInteger(pin.size) && pin.size > 0);
+    assert.match(pin.git ?? pin.sha256, /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
+  }
+});
 
 test("only explicit official model pins and ignored comparison paths are accepted", () => {
   assert.throws(() => qwenComparisonDirectory("../../production"), /pinned/);

@@ -16,6 +16,13 @@ wording locations. The safer current tracker finds 5/36 controlled operations,
 with 83.33% precision and 13.89% recall. New decoding/candidate experiments were
 rejected; neither 99% qualification nor production/store release is established.
 
+Newer development follow-up: [approved streaming-model access and real controlled
+evaluations](quran-streaming-recognition-evidence-2026-10-13.md). Both approved
+Quran-Lab streaming variants were actually tested. Fixed quiet compaction removed
+two observed pause-related false alerts, but the clearer v3 comparison still
+finds only 13/18 mistakes on the other control split: 92.86% precision and
+72.22% recall, not 99% natural accuracy. The experimental models are not shipped.
+
 Earlier development follow-up: [competing acoustic evidence and real
 voice-following](quran-recitation-competing-evidence-2026-10-13.md). A real-model
 word-navigation indicator was verified; the best joint offline detector achieved

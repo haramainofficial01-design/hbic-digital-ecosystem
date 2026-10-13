@@ -27,7 +27,7 @@ function logAdd(a: number, b: number) {
   return max + Math.log1p(Math.exp(Math.min(a, b) - max));
 }
 function validateAcoustics(logprobs: Float32Array, vocabSize: number, blank: number) {
-  if (!(logprobs instanceof Float32Array) || !Number.isInteger(vocabSize) || vocabSize < 2 || vocabSize > 64
+  if (!(logprobs instanceof Float32Array) || !Number.isInteger(vocabSize) || vocabSize < 2 || vocabSize > 256
     || !Number.isInteger(blank) || blank < 0 || blank >= vocabSize || !logprobs.length
     || logprobs.length % vocabSize || logprobs.length / vocabSize > 650) throw Error("Bounded phonetic CTC emissions required");
   for (let t = 0; t < logprobs.length / vocabSize; t++) {

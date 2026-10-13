@@ -10,12 +10,12 @@ import { wordEdits } from "./recitationQualification";
 
 const variant = process.argv[2] ?? "0.6B", mode = process.argv[3] ?? "auto";
 const split = process.argv[4] ?? "calibration";
-if (!["0.6B", "1.7B", "whisper-turbo"].includes(variant) || !["auto", "cpu-f32", "mps-f32"].includes(mode)) throw Error("Pinned model and supported runtime required");
+if (!["0.6B", "1.7B", "whisper-turbo", "wav2vec-quran"].includes(variant) || !["auto", "cpu-f32", "mps-f32"].includes(mode)) throw Error("Pinned model and supported runtime required");
 if (!["calibration", "heldout"].includes(split)) throw Error("Explicit development corpus split required");
-const root = resolve(`output/quran-development/${variant === "0.6B" ? "qwen-comparison" : variant === "1.7B" ? "qwen-1.7b-comparison" : "whisper-turbo-comparison"}`);
+const root = resolve(`output/quran-development/${variant === "0.6B" ? "qwen-comparison" : variant === "1.7B" ? "qwen-1.7b-comparison" : `${variant}-comparison`}`);
 const manifest = JSON.parse(readFileSync(resolve(root, "assets/verified-manifest.json"), "utf8"));
-const output = resolve(root, `${variant === "whisper-turbo" ? "whisper-turbo" : "qwen"}-whole-${split}-${mode}-${Date.now()}-${randomUUID()}.json`);
-const workerPath = resolve(`apps/mobile/scripts/${variant === "whisper-turbo" ? "whisper" : "qwen"}-recitation-worker.py`);
+const output = resolve(root, `${variant === "wav2vec-quran" ? variant : variant === "whisper-turbo" ? variant : "qwen"}-whole-${split}-${mode}-${Date.now()}-${randomUUID()}.json`);
+const workerPath = resolve(`apps/mobile/scripts/${variant === "wav2vec-quran" ? "wav2vec-quran-worker" : `${variant === "whisper-turbo" ? "whisper" : "qwen"}-recitation-worker`}.py`);
 const python = resolve("output/quran-development/nvidia-evaluation-runtime/bin/python");
 const sha = (data: string | Uint8Array) => createHash("sha256").update(data).digest("hex");
 const codeSha256 = Object.fromEntries([workerPath, "apps/mobile/scripts/evaluate-recitation-qwen.mts", "apps/mobile/scripts/recitationTranscriptDifferences.ts", "apps/mobile/src/quran/recitationTracking.ts"].map(file => [file.split("/").at(-1), sha(readFileSync(file))]));

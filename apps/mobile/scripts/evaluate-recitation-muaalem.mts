@@ -18,7 +18,8 @@ if (!["cpu", "mps"].includes(mode)) throw Error("Supported development phoneme r
 const quietTailMs = Number(process.argv[3] ?? 0);
 if (![0, 600].includes(quietTailMs)) throw Error("Explicit zero or 600 ms acoustic-tail experiment required");
 const phoneticProposals = process.argv[4] === "--events-rnnt-whisper-lexicon-duration";
-const supplementaryProposals = process.argv[4] === "--events-rnnt-whisper-duration" || phoneticProposals;
+const characterProposals = process.argv[4] === "--events-rnnt-wav2vec-duration";
+const supplementaryProposals = process.argv[4] === "--events-rnnt-whisper-duration" || phoneticProposals || characterProposals;
 const durationNuisance = process.argv[4] === "--events-rnnt-duration" || supplementaryProposals;
 const lexicalProposals = process.argv[4] === "--events-rnnt" || durationNuisance;
 const eventHypotheses = process.argv[4] === "--events" || lexicalProposals;
@@ -69,7 +70,7 @@ function save() {
       "Optional competing reference/error likelihoods are a comparison experiment, NEVER an independently recognized or verified-correct transcript.",
       "Substitutions require optional independent RNNT lexical proposals; absent/out-of-lexicon proposals count as misses, not exclusions.",
       "RNNT proposal observations are saved actual-model replay, not fresh RNNT inference; phoneme inference in this run is fresh.",
-      "Optional independently recognized Whisper proposals are saved whole-clip acoustic observations, not validated corrections or speech timings.",
+      "Optional independently recognized Whisper or Quran character CTC proposals are saved whole-clip acoustic observations, not validated corrections or speech timings.",
       "Optional lexicon retrieval uses actual reference-free phoneme output. Reference coordinates select comparison fragments only; candidates are not verified words, corrections or human word boundaries.",
       "Phonetic retrieval cannot cover every learner word or phonetic variant. Missing lexicon coverage counts as a miss and is never silently excluded.",
       "Optional phone-run duration nuisance is for lexical event comparison ONLY; it cannot certify Tajweed, gemination or pronunciation.",
@@ -127,20 +128,25 @@ try {
   }
   if (supplementaryProposals) {
     const evidencePath = resolve(process.argv[7] ?? "");
-    if (resolve(evidencePath, "..") !== resolve("output/quran-development/whisper-turbo-comparison")
-      || !new RegExp(`^whisper-turbo-whole-${split}-(?:cpu-f32|mps-f32)-[0-9]+-[a-f0-9-]{36}\\.json$`).test(evidencePath.split("/").at(-1)!))
-      throw Error("Explicit isolated complete Whisper evidence path required");
+    const candidate = characterProposals ? { directory: "wav2vec-quran-comparison", prefix: "wav2vec-quran",
+      model: "rabah2026/wav2vec2-large-xlsr-53-arabic-quran-v_final", revision: "b03a268c6ba1a693752307325ab376c86c3b12da",
+      hash: "bf65674a26eb4ef7042cedade96c3c8f8cbd04f3a7d1a68eadceec8ed0f99ecb" }
+      : { directory: "whisper-turbo-comparison", prefix: "whisper-turbo", model: "openai/whisper-large-v3-turbo",
+        revision: "41f01f3fe87f28c78e2fbf8b568835947dd65ed9", hash: "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1" };
+    if (resolve(evidencePath, "..") !== resolve(`output/quran-development/${candidate.directory}`)
+      || !new RegExp(`^${candidate.prefix}-whole-${split}-(?:cpu-f32|mps-f32)-[0-9]+-[a-f0-9-]{36}\\.json$`).test(evidencePath.split("/").at(-1)!))
+      throw Error("Explicit isolated complete acoustic proposal evidence required");
     const bytes = readFileSync(evidencePath), old = JSON.parse(bytes.toString());
-    if (old.model !== "openai/whisper-large-v3-turbo" || old.revision !== "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
-      || old.modelSha256 !== "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1"
+    if (old.model !== candidate.model || old.revision !== candidate.revision
+      || old.modelSha256 !== candidate.hash
       || old.runtime?.dtype !== "torch.float32" || old.scope !== "offline whole-clip diagnostic" || old.split !== split
       || old.complete !== true || old.newInference !== true || old.canonicalPrompt !== false || old.forcedAlignment !== false
       || old.failures.length || old.results.length !== 48 || new Set(old.results.map((row: any) => row.index)).size !== 48)
-      throw Error("Verified actual full-precision Whisper proposal observations required");
+      throw Error("Verified actual full-precision acoustic proposal observations required");
     supplementaryRows = new Map(old.results.map((row: any) => [row.index, row]));
     supplementaryProposalProvenance = { evidencePath, evidenceSha256: sha(bytes), model: old.model, revision: old.revision,
       modelSha256: old.modelSha256, runtime: old.runtime, codeSha256: old.codeSha256, newInference: false,
-      scope: "saved independent actual Whisper transcript proposals only; no confidence/timestamps invented" };
+      scope: "saved independent actual transcript proposals only; no confidence/timestamps invented" };
   }
   let phoneticLexicon: PhoneticLexiconEntry[] = [];
   if (phoneticProposals) {

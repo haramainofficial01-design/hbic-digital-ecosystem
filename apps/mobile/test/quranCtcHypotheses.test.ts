@@ -3,6 +3,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { comparePhoneticEventHypotheses, phoneticCtcLogLikelihood, phoneticRunLogLikelihood, uniquePhoneticEventHypotheses } from "../scripts/recitationCtcHypotheses";
 const logs = (rows: number[][]) => Float32Array.from(rows.flat().map(Math.log));
+test("a 251-unit streaming alphabet retains its last-index blank and exact CTC math", () => {
+  const row = Array.from({length: 251}, () => .000001); row[1] = .7498755; row[250] = .2498755;
+  const evidence = logs([row, row]);
+  const expected = row[1] * row[1] + 2 * row[1] * row[250];
+  assert.ok(Math.abs(Math.exp(phoneticCtcLogLikelihood(evidence, 251, 250, [1])) - expected) < 1e-6);
+  assert.throws(() => phoneticCtcLogLikelihood(evidence, 251, 250, [250]), /nonblank/);
+  assert.throws(() => phoneticCtcLogLikelihood(evidence, 257, 250, [1]), /Bounded/);
+});
 test("CTC forward sums every tiny waveform-path alternative without reference-forced output", () => {
   const rows = [[.3, .5, .2], [.4, .25, .35], [.25, .5, .25]], sums = new Map<string, number>();
   for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) for (let c = 0; c < 3; c++) {
