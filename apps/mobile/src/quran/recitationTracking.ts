@@ -197,7 +197,7 @@ export class RecitationTracker {
     const judged = alignRecitationWords(words, spoken.map(word => word.text));
     const anchors = judged.words.filter(word => word.expectedIndex !== null && word.recognizedIndex !== null
       && word.judgment === "correct" && wholeWordAnchor(words[word.expectedIndex], spoken[word.recognizedIndex].text)
-      && spoken[word.recognizedIndex].confidence >= .8);
+      && spoken[word.recognizedIndex].confidence >= .8 && spoken[word.recognizedIndex].support > 0);
     if (anchors.length < 2) return emptyFeedback(expected);
     const first = anchors[0], last = anchors.at(-1)!;
     const firstExpected = first.expectedIndex!, lastExpected = last.expectedIndex!;
@@ -224,7 +224,12 @@ export class RecitationTracker {
           // Keep them visibly uncertain, NEVER silently count them as correct.
           const a = recitationLexeme(words[ei]), b = recitationLexeme(spoken[hi!]?.text ?? "");
           const oneLetter = a.length === b.length && [...a].filter((letter, index) => letter !== b[index]).length === 1;
-          if (stable(hi) && !oneLetter) {states[ei].state = "possible_difference"; differences.push({kind: "substitution", index: ei});}
+          // An acoustically stable wrong-looking word alone cannot establish
+          // its position in the selected ayah. Both surrounding exact anchors
+          // must also survive overlap revisions; retracted/unstable context
+          // remains uncertainty, not a correction at the wrong word.
+          const before = [...anchors].reverse().find(a => a.expectedIndex! < ei), after = anchors.find(a => a.expectedIndex! > ei);
+          if (stable(hi) && stable(before?.recognizedIndex ?? null) && stable(after?.recognizedIndex ?? null) && !oneLetter) {states[ei].state = "possible_difference"; differences.push({kind: "substitution", index: ei});}
           else states[ei].state = "uncertain";
         }
       } else if (word.operation === "insertion" && hi !== null) {

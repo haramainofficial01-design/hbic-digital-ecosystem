@@ -144,3 +144,11 @@ test("an overlapping decode retracting a word cannot reuse stale history to adva
   assert.equal(next.words[2].state, "uncertain"); assert.equal(next.stableComplete, false);
   assert.equal(guard.observe(next, 80000), false);
 });
+test("a stable wrong-looking word cannot be localized using unstable surrounding anchors", () => {
+  const tracker = new RecitationTracker();
+  const uncertainContext = [word("الحمد", 4000), word("لله", 12000, .82), word("الشمس", 22000), word("العالمين", 32000, .82)];
+  const result = twice(tracker, expected, uncertainContext);
+  assert.deepEqual(result.differences, []);
+  assert.equal(result.words[2].state, "uncertain");
+  assert.equal(result.stableComplete, false);
+});

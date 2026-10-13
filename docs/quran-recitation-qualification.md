@@ -8,7 +8,168 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
-## 12 October: real recording/tracking integration, still not qualified
+## 12 October follow-up: requested 99% accuracy is NOT established
+
+New development verification: **118 focused Quran regressions pass**, mobile
+and public-web typechecks pass, the evaluation scripts pass their strict
+typecheck, the public-web build passes with existing lint/CSS warnings, and both
+iOS/Android Hermes exports pass. These are not new native/store binaries or
+physical-device acoustic/battery qualification. The actual production WASM worker
+browser check was rerun successfully: three observations of public licensed
+audio, `ورفعنا لك ذكرك`, one shared recording/recognition capture, closed tracks,
+local review/deletion, and zero browser errors. No personal microphone was used.
+
+### Alignment safety improvement
+
+Retracted words cannot act as anchors. A substitution now also needs stable
+exact anchors on both sides, not merely a stable wrong-looking token. This fixes
+a calibration false correction exposed by the alternative recognizer. Low or
+conflicting evidence remains visibly uncertain, never silently correct.
+
+Saved actual current-model acoustic evidence replay:
+
+| Measurement | Latest result |
+| --- | ---: |
+| Controlled operation detections | **6/36 (16.67%)** |
+| Omission / repetition / substitution | 2/12 · 4/12 · **0/12** |
+| Negative-control false alerts | **0/60**, previously 1/60 |
+| Wrong operation alerts on positive controls | 0 |
+| Natural clean clips with any alert | 0/126 (held-out 0/37) |
+| Natural complete-following clips | 24/126 (held-out 10/37) |
+| Natural reviewed wording locations detected | **0/2** |
+
+These are immutable-evidence replays, not fresh current-model inference or proof
+of 99% accuracy. The controls retain approximate cuts and baseline-success
+selection; zero observed false alerts and 6/6 case precision do not demonstrate
+a zero real false-positive rate or dependable mistake recognition. Both natural
+wording locations remain missed. Native simulator parity for the newest anchor
+guard has not been rerun.
+
+### Stronger local NVIDIA experiment (not shipped)
+
+Reconstructed the missing decoder from the original
+[NVIDIA Arabic FastConformer checkpoint](https://huggingface.co/nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0),
+revision `7f32349d952f42a28dce979ba73270aa2bbdfa89` (CC BY 4.0). Original archive
+SHA-256: `d29d19d7c054a5fc010ac6815e9cbb0dd1b21a30e0a7f7f2982e1fecaf0c3e31`.
+Its actual CTC head, RNNT predictor/joint, SentencePiece model, mel filterbank and
+STFT window are used, not guessed weights. Checkpoint loading uses
+`weights_only=True`; no archive paths are extracted. Greedy RNNT is independently
+implemented following the documented
+[NeMo v2 decoder equations](https://github.com/NVIDIA/NeMo/blob/v2.0.0/nemo/collections/asr/modules/rnnt.py).
+
+The experimental encoder remains the
+[community ONNX export](https://huggingface.co/dev-ahmedhany/stt_ar_fastconformer_hybrid_large_pcd_v1.0-sherpa-ctc),
+revision `9137361f6f29fa5162aa7aa3d730bdda1e703bf2`, SHA-256
+`a74e77489a9e48d689bac080a30c5e54b35e5f54171273771dba9c72752eade3`.
+419/607 named initializers exactly match original checkpoint arrays, with zero
+directly matched discrepancies. The other initializers/graph transformations
+have not been independently proven equivalent; this is **not an official complete
+export or production-qualified model**. No native runtime/model download changes
+were made. Models, Python venv and transcripts stay in ignored development output.
+
+No expected ayah, grammar, prompt, hotwords, language-model rescoring or forced
+alignment is supplied to the recognizer. Original public waveform hashes are
+verified before inference; PCM only crosses a private local pipe and is erased.
+CTC and RNNT timings/confidences come from real emissions. RNNT tokens are not
+incorrectly CTC-collapsed. Confidence remains an uncalibrated acoustic statistic.
+
+Same 48 calibration controls / 192 scripted spoken words:
+
+| Decoder / input | Word edits | Live operation detections | False alerts |
+| --- | ---: | ---: | ---: |
+| CTC, complete original clip | **20/192 (10.42% WER)** | Not measured | Not measured |
+| RNNT, complete original clip | **16/192 (8.33% WER)** | Not measured | Not measured |
+| CTC, production rolling/compaction/tracker | 36/192 (18.75% WER) | **0/18** | 0/30 |
+| RNNT, production rolling/compaction/tracker | 23/192 (11.98% WER) | **1/18** | 0/30 |
+
+All runs have zero inference failures. Whole-clip recognition is an exploratory
+diagnostic, not live correction: one observation cannot establish temporal
+stability. RNNT's 91.67% scripted word agreement is **not natural-recitation
+accuracy or 99% mistake detection**. Both decoders sometimes restore a removed
+canonical word. RNNT fails the calibration screen and is not evaluated on the
+held-out controls or promoted. Warm desktop inference is approximately 21–25 ms
+median / 26–36 ms p95, not microphone-to-feedback or phone/battery measurement.
+
+CTC additionally had a frozen diagnostic 48-case held-out run: 2/18 operation
+detections (both repetitions), two wrong positive-operation alerts, 1/30 negative
+false alerts, 51/208 controlled word edits. It is worse than the current tracker
+and is **rejected as a replacement**. These previously inspected development
+controls cannot be reused as a fresh 99% qualification cohort.
+
+Reproduce with the existing public RAM control server running on loopback 3011:
+
+```sh
+npx tsx apps/mobile/scripts/evaluate-recitation-nvidia.mts calibration ctc whole
+npx tsx apps/mobile/scripts/evaluate-recitation-nvidia.mts calibration rnnt whole
+npx tsx apps/mobile/scripts/evaluate-recitation-nvidia.mts calibration ctc rolling
+npx tsx apps/mobile/scripts/evaluate-recitation-nvidia.mts calibration rnnt rolling
+```
+
+Use an isolated ignored venv with torch 2.10.0, numpy 2.3.4, sentencepiece 0.2.1,
+onnxruntime 1.24.3 and PyYAML 6.0.3. The evaluator never installs dependencies,
+provisions an online service, downloads gated files or enables recognition in
+production. Its twelve-second whole-clip mode is offline-only; live app windows
+remain six seconds. No cloud voice upload or paid service was authorized.
+
+### Offline 99% qualification gate
+
+Added `recitationQualification.ts` and `qualify-recitation.mts`. This is an
+explicit development report generator, **not automatic enforcement in hosting,
+store submission or the parent UI**. It exits nonzero on failure/malformed input.
+No qualification PASS has been obtained. Unit fixtures verify the mathematics
+only and are explicitly disallowed as model evidence.
+
+The gate requires verified usage rights/voice consent, two independent reviews
+of verbatim audible natural speech, frozen speaker/recording-disjoint evaluation,
+and exclusion of training-speaker overlap. Controlled splices, fixture outputs,
+missing analyses and reused test sets fail. Failed inference cannot inflate WER
+using a cached perfect transcript. Wrong error categories or word locations are
+not correct detections. Blanket abstention fails recall.
+
+All three mistake-category recalls, correction precision, clean specificity and
+an additional exact-spoken-transcript agreement safety check must independently
+reach a 99% lower bound at familywise 95% confidence. Speakers, not correlated
+words/windows/clips, are the independent units; every relevant utterance per
+speaker must pass. This conservative gate is stronger than a 99% word-level
+point estimate. Even a completely successful sample needs **477 independent
+speakers relevant to each metric** under this rule; 600 clips of one speaker
+remain one unit. Sampling coverage still requires human audit, not just counts.
+Verbatim held-out WER must also be at most 1%.
+
+Running the gate against existing controls deliberately returns **FAIL**:
+speaker identities/consent and independently reviewed natural-error transcripts
+are absent; artificial controls and already-inspected development data cannot
+establish the target. Reports retain code/evidence hashes, never source audio.
+
+```sh
+npx tsx apps/mobile/scripts/qualify-recitation.mts \
+  output/quran-development/qualification/known-controls-unqualified-evidence.json \
+  output/quran-development/qualification/99-percent-gate-result.json
+```
+
+### Evaluation-access limits
+
+The apparently larger
+[public test dataset](https://huggingface.co/datasets/sobolev210/quran-recitation-errors-test)
+revision `a5efade58cdb5df3a40f9619907279bc76a8ee32` has 1,042 metadata rows but
+exactly the same 172 reviewed Hafs clips and two wording clips already evaluated:
+**zero new reviewed cases**. Unreviewed or other-riwayah rows cannot silently
+become trusted clean gold.
+
+The [Quran-Lab benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark)
+has a manual approval gate and separate voice/usage terms. Only its public card
+and status were inspected; no gated audio, account permissions or agreement was
+obtained. Its data approval would not automatically grant HBIC commercial model
+rights or qualify lexical-error detection. No pronunciation/Tajweed capability
+has been established by this work.
+
+**Remaining release blockers:** a recognizer that preserves learner mistakes
+rather than restoring canonical wording, permissioned independently transcribed
+teacher-reviewed natural-error evidence, fresh representative held-out evaluation,
+and actual native acoustic/performance qualification of any replacement. Repeating
+the same checks cannot replace these. Production and store releases are unchanged.
+
+## Earlier 12 October: real recording/tracking integration, still not qualified
 
 The normal native recording button previously invoked the audio-only recorder;
 automatic recognition was a separate action. It now invokes Recite Assist's
