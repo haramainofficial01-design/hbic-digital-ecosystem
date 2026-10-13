@@ -7,6 +7,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { approvedWebQuranResources, restoreWebQuranState, webQuranClient, webQuranStorageKey } from "../lib/quranBrowser";
 import { QuranListeningLibrary, QuranMadinahReader, QuranWebPractice, QuranPlaybackOptions, useWebQuranAudio } from "./QuranReaderTools";
 import styles from "./QuranReader.module.css";
+import { QuranBrandMark } from "./QuranBrandMark";
 
 type QuranMode = "read" | "listen" | "practice" | "memorize" | "test" | "bookmarks";
 const modes: { id: QuranMode; label: string }[] = [{ id: "read", label: "Read" }, { id: "listen", label: "Listen" }, { id: "practice", label: "Practise" }, { id: "bookmarks", label: "Library" }];
@@ -169,7 +170,7 @@ export function QuranReader() {
   }, []);
   return <main className={`${styles.shell}${focused ? ` ${styles.focused}` : ""}${audio.playback.phase !== "idle" ? ` ${styles.audioActive}` : ""}`}>
     <section className={styles.hero}>
-      <div><small>A QUIET PLACE TO READ</small><h1>Quran &amp; Recite</h1><p>Read the Madinah Mushaf, listen to authentic recitations, and practise at your own pace.</p></div>
+      <div className={styles.brandHeading}><QuranBrandMark /><div><small>A QUIET PLACE TO READ</small><h1>Quran &amp; Recite</h1><p>Read the Madinah Mushaf, listen to authentic recitations, and practise at your own pace.</p></div></div>
       <span lang="ar" dir="rtl" translate="no">ٱلْقُرْآنُ ٱلْكَرِيمُ</span>
     </section>
     <div className={styles.quick}><a href="#reader"><BookOpen />Read</a><a href="#qibla"><Compass />Qibla</a><a href="https://sunnah.com" target="_blank" rel="noreferrer"><ExternalLink />Hadith Library</a></div>

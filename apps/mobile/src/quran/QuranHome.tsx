@@ -4,6 +4,7 @@ import { Text } from "../i18n/LocalizedText";
 import type { QuranChapter } from "@hbic/shared";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranSurface } from "./QuranControls";
+import { QuranBrandMark } from "./QuranBrandMark";
 import type { QuranLibrary, QuranMode } from "./types";
 const actions: { mode: QuranMode; title: string; detail: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { mode: "practice", title: "Practise", detail: "Record & replay", icon: "mic-outline" },
@@ -24,6 +25,7 @@ export function QuranHome({ library, chapters, onMode, onOpen, fontLoaded, audio
   const last = chapters.find((c) => c.id === resume.chapter);
   return <View style={styles.content}>
     <View style={styles.welcome}>
+      <View style={{ alignItems: "center", marginBottom: 12 }}><QuranBrandMark size={88} /></View>
       <Text style={{ color: theme.colors.teal, fontFamily: fontLoaded ? "QuranNaskh" : undefined, fontSize: 27, lineHeight: 44, textAlign: "center", writingDirection: "rtl" }}>القرآن الكريم</Text>
       <Text style={[styles.title, { color: theme.colors.text }]}>Quran &amp; Recite</Text>
       <Text style={[styles.body, { color: theme.colors.muted }]}>A quiet place to read. A personal space to practise.</Text>

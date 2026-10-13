@@ -12,6 +12,7 @@ import { useAppTheme } from "../theme/ThemeProvider";
 import { AppButton } from "../components/AppButton";
 import { QuranIconButton, QuranMessage } from "./QuranControls";
 import { QuranHome } from "./QuranHome";
+import { QuranBrandMark } from "./QuranBrandMark";
 import { QuranVerseRow } from "./QuranVerseRow";
 import { QuranSettings } from "./QuranSettings";
 import { QuranPractice } from "./QuranPractice";
@@ -190,7 +191,7 @@ export default function QuranReaderScreen() {
     {workspace.desktop ? <QuranMacToolbar title={titles[mode]} chapter={reader.chapter ?? undefined} mode={mode} focused={focused} sidebar={showSidebar} inspector={showInspector} canSidebar={workspace.sidebar} canInspect={workspace.inspector}
       onSidebar={() => setSidebarVisible(value => !value)} onInspector={() => setInspectorVisible(value => !value)} onFocus={() => setFocused(value => !value)} onMode={onMode} onBack={backToMasjid} />
       : <View style={[styles.navigation, { borderBottomColor: theme.colors.border }]}><QuranIconButton label={mode === "home" ? "Back to More" : "Quran home"} icon="chevron-back" onPress={() => { if (mode === "home") backToMasjid(); else onMode("home"); }} />
-      <Text numberOfLines={1} style={[styles.navTitle, { color: theme.colors.text }]}>{titles[mode]}</Text>{mode === "read" ? <QuranIconButton label={focused ? "Leave focus" : "Focus reading"} icon={focused ? "contract-outline" : "expand-outline"} onPress={() => setFocused(value => !value)} /> : null}{!focused ? <><QuranIconButton label="Search Quran" icon="search-outline" onPress={() => onMode("search")} /><QuranIconButton label="Quran preferences" icon="options-outline" onPress={() => onMode("settings")} /></> : null}</View>}
+      {mode === "home" ? <View style={{ marginRight: 8 }}><QuranBrandMark size={30} /></View> : null}<Text numberOfLines={1} style={[styles.navTitle, { color: theme.colors.text }]}>{titles[mode]}</Text>{mode === "read" ? <QuranIconButton label={focused ? "Leave focus" : "Focus reading"} icon={focused ? "contract-outline" : "expand-outline"} onPress={() => setFocused(value => !value)} /> : null}{!focused ? <><QuranIconButton label="Search Quran" icon="search-outline" onPress={() => onMode("search")} /><QuranIconButton label="Quran preferences" icon="options-outline" onPress={() => onMode("settings")} /></> : null}</View>}
     {!focused ? workspace.desktop ? !showSidebar ? <QuranMacCompactNavigation mode={mode} onMode={onMode} /> : null : <QuranNavigation mode={mode} onMode={onMode} /> : null}
     {!library.ready ? <ActivityIndicator color={theme.colors.teal} accessibilityLabel="Preparing private Quran library" /> : null}
     <Animated.View style={[{ flex: 1 }, transition]}>

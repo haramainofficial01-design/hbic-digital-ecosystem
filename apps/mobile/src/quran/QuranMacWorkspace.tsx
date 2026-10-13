@@ -6,6 +6,7 @@ import { Text, TextInput } from "../i18n/LocalizedText";
 import { NativeGlassSurface } from "../components/NativeGlassSurface";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { QuranIconButton } from "./QuranControls";
+import { QuranBrandMark } from "./QuranBrandMark";
 import { quranPrimaryMode } from "./workspaceLayout";
 import type { QuranMode } from "./types";
 
@@ -49,7 +50,7 @@ export function QuranMacSidebar({ chapters, chapterId, mode, onMode, onOpen, onB
   return <MacGlass style={[styles.sidebar, { borderColor: theme.colors.border }]}>
     <FlatList accessibilityLabel="Mac Quran sidebar" data={matches} keyExtractor={chapter => String(chapter.id)} initialNumToRender={8} maxToRenderPerBatch={6} windowSize={5}
       ListHeaderComponent={<View style={{ gap: 3 }}>
-        <View style={styles.brand}><Ionicons name="book-outline" size={25} color={theme.colors.teal} /><View><Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: "700" }}>Quran</Text><Text style={{ color: theme.colors.muted, fontSize: 11 }}>Masjid Bilal</Text></View></View>
+        <View style={styles.brand}><QuranBrandMark size={42} /><View><Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: "700" }}>Quran</Text><Text style={{ color: theme.colors.muted, fontSize: 11 }}>Masjid Bilal</Text></View></View>
         {destinations.map((item, index) => <View key={item.mode}>
           {index === 4 ? <Text style={[styles.section, { color: theme.colors.muted }]}>My Practice</Text> : null}
           <Pressable accessibilityRole="button" accessibilityLabel={item.label} accessibilityState={{ selected: selected(item) }} onPress={() => onMode(item.mode)}
@@ -82,6 +83,7 @@ export function QuranMacToolbar({ title, chapter, mode, focused, sidebar, inspec
   return <MacGlass style={[styles.toolbar, { borderColor: theme.colors.border }]}>
     <QuranIconButton label="Back to Masjid Bilal" icon="chevron-back" onPress={onBack} />
     {!focused && canSidebar ? <QuranIconButton label={sidebar ? "Hide Quran sidebar" : "Show Quran sidebar"} icon="albums-outline" active={sidebar} onPress={onSidebar} /> : null}
+    {mode === "home" ? <QuranBrandMark size={32} /> : null}
     <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 8 }}><Text numberOfLines={1} style={{ color: theme.colors.text, fontSize: 15, fontWeight: "700" }}>{title}</Text>
       {mode === "read" && chapter ? <Text numberOfLines={1} style={{ color: theme.colors.muted, fontSize: 11, marginTop: 2 }}>{chapter.nameSimple}</Text> : null}</View>
     {mode === "read" ? <QuranIconButton label={focused ? "Leave focus" : "Focus reading"} icon={focused ? "contract-outline" : "expand-outline"} onPress={onFocus} /> : null}

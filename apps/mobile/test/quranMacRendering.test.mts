@@ -9,6 +9,7 @@ const nativeAdapter = `import React from 'react';
 function flatten(value){return Array.isArray(value)?Object.assign({},...value.filter(Boolean).map(flatten)):value||{}}
 function css(value,container){const s=flatten(typeof value==='function'?value({pressed:false}):value);if(container){s.display='flex';s.flexDirection=s.flexDirection||'column'}if(s.paddingHorizontal!=null){s.paddingLeft=s.paddingRight=s.paddingHorizontal;delete s.paddingHorizontal}if(s.paddingVertical!=null){s.paddingTop=s.paddingBottom=s.paddingVertical;delete s.paddingVertical}if(s.marginHorizontal!=null){s.marginLeft=s.marginRight=s.marginHorizontal;delete s.marginHorizontal}if(s.marginVertical!=null){s.marginTop=s.marginBottom=s.marginVertical;delete s.marginVertical}if(s.flex!=null)s.flex=s.flex+' 1 0%';return s}
 export function View({children,style,accessibilityLabel,accessibilityRole}){return React.createElement('div',{'aria-label':accessibilityLabel,role:accessibilityRole,style:css(style,true)},children)}
+export function Image({source,style}){return React.createElement('img',{src:source,alt:'',style:css(style,false)})}
 export function Text({children,style,numberOfLines}){return React.createElement('span',{style:{...css(style,false),...(numberOfLines===1?{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}:{})}},children)}
 export function TextInput({accessibilityLabel,onChangeText,style,...p}){delete p.autoCorrect;return React.createElement('input',{...p,'aria-label':accessibilityLabel,onChange:e=>onChangeText?.(e.target.value),style:css(style,false)})}
 export function Pressable({children,style,onPress,accessibilityLabel,accessibilityRole,accessibilityState,disabled}){return React.createElement('button',{type:'button',onClick:onPress,'aria-label':accessibilityLabel,role:accessibilityRole,'aria-selected':accessibilityState?.selected,disabled,style:css(style,true)},children)}
@@ -18,7 +19,7 @@ export const StyleSheet={create:s=>s,hairlineWidth:1};
 export const AccessibilityInfo={isReduceTransparencyEnabled:async()=>window.qaOpaque,addEventListener:(_,fn)=>{window.qaTransparency=fn;return{remove(){window.qaTransparency=null}}}};`;
 
 async function renderBundle() {
-  const result = await build({ write: false, bundle: true, platform: "browser", format: "iife", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
+  const result = await build({ write: false, bundle: true, platform: "browser", format: "iife", jsx: "automatic", loader: { ".png": "dataurl" }, define: { "process.env.NODE_ENV": '"production"' },
     stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';
 import{QuranMacSidebar,QuranMacToolbar,QuranMacCompactNavigation,QuranMacInspector}from'./apps/mobile/src/quran/QuranMacWorkspace';
 import{quranWorkspaceLayout}from'./apps/mobile/src/quran/workspaceLayout';
