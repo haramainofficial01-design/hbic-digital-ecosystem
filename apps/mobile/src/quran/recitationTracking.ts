@@ -129,6 +129,53 @@ interface TrackedWord extends RecitationWord { support: number; context: number;
 const emptyFeedback = (expected: string): ReciteFeedback => ({status: "uncertain", attempted: 0, differences: [], stableComplete: false,
   words: recitationDisplayWords(expected).map(text => ({text, state: "not_heard"}))});
 
+/** Navigation only: follow ACTUAL current tokens without waiting for whole-ayah
+ * assessment. This never marks a word correct, creates a mistake, advances an
+ * ayah, or fills gaps with the expected text. A lone token is accepted only at a
+ * unique selected opening; otherwise two adjacent exact word anchors are needed.
+ * Revisions/weak/clipped/new unrelated speech cannot reuse a stale cursor. */
+export function recitationFollowingIndex(expected: string, observation: RecitationObservation): number | null {
+  const words = recitationDisplayWords(expected);
+  if (!words.length || words.length > 200 || observation.words.length > 240 || !Number.isFinite(observation.quality)
+    || observation.quality < .7 || !Number.isSafeInteger(observation.startSample) || observation.startSample < 0
+    || !Number.isSafeInteger(observation.endSample) || observation.endSample <= observation.startSample) return null;
+  const spoken = observation.words.map(word => ({ ...word }));
+  if (spoken.some((word, i) => !Number.isFinite(word.startSample) || !Number.isFinite(word.endSample)
+    || word.startSample < observation.startSample || word.endSample > observation.endSample || word.endSample <= word.startSample
+    || i > 0 && (word.startSample < spoken[i - 1].startSample || word.endSample < spoken[i - 1].endSample)
+    || !Number.isFinite(word.confidence) || word.confidence < 0 || word.confidence > 1 || !recitationLexeme(word.text))) return null;
+  const vocabulary = new Set(words.map(recitationLexeme));
+  for (let i = 0; i + 1 < spoken.length; i++) {
+    const a = spoken[i], b = spoken[i + 1], joined = recitationLexeme(a.text + b.text);
+    if (vocabulary.has(joined) && !vocabulary.has(recitationLexeme(a.text)) && b.startSample >= a.endSample
+      && b.startSample - a.endSample < 24000) spoken.splice(i, 2, { ...a, text: joined, endSample: b.endSample,
+        confidence: Math.min(a.confidence, b.confidence), edge: a.edge || b.edge });
+  }
+  const aligned = alignRecitationWords(words, spoken.map(word => word.text));
+  const anchors = aligned.words.filter(word => word.operation === "match" && word.expectedIndex !== null && word.recognizedIndex !== null
+    && wholeWordAnchor(words[word.expectedIndex], spoken[word.recognizedIndex].text)
+    && spoken[word.recognizedIndex].confidence >= .85 && !spoken[word.recognizedIndex].edge);
+  let following: number | null = null;
+  const opening = anchors.find(anchor => anchor.expectedIndex === 0 && anchor.recognizedIndex === 0);
+  if (opening && spoken[0].confidence >= .95 && words.filter(word => wholeWordAnchor(word, spoken[0].text)).length === 1) following = 0;
+  let possibleStarts: number[] = [], runLength = 0;
+  for (let i = 0; i < anchors.length; i++) {
+    const current = anchors[i], before = anchors[i - 1];
+    const heard = spoken[current.recognizedIndex!].text;
+    if (!before || current.expectedIndex !== before.expectedIndex! + 1 || current.recognizedIndex !== before.recognizedIndex! + 1) {
+      runLength = 0;
+      possibleStarts = words.flatMap((word, index) => wholeWordAnchor(word, heard) ? [index] : []);
+    } else possibleStarts = possibleStarts.filter(start => start + runLength < words.length && wholeWordAnchor(words[start + runLength], heard));
+    runLength++;
+    // Repeated Quran phrases need enough actual context to identify a UNIQUE
+    // location. Minimum-edit alignment alone must not invent which repeat was
+    // heard. Candidate filtering is bounded, with no new inference or timers.
+    if (runLength >= 2 && possibleStarts.length === 1 && possibleStarts[0] + runLength - 1 === current.expectedIndex)
+      following = current.expectedIndex;
+  }
+  return following;
+}
+
 /** Temporal overlap, not string overlap. Equal words at different acoustic times
  * remain repetitions; a second decode of the same samples is not new evidence.
  * A corrected interior decode replaces a clipped/unstable boundary token. */
@@ -179,7 +226,8 @@ export class RecitationTracker {
     this.history.sort((a, b) => a.startSample - b.startSample);
     // The UI caps a session at two minutes; independently cap text-side memory.
     if (this.history.length > 240) { this.reset(); return emptyFeedback(expected); }
-    return this.assess(expected);
+    const assessment = this.assess(expected), followingIndex = recitationFollowingIndex(expected, observation);
+    return followingIndex === null ? assessment : { ...assessment, followingIndex };
   }
   private assess(expected: string): ReciteFeedback {
     const words = recitationDisplayWords(expected), spoken = this.history.map(word => ({...word}));

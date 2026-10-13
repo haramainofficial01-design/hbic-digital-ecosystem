@@ -7,8 +7,8 @@ import {chromium, type Page} from 'playwright';
 import {createServer} from 'node:http';
 import {readFileSync,writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
-const root=process.cwd();
+import {createHash,randomUUID} from 'node:crypto';
+const root=process.cwd(), reportOutput=path.join(root,`output/quran-development/qualification/actual-browser-recitation-${Date.now()}-${randomUUID()}.json`);
 const entries=await fetch('http://127.0.0.1:3011/cases').then(r=>r.json()) as {split:string; category:string; text:string; name:string; index:number; sourceHash:string; audioSha256:string}[];
 const entry=entries.find(e=>e.split==='calibration'&&e.category==='correct'&&e.text.includes('وَرَفَعْنَا'))??entries[16];
 const pcm=new Uint8Array(await fetch('http://127.0.0.1:3011/audio/'+entry.index).then(r=>r.arrayBuffer()) as ArrayBuffer);
@@ -39,9 +39,11 @@ await page.getByText('Listening privately on this device.',{exact:false}).waitFo
 await page.waitForFunction(()=>(window as any).qa.observations.some((o:{text:string})=>o.text.trim()),undefined,{timeout:30000});
 await page.waitForTimeout(6500);report.observations=await page.evaluate(()=>(window as any).qa.observations);report.requests=await page.evaluate(()=>(window as any).qa.requests);assert.equal(report.requests,1);
 report.heard=await page.getByLabel('Recognized speech').innerText();assert.ok(report.heard.trim());
+report.followingWords=await page.locator('[aria-current="location"]').allTextContents();
+assert.equal(report.followingWords.length,1,'Actual acoustic speech should produce one supported word cursor');
 await page.getByRole('button',{name:'Stop & Review',exact:true}).click();await page.getByRole('link',{name:'Download to my device'}).waitFor();
 report.tracksClosed=await page.evaluate(()=>(window as any).qa.streams.every((s:MediaStream)=>s.getTracks().every(t=>t.readyState==='ended')));assert.equal(report.tracksClosed,true);
 report.localRecording=await page.locator('audio').getAttribute('src');assert.match(report.localRecording,/^blob:/);report.localRecording='browser-local blob; erased after test';
 await page.getByRole('button',{name:'Delete recording',exact:true}).click();assert.equal(await page.locator('audio').count(),0);report.reviewDeleted=true;
 await page.evaluate(()=>Promise.all((window as any).qa.contexts.map((c:AudioContext)=>c.close())));report.pass=true;
-}catch(e){report.pass=false;report.error=String(e);report.body=await page!?.locator('body').innerText().catch(()=>null);throw e;}finally{writeFileSync('output/quran-development/qualification/actual-browser-recitation.json',JSON.stringify(report,null,2));pcm.fill(0);await browser.close();await new Promise<void>(r=>server.close(()=>r()));console.log(JSON.stringify({pass:report.pass,heard:report.heard,observations:report.observations.length,errors:report.errors,body:report.body}));}
+}catch(e){report.pass=false;report.error=String(e);report.body=await page!?.locator('body').innerText().catch(()=>null);throw e;}finally{writeFileSync(reportOutput,JSON.stringify(report,null,2));pcm.fill(0);await browser.close();await new Promise<void>(r=>server.close(()=>r()));console.log(JSON.stringify({pass:report.pass,heard:report.heard,observations:report.observations.length,followingWords:report.followingWords,errors:report.errors,body:report.body,output:reportOutput}));}

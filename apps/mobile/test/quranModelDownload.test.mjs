@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { downloadQwenRanges, qwenComparisonDirectory, qwenRecitationModels, verifyPinnedRecitationAsset } from "../scripts/prepare-qwen-recitation.mjs";
 import { muaalemRecitationModel } from "../scripts/prepare-muaalem-recitation.mjs";
+import { whisperRecitationModel } from "../scripts/prepare-whisper-recitation.mjs";
 
 test("only explicit official model pins and ignored comparison paths are accepted", () => {
   assert.throws(() => qwenComparisonDirectory("../../production"), /pinned/);
@@ -23,6 +24,19 @@ test("only explicit official model pins and ignored comparison paths are accepte
   assert.equal(muaalemRecitationModel.repository, "obadx/muaalem-model-v3_2");
   assert.equal(muaalemRecitationModel.revision, "01a1ef9fbe40d144ef845101e89ff924aed3fef5");
   assert.equal(muaalemRecitationModel.files["model.safetensors"].sha256, "6b6a2e85303d17ff0f3af5e1fc79ac83daecee409c756ddf27f0ced59393bb41");
+});
+
+test("the additional local transcription baseline pins official MIT safetensors, not remote code or an API", () => {
+  assert.equal(whisperRecitationModel.repository, "openai/whisper-large-v3-turbo");
+  assert.equal(whisperRecitationModel.license, "MIT");
+  assert.equal(whisperRecitationModel.revision, "41f01f3fe87f28c78e2fbf8b568835947dd65ed9");
+  assert.equal(whisperRecitationModel.files["model.safetensors"].sha256, "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1");
+  assert.equal(Object.keys(whisperRecitationModel.files).length, 10);
+  for (const [name, pin] of Object.entries(whisperRecitationModel.files)) {
+    assert.match(name, /^[a-z_]+\.(?:md|json|txt|safetensors)$/i);
+    assert.ok(Number.isSafeInteger(pin.size) && pin.size > 0);
+    assert.match(pin.git ?? pin.sha256, /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
+  }
 });
 
 test("complete assets must match both pinned byte length and digest before loading", async () => {

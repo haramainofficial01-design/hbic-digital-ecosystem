@@ -8,6 +8,13 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest development follow-up: [competing acoustic evidence and real
+voice-following](quran-recitation-competing-evidence-2026-10-13.md). A real-model
+word-navigation indicator was verified; the best joint offline detector achieved
+13/18 controlled operations on the comparison split, with 81.25% precision,
+72.22% recall and 0/30 negative alerts. It is **not integrated or qualified at
+99%**; production and stores remain unchanged.
+
 ## 13 October: fresh alternative recognition, 99% still NOT established
 
 The unchanged current tracker remains at the 12 October measured **6/36

@@ -8,6 +8,9 @@ export interface ReciteFeedback {
   attempted: number;
   /** Navigation evidence only; never a recitation or memorization score. */
   stableComplete?: boolean;
+  /** Last supported word in the current observation, NOT correctness or
+   * completion. May follow a clear opening while assessment stays uncertain. */
+  followingIndex?: number;
 }
 /** Require two complete, stable observations before suggesting verse progression.
  * This is a navigation guard, never a memorization score or teacher assessment. */

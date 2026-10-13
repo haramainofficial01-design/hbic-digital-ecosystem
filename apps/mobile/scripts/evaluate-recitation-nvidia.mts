@@ -3,7 +3,7 @@
  * No grammar, forced alignment, private audio, online ASR or app release changes.
  * Experimental community encoder + original CTC head is NOT an official export.
  */
-import {createHash} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 import {readFileSync,writeFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {spawn} from "node:child_process";
@@ -20,7 +20,7 @@ const scope=process.argv[4]??"rolling";if(scope!=="rolling"&&scope!=="whole")thr
 const root=resolve("output/quran-development/sherpa-comparison");
 const python=resolve(process.env.RECITE_NVIDIA_PYTHON??"output/quran-development/nvidia-evaluation-runtime/bin/python");
 if(!python.includes("/output/quran-development/"))throw Error("Use the isolated ignored development Python runtime.");
-const worker=resolve("apps/mobile/scripts/nvidia-recitation-worker.py"), output=resolve(root,`nvidia-${scope}-${mode}-${split}.json`);
+const worker=resolve("apps/mobile/scripts/nvidia-recitation-worker.py"), output=resolve(root,`nvidia-${scope}-${mode}-${split}-${Date.now()}-${randomUUID()}.json`);
 const sha=(bytes:string|Uint8Array)=>createHash("sha256").update(bytes).digest("hex");
 const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/evaluate-recitation-nvidia.mts","apps/mobile/scripts/nvidiaRecitationEvidence.ts","apps/mobile/src/quran/recitationTracking.ts","apps/mobile/src/quran/reciteAssistFeedback.ts"].map(path=>[path.split("/").at(-1)!,sha(readFileSync(path))]));
 const processWorker=spawn(python,[worker,root,mode,scope],{stdio:["pipe","pipe","pipe"]});

@@ -43,7 +43,10 @@ test("recitation and test UI share a single private capture, review/delete corre
     await page.getByRole('button',{name:'Resume',exact:true}).click();await page.waitForFunction(old=>(window as any).qa.lastRequest.request!==old,old);
     await page.evaluate(old=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:old,observation:{text:'STALE',quality:1,words:[],startSample:0,endSample:64000}});},old);
     assert.equal(await page.getByText('STALE',{exact:true}).count(),0);
-    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,observation:{text:'الحمد لله',quality:1,words:[],startSample:0,endSample:64000}});});
+    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,observation:{text:'الحمد لله',quality:1,
+      words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600},{text:'لله',confidence:.99,edge:false,startSample:12000,endSample:13600}],startSample:0,endSample:64000}});});
+    await page.locator('[aria-current="location"]').waitFor();
+    assert.equal((await page.locator('[aria-current="location"]').innerText()).trim(),'لله');
     await page.getByRole('button',{name:'Stop & Review',exact:true}).click();await page.getByRole('link',{name:'Download to my device'}).waitFor();
     assert.equal(await page.evaluate(()=>(window as any).qa.streams.every((s:MediaStream)=>s.getTracks().every(t=>t.readyState==='ended'))),true);
     await page.getByLabel('Recording playback speed').selectOption('1.5');await page.getByRole('button',{name:'Loop Off',exact:true}).click();
@@ -53,8 +56,10 @@ test("recitation and test UI share a single private capture, review/delete corre
     await page.getByRole('button',{name:'Toggle test',exact:true}).click();await page.getByRole('button',{name:'Start Recitation Test',exact:true}).click();
     await page.getByText('Listening privately on this device.',{exact:false}).waitFor();
     await page.waitForFunction(()=>(window as any).qa.requests===3);
-    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,observation:{text:'Hidden fixture',quality:1,words:[],startSample:0,endSample:64000}});});
+    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,observation:{text:'الحمد',quality:1,
+      words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600}],startSample:0,endSample:64000}});});
     assert.equal(await page.getByLabel('Recognized speech').count(),0);
+    assert.equal(await page.locator('[aria-current="location"]').count(),0);
     await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await page.waitForFunction(()=>(window as any).captureBusy===false);
     assert.equal(await page.locator('audio').count(),0);
     assert.equal(await page.evaluate(()=>(window as any).qa.streams.every((s:MediaStream)=>s.getTracks().every(t=>t.readyState==='ended'))),true);

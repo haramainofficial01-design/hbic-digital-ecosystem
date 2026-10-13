@@ -261,9 +261,11 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
       icon={phase === "paused" ? "play-outline" : "pause-outline"} disabled={phase === "pausing" || phase === "resuming"}
       onPress={() => void (phase === "paused" ? resume() : pause())} /></View> : null}
     {summary ? <View style={{ marginTop: 16 }}><Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: "700" }}>Session review</Text><Text style={{ color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 6 }}>{summary}</Text></View> : null}
-    {feedback ? <View style={{ marginTop: 16, gap: 10 }}><Text style={{ color: theme.colors.muted, fontSize: 14 }}>{feedback.status === "uncertain" ? "Couldn’t hear clearly enough—no mistake marked." : feedback.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words."}</Text>
+    {feedback ? <View style={{ marginTop: 16, gap: 10 }}><Text style={{ color: theme.colors.muted, fontSize: 14 }}>{feedback.status === "uncertain" ? feedback.followingIndex !== undefined ? "Following your voice; the rest is still uncertain." : "Couldn’t hear clearly enough—no mistake marked." : feedback.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words."}</Text>
       {!concealed ? <View style={{ flexDirection: "row-reverse", flexWrap: "wrap", gap: 7 }}>{feedback.words.map((word, i) => <Text key={i} style={{ fontSize: 25, lineHeight: 49, writingDirection: "rtl", paddingHorizontal: 4, borderRadius: 5,
-        fontFamily: fontLoaded ? "QuranNaskh" : undefined, color: word.state === "matched" ? theme.colors.teal : theme.colors.text, backgroundColor: word.state === "possible_difference" ? theme.colors.tintSoft : "transparent" }}>{word.text}</Text>)}</View> : <Text style={{ color: theme.colors.muted, fontSize: 14 }}>Text stays hidden until you choose Reveal.</Text>}
+        fontFamily: fontLoaded ? "QuranNaskh" : undefined, color: word.state === "matched" ? theme.colors.teal : theme.colors.text,
+        borderBottomWidth: 2, borderBottomColor: feedback.followingIndex === i ? theme.colors.teal : "transparent",
+        backgroundColor: word.state === "possible_difference" ? theme.colors.tintSoft : "transparent" }}>{word.text}</Text>)}</View> : <Text style={{ color: theme.colors.muted, fontSize: 14 }}>Text stays hidden until you choose Reveal.</Text>}
       <Text style={{ color: theme.colors.subtle, fontSize: 12 }}>On-device model: Tilawi / Muhammad Dur, CC BY 4.0. Quran text: Tanzil, CC BY 3.0. No numerical recitation score.</Text></View> : null}
   </QuranSurface>;
 });

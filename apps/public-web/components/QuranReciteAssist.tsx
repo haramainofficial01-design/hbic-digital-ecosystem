@@ -141,7 +141,7 @@ export function QuranReciteAssist({verse, concealed, blocked = false, stopPlayba
         if (data.type === "observation" && data.observation && selected.current && stream.current && data.request === captureEpoch.current) {
           if (data.observation.text.trim()) setHeard(data.observation.text);
           const result = tracker.current.observe(selected.current.textUthmani, data.observation); setFeedback(result);
-          setMessage(result.status === "uncertain" ? "Couldn’t hear clearly enough—no mistake marked." : result.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words. This is not a score.");
+          setMessage(result.status === "uncertain" ? result.followingIndex !== undefined ? "Following your voice; the rest is still uncertain." : "Couldn’t hear clearly enough—no mistake marked." : result.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words. This is not a score.");
         }
       };
       await capture(token);
@@ -178,7 +178,7 @@ export function QuranReciteAssist({verse, concealed, blocked = false, stopPlayba
     <small>{available ? "Sessions stop after two minutes. Pause releases the microphone and discards the unfinished recording." : "Audio-only recordings stop after five minutes."}</small>
     {heard && !concealed ? <div><small>Recognized speech · may contain transcription errors</small><p lang="ar" dir="rtl" translate="no" aria-label="Recognized speech">{heard}</p></div> : null}
     {feedback?.differences.map((difference,index) => <div key={`${difference.kind}:${difference.index}:${index}`}><p>Possible {difference.kind === "omission" ? "skipped word" : difference.kind === "substitution" ? "different word" : difference.kind === "repetition" ? "repeated word" : "extra word"}{difference.index !== null ? ` · Word ${difference.index + 1}` : ""}</p>{difference.index !== null && onRevealWord ? <button onClick={() => onRevealWord(difference.index!)}>Show correction hint</button> : null}</div>)}
-    {feedback && !concealed ? <p lang="ar" dir="rtl" translate="no" className={styles.assistWords}>{feedback.words.map((word, index) => <span key={index} data-state={word.state}>{word.text} </span>)}</p> : feedback ? <p>The passage stays hidden until you choose Reveal.</p> : null}
+    {feedback && !concealed ? <p lang="ar" dir="rtl" translate="no" className={styles.assistWords}>{feedback.words.map((word, index) => <span key={index} data-state={word.state} aria-current={feedback.followingIndex === index ? "location" : undefined}>{word.text} </span>)}</p> : feedback ? <p>The passage stays hidden until you choose Reveal.</p> : null}
     <small>Model: <a href="https://huggingface.co/muhdur/tilawi-fastconformer-quran" target="_blank" rel="noreferrer">Tilawi / Muhammad Dur</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>. Reference text: Quran Foundation. No recitation score.</small>
   </section>;
 }
