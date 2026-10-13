@@ -1,4 +1,4 @@
-# Recite Assist qualification — 8 October 2026
+# Recite Assist qualification — updated 12 October 2026
 
 **Authorized only as an optional early preview, not a qualified assessment.**
 After reviewing the limitations, the user explicitly requested publishing the
@@ -7,6 +7,121 @@ download/microphone consent and prominent warnings that it misses many mistakes
 and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
+
+## 12 October: real recording/tracking integration, still not qualified
+
+The normal native recording button previously invoked the audio-only recorder;
+automatic recognition was a separate action. It now invokes Recite Assist's
+owned PCM capture, records from that same input, and follows the existing private
+retention/review setting. Test mode uses the same real recognizer with concealed
+reference text and explicit correction hints. Self-reported memorization remains
+separate from recognition; no automatic score is fabricated.
+
+The website now similarly records and recognizes through **one microphone
+stream**. It can review, loop, change pitch-preserving playback speed, download
+or delete an explicitly requested browser-local recording. Pause/background/
+navigation discard unfinished browser recordings and release capture. Older
+browsers retain a clearly labeled audio-only fallback rather than losing the
+previous recording feature. Browser audio is never uploaded or auto-downloaded.
+
+Additional pipeline changes:
+
+- Exact lexical alignment replaces the upstream fuzzy/substring judge. Different
+  words no longer silently turn green. Quran orthographic aliases are comparison
+  only; the displayed canonical Quran is unchanged.
+- Conflicting overlapping hypotheses retract old green/stable evidence. A
+  one-letter acoustic confusion stays uncertain, not a pronunciation judgment.
+- A bounded three-check quiet tail can finish the final spoken word. It consumes
+  actual capture samples, never generated silence in the live app, and cannot
+  run indefinitely or on initial silence. Normal pacing remains 2.5 seconds.
+- Skipped/substituted/repeated word hints index the canonical reference, not
+  generated recognition text. Recognized speech is labeled separately and stays
+  hidden while test text is concealed.
+- Browser pause/resume rejects old responses before clearing the new inference
+  state; review recording cannot open a second microphone or close borrowed
+  recognition tracks. Browser confidence/timing now share one CTC decoding pass.
+
+### Updated measurements (not a production accuracy claim)
+
+On all 96 actual waveform controls with final quiet-context checks:
+
+| Measurement | Result |
+| --- | ---: |
+| Correct operation detections | **6/36 (16.67%)** |
+| Wrong operation alerts on positive controls | 0 |
+| False alerts on negative controls | **1/60 (1.67%)** |
+| Operation-case precision | 6/7 (85.71%; small selected sample) |
+| Omission / repetition / substitution | 2/12 · 4/12 · **0/12** |
+| Held-out detections / false alerts | 3/18 · 0/30 |
+| Controlled script-reference WER | 85/400 (21.25%) |
+| Desktop inference median / p95 | 76 / 119 ms |
+
+These remain approximate waveform splices with baseline-success selection, not
+human-recited mistake gold. The three quiet-context observations are not three
+independent recitations. Current native simulator parity with this new cadence
+has **not** been rerun; the native results below are the earlier 8 October run.
+
+Replaying the existing 172 natural clips' actual acoustic observations through
+the final lexical tracker gives **0/126** clean clips with any alert (held-out
+0/37) but just **23/126** completely followed clips (held-out 9/37). Both natural
+reviewed wording locations remain missed (**0/2**). This is saved-evidence replay,
+not a new model inference run, and is not a word-recognition accuracy estimate.
+
+The headless browser end-to-end check runs the **unmodified production WASM
+worker**, verified model and real AudioWorklet/MediaRecorder on public licensed
+RAM audio. It transcribed `ورفعنا لك ذكرك`, emitted three actual observations,
+opened one shared capture, produced a browser-local review, closed the tracks,
+and deleted the review without errors. No host microphone or user voice was
+used. This proves wiring/lifecycle for that case, not general correction accuracy.
+
+105 focused Quran regression tests pass. Real-browser UI tests cover recording,
+pause/resume/stale responses, concealed test speech, permission denial,
+background deletion, loop/speed, and unsupported-recognition fallback. Those UI
+tests use explicitly identified worker fixtures and are **not** ASR measurements.
+Mobile/public-web typechecks, public-web production build and iOS/Android Hermes
+exports pass; exports are not store binaries or physical microphone checks.
+
+### Additional recognizer investigation
+
+- [Moonshine Arabic legacy base](https://huggingface.co/moonshine-ai/moonshine-base-ar),
+  using the [Sherpa maintainers' quantized export](https://k2-fsa.github.io/sherpa/onnx/moonshine/index.html),
+  was evaluated locally on 48 calibration waveform controls only. Identical
+  lexical normalization gives 48/192 scripted word edits (25.00%). It was not
+  promoted or tested on held-out controls after failing the calibration screen.
+  The [upstream license](https://github.com/moonshine-ai/moonshine/blob/main/LICENSE)
+  distinguishes MIT streaming models from Community-licensed legacy Arabic
+  base/tiny; no HBIC commercial-release license or registration was assumed.
+- [NVIDIA Arabic FastConformer](https://huggingface.co/nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0)
+  is CC BY 4.0, but the inspected pinned community CTC export contains an
+  80-feature input and 512-channel encoder output, not a complete waveform-to-word
+  recognizer. It was not substituted for a working engine or assigned invented
+  accuracy. A complete frontend/CTC head/export remains required for evaluation.
+- [Quran-Lab streaming license](https://huggingface.co/Muno459/fastconformer-quran-streaming)
+  is gated and restricts revenue-linked use. HBIC tuition functionality does not
+  justify assuming a licensing exception. No gated weights or new permissions
+  were obtained.
+
+**Release status:** these changes are development improvements, not a newly
+deployed dependable correction feature. Production and store submissions remain
+unchanged. Recognition still misses 30/36 controlled mistakes and both natural
+wording locations. A better licensed recognizer and permissioned, independently
+transcribed teacher-reviewed natural-error data remain the accuracy blockers.
+No user audio is sent to an online provider without explicit opt-in authorization.
+
+Reproduce the actual browser wiring check after starting the existing public
+RAM corpus (`RECITE_SERVE_ONLY=1 RECITE_SERVE=1` on the control evaluator):
+
+```sh
+npx tsx apps/public-web/scripts/evaluate-recitation-browser.mts
+```
+
+Evidence stays in ignored `output/quran-development/qualification/`: the actual
+96-case run is `utterance-tail-final-controls.json`; final tracker/hint replay is
+`utterance-tail-hints-replayed.json`; natural replay is
+`lexical-final-replayed.json`; browser run is `actual-browser-recitation.json`.
+These retain source/code hashes, not audio or private accounts.
+
+## Earlier 8 October qualification (retained for comparison)
 
 ## What actually changed
 

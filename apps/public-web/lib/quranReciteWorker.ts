@@ -2,8 +2,8 @@
 // Dedicated browser worker: no microphone, account or server-side inference.
 import * as ort from "onnxruntime-web/wasm";
 import { TextCTCDecoder, detectSpeech } from "@tilawi/quran-asr";
-import { acousticQuality, compactQuietPausesWithTimeline } from "../../mobile/src/quran/reciteAssistFeedback";
-import { decodeRecitationWords } from "../../mobile/src/quran/recitationTracking";
+import { compactQuietPausesWithTimeline } from "../../mobile/src/quran/reciteAssistFeedback";
+import { decodeRecitationEvidence } from "../../mobile/src/quran/recitationTracking";
 
 const revision = "e9448a0e84f3adb64c28b7a8db501dd8e0e59a84";
 const source = `https://huggingface.co/muhdur/tilawi-fastconformer-quran/resolve/${revision}/`;
@@ -54,7 +54,7 @@ worker.onmessage = async ({data}: MessageEvent) => {
     let speech: ReturnType<typeof compactQuietPausesWithTimeline> | null = null;
     try {
       if (!Number.isSafeInteger(startSample) || startSample < 0 || pcm.length > 96000) throw new Error("Invalid recognition window.");
-      let observation = {text: "", quality: 0, words: [] as ReturnType<typeof decodeRecitationWords>, startSample, endSample: startSample + pcm.length};
+      let observation = {text: "", quality: 0, words: [] as ReturnType<typeof decodeRecitationEvidence>["words"], startSample, endSample: startSample + pcm.length};
       if (pcm.length >= 16000 && detectSpeech(pcm)) {
         speech = compactQuietPausesWithTimeline(pcm);
         const output = await session.run({audio_signal: new ort.Tensor("float32", speech.pcm, [1, speech.pcm.length]),
@@ -63,8 +63,8 @@ worker.onmessage = async ({data}: MessageEvent) => {
         if (tensor.type !== "float32" || tensor.dims.length !== 3 || tensor.dims[0] !== 1) throw new Error("Invalid recognition output.");
         const acoustic = {logprobs: tensor.data as Float32Array, timeSteps: tensor.dims[1], vocabSize: tensor.dims[2], blankId: 1024};
         const result = {...decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize), acoustic};
-        observation = {...observation, text: result.text, quality: acousticQuality(result),
-          words: decodeRecitationWords(result, vocab, speech.pcm.length, speech.spans, startSample, pcm.length)};
+        const evidence = decodeRecitationEvidence(result, vocab, speech.pcm.length, speech.spans, startSample, pcm.length);
+        observation = {...observation, text: result.text, ...evidence};
       }
       worker.postMessage({type: "observation", observation, request: data.request});
     } catch (error) { worker.postMessage({type: "error", request: data.request, message: error instanceof Error ? error.message : "Recognition could not run."}); }

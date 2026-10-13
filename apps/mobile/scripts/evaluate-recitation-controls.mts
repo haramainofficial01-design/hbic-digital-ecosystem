@@ -16,6 +16,7 @@ const base = `https://huggingface.co/datasets/${dataset}/resolve/${revision}/`;
 const modelRevision = "e9448a0e84f3adb64c28b7a8db501dd8e0e59a84";
 const root = resolve(process.env.RECITE_MODEL_ASSETS ?? "output/quran-development/recognition/assets");
 const output = resolve(process.env.RECITE_CONTROLS_OUTPUT ?? "output/quran-development/qualification/waveform-controls.json");
+const finishingContext = process.env.RECITE_FINISHING_CONTROLS === "1";
 const baselinePath = resolve(process.env.RECITE_BASELINE ?? "output/quran-development/qualification/baseline.json");
 if (!output.includes("/output/quran-development/") || !baselinePath.includes("/output/quran-development/")) throw Error("Use ignored development output only.");
 const sha = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
@@ -147,11 +148,11 @@ function save() {
       "CTC emission-midpoint cuts approximate acoustic word segments, not human phoneme boundaries. Known waveform interventions are controlled-edit gold, NOT natural learner mistake labels.",
       "Substitution donors are different recording groups in the same split; no calibration/held-out waveform sharing.",
       "0.8x/1.2x linear resampling changes pitch and timing; it does not prove robustness to natural recitation speed or microphone acoustics.",
-      "Strict production 2.5-second observation cadence, six-second windows; quiet padding supplies at least 0.8-second settling and a following real cadence tick. Different capture boundaries are not independent recitations.",
-      "Precision/recall is controlled operation-case agreement; repeated-word location is not exposed by feedback and must be supported by consecutive matching tracked words.",
+      finishingContext ? "Normal observations every 2.5 seconds, six-second windows, then three actual quiet-context checks at one-second intervals. Offline quiet padding is a controlled settling condition, not microphone evidence or independent recitations." : "Strict production 2.5-second observation cadence, six-second windows; quiet padding supplies at least 0.8-second settling and a following real cadence tick. Different capture boundaries are not independent recitations.",
+      "Precision/recall is controlled operation-case agreement; repetition must be supported by consecutive matching tracked words at the scripted target, not any repetition elsewhere.",
       "Script-reference WER uses known edited source words but approximate cuts can affect pronunciation. Not a human-verified natural speech WER.",
       "Latency is desktop native ONNX runtime, not phone microphone-to-feedback latency. No Tajweed/phoneme qualification or production release claim."],
-    runtime: ort.env.versions, sourceOnly: serveOnly, servedControlCases: servedCases.length,
+    runtime: ort.env.versions, finishingContext, sourceOnly: serveOnly, servedControlCases: servedCases.length,
     selection: {eligibleClips: eligible.length, eligibleGroups: new Set(eligible.map(r => r.group)).size, selectedIds, selectedBeforeNewDetector: chosen.length, reliableSpliceSources: sources.length, exclusions},
     sourceEmissions: sources.map(source => ({id: source.baseline.id, group: source.baseline.group, split: source.baseline.split, key: source.baseline.key, audioSha256: source.baseline.audioSha256, emissions: source.emissions, boundaries: source.boundaries, editedInternalIndex: source.index})),
     summaries: Object.fromEntries(["all", "calibration", "heldout"].map(split => [split, summary(results.filter(r => split === "all" || r.split === split))])), results, failures}, null, 2));
@@ -183,11 +184,14 @@ try {
   }
   for (const source of sources) for (const variant of variants(source)) {
     try {
-      const total = Math.max(80000, Math.ceil((variant.pcm.length + 12800) / 40000) * 40000);
+      const total = Math.max(80000, Math.ceil((variant.pcm.length + (finishingContext ? 48000 : 12800)) / 40000) * 40000);
       if (serveOnly) {retainCase(source, variant, total); variant.pcm.fill(0); save(); continue;}
       const tracker = new RecitationTracker(), padded = new Float32Array(total); padded.set(variant.pcm);
       const observations: Record<string, unknown>[] = [], inferenceMs: number[] = []; let detected = false, anyAlert = false, feedback: ReciteFeedback | null = null;
-      for (let end = 40000; end <= total; end += 40000) {
+      const ends: number[] = [];
+      for (let end = 40000; end <= (finishingContext ? variant.pcm.length : total); end += 40000) ends.push(end);
+      if (finishingContext) for (let extra = 16000; extra <= 48000; extra += 16000) ends.push(variant.pcm.length + extra);
+      for (const end of ends) {
         const start = Math.max(0, end - 96000), window = padded.subarray(start, end), begin = performance.now(), observation = await recognize(window, start);
         const latencyMs = performance.now() - begin; inferenceMs.push(latencyMs); feedback = tracker.observe(source.expected, observation);
         anyAlert ||= feedback.differences.length > 0;

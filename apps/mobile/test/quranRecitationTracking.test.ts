@@ -68,6 +68,7 @@ test("different audio timestamps preserve repeated words; overlapping windows ne
   tracker.reset();
   const repeated = twice(tracker, expected, [heard[0], heard[1], word("لله", 17000), heard[2], heard[3]]);
   assert.ok(repeated.differences.some(difference => difference.kind === "repetition"));
+  assert.ok(repeated.differences.some(difference => difference.kind === "repetition" && difference.index === 1), "correction hint points to the actual repeated reference word");
 });
 test("no mistake on a single unstable observation; stable omissions/substitutions have internal anchors", () => {
   const tracker = new RecitationTracker(), skipped = [word("الحمد", 4000), word("لله", 12000), word("العالمين", 32000)];
@@ -108,6 +109,25 @@ test("a low-confidence canonical hallucination cannot certify a skipped word or 
   const result = twice(tracker, expected, heard);
   assert.equal(result.words[2].state, "uncertain");
   const guard = new ReciteCompletionGuard(); assert.equal(guard.observe(result, 80000), false); assert.equal(guard.observe(result, 120000), false);
+});
+
+test("similar but different whole words never silently become correct; Quran orthographic alternatives remain valid", () => {
+  const tracker = new RecitationTracker();
+  const result = twice(tracker, "أَفَلَا يَعْلَمُ ٱلْإِنسَـٰنُ", [word("افلا", 4000), word("علم", 16000), word("الانسان", 32000)]);
+  assert.notEqual(result.words[1].state, "matched");
+  assert.equal(result.stableComplete, false);
+  assert.equal(wholeWordAnchor("ءَامَنُوا۟", "امنوا"), true);
+  assert.equal(wholeWordAnchor("أَدْرَىٰكَ", "ادراك"), true);
+  tracker.reset();
+  const oneLetter = twice(tracker, "أَلَمْ نَجْعَل لَّهُۥ عَيْنَيْنِ", [word("الم", 4000), word("يجعل", 16000), word("له", 24000), word("عينين", 32000)]);
+  assert.equal(oneLetter.words[1].state, "uncertain"); assert.equal(oneLetter.stableComplete, false);
+});
+
+test("an overlapping conflicting hypothesis cannot keep an old word green just because its timing context was better", () => {
+  const tracker = new RecitationTracker(), full = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];
+  twice(tracker, expected, full);
+  const result = tracker.observe(expected, observation([word("الشمس", 22000, .95), full[3]], 90000, 16000));
+  assert.equal(result.words[2].state, "uncertain"); assert.equal(result.stableComplete, false);
 });
 test("invalid capture bounds cannot poison subsequent timing or fabricate stable feedback", () => {
   const tracker = new RecitationTracker(), heard = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];

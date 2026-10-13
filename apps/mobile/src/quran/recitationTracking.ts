@@ -1,4 +1,4 @@
-import { judgeAttempt, normalizeArabicForJudge, type AsrTranscribeResult } from "@tilawi/quran-asr";
+import { normalizeArabicForJudge, type AsrTranscribeResult } from "@tilawi/quran-asr";
 import type { ReciteFeedback } from "./reciteAssistFeedback";
 
 /** Acoustic evidence, not a probability that a recitation is correct. Times
@@ -23,7 +23,7 @@ export interface AudioSpan { compactStart: number; originalStart: number; length
  * Never change the licensed canonical text itself. No phonetic letter folding:
  * e.g. قلب/كلب must not become the same lexical word. */
 export function recitationLexeme(text: string) {
-  return normalizeArabicForJudge(text.replaceAll("ٰ", "ا")).replace(/[^\u0621-\u063A\u0641-\u064A\u066E\u066F\u0671-\u06D3\s]/g, "")
+  return normalizeArabicForJudge(text.replace(/ىٰ/g, "ا").replaceAll("ٰ", "ا")).replace(/ءا/g, "ا").replace(/[^\u0621-\u063A\u0641-\u064A\u066E\u066F\u0671-\u06D3\s]/g, "")
     .replace(/[\u06E5\u06E6]/g, "").trim();
 }
 export function recitationDisplayWords(text: string) {
@@ -35,6 +35,40 @@ export function wholeWordAnchor(a: string, b: string) {
   // lexical matches. In particular علم must not anchor the different word يعلم.
   const plain = normalizeArabicForJudge(a).replace(/[^\u0621-\u063A\u0641-\u064A\u066E\u066F\u0671-\u06D3]/g, "");
   return !!x && !!y && (x === y || plain === y);
+}
+
+/** Lexical alignment must not call a different word correct merely because it
+ * sounds similar or is a substring. ASR uncertainty is handled separately by
+ * the acoustic/stability gates, not by silently correcting the transcript. */
+export function alignRecitationWords(expected: string[], heard: string[]) {
+  const aliases = expected.map(word => new Set([recitationLexeme(word), normalizeArabicForJudge(word)
+    .replace(/[^\u0621-\u063A\u0641-\u064A\u066E\u066F\u0671-\u06D3]/g, "")].filter(Boolean)));
+  const spoken = heard.map(recitationLexeme), width = heard.length + 1;
+  // Free heard prefix/suffix permits neighboring ayahs without dragging their
+  // words into the selected ayah. Among equal edit counts prefer more exact
+  // anchors, then the earliest matching span (important for repeated ayahs).
+  const costs = new Int32Array((expected.length + 1) * width);
+  for (let i = 1; i <= expected.length; i++) costs[i * width] = i * 256;
+  const matches = (i: number, j: number) => aliases[i].has(spoken[j]);
+  for (let i = 1; i <= expected.length; i++) for (let j = 1; j <= heard.length; j++) {
+    costs[i * width + j] = Math.min(costs[(i - 1) * width + j] + 256, costs[i * width + j - 1] + 256,
+      costs[(i - 1) * width + j - 1] + (matches(i - 1, j - 1) ? -1 : 256));
+  }
+  const words: {expectedIndex: number | null; recognizedIndex: number | null;
+    operation: "match" | "substitution" | "omission" | "insertion"; judgment: "correct" | "apparent-error"}[] = [];
+  let i = expected.length, j = 0;
+  for (let end = 1; end <= heard.length; end++) if (costs[i * width + end] < costs[i * width + j]) j = end;
+  for (let suffix = heard.length - 1; suffix >= j; suffix--) words.push({expectedIndex: null, recognizedIndex: suffix, operation: "insertion", judgment: "apparent-error"});
+  while (i) {
+    const value = costs[i * width + j];
+    if (i && j && value === costs[(i - 1) * width + j - 1] + (matches(i - 1, j - 1) ? -1 : 256)) {
+      const exact = matches(i - 1, j - 1);
+      words.push({expectedIndex: --i, recognizedIndex: --j, operation: exact ? "match" : "substitution", judgment: exact ? "correct" : "apparent-error"});
+    } else if (i && value === costs[(i - 1) * width + j] + 256) words.push({expectedIndex: --i, recognizedIndex: null, operation: "omission", judgment: "apparent-error"});
+    else words.push({expectedIndex: null, recognizedIndex: --j, operation: "insertion", judgment: "apparent-error"});
+  }
+  while (j) words.push({expectedIndex: null, recognizedIndex: --j, operation: "insertion", judgment: "apparent-error"});
+  return {words: words.reverse()};
 }
 
 /** Greedy CTC timings from actual model emissions. This does NOT force-align
@@ -130,6 +164,7 @@ export class RecitationTracker {
         const preferred = !word.edge && (candidate.edge || context > candidate.context + 1600
           || (context >= candidate.context && word.confidence > candidate.confidence));
         if (preferred) Object.assign(candidate, word, {context, support: agrees ? candidate.support : 1});
+        else if (!agrees) candidate.support = 0;
         candidate.lastEnd = observation.endSample;
       } else if (!word.edge) {
         const tracked = {...word, support: 1, context, lastEnd: observation.endSample};
@@ -159,7 +194,7 @@ export class RecitationTracker {
         spoken.splice(i, 2, {...a, text: joined, endSample: b.endSample, confidence: Math.min(a.confidence, b.confidence), support: Math.min(a.support, b.support)});
       }
     }
-    const judged = judgeAttempt(words, spoken.map(word => word.text), {confidences: spoken.map(word => word.confidence)});
+    const judged = alignRecitationWords(words, spoken.map(word => word.text));
     const anchors = judged.words.filter(word => word.expectedIndex !== null && word.recognizedIndex !== null
       && word.judgment === "correct" && wholeWordAnchor(words[word.expectedIndex], spoken[word.recognizedIndex].text)
       && spoken[word.recognizedIndex].confidence >= .8);
@@ -185,7 +220,11 @@ export class RecitationTracker {
           if (stable(before?.recognizedIndex ?? null) && stable(after?.recognizedIndex ?? null)) { states[ei].state = "possible_difference"; differences.push({kind: "omission", index: ei}); }
           else states[ei].state = "uncertain";
         } else if (word.operation === "substitution") {
-          if (stable(hi)) {states[ei].state = "possible_difference"; differences.push({kind: "substitution", index: ei});}
+          // Single-letter ASR confusions are not validated pronunciation errors.
+          // Keep them visibly uncertain, NEVER silently count them as correct.
+          const a = recitationLexeme(words[ei]), b = recitationLexeme(spoken[hi!]?.text ?? "");
+          const oneLetter = a.length === b.length && [...a].filter((letter, index) => letter !== b[index]).length === 1;
+          if (stable(hi) && !oneLetter) {states[ei].state = "possible_difference"; differences.push({kind: "substitution", index: ei});}
           else states[ei].state = "uncertain";
         }
       } else if (word.operation === "insertion" && hi !== null) {
@@ -193,7 +232,10 @@ export class RecitationTracker {
           || (hi + 1 < spoken.length && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi + 1].text));
         const repeatsAnchor = repeated && anchors.some(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
           && recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text));
-        if ((hi > firstHeard && hi < lastHeard || repeatsAnchor) && stable(hi)) differences.push({kind: repeated ? "repetition" : "extra_word", index: null});
+        if ((hi > firstHeard && hi < lastHeard || repeatsAnchor) && stable(hi)) {
+          const reference = repeated ? anchors.find(anchor => recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text)) : null;
+          differences.push({kind: repeated ? "repetition" : "extra_word", index: reference?.expectedIndex ?? null});
+        }
       }
     }
     const complete = states.every(word => word.state === "matched") && !differences.length;

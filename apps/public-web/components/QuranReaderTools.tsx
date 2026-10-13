@@ -2,13 +2,13 @@
 
 import { createSelfTest, memorizationLabels, normalizeSearch, parseAyahReference, passageId, repeatSequence, validAudioUrl, validMushafPageNumber, QURAN_PLAYBACK_SPEEDS, validQuranPlaybackSpeed,
   type MemorizationStatus, type MushafPage, type QuranChapter, type QuranPassage, type QuranPreferences, type QuranState, type QuranVerse } from "@hbic/shared";
-import { Bookmark, ChevronLeft, ChevronRight, Mic, Pause, Play, Square, Trash2 } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, Pause, Play, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mushafDocument } from "../../mobile/src/quran/mushafDocument";
 import { availableListeningChapters, filterListeningCatalog, listeningClient, listeningUrl, validListeningUrl, type ListeningReciter } from "../../mobile/src/services/quranListening";
 import { webQuranClient } from "../lib/quranBrowser";
-import { createBrowserRecording, recordingExtension, type BrowserRecordingState } from "../lib/quranBrowserRecording";
 import { QuranReciteAssist } from "./QuranReciteAssist";
+import {recitationDisplayWords} from "../../mobile/src/quran/recitationTracking";
 import styles from "./QuranReader.module.css";
 
 type Playback = { phase: "idle" | "loading" | "playing" | "paused" | "error"; key: string | null; title: string; error: string | null };
@@ -182,51 +182,6 @@ export function QuranMadinahReader({ reference, bookmarks, bookmark, onOpen, onR
   </div>;
 }
 
-const idleRecording: BrowserRecordingState = { phase: "idle", url: null, mimeType: null, error: null };
-function QuranPrivateRecording({ blocked, stopPlayback, onBusyChange, passage }: {
-  blocked: boolean; stopPlayback: () => void; onBusyChange: (busy: boolean) => void; passage: string;
-}) {
-  const [consented, setConsented] = useState(false), [state, setState] = useState<BrowserRecordingState>(idleRecording);
-  const [supported, setSupported] = useState(false);
-  const [reviewSpeed, setReviewSpeed] = useState(1), [reviewLoop, setReviewLoop] = useState(false);
-  const recorder = useRef<ReturnType<typeof createBrowserRecording> | null>(null);
-  const ownAudio = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    const available = Boolean(window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === "function" && typeof MediaRecorder !== "undefined"); setSupported(available);
-    if (!available) return;
-    const session = createBrowserRecording({
-      getUserMedia: () => navigator.mediaDevices.getUserMedia({ audio: true, video: false }),
-      recorder: (stream) => {
-        const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type));
-        return new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      }, createUrl: (blob) => URL.createObjectURL(blob), revokeUrl: (url) => URL.revokeObjectURL(url), isVisible: () => !document.hidden,
-    }, setState); recorder.current = session;
-    const erase = () => { ownAudio.current?.pause(); session.erase(); setConsented(false); };
-    const hide = () => { if (document.hidden) erase(); };
-    document.addEventListener("visibilitychange", hide); window.addEventListener("pagehide", erase);
-    return () => { ownAudio.current?.pause(); document.removeEventListener("visibilitychange", hide); window.removeEventListener("pagehide", erase); session.dispose(); recorder.current = null; };
-  }, []);
-  const busy = state.phase === "preparing" || state.phase === "recording";
-  useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
-  useEffect(() => { recorder.current?.erase(); setConsented(false); }, [passage]);
-  useEffect(() => { if (blocked) ownAudio.current?.pause(); }, [blocked]);
-  useEffect(() => { setReviewLoop(false); }, [state.url]);
-  useEffect(() => { if (ownAudio.current) { ownAudio.current.playbackRate = reviewSpeed; ownAudio.current.preservesPitch = true; ownAudio.current.loop = reviewLoop; } }, [reviewSpeed, reviewLoop, state.url]);
-  return <section className={styles.practiceCard}>
-    <h3>Listen to your own recitation</h3><p>Your microphone is used only after you allow it below and press Record. No recording is uploaded. Stop to review in this browser, or download a copy to your device.</p>
-    <p className={styles.finePrint}>Maximum five minutes. Leaving this page or putting it in the background discards the recording and releases the microphone. Downloads are kept only when you choose Download.</p>
-    {!supported ? <p>Private recording is unavailable in this browser. Try a supported browser over HTTPS.</p> : <>
-      <label className={styles.checkLabel}><input type="checkbox" checked={consented} disabled={busy || blocked} onChange={(event) => { setConsented(event.target.checked); if (!event.target.checked) recorder.current?.erase(); }} />I allow private microphone recording for this session.</label>
-      <div className={styles.actionRow}><button disabled={!consented || blocked || state.phase === "preparing"} onClick={() => {
-        ownAudio.current?.pause(); stopPlayback(); if (state.phase === "recording") recorder.current?.stop(); else void recorder.current?.start();
-      }}>{state.phase === "recording" ? <Square size={17} /> : <Mic size={17} />}{state.phase === "preparing" ? "Waiting for microphone…" : state.phase === "recording" ? "Stop and review" : "Record my recitation"}</button>
-        {state.url ? <button onClick={() => { ownAudio.current?.pause(); recorder.current?.erase(); }}><Trash2 size={16} />Delete recording</button> : null}</div>
-      {state.url ? <div className={styles.localRecording}><audio ref={ownAudio} src={state.url} controls preload="metadata" onPlay={() => { if (blocked) ownAudio.current?.pause(); else stopPlayback(); }} aria-label={`Your recitation of ${passage}`} /><QuranPlaybackOptions speed={reviewSpeed} loop={reviewLoop} disabled={blocked || busy} onSpeed={rate => { if (validQuranPlaybackSpeed(rate)) setReviewSpeed(rate); }} onLoop={setReviewLoop} /><a href={state.url} download={`quran-${passage.replace(/[^\d-]/g, "-")}.${recordingExtension(state.mimeType ?? "")}`}>Download to my device</a></div> : null}
-    </>}
-    {state.error ? <p className={styles.notice} role="alert">{state.error}</p> : null}
-  </section>;
-}
-
 export function QuranWebPractice({ mode, chapter, preferences, getVerse, library, update, audio, startAyah }: {
   mode: "practice" | "memorize" | "test"; chapter: QuranChapter; preferences: QuranPreferences;
   getVerse: (ayah: number) => Promise<QuranVerse>; library: QuranState;
@@ -237,19 +192,19 @@ export function QuranWebPractice({ mode, chapter, preferences, getVerse, library
   const [hidden, setHidden] = useState(mode !== "practice"), [revealed, setRevealed] = useState(false), [hints, setHints] = useState(0);
   const [questions, setQuestions] = useState<number[]>([]), [questionIndex, setQuestionIndex] = useState(0), [temporary, setTemporary] = useState(false);
   const [reviewAyah, setReviewAyah] = useState(startAyah), [current, setCurrent] = useState<QuranVerse | null>(null), [error, setError] = useState<string | null>(null);
-  const [recordingBusy, setRecordingBusy] = useState(false), [assistBusy, setAssistBusy] = useState(false);
+  const [assistBusy, setAssistBusy] = useState(false);
   const passage: QuranPassage = { chapter: chapter.id, from: Number(from), to: Number(to) };
   const valid = Number.isInteger(passage.from) && Number.isInteger(passage.to) && passage.from >= 1 && passage.to >= passage.from && passage.to <= chapter.versesCount;
   const question = questions[questionIndex], completed = Boolean(questions.length && questionIndex >= questions.length);
   const selectedAyah = mode === "test" && question ? question : valid ? Math.max(passage.from, Math.min(passage.to, reviewAyah)) : 1;
-  const busy = recordingBusy || assistBusy;
+  const busy = assistBusy;
   useEffect(() => {
     let active = true; setCurrent(null); setError(null); setHints(0); setRevealed(false);
     if (valid && !completed) void getVerse(selectedAyah).then((verse) => { if (active) setCurrent(verse); })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "The selected ayah is unavailable."); });
     return () => { active = false; };
   }, [getVerse, selectedAyah, valid, completed]);
-  useEffect(() => { if (recordingBusy || assistBusy) audio.stop(); }, [recordingBusy, assistBusy, audio.stop]);
+  useEffect(() => { if (assistBusy) audio.stop(); }, [assistBusy, audio.stop]);
   function memorize(range: QuranPassage, status: MemorizationStatus) {
     update((state) => ({ ...state, memorization: [{ ...range, status, updatedAt: new Date().toISOString() }, ...state.memorization.filter((item) => passageId(item) !== passageId(range))].slice(0, 500) }));
   }
@@ -257,8 +212,7 @@ export function QuranWebPractice({ mode, chapter, preferences, getVerse, library
   function review(status: MemorizationStatus) { if (!question || busy) return; if (!temporary) memorize({ chapter: chapter.id, from: question, to: question }, status); audio.stop(); setQuestionIndex((n) => n + 1); }
   const showText = mode === "test" ? revealed : !hidden;
   const status = library.memorization.find((item) => passageId(item) === passageId(passage))?.status ?? "not_started";
-  const recordingPassage = mode === "test" && question ? `${chapter.id}:${question}` : valid ? passageId(passage) : "invalid";
-  const words = current?.textUthmani.trim().split(/\s+/) ?? [];
+  const words = current ? recitationDisplayWords(current.textUthmani) : [];
   return <div className={styles.featurePanel}>
     <h2>{mode === "test" ? "Test yourself" : mode === "memorize" ? "Memorization" : "Recitation practice"}</h2>
     <p>{chapter.nameSimple} · Listen, recall, and review yourself. Progress is self-reported; a teacher can help assess your recitation.</p>
@@ -282,8 +236,7 @@ export function QuranWebPractice({ mode, chapter, preferences, getVerse, library
         </section>}
     {error ? <div className={styles.notice} role="alert">{error}</div> : null}
     {valid && !completed && (mode !== "test" || questions.length > 0) ? <>
-      <QuranReciteAssist verse={current} concealed={!showText} blocked={recordingBusy} stopPlayback={audio.stop} onBusyChange={setAssistBusy} />
-      <QuranPrivateRecording blocked={assistBusy} stopPlayback={audio.stop} onBusyChange={setRecordingBusy} passage={recordingPassage} />
+      <QuranReciteAssist verse={current} concealed={!showText} stopPlayback={audio.stop} onBusyChange={setAssistBusy} testMode={mode === "test"} onRevealWord={index => setHints(n => Math.max(n,index + 1))} />
     </> : null}
     {mode !== "test" ? <section className={styles.practiceCard}><h3>My memorization progress</h3><p>{valid ? `Passage ${passageId(passage)}` : "Choose a passage to save progress."} · Self-reported and saved only in this browser.</p><div className={styles.statusChoices} role="group" aria-label="Memorization status">{(["not_started", "practising", "memorized", "needs_revision"] as const).map((item) => <button key={item} disabled={!valid || busy} aria-pressed={status === item} onClick={() => memorize(passage, item)}>{memorizationLabels[item]}</button>)}</div>
       {library.memorization.filter((item) => item.chapter === chapter.id).length ? <div className={styles.progressList}>{library.memorization.filter((item) => item.chapter === chapter.id).map((item) => <p key={passageId(item)}><b>{item.from === item.to ? `Ayah ${item.from}` : `Ayahs ${item.from}–${item.to}`}</b><span>{memorizationLabels[item.status]}</span></p>)}</div> : null}

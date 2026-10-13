@@ -64,6 +64,23 @@ test("microphone errors discard all chunks and release tracks", async () => {
   assert.equal(h.stoppedTracks, 1); assert.equal(h.created, 0); assert.ok(h.states.at(-1)?.error); h.session.dispose();
 });
 
+test("a borrowed recognition stream opens no second microphone and only the owner stops its tracks", async () => {
+  const h = recordingHarness(); await h.session.start(h.stream);
+  assert.equal(h.states.at(-1)?.phase, "recording");
+  h.recorder.ondataavailable?.({data: new Blob(["shared-stream audio"], {type: h.recorder.mimeType})});
+  h.session.stop(); h.recorder.onstop?.();
+  assert.equal(h.stoppedTracks, 0);
+  assert.equal(h.states.at(-1)?.url, "blob:private-review");
+  h.session.dispose(); assert.equal(h.stoppedTracks, 0);
+  h.stream.getTracks().forEach(track => track.stop()); assert.equal(h.stoppedTracks, 1);
+});
+
+test("disposing or failing borrowed recording leaves recognition capture owned by recognition", async () => {
+  const h = recordingHarness(); await h.session.start(h.stream); h.recorder.onerror?.();
+  assert.equal(h.stoppedTracks, 0); assert.equal(h.created, 0); assert.ok(h.states.at(-1)?.error);
+  h.session.dispose(); assert.equal(h.stoppedTracks, 0);
+});
+
 test("browser library restores exact bookmarks but never imports native recording paths", () => {
   const migrated = restoreWebQuranState(null, ["2:255", "2:255", "javascript:alert(1)", "115:1"], 2);
   assert.deepEqual(migrated.bookmarks, ["2:255"]); assert.deepEqual(migrated.lastRead, { chapter: 2, ayah: 1 });

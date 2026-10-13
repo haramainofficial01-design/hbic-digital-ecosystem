@@ -16,9 +16,9 @@ export interface BrowserRecordingPort {
 export function createBrowserRecording(port: BrowserRecordingPort, changed: (state: BrowserRecordingState) => void) {
   let epoch = 0, recorder: MediaRecorder | null = null, stream: MediaStream | null = null;
   let chunks: Blob[] = [], url: string | null = null, timer: ReturnType<typeof setTimeout> | null = null;
-  let saveOnStop = false, disposed = false;
+  let saveOnStop = false, disposed = false, ownsStream = true;
   const publish = (state: BrowserRecordingState) => { if (!disposed) changed(state); };
-  function stopTracks() { stream?.getTracks().forEach((track) => track.stop()); stream = null; }
+  function stopTracks() { if (ownsStream) stream?.getTracks().forEach((track) => track.stop()); stream = null; }
   function clearReview() { if (url) port.revokeUrl(url); url = null; chunks = []; }
   function erase() {
     ++epoch; saveOnStop = false;
@@ -29,13 +29,16 @@ export function createBrowserRecording(port: BrowserRecordingPort, changed: (sta
     stopTracks(); clearReview();
     publish({ phase: "idle", url: null, mimeType: null, error: null });
   }
-  async function start() {
+  // Recognition can lend its stream: recording never opens a second microphone
+  // or closes the owner's tracks. The recognition owner handles their lifetime.
+  async function start(sharedStream?: MediaStream) {
     if (disposed) return;
     erase(); const run = epoch;
     publish({ phase: "preparing", url: null, mimeType: null, error: null });
     try {
-      const granted = await port.getUserMedia();
-      if (disposed || run !== epoch || !port.isVisible()) { granted.getTracks().forEach((track) => track.stop()); return; }
+      const granted = sharedStream ?? await port.getUserMedia();
+      if (disposed || run !== epoch || !port.isVisible()) { if (!sharedStream) granted.getTracks().forEach((track) => track.stop()); return; }
+      ownsStream = !sharedStream;
       stream = granted; const capture = port.recorder(granted); recorder = capture;
       capture.ondataavailable = (event) => { if (run === epoch && event.data.size) chunks.push(event.data); };
       capture.onstop = () => {
