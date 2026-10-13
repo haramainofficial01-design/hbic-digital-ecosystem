@@ -108,6 +108,85 @@ worker observations for lifecycle/UI assertions, not real recognition accuracy.
 The unchanged qualification gate returns its expected **FAIL** on known controls.
 No app/backend production code changed here, and no new build/release is claimed.
 
+### Quran-specific phoneme experiment (offline only, not shipped)
+
+The MIT-tagged [Quran Muaalem checkpoint](https://huggingface.co/obadx/muaalem-model-v3_2)
+was then evaluated locally. Every encoder and all eleven classifier heads load
+with **strict state matching**, using the published architecture and all five
+verified assets. Only the phoneme head is evaluated: no Tajweed/sifat grade is
+implemented. Runtime is CPU float32, torch 2.10.0, Transformers 5.19.0, numpy
+2.3.4. This is a reconstructed offline runtime, not a qualified native export.
+
+The recognizer's input is **PCM only**, not the expected ayah/phones or a grammar.
+Its greedy output is checked independently against its actual acoustic
+log-probabilities. A separate comparison process converts the canonical text
+with MIT `quran-transcript` 0.6.4 and explicit Hafs duration attributes. That
+conversion is **not a human-verbatim phonetic transcript**, and does not cover
+all accepted readings/durations. The two processes do not send the reference
+into recognition. Simple phonetic differences therefore cannot be called
+learner mistakes, false corrections, word error rate or Tajweed accuracy.
+
+All four actual runs cover the identical **48 calibration waveforms**, with
+zero failures. Neither controls nor decoder variants are independent speakers
+or fresh held-out evidence:
+
+| Actual acoustic diagnostic | No quiet tail | Fixed 600 ms quiet tail |
+| --- | ---: | ---: |
+| Initial greedy canonical phone edits | 252/1,464 | 229/1,464 |
+| Initial negative controls with any phone difference | 22/30 | 23/30 |
+| Repeat greedy run, canonical phone edits | 252/1,464 | 229/1,464 |
+| Reference-free CTC prefix search, canonical phone edits | 247/1,464 | 231/1,464 |
+| Prefix-search negative controls with any phone difference | **21/30** | **22/30** |
+| Positive controls with any phone difference, either decoder | 18/18 | 18/18 |
+| Repeat inference median / p95 | 380 / 548 ms | 405 / 598 ms |
+| Added prefix-search median / p95 | 13 / 20 ms | 15 / 21 ms |
+
+The quiet tail preserves every spoken sample and adds only zeros; original and
+inference-waveform hashes are retained separately. It can recover ending sounds,
+but does **not** improve the negative-control case count. Prefix search sums
+acoustic CTC paths using a fixed width of 16, **without any language model or
+expected answer**. Its retained path score is not a calibrated correctness
+probability. It preserves same-token repetitions separated by blanks and final
+emissions; brute-force small-path tests verify the math, not speech accuracy.
+The remaining differences include duration, reference-conversion and acoustic
+issues that cannot responsibly be diagnosed as student errors from these data.
+Word-location diagnostics are explicitly unqualified, even when a minimum-edit
+path looks plausible.
+
+This candidate **does not pass calibration as a direct correction pipeline**.
+It remains an isolated experiment. No 99% score, validated word-error recall,
+pronunciation assessment or native/battery suitability is inferred. Its weight
+file is 2,423,124,012 bytes: it has not been bundled into the phone app or loaded
+on users' devices. No live engine, model download, release flag, backend,
+production environment or store build changed.
+
+Pinned model revision: `01a1ef9fbe40d144ef845101e89ff924aed3fef5`; SHA-256
+`6b6a2e85303d17ff0f3af5e1fc79ac83daecee409c756ddf27f0ced59393bb41`.
+All reports preserve runtime, asset/code/audio hashes, raw phonemes and
+comparisons, but **no audio or full acoustic arrays on disk**. Original runs:
+`muaalem-phoneme-calibration-1791913435695.json` and
+`muaalem-phoneme-calibration-1791913571943.json`; prefix-search runs:
+`muaalem-phoneme-calibration-1791913733383.json` and
+`muaalem-phoneme-calibration-1791913762656.json`. These stay in ignored
+`output/quran-development/muaalem-comparison`, not private-data commits.
+
+Reproduce after preparing the explicitly pinned, isolated development libraries
+and serving the same public licensed RAM controls on loopback 3011:
+
+```sh
+node apps/mobile/scripts/prepare-muaalem-recitation.mjs
+npx tsx apps/mobile/scripts/evaluate-recitation-muaalem.mts cpu 0
+npx tsx apps/mobile/scripts/evaluate-recitation-muaalem.mts cpu 600
+```
+
+**Verification:** 108 mobile/shared and 26 browser/shared focused checks pass
+(one shared playback test runs in both suites: 133 distinct tests). Both
+mobile/public-web typechecks and strict comparison-script typecheck pass.
+These protect existing Quran features and transport/privacy boundaries; they
+are **not** evidence of 99% acoustic recognition. Production and stores remain
+unchanged. Model access alone does not supply the independently reviewed natural
+learner errors needed to improve and qualify the detector.
+
 ### Independent evidence access remains unresolved
 
 - [Quran-Lab's 600-clip benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark):

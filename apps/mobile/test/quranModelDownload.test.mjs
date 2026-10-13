@@ -5,7 +5,9 @@ import { createServer } from "node:http";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { downloadQwenRanges, qwenComparisonDirectory, qwenRecitationModels } from "../scripts/prepare-qwen-recitation.mjs";
+import { createHash } from "node:crypto";
+import { downloadQwenRanges, qwenComparisonDirectory, qwenRecitationModels, verifyPinnedRecitationAsset } from "../scripts/prepare-qwen-recitation.mjs";
+import { muaalemRecitationModel } from "../scripts/prepare-muaalem-recitation.mjs";
 
 test("only explicit official model pins and ignored comparison paths are accepted", () => {
   assert.throws(() => qwenComparisonDirectory("../../production"), /pinned/);
@@ -18,6 +20,22 @@ test("only explicit official model pins and ignored comparison paths are accepte
     assert.match(model.files["model.safetensors"].sha256, /^[a-f0-9]{64}$/);
     assert.equal(Object.keys(model.files).length, 8);
   }
+  assert.equal(muaalemRecitationModel.repository, "obadx/muaalem-model-v3_2");
+  assert.equal(muaalemRecitationModel.revision, "01a1ef9fbe40d144ef845101e89ff924aed3fef5");
+  assert.equal(muaalemRecitationModel.files["model.safetensors"].sha256, "6b6a2e85303d17ff0f3af5e1fc79ac83daecee409c756ddf27f0ced59393bb41");
+});
+
+test("complete assets must match both pinned byte length and digest before loading", async () => {
+  await withDownloadServer((_request, response) => { response.writeHead(500); response.end(); }, async (_url, file) => {
+    const bytes = Buffer.from("controlled integrity test");
+    await writeFile(file, bytes);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const git = createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+    assert.equal(await verifyPinnedRecitationAsset(file, { size: bytes.length, sha256, git }), sha256);
+    await assert.rejects(verifyPinnedRecitationAsset(file, { size: bytes.length + 1, sha256 }), /length/);
+    await assert.rejects(verifyPinnedRecitationAsset(file, { size: bytes.length, sha256: "0".repeat(64) }), /integrity/);
+    await assert.rejects(verifyPinnedRecitationAsset(file, { size: bytes.length, git: "0".repeat(40) }), /integrity/);
+  });
 });
 
 async function withDownloadServer(responder, operation) {

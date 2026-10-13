@@ -36,7 +36,7 @@ export function qwenComparisonDirectory(variant) {
   if (!Object.hasOwn(qwenRecitationModels, variant)) throw Error("Explicit pinned Qwen model variant required");
   return resolve(`output/quran-development/${variant === "0.6B" ? "qwen-comparison" : "qwen-1.7b-comparison"}`);
 }
-async function hashes(file, expected) {
+export async function verifyPinnedRecitationAsset(file, expected) {
   if ((await stat(file)).size !== expected.size) throw Error("Unexpected official model file length");
   const sha256 = createHash("sha256"), git = createHash("sha1").update(`blob ${expected.size}\0`);
   for await (const chunk of createReadStream(file)) { sha256.update(chunk); git.update(chunk); }
@@ -85,7 +85,7 @@ export async function prepareQwenRecitation(variant = "0.6B") {
   const verified = {};
   for (const [name, expected] of Object.entries(selected.files)) {
     const file = resolve(directory, name);
-    try { verified[name] = await hashes(file, expected); continue; } catch { /* Download a separate temporary artifact. */ }
+    try { verified[name] = await verifyPinnedRecitationAsset(file, expected); continue; } catch { /* Download a separate temporary artifact. */ }
     const temporary = `${file}.download`;
     let resumeAt = 0;
     try { resumeAt = (await stat(temporary)).size; } catch { /* First download. */ }
@@ -95,7 +95,7 @@ export async function prepareQwenRecitation(variant = "0.6B") {
     if (expected.size > 256 * 1024 * 1024) {
       if (resumeAt === 0) await writeFile(temporary, new Uint8Array());
       await downloadQwenRanges(url, temporary, expected.size, resumeAt);
-      verified[name] = await hashes(temporary, expected);
+      verified[name] = await verifyPinnedRecitationAsset(temporary, expected);
       await rename(temporary, file);
       continue;
     }
@@ -113,7 +113,7 @@ export async function prepareQwenRecitation(variant = "0.6B") {
       done(received > expected.size ? Error("Asset transfer exceeds pinned bound") : null, chunk);
     } });
     await pipeline(Readable.fromWeb(response.body), bounded, createWriteStream(temporary, { flags: resumeAt ? "a" : "w" }));
-    verified[name] = await hashes(temporary, expected);
+    verified[name] = await verifyPinnedRecitationAsset(temporary, expected);
     await rename(temporary, file);
   }
   const manifest = { ...selected, verifiedSha256: verified };
