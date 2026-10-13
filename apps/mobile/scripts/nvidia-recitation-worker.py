@@ -36,9 +36,9 @@ def main():
     if mode not in ("ctc", "rnnt"):
         raise ValueError("Explicit supported decoder required")
     scope = sys.argv[3] if len(sys.argv) > 3 else "rolling"
-    if scope not in ("rolling", "whole"):
+    if scope not in ("rolling", "whole", "research-benchmark"):
         raise ValueError("Explicit supported evaluation scope required")
-    maximum_samples = 192000 if scope == "whole" else 96000
+    maximum_samples = 16000 * 90 if scope == "research-benchmark" else 192000 if scope == "whole" else 96000
     if "/output/quran-development/" not in str(root) + "/":
         raise ValueError("Only ignored development model assets are supported")
     archive = root / "nvidia-ar-official.nemo"
@@ -76,6 +76,7 @@ def main():
     options.inter_op_num_threads = 1
     session = ort.InferenceSession(str(encoder), options, providers=["CPUExecutionProvider"])
     print(json.dumps({"ready": True, "mode": mode, "blankId": 1024,
+                      "canonicalPrompt": False, "forcedAlignment": False, "wordRecognitionQualified": False,
                       "vocab": {str(i): tokenizer.id_to_piece(i) for i in range(1024)},
                       "versions": {"torch": torch.__version__, "onnxruntime": ort.__version__,
                                    "numpy": np.__version__, "sentencepiece": spm.__version__}}), flush=True)
@@ -83,6 +84,8 @@ def main():
         if len(line) > maximum_samples * 6:
             raise ValueError("Bounded evaluation PCM request required")
         request = json.loads(line)
+        if set(request) != {"pcm"}:
+            raise ValueError("Only independent waveform PCM is accepted")
         data = bytearray(base64.b64decode(request["pcm"], validate=True))
         if not 16000 * 4 <= len(data) <= maximum_samples * 4 or len(data) % 4:
             raise ValueError("Invalid bounded mono 16 kHz PCM")
@@ -100,7 +103,7 @@ def main():
             encoded, lengths = session.run(None, {"audio_signal": features.numpy(),
                 "length": np.array([features.shape[-1]], dtype=np.int64)})
         frames = int(lengths[0])
-        if not 0 < frames <= encoded.shape[2] <= (200 if scope == "whole" else 100):
+        if not 0 < frames <= encoded.shape[2] <= (1128 if scope == "research-benchmark" else 200 if scope == "whole" else 100):
             raise ValueError("Unexpected encoder frames")
         with torch.no_grad():
             if mode == "ctc":

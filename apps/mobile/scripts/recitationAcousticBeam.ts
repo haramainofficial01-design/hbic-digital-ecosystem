@@ -11,10 +11,10 @@ function add(a: number, b: number) {
   const high = Math.max(a, b);
   return high + Math.log1p(Math.exp(Math.min(a, b) - high));
 }
-function validate(logprobs: Float32Array, vocabSize: number, blankId: number) {
+function validate(logprobs: Float32Array, vocabSize: number, blankId: number, researchLongForm = false) {
   if (!(logprobs instanceof Float32Array) || !Number.isInteger(vocabSize) || vocabSize < 2 || vocabSize > 2048
     || !Number.isInteger(blankId) || blankId < 0 || blankId >= vocabSize || !logprobs.length
-    || logprobs.length % vocabSize || logprobs.length / vocabSize > 650) throw Error("Bounded wordpiece CTC emissions required");
+    || logprobs.length % vocabSize || logprobs.length / vocabSize > (researchLongForm ? 2280 : 650)) throw Error("Bounded wordpiece CTC emissions required");
   for (let t = 0; t < logprobs.length / vocabSize; t++) {
     let normalization = -Infinity;
     for (let id = 0; id < vocabSize; id++) {
@@ -25,8 +25,10 @@ function validate(logprobs: Float32Array, vocabSize: number, blankId: number) {
     if (Math.abs(normalization) > .002) throw Error("Normalized actual CTC emissions required");
   }
 }
-export function acousticWordpieceBeam(logprobs: Float32Array, vocabSize: number, blankId: number, width = 8, tokensPerFrame = 12) {
-  validate(logprobs, vocabSize, blankId);
+export function acousticWordpieceBeam(logprobs: Float32Array, vocabSize: number, blankId: number, width = 8, tokensPerFrame = 12,
+  scope: "controls" | "research-benchmark" = "controls") {
+  if (scope !== "controls" && scope !== "research-benchmark") throw Error("Explicit bounded acoustic scope required");
+  validate(logprobs, vocabSize, blankId, scope === "research-benchmark");
   if (!Number.isInteger(width) || width < 1 || width > 32 || !Number.isInteger(tokensPerFrame)
     || tokensPerFrame < 1 || tokensPerFrame > 32) throw Error("Bounded acoustic search required");
   type Path = { key: string; blank: number; nonblank: number };

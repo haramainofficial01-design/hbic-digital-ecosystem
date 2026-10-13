@@ -33,6 +33,21 @@ test("sparse high-vocabulary search supports last blank ID and low-ranked prefix
   assert.ok(acousticTokenPath(logs(rows), 5, 4, sparse.ids));
   assert.deepEqual(acousticWordpieceBeam(logs([[0, 0, 0, 0, 1]]), 5, 4).ids, []);
 });
+test("long research recordings require explicit scope; default controls stay bounded", () => {
+  const silence=new Float32Array(651*2).fill(-Infinity);
+  for(let t=0;t<651;t++)silence[t*2+1]=0;
+  assert.throws(()=>acousticWordpieceBeam(silence,2,1),/Bounded/);
+  assert.deepEqual(acousticWordpieceBeam(silence,2,1,8,12,"research-benchmark").ids,[]);
+  assert.throws(()=>acousticWordpieceBeam(new Float32Array(2281*2),2,1,8,12,"research-benchmark"),/Bounded/);
+  assert.throws(()=>acousticWordpieceBeam(silence,2,1,8,12,"unbounded" as never),/scope/);
+  const compoundAlphabet=new Float32Array(251*2).fill(-Infinity);
+  for(let t=0;t<2;t++){
+    compoundAlphabet[t*251+250]=Math.log(.4);
+    compoundAlphabet[t*251]=Math.log(.35);
+    compoundAlphabet[t*251+1]=Math.log(.25);
+  }
+  assert.deepEqual(acousticWordpieceBeam(compoundAlphabet,251,250).ids,[0]);
+});
 test("word evidence retains original posteriors, removed-pause boundaries and uncertainty", () => {
   const evidence = logs([[.02, .96, .02], [.96, .02, .02], [.02, .02, .96], [.96, .02, .02]]), before = evidence.slice();
   const words = acousticBeamEvidence(evidence, 3, 0, [1, 2], {"1": "▁الحمد", "2": "▁لله"}, 12800,

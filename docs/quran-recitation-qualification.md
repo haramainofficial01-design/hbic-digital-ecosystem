@@ -23,6 +23,12 @@ two observed pause-related false alerts, but the clearer v3 comparison still
 finds only 13/18 mistakes on the other control split: 92.86% precision and
 72.22% recall, not 99% natural accuracy. The experimental models are not shipped.
 
+Latest approved research benchmark: [599 distinct recordings / 600 publisher
+entries and further phone-model comparisons](quran-research-benchmark-2026-10-13.md).
+Every entry was actually analyzed. A bounded level experiment gives
+7.114% raw canonical-phone character error after de-duplication; this is not
+word/mistake-detection accuracy and does not pass the 99% release gate.
+
 Earlier development follow-up: [competing acoustic evidence and real
 voice-following](quran-recitation-competing-evidence-2026-10-13.md). A real-model
 word-navigation indicator was verified; the best joint offline detector achieved
@@ -385,12 +391,13 @@ exactly the same 172 reviewed Hafs clips and two wording clips already evaluated
 **zero new reviewed cases**. Unreviewed or other-riwayah rows cannot silently
 become trusted clean gold.
 
-The [Quran-Lab benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark)
-has a manual approval gate and separate voice/usage terms. Only its public card
-and status were inspected; no gated audio, account permissions or agreement was
-obtained. Its data approval would not automatically grant HBIC commercial model
-rights or qualify lexical-error detection. No pronunciation/Tajweed capability
-has been established by this work.
+At the earlier investigation, the
+[Quran-Lab benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark)
+was gated and only its public card was inspected. On 13 October the user accepted
+its separate research-only terms, authors granted access, and the complete
+permitted benchmark was actually evaluated as documented above. Data approval
+does not automatically grant commercial model rights or qualify lexical errors.
+No dependable pronunciation/Tajweed capability is established by that follow-up.
 
 **Remaining release blockers:** a recognizer that preserves learner mistakes
 rather than restoring canonical wording, permissioned independently transcribed

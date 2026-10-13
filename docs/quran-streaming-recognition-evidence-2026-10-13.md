@@ -110,11 +110,14 @@ no saved audio. Key simpler compact reports:
 - `zipformer-raw-heldout-1-1791926006432-0d4d35d8-2acf-49b8-9ee6-b433d90a9e06.json`
   SHA-256 `7fa5867c92f791eb0bd5d24c98ec289f52922003300f8347affd149d59e96531`.
 
-The model access grant does **not** grant access to the separate
-[Quranic ASR research benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark).
-Its 200 real phone recordings require separate research-only/no-audio-redistribution
-consent and author approval. Do not bypass that gate or package its recordings
-in the app. Such a benchmark can measure generalization, but still cannot
+Separate author approval to the
+[Quranic ASR research benchmark](https://huggingface.co/datasets/Quran-Lab/quranic-asr-benchmark)
+has now been verified after the user's research-only/no-audio-redistribution
+consent. [All 600 entries and two further phone comparisons were actually
+run](quran-research-benchmark-2026-10-13.md), with retained failed attempts and
+deduplicated counts. Do not package its recordings in the app. Its real-phone
+v3 raw canonical-phone error is 7.234% on 199 distinct recordings, not 99%
+word-mistake accuracy. Such a benchmark can measure generalization, but cannot
 substitute for consented, speaker-disjoint, independently reviewed natural
 mistake annotations, audible-scope checks and phone-native lifecycle testing.
 

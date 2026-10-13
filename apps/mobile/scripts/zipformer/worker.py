@@ -23,6 +23,10 @@ def main():
     variant = sys.argv[3] if len(sys.argv) > 3 else "v3"
     if variant not in ("v3", "v3.1"):
         raise ValueError("Explicit approved streaming variant required")
+    research_benchmark = len(sys.argv) > 4 and sys.argv[4] == "research-benchmark"
+    if len(sys.argv) > 4 and not research_benchmark:
+        raise ValueError("Explicit research-only waveform scope required")
+    max_samples = 16000 * 90 if research_benchmark else 192000
     model_name = "zipformer_p_arabic_v3.int8.onnx" if variant == "v3" else "zipformer_p_arabic_v3.1.int8.onnx"
     model_hash = "6a5ddafa9c5e5c01260d30264031b341785bdc152e9ef1d569b41c8c278508eb" if variant == "v3" else "31755836528da336a6192121cd7bc82cb41752dddb65566fd000b89c8686da6b"
     manifest_name = "verified-manifest.json" if variant == "v3" else "verified-manifest-v31.json"
@@ -64,13 +68,13 @@ def main():
         "featureType": "kaldi-fbank-povey", "inputScale": scale, "chunkFrames": 48, "blankId": 250,
         "canonicalPrompt": False, "forcedAlignment": False, "wordRecognitionQualified": False}), flush=True)
     for line in sys.stdin:
-        if len(line) > 192000 * 6:
+        if len(line) > max_samples * 6:
             raise ValueError("Request exceeds bounded acoustic comparison")
         request = json.loads(line)
         if set(request) != {"pcm"}:
             raise ValueError("Only waveform is accepted, not a reference answer")
         data = bytearray(base64.b64decode(request["pcm"], validate=True))
-        if not 64000 <= len(data) <= 192000 * 4 or len(data) % 4:
+        if not (16000 if research_benchmark else 64000) <= len(data) <= max_samples * 4 or len(data) % 4:
             raise ValueError("Bounded 16 kHz mono float PCM required")
         pcm = np.frombuffer(data, dtype="<f4")
         if not np.isfinite(pcm).all() or np.abs(pcm).max() > 1.00001:
