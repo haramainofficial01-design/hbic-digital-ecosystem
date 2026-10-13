@@ -11,12 +11,14 @@ import { withRecitationAcousticTail } from "./recitationAcousticTail";
 import { phoneticPrefixBeam } from "./recitationPhoneticBeam";
 import { comparePhoneticEventHypotheses, uniquePhoneticEventHypotheses, type PhoneticEventHypothesis } from "./recitationCtcHypotheses";
 import { recitationLexeme, recitationDisplayWords } from "../src/quran/recitationTracking";
+import { phoneticLexiconProposals, type PhoneticLexiconEntry } from "./recitationPhoneticLexicon";
 
 const mode = process.argv[2] ?? "cpu";
 if (!["cpu", "mps"].includes(mode)) throw Error("Supported development phoneme runtime required");
 const quietTailMs = Number(process.argv[3] ?? 0);
 if (![0, 600].includes(quietTailMs)) throw Error("Explicit zero or 600 ms acoustic-tail experiment required");
-const supplementaryProposals = process.argv[4] === "--events-rnnt-whisper-duration";
+const phoneticProposals = process.argv[4] === "--events-rnnt-whisper-lexicon-duration";
+const supplementaryProposals = process.argv[4] === "--events-rnnt-whisper-duration" || phoneticProposals;
 const durationNuisance = process.argv[4] === "--events-rnnt-duration" || supplementaryProposals;
 const lexicalProposals = process.argv[4] === "--events-rnnt" || durationNuisance;
 const eventHypotheses = process.argv[4] === "--events" || lexicalProposals;
@@ -28,7 +30,7 @@ const output = resolve(root, `muaalem-phoneme-${split}-${Date.now()}-${randomUUI
 const worker = resolve("apps/mobile/scripts/muaalem-recitation-worker.py"), referenceWorker = resolve("apps/mobile/scripts/recitation-phonetic-reference.py");
 const manifest = JSON.parse(readFileSync(resolve(root, "assets/verified-manifest.json"), "utf8"));
 const sha = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
-const codeSha256 = Object.fromEntries([worker, referenceWorker, "apps/mobile/scripts/evaluate-recitation-muaalem.mts", "apps/mobile/scripts/recitationPhoneticComparison.ts", "apps/mobile/scripts/recitationAcousticTail.ts", "apps/mobile/scripts/recitationPhoneticBeam.ts", "apps/mobile/scripts/recitationCtcHypotheses.ts"].map(file => [file.split("/").at(-1), sha(readFileSync(file))]));
+const codeSha256 = Object.fromEntries([worker, referenceWorker, "apps/mobile/scripts/evaluate-recitation-muaalem.mts", "apps/mobile/scripts/recitationPhoneticComparison.ts", "apps/mobile/scripts/recitationAcousticTail.ts", "apps/mobile/scripts/recitationPhoneticBeam.ts", "apps/mobile/scripts/recitationCtcHypotheses.ts", "apps/mobile/scripts/recitationPhoneticLexicon.ts"].map(file => [file.split("/").at(-1), sha(readFileSync(file))]));
 const child = spawn(python, [worker, root, mode], { stdio: ["pipe", "pipe", "pipe"] });
 let stderr = "", pending: { resolve: (value: any) => void; reject: (error: Error) => void } | null = null;
 child.stderr.on("data", data => { stderr = (stderr + String(data)).slice(-3000); });
@@ -50,14 +52,14 @@ function bounded<T>(promise: Promise<T>) { return new Promise<T>((resolve, rejec
 }); }
 const startup = bounded(new Promise<any>((resolve, reject) => { pending = { resolve, reject }; }));
 const results: any[] = [], failures: { index: number; reason: string }[] = [];
-let runtime: any, referenceProvenance: any, proposalProvenance: any, supplementaryProposalProvenance: any, complete = false;
+let runtime: any, referenceProvenance: any, proposalProvenance: any, supplementaryProposalProvenance: any, phoneticProposalProvenance: any, complete = false;
 const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.max(0, Math.ceil(values.length * p) - 1)] ?? null;
 function save() {
   const negative = results.filter(row => row.expected === null), positive = results.filter(row => row.expected !== null);
   const matches = (row: any) => row.event?.predicted?.kind === row.category && row.event?.predicted?.index === row.expectedIndex;
   const trueEvents = positive.filter(matches).length, predictedEvents = results.filter(row => row.event?.predicted).length;
   writeFileSync(output, JSON.stringify({ model: manifest.repository, revision: manifest.revision, modelSha256: manifest.verifiedSha256["model.safetensors"], codeSha256,
-    runtime, referenceProvenance, proposalProvenance, supplementaryProposalProvenance, complete, quietTailMs, eventHypotheses, durationNuisance, newInference: true, canonicalPrompt: false, forcedAlignment: false,
+    runtime, referenceProvenance, proposalProvenance, supplementaryProposalProvenance, phoneticProposalProvenance, complete, quietTailMs, eventHypotheses, durationNuisance, newInference: true, canonicalPrompt: false, forcedAlignment: false,
     scope: "raw whole-clip phonetic diagnostics", split, wordRecognitionQualified: false,
     acousticDecoders: ["greedy", "CTC prefix beam 16, no reference or language model"],
     limits: ["Actual greedy CTC phonemes, not simulated or reference-forced output.", "Approximate licensed waveform controls, not natural learner error gold.",
@@ -68,6 +70,8 @@ function save() {
       "Substitutions require optional independent RNNT lexical proposals; absent/out-of-lexicon proposals count as misses, not exclusions.",
       "RNNT proposal observations are saved actual-model replay, not fresh RNNT inference; phoneme inference in this run is fresh.",
       "Optional independently recognized Whisper proposals are saved whole-clip acoustic observations, not validated corrections or speech timings.",
+      "Optional lexicon retrieval uses actual reference-free phoneme output. Reference coordinates select comparison fragments only; candidates are not verified words, corrections or human word boundaries.",
+      "Phonetic retrieval cannot cover every learner word or phonetic variant. Missing lexicon coverage counts as a miss and is never silently excluded.",
       "Optional phone-run duration nuisance is for lexical event comparison ONLY; it cannot certify Tajweed, gemination or pronunciation.",
       "This historical heldout waveform-control split was inspected during earlier work: it is not a fresh natural qualification cohort.",
       "No phone-native runtime/battery, microphone-to-feedback timing, fresh held-out qualification or 99% claim.",
@@ -138,6 +142,31 @@ try {
       modelSha256: old.modelSha256, runtime: old.runtime, codeSha256: old.codeSha256, newInference: false,
       scope: "saved independent actual Whisper transcript proposals only; no confidence/timestamps invented" };
   }
+  let phoneticLexicon: PhoneticLexiconEntry[] = [];
+  if (phoneticProposals) {
+    const evidencePath = resolve(process.argv[8] ?? "");
+    if (resolve(evidencePath, "..") !== root || !/^phonetic-lexicon-[0-9]+-[a-f0-9-]{36}\.json$/.test(evidencePath.split("/").at(-1)!))
+      throw Error("Explicit ignored phonetic lexicon required");
+    const bytes = readFileSync(evidencePath), lexicon = JSON.parse(bytes.toString());
+    if (lexicon.scope !== "comparison-side phonetic candidate lexicon"
+      || lexicon.canonicalSha256 !== "19453574fcf89b4611d27456a9f10673e63635f7f124ec80815d3392e0ef6a67"
+      || lexicon.referenceProvenance?.version !== "0.6.4" || lexicon.referenceWorkerSha256 !== sha(readFileSync(referenceWorker))
+      || lexicon.vocabSha256 !== sha(readFileSync(resolve(root, "assets/vocab.json")))
+      || !Array.isArray(lexicon.entries) || !lexicon.entries.length || lexicon.entries.length > 100_000)
+      throw Error("Verified comparison-side lexical provenance required");
+    const canonical = JSON.parse(readFileSync("apps/mobile/assets/quran/tanzil-uthmani.json", "utf8"));
+    const canonicalForms = new Set(canonical.chapters.flatMap((chapter: any) => chapter.verses.flatMap((verse: any) => recitationDisplayWords(verse.textUthmani))));
+    const alphabet = new Set(Object.values(runtime.vocab));
+    if (lexicon.entries.some((entry: any) => !entry || typeof entry.word !== "string" || !canonicalForms.has(entry.word)
+      || typeof entry.phones !== "string" || !entry.phones.length || [...entry.phones].some(phone => !alphabet.has(phone))))
+      throw Error("Phonetic candidates must be unchanged canonical forms with official model phones");
+    phoneticLexicon = lexicon.entries;
+    phoneticProposalProvenance = { evidencePath, evidenceSha256: sha(bytes), canonicalSha256: lexicon.canonicalSha256,
+      vocabSha256: lexicon.vocabSha256, referenceWorkerSha256: lexicon.referenceWorkerSha256, builderSha256: lexicon.builderSha256,
+      referenceProvenance: lexicon.referenceProvenance, forms: phoneticLexicon.length, convertedVerses: lexicon.convertedVerses,
+      exclusions: lexicon.exclusions, maxAdditionalFormsPerClip: 8, newInference: false,
+      scope: "reference-side lexicon; retrieval consumes newly recognized independent phoneme beam, not expected speech" };
+  }
   const referenceRequests = cases.map(row => {
     const substitutions: string[] = [];
     if (lexicalProposals) {
@@ -201,11 +230,25 @@ try {
         last = id;
       }
       if (decoded !== recognized.phonemes) throw Error("Phonemes do not match actual greedy acoustic emissions");
-      const reference: any = byIndex.get(row.index);
+      let reference: any = byIndex.get(row.index);
       const comparison = phoneticComparison(reference.wordPhones, decoded);
       const beamStart = performance.now(), beamResult = phoneticPrefixBeam(acoustic, 43, 0, 16);
       const beamElapsedMs = performance.now() - beamStart;
       const beamPhones = beamResult.ids.map(id => runtime.vocab[id]).join("");
+      let phoneticCandidateEvidence: ReturnType<typeof phoneticLexiconProposals> | undefined, phoneticRetrievalMs: number | undefined;
+      if (phoneticProposals) {
+        const retrievalStart = performance.now();
+        phoneticCandidateEvidence = phoneticLexiconProposals(reference.wordPhones, recitationDisplayWords(row.text), beamPhones, phoneticLexicon);
+        const originalRequest = referenceRequests.find(r => r.index === row.index)!;
+        const substitutions = [...new Set([...originalRequest.substitutions, ...phoneticCandidateEvidence.candidates.map(candidate => candidate.word)])];
+        const converted = spawnSync(python, [referenceWorker, "--events"], {input: JSON.stringify([{...originalRequest, substitutions}]),
+          encoding: "utf8", timeout: 30_000, maxBuffer: 1_000_000});
+        if (converted.status !== 0) throw Error(`Phonetic candidate comparison failed: ${converted.stderr.slice(-1500)}`);
+        const added = JSON.parse(converted.stdout);
+        if (added.referenceOnly !== true || added.version !== "0.6.4" || added.results.length !== 1 || added.results[0].index !== row.index)
+          throw Error("Bounded phonetic reference comparison required");
+        reference = added.results[0]; phoneticRetrievalMs = performance.now() - retrievalStart;
+      }
       let event: ReturnType<typeof comparePhoneticEventHypotheses> | undefined, duplicateReferencePathsIgnored = 0;
       if (eventHypotheses) {
         const tokenIds = new Map<string, number>(Object.entries(runtime.vocab).map(([id, phone]) => [String(phone), Number(id)]));
@@ -218,7 +261,7 @@ try {
       results.push({ index: row.index, category: row.category, expected: row.expected, expectedIndex: row.expectedIndex, audioSha256: row.audioSha256,
         inferenceAudioSha256: sha(pcm), originalSamples: row.originalSamples, inferenceSamples: pcm.byteLength / 4,
         reference: row.text, referenceWordPhones: reference.wordPhones, independentLexicalProposals: referenceRequests.find(r => r.index === row.index)?.substitutions,
-        phonemes: decoded, timeSteps: recognized.timeSteps,
+        phonemes: decoded, timeSteps: recognized.timeSteps, phoneticCandidateEvidence, phoneticRetrievalMs,
         acousticSha256: sha(acousticBytes), comparison, elapsedMs, event, duplicateReferencePathsIgnored,
         beam: { phonemes: beamPhones, retainedPathLogScore: beamResult.retainedPathLogScore, elapsedMs: beamElapsedMs,
           comparison: phoneticComparison(reference.wordPhones, beamPhones), confidenceQualified: false } });

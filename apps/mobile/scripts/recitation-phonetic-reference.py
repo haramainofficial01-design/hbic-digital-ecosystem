@@ -16,7 +16,8 @@ if importlib.metadata.version("quran-transcript") != "0.6.4":
     raise ValueError("Pinned comparison-side phonetizer required")
 attributes = MoshafAttributes(rewaya="hafs", madd_monfasel_len=2, madd_mottasel_len=4, madd_mottasel_waqf=4, madd_aared_len=2)
 events = len(sys.argv) > 1 and sys.argv[1] == "--events"
-if len(sys.argv) > 1 and not events:
+lexicon = len(sys.argv) > 1 and sys.argv[1] == "--lexicon"
+if len(sys.argv) > 1 and not events and not lexicon:
     raise ValueError("Explicit comparison-only event hypothesis mode required")
 request = json.load(sys.stdin)
 if not isinstance(request, list) or len(request) > 100:
@@ -26,15 +27,26 @@ for row in request:
     text = row["text"]
     if not isinstance(text, str) or len(text) > 8000 or not isinstance(row["index"], int):
         raise ValueError("Invalid comparison-side text")
-    result = quran_phonetizer(text, attributes, remove_spaces=False)
-    words = result.phonemes.split()
-    if len(words) != len(text.split()) or any(not word for word in words):
-        raise ValueError("Phonetic word coordinates must not be guessed")
+    try:
+        result = quran_phonetizer(text, attributes, remove_spaces=False)
+        words = result.phonemes.split()
+        if len(words) != len(text.split()) or any(not word for word in words):
+            raise ValueError("Phonetic word coordinates must not be guessed")
+    except (ValueError, AssertionError):
+        if not lexicon:
+            raise
+        # Lexicon coverage is diagnostic. Preserve explicit exclusions without
+        # guessing word boundaries or losing the rest of this bounded batch.
+        results.append({"index": row["index"], "error": "Exact comparison-side word coordinates unavailable"})
+        continue
     entry = {"index": row["index"], "wordPhones": words, "phonemes": "".join(words)}
     if events:
         original = text.split()
         if not 3 <= len(original) <= 32:
             raise ValueError("Bounded full-utterance hypothesis scope required")
+        proposals = row.get("substitutions", [])
+        if not isinstance(proposals, list) or len(proposals) > 16 or (len(original) - 2) * (2 + len(proposals)) + 1 > 257:
+            raise ValueError("Bounded independent lexical proposals required")
         hypotheses = [{"kind": "unchanged", "index": None, "phonemes": entry["phonemes"]}]
         # Recompute contextual phonetics after each word operation. Never reuse
         # full-verse assimilation after deleting/repeating its triggering word.
@@ -49,9 +61,6 @@ for row in request:
                 # strip only that mark, retaining every letter/vowel/length token.
                 phones = raw_phones.replace("\u0653", "")
                 hypotheses.append({"kind": kind, "index": position, "phonemes": phones, "rawPhonemes": raw_phones})
-            proposals = row.get("substitutions", [])
-            if not isinstance(proposals, list) or len(proposals) > 8:
-                raise ValueError("Bounded independent lexical proposals required")
             for proposed in proposals:
                 if not isinstance(proposed, str) or not proposed or len(proposed) > 100 or len(proposed.split()) != 1:
                     raise ValueError("Single-word independent lexical proposal required")

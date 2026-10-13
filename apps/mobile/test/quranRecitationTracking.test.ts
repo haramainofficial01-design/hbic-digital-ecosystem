@@ -149,6 +149,43 @@ test("a stable wrong-looking word cannot be localized using unstable surrounding
   const uncertainContext = [word("الحمد", 4000), word("لله", 12000, .82), word("الشمس", 22000), word("العالمين", 32000, .82)];
   const result = twice(tracker, expected, uncertainContext);
   assert.deepEqual(result.differences, []);
-  assert.equal(result.words[2].state, "uncertain");
+  assert.equal(result.status, "uncertain");
+  assert.notEqual(result.words[2].state, "matched");
   assert.equal(result.stableComplete, false);
+});
+
+test("a strong word followed by NEW interior uncertainty withdraws its old correction and completion support", () => {
+  const tracker = new RecitationTracker(), swapped = [word("الحمد", 4000), word("لله", 12000), word("الشمس", 22000), word("العالمين", 32000)];
+  assert.ok(twice(tracker, expected, swapped).differences.some(d => d.kind === "substitution"));
+  const weaker = swapped.map((w, i) => i === 2 ? {...w, confidence: .55} : w);
+  const uncertain = tracker.observe(expected, observation(weaker, 90000));
+  assert.deepEqual(uncertain.differences, []); assert.equal(uncertain.words[2].state, "uncertain");
+  assert.equal(uncertain.stableComplete, false);
+  assert.deepEqual(tracker.observe(expected, observation(swapped, 100000)).differences, []);
+  assert.ok(tracker.observe(expected, observation(swapped, 110000)).differences.some(d => d.kind === "substitution"));
+});
+test("an uncertain split word cannot turn its stable prefix into an extra-word correction", () => {
+  const tracker = new RecitationTracker(), heard = [word("قل", 4000), word("يا", 9000), word("ايهاي", 19000, .55), word("الكافرون", 30000)];
+  const result = twice(tracker, "قُلْ يَـٰٓأَيُّهَا ٱلْكَـٰفِرُونَ", heard);
+  assert.deepEqual(result.differences, []); assert.notEqual(result.words[1].state, "matched"); assert.equal(result.stableComplete, false);
+});
+test("independently stable real extra words still require their immediate stable neighboring anchors", () => {
+  const tracker = new RecitationTracker(), heard = [word("الحمد", 4000), word("لله", 12000), word("الشمس", 17000), word("رب", 22000), word("العالمين", 32000)];
+  assert.ok(twice(tracker, expected, heard).differences.some(d => d.kind === "extra_word"));
+  assert.deepEqual(tracker.observe(expected, observation(heard.map((w, i) => i === 3 ? {...w, confidence: .55} : w), 90000)).differences, []);
+});
+test("window-boundary timing drift and overlapping revised word emissions never fabricate repetition", () => {
+  const tracker = new RecitationTracker(), text = "فَهُوَ فِى عِيشَةٍ رَّاضِيَةٍ";
+  tracker.observe(text, observation([word("فهو", 2500, .65), word("في", 13750), {...word("ععيشه", 20200, .55), endSample: 35380}, word("راضيه", 43000, .55)], 79472));
+  tracker.observe(text, observation([word("فهو", 2500, .65), word("في", 13900), {...word("ععيشه", 20200, .55), endSample: 35380}, word("راضيه", 43000, .55)], 95472));
+  const result = tracker.observe(text, observation([word("في", 18000), {...word("عيشه", 30640, .865), endSample: 36960}, word("راضيه", 43280)], 111472, 15472));
+  assert.deepEqual(result.differences, []); assert.equal(tracker.snapshot().filter(w => w.text === "في").length, 1);
+  assert.equal(tracker.snapshot().filter(w => w.text === "عيشه").length, 1);
+  assert.equal(tracker.snapshot().filter(w => w.text === "ععيشه").length, 0);
+  assert.equal(result.stableComplete, false);
+});
+test("a weak repeated anchor does not certify a second acoustic copy, but separate strong copies remain", () => {
+  const tracker = new RecitationTracker(), heard = [word("الحمد", 4000), word("لله", 12000, .82), word("لله", 17000), word("رب", 22000), word("العالمين", 32000)];
+  assert.deepEqual(twice(tracker, expected, heard).differences, []);
+  assert.equal(tracker.snapshot().filter(w => w.text === "لله").length, 2);
 });

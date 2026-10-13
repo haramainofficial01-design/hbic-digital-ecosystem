@@ -198,18 +198,29 @@ export class RecitationTracker {
         || word.confidence < 0 || word.confidence > 1 || !recitationLexeme(word.text)) continue;
       const context = Math.max(0, Math.min(word.startSample - observation.startSample, observation.endSample - word.endSample));
       const middle = (word.startSample + word.endSample) / 2;
-      const nearby = this.history.filter(old => !used.has(old) && old.endSample > observation.startSample)
+      // CTC emission boundaries move slightly when a rolling window starts
+      // inside an already-heard word. A bounded timing halo lets the new decode
+      // revise that word instead of inventing a second copy at the window edge.
+      // `used` still preserves two genuinely co-observed repetitions.
+      const nearby = this.history.filter(old => !used.has(old) && old.endSample > observation.startSample - 6400)
         .sort((a, b) => Math.abs((a.startSample + a.endSample) / 2 - middle) - Math.abs((b.startSample + b.endSample) / 2 - middle));
+      const overlaps = (old: TrackedWord) => Math.min(old.endSample, word.endSample) - Math.max(old.startSample, word.startSample)
+        >= .5 * Math.min(old.endSample - old.startSample, word.endSample - word.startSample);
       const candidate = nearby.find(old => recitationLexeme(old.text) === recitationLexeme(word.text)
         && Math.abs((old.startSample + old.endSample) / 2 - middle) < 6400)
-        ?? nearby.find(old => Math.abs((old.startSample + old.endSample) / 2 - middle) < 4000);
+        ?? nearby.find(old => Math.abs((old.startSample + old.endSample) / 2 - middle) < 4000 || overlaps(old));
       if (candidate) {
         used.add(candidate);
         const agrees = recitationLexeme(candidate.text) === recitationLexeme(word.text);
         if (!agrees) candidate.support = 1;
         if (agrees && !word.edge && !candidate.edge && word.confidence >= .85) candidate.support++;
+        // Better historical context cannot overrule NEW interior uncertainty.
+        // Keep its timing/text for review, but withdraw correction/advance
+        // support until consecutive confident observations recover it.
+        if (agrees && !word.edge && word.confidence < .9) candidate.support = Math.min(candidate.support, word.confidence < .85 ? 0 : 1);
         const preferred = !word.edge && (candidate.edge || context > candidate.context + 1600
-          || (context >= candidate.context && word.confidence > candidate.confidence));
+          || (context >= candidate.context && word.confidence > candidate.confidence)
+          || (overlaps(candidate) && word.confidence >= candidate.confidence + .15));
         if (preferred) Object.assign(candidate, word, {context, support: agrees ? candidate.support : 1});
         else if (!agrees) candidate.support = 0;
         candidate.lastEnd = observation.endSample;
@@ -285,7 +296,15 @@ export class RecitationTracker {
           || (hi + 1 < spoken.length && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi + 1].text));
         const repeatsAnchor = repeated && anchors.some(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
           && recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text));
-        if ((hi > firstHeard && hi < lastHeard || repeatsAnchor) && stable(hi)) {
+        const before = anchors.find(anchor => anchor.recognizedIndex === hi - 1), after = anchors.find(anchor => anchor.recognizedIndex === hi + 1);
+        // A stable prefix beside an uncertain word fragment is not an extra
+        // word. Non-repetitions require immediate stable exact neighbors;
+        // repetitions require BOTH acoustic copies, not one stable copy and
+        // an unstable anchor at the same written word.
+        const stableRepeat = repeatsAnchor && anchors.some(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
+          && recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text) && stable(anchor.recognizedIndex));
+        const stableExtra = !repeated && hi > firstHeard && hi < lastHeard && stable(before?.recognizedIndex ?? null) && stable(after?.recognizedIndex ?? null);
+        if ((stableExtra || stableRepeat) && stable(hi)) {
           const reference = repeated ? anchors.find(anchor => recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text)) : null;
           differences.push({kind: repeated ? "repetition" : "extra_word", index: reference?.expectedIndex ?? null});
         }

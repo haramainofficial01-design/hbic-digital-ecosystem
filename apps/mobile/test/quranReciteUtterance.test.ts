@@ -20,8 +20,12 @@ test("a finite captured quiet tail permits finishing inference, but initial/stal
 test("normal recitation records and recognizes through one owned PCM capture, not a parallel audio-only recorder", () => {
   const practice=readFileSync(new URL("../src/quran/QuranPractice.tsx",import.meta.url),"utf8");
   const assist=readFileSync(new URL("../src/quran/ReciteAssist.tsx",import.meta.url),"utf8");
-  assert.ok(practice.includes("Recite & record with word tracking"));
-  assert.ok(practice.includes("assist.current?.toggleRecording()"));
+  assert.ok(practice.includes('captureMode === "assist"'));
+  assert.ok(practice.includes('captureMode === "audio" ? <AppButton'));
+  assert.ok(practice.includes("Save a Recite Assist recording"));
+  assert.ok(practice.includes("disabled={practiceBusy} onPress={() => setCaptureMode(choice)}"));
+  assert.ok(!practice.includes("assist.current?.toggleRecording()"));
+  assert.ok(assist.includes('saveAudio ? "Recite and Record"'));
   assert.ok(assist.includes("toggleRecording: () => requestStart(true)"));
   assert.ok(assist.includes("if (recordAudio && onRecording)"));
   assert.ok(assist.includes("held.recognize(pcm, startSample)"));

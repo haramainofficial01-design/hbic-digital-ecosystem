@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from "react-native";
 import { Text, TextInput } from "../i18n/LocalizedText";
 
@@ -9,7 +9,6 @@ import { QuranMessage, QuranSurface } from "./QuranControls";
 import { useQuranRecording } from "./useQuranRecording";
 import { rememberRecitationFeedback } from "./mistakeReview";
 import type { ReciteFeedback } from "./reciteAssistFeedback";
-import type { ReciteAssistHandle } from "./ReciteAssist";
 import {recitationDisplayWords} from "./recitationTracking";
 import type { QuranLibrary, QuranMode, ReturnTypeQuranAudio } from "./types";
 // Expo's ES2015 compilation target needs a lazy require rather than import().
@@ -33,7 +32,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   const [hints, setHints] = useState(0), [temporary, setTemporary] = useState(false);
   const [reviewAyah, setReviewAyah] = useState(initialAyah);
   const [assistBusy, setAssistBusy] = useState(false);
-  const assist = useRef<ReciteAssistHandle>(null);
+  const [captureMode, setCaptureMode] = useState<"assist" | "audio">(assistEnabled ? "assist" : "audio");
   const [optionsOpen, setOptionsOpen] = useState(false), [recordingOptionsOpen, setRecordingOptionsOpen] = useState(false);
   const [current, setCurrent] = useState<QuranVerse | null>(null), [error, setError] = useState<string | null>(null);
   const passage: QuranPassage = { chapter: chapter.id, from: Number(from), to: Number(to) };
@@ -134,7 +133,20 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       </> : null}
     </QuranSurface>}
     {error ? <QuranMessage message={error} /> : null}
-    {assistEnabled && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist ref={assist} verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+    {assistEnabled ? <QuranSurface>
+      <Text style={[styles.subtitle, { color: theme.colors.text }]}>Recitation Mode</Text>
+      <View style={styles.row}>{(["assist", "audio"] as const).map(choice => <Pressable key={choice} accessibilityRole="radio"
+        accessibilityLabel={choice === "assist" ? "Word Tracking" : "Audio Only"} accessibilityState={{ checked: captureMode === choice, disabled: practiceBusy }}
+        disabled={practiceBusy} onPress={() => setCaptureMode(choice)} style={[styles.captureChoice, { borderColor: captureMode === choice ? theme.colors.teal : theme.colors.borderStrong,
+          backgroundColor: captureMode === choice ? theme.colors.tintSoft : theme.colors.surface, opacity: practiceBusy ? .5 : 1 }]}>
+        <Text style={{ color: captureMode === choice ? theme.colors.teal : theme.colors.text, fontWeight: "700", textAlign: "center" }}>{choice === "assist" ? "Word Tracking" : "Audio Only"}</Text>
+      </Pressable>)}</View>
+      <Text style={{ ...textStyle, color: theme.colors.muted }}>{captureMode === "assist" ? "Follow your words with Recite Assist. Possible differences still need review." : "Record and listen back without word recognition."}</Text>
+      {captureMode === "assist" ? <View style={styles.row}><Text style={[textStyle, styles.flex]}>Save a recording</Text><Switch accessibilityLabel="Save a Recite Assist recording"
+        disabled={practiceBusy} value={library.library.preferences.saveAssistAudio} onValueChange={saveAssistAudio => void update(s => ({ ...s, preferences: { ...s.preferences, saveAssistAudio } }))
+          .catch(() => setError("Recording preference could not be saved. Please retry."))} /></View> : null}
+    </QuranSurface> : null}
+    {assistEnabled && captureMode === "assist" && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
       testMode={mode === "test"} onRevealWord={index => setHints(n => Math.max(n, index + 1))}
       recognitionMode={library.library.preferences.recognitionMode} onReview={remember} saveAudio={library.library.preferences.saveAssistAudio}
       onRecording={(record, allowReview) => recording.accept(record, library.library.preferences.recordingRetention !== "session", allowReview)}
@@ -144,17 +156,16 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
         setCurrent(verse); setReviewAyah(next);
       } : undefined} /></Suspense> : null}
     <QuranSurface>
-      <Text style={[styles.subtitle, { color: theme.colors.text }]}>Listen to your own recitation</Text>
-      <Text style={{ ...textStyle, color: theme.colors.muted }}>Microphone starts only when you choose. Audio stays on this device. Word-tracking sessions last up to two minutes; audio-only recordings up to five minutes.</Text>
+      <Text style={[styles.subtitle, { color: theme.colors.text }]}>{captureMode === "audio" ? "Audio Recording" : "Your Recordings"}</Text>
+      <Text style={{ ...textStyle, color: theme.colors.muted }}>Microphone starts only when you choose. Audio stays on this device. {captureMode === "assist" ? "Word-tracking sessions last up to two minutes." : "Audio-only recordings last up to five minutes."}</Text>
       <AppButton label={recordingOptionsOpen ? "Close recording options" : "Recording options"} variant="ghost" disabled={practiceBusy} onPress={() => setRecordingOptionsOpen(!recordingOptionsOpen)} />
       {recordingOptionsOpen ? <>
       <View style={styles.row}><Text style={[textStyle, styles.flex]}>Keep recordings after this session</Text><Switch accessibilityLabel="Keep recordings after this session" disabled={practiceBusy} value={library.library.preferences.recordingRetention !== "session"} onValueChange={keep => void update(s => ({ ...s, preferences: { ...s.preferences, recordingRetention: keep ? "keep" : "session" } })).catch(() => {})} /></View>
-      {assistEnabled ? <View style={styles.row}><Text style={[textStyle, styles.flex]}>Record Recite Assist sessions too</Text><Switch accessibilityLabel="Record Recite Assist sessions" disabled={practiceBusy} value={library.library.preferences.saveAssistAudio} onValueChange={saveAssistAudio => void update(s => ({ ...s, preferences: { ...s.preferences, saveAssistAudio } })).catch(() => {})} /></View> : null}
       </> : null}
       <Text style={{ ...textStyle, color: theme.colors.muted }}>{library.library.preferences.recordingRetention === "session" ? "Review-only recordings are deleted when you leave this screen, unless you choose Keep." : "Saved privately on this device. Delete individual recordings from My Library."}</Text>
-      <AppButton label={assistEnabled ? assistBusy ? "Stop and review recitation" : "Recite & record with word tracking" : recording.phase === "recording" ? "Stop and review recording" : recording.phase === "saving" ? "Preparing review…" : recording.phase === "preparing" ? "Preparing microphone…" : "Record audio only"}
-        icon={recording.phase === "recording" || assistBusy ? "stop-circle-outline" : "mic-outline"} disabled={!library.ready || !valid || assistEnabled && (!displayVerse || mode === "test" && !question) || (recordingBusy && recording.phase !== "recording")}
-        onPress={() => { if (assistEnabled) { if (!assist.current?.toggleRecording()) setError("Word tracking is unavailable or still preparing. Please retry from Recite Assist."); } else void (recording.phase === "recording" ? recording.stop() : recording.start()); }} />
+      {captureMode === "audio" ? <AppButton label={recording.phase === "recording" ? "Stop and review recording" : recording.phase === "saving" ? "Preparing review…" : recording.phase === "preparing" ? "Preparing microphone…" : "Record audio only"}
+        icon={recording.phase === "recording" ? "stop-circle-outline" : "mic-outline"} disabled={!library.ready || !valid || assistBusy || mode === "test" && !question || (recordingBusy && recording.phase !== "recording")}
+        onPress={() => void (recording.phase === "recording" ? recording.stop() : recording.start())} /> : null}
       {recording.error ? <Text accessibilityRole="alert" style={{ ...textStyle, color: theme.colors.danger }}>{recording.error}</Text> : null}
       {recording.temporary ? <View style={styles.record}><Text style={textStyle}>Session-only review · {Math.ceil(recording.temporary.durationMillis / 1000)}s</Text><View style={styles.row}>
         <AppButton label="Play temporary recording" variant="secondary" disabled={practiceBusy} onPress={() => void audio.playRecording(recording.temporary!.uri).catch(() => setError("Temporary recording could not play."))} />
@@ -181,5 +192,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginVertical: 8 }, flex: { flex: 1, minWidth: 100 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, marginTop: 8, fontSize: 18 },
   option: { minHeight: 44, padding: 12, borderRadius: 14 }, arabic: { textAlign: "right", writingDirection: "rtl", marginVertical: 14 },
+  captureChoice: { flexGrow: 1, flexBasis: 120, minHeight: 50, borderRadius: 16, borderWidth: 1, padding: 12, justifyContent: "center" },
   hidden: { padding: 30, borderRadius: 18, marginVertical: 8 }, record: { paddingVertical: 14 }
 });

@@ -8,7 +8,15 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
-Latest development follow-up: [competing acoustic evidence and real
+Latest development follow-up: [broader real-audio safety checks and practice
+controls](quran-recitation-safety-evidence-2026-10-13.md). The new all-observation
+exercise found three false warnings on labelled-clean natural clips; a complete
+fresh rerun after history/uncertainty fixes has 0/126, but still detects 0/2
+wording locations. The safer current tracker finds 5/36 controlled operations,
+with 83.33% precision and 13.89% recall. New decoding/candidate experiments were
+rejected; neither 99% qualification nor production/store release is established.
+
+Earlier development follow-up: [competing acoustic evidence and real
 voice-following](quran-recitation-competing-evidence-2026-10-13.md). A real-model
 word-navigation indicator was verified; the best joint offline detector achieved
 13/18 controlled operations on the comparison split, with 81.25% precision,
