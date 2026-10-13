@@ -7,6 +7,8 @@ import { useAppLanguage } from "../i18n/LanguageProvider";
 import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
+import { isMacQuranHost } from "../quran/macRuntime";
+import { desktopAppLayout } from "./desktopLayout";
 
 export function AppScreen({ children, style, onReady, onInteraction }: PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
@@ -18,6 +20,7 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
   const { width } = useWindowDimensions();
   const { lastUpdatedAt, loading, refresh, refreshError, source } = usePublishedContent();
   const isWide = width >= 768;
+  const desktop = desktopAppLayout(width, isMacQuranHost);
   const cachedAt = lastUpdatedAt
     ? new Date(lastUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : null;
@@ -30,7 +33,12 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
           onLayout={onReady}
           onTouchStart={onInteraction}
           onScrollBeginDrag={onInteraction}
-          contentContainerStyle={[styles.content, isWide && styles.wideContent, style]}
+          contentContainerStyle={[
+            styles.content,
+            isWide && styles.wideContent,
+            desktop.desktop && { maxWidth: desktop.maxWidth, paddingTop: desktop.topPadding, paddingBottom: 40 },
+            style
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.colors.teal} />}
         >

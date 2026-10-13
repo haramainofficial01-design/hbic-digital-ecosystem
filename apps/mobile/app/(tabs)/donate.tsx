@@ -6,6 +6,7 @@ import { donationFunds, donationAmountCents, type DonationFund } from "@hbic/sha
 import { AppButton } from "../../src/components/AppButton";
 import { AppScreen } from "../../src/components/AppScreen";
 import { GlassCard } from "../../src/components/GlassCard";
+import { DesktopColumns } from "../../src/components/DesktopColumns";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
 
@@ -31,6 +32,7 @@ export default function DonateScreen() {
   }
   return <AppScreen>
     <SectionHeader title="Donate" subtitle="Support prayer services, education, youth programs and community care." />
+    <DesktopColumns>
     <GlassCard>
       <Text style={[styles.title, { color: theme.colors.text }]}>Choose where your donation goes</Text>
       <View style={styles.choices}>{donationFunds.map(category => <Pressable key={category.id} accessibilityRole="radio"
@@ -52,6 +54,7 @@ export default function DonateScreen() {
       <Text style={{ color: theme.colors.muted }}>bilalislamiccentrecalgary@gmail.com</Text>
       <AppButton label="Share / Copy E-transfer Email" variant="secondary" icon="copy" onPress={() => void Share.share({ message: "bilalislamiccentrecalgary@gmail.com" })} />
     </GlassCard>
+    </DesktopColumns>
   </AppScreen>;
 }
 function randomRequestId() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const n = Math.floor(Math.random() * 16); return (c === "x" ? n : (n & 3) | 8).toString(16); }); }

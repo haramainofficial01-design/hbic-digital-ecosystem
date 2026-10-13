@@ -10,6 +10,7 @@ import { AppScreen } from "../../src/components/AppScreen";
 import { EventCard } from "../../src/components/EventCard";
 import { GlassCard } from "../../src/components/GlassCard";
 import { PrayerHero } from "../../src/components/PrayerHero";
+import { DesktopColumns } from "../../src/components/DesktopColumns";
 import { PrayerTimesList } from "../../src/components/PrayerTimesList";
 import { WhiteDaysNotice } from "../../src/components/WhiteDaysNotice";
 import { SectionHeader } from "../../src/components/SectionHeader";
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   return (
     <AppScreen onReady={() => setHomeLaidOut(true)} onInteraction={() => noteRatingHomeInteraction()}>
       <RatingCampaignHost homeReady={homeLaidOut && heroLoaded} />
+      <DesktopColumns>
       <ImageBackground source={photoAssets.exterior} onLoadEnd={() => setHeroLoaded(true)} resizeMode="cover" style={styles.hero} imageStyle={styles.heroImage}>
         <LinearGradient colors={theme.gradients.hero} style={StyleSheet.absoluteFill} />
         <Image source={brandAssets.appMark} style={styles.logo} />
@@ -47,6 +49,7 @@ export default function HomeScreen() {
       </ImageBackground>
 
       <PrayerHero />
+      </DesktopColumns>
       <WhiteDaysNotice />
       <AppButton label="Hijri Calendar" icon="calendar-outline" variant="secondary" onPress={() => router.push("/hijri-calendar" as never)} />
 

@@ -7,6 +7,7 @@ import { AppScreen } from "../../src/components/AppScreen";
 import { GlassCard } from "../../src/components/GlassCard";
 import { PrayerHero } from "../../src/components/PrayerHero";
 import { PrayerTimesList } from "../../src/components/PrayerTimesList";
+import { DesktopColumns } from "../../src/components/DesktopColumns";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { usePublishedContent } from "../../src/services/content";
 import { spacing } from "../../src/theme/theme";
@@ -39,6 +40,7 @@ export default function PrayerScreen() {
     <AppScreen>
       <SectionHeader title="Prayer & Iqamah" subtitle="Today’s adhan, iqamah, and Jumu'ah times for Masjid Bilal." />
       <PrayerHero focusPrayer={highlightedPrayer} />
+      <DesktopColumns>
       <PrayerTimesList highlightedPrayer={highlightedPrayer} />
 
       <GlassCard tone="gold">
@@ -56,6 +58,7 @@ export default function PrayerScreen() {
           <Text style={[styles.note, { color: theme.colors.muted }]} key={notice}>{notice}</Text>
         ))}
       </GlassCard>
+      </DesktopColumns>
 
       {settings.ramadanMode ? (
         <GlassCard tone="navy">

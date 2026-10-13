@@ -9,7 +9,7 @@ import {
   type PrayerName
 } from "@hbic/shared";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text, Image } from "../i18n/LocalizedText";
 
 import { useVisibleClock } from "../services/useVisibleClock";
@@ -19,6 +19,7 @@ import { usePublishedContent } from "../services/content";
 import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { GlassCard } from "./GlassCard";
+import { isMacQuranHost } from "../quran/macRuntime";
 
 type CongregationalPrayer = Exclude<PrayerName, "sunrise">;
 
@@ -43,6 +44,9 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
   const { language, t, translate } = useAppLanguage();
   const { content, loading, source } = usePublishedContent();
   const now = useVisibleClock();
+  const { fontScale } = useWindowDimensions();
+  const [cardWidth, setCardWidth] = useState(0);
+  const desktopRow = isMacQuranHost && cardWidth >= 680 && fontScale <= 1.4;
   const [selectedPrayer, setSelectedPrayer] = useState<CongregationalPrayer | null>(null);
   const [showBlessing, setShowBlessing] = useState(false);
   const jumuahActive = isJumuahWindow(content.prayerTime, now);
@@ -85,16 +89,27 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
   }
 
   const isLiveNext = selectedPrayer === null;
+  const selectorButtons = <>
+    <PrayerSelectorButton label={language === "ur" ? "اب" : "Now"} selected={selectedPrayer === null}
+      accent={palette.accent} onPress={() => setSelectedPrayer(null)} desktop={isMacQuranHost} />
+    {congregationalPrayerOrder.map(name=><PrayerSelectorButton key={name} label={t(name)}
+      selected={selectedPrayer === name} accent={prayerPalettes[name].accent}
+      onPress={()=>setSelectedPrayer(name)} desktop={isMacQuranHost} />)}
+  </>;
 
   return (
-    <GlassCard tone="navy" style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-      <View
+    <GlassCard tone="navy" style={[styles.card,isMacQuranHost&&styles.desktopCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+      <View pointerEvents="none" style={styles.measure} onLayout={event => {
+        const width = Math.round(event.nativeEvent.layout.width);
+        setCardWidth(old => old === width ? old : width);
+      }} />
+      {!isMacQuranHost ? <View
         pointerEvents="none"
         style={[styles.celestial, { left: sunLeft, top: sunTop, opacity: celestial.visibility * 0.68 }]}
       >
         <View style={styles.sunAura} />
         <View style={styles.sunCore}><View style={styles.sunHighlight} /></View>
-      </View>
+      </View> : null}
       <View style={[styles.accentLine, { backgroundColor: palette.accent }]} />
       {jumuahActive ? (
         <View style={styles.jumuahBadge} accessibilityLabel={translate("Yawm al-Jumu’ah")}>
@@ -130,7 +145,8 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
         <Text style={[styles.blessing, { color: palette.softAccent }]}>May your day carry barakah.</Text>
       ) : null}
 
-      <View style={styles.prayerHeading}>
+      <View style={[styles.focusContent,desktopRow&&styles.desktopFocusContent]}>
+      <View style={[styles.prayerHeading,desktopRow&&styles.desktopPrayerHeading]}>
         <Text style={[styles.kicker, { color: palette.softAccent }]}>{isLiveNext ? t("nextPrayer") : t("prayerTimes")}</Text>
         <Text style={styles.title}>{t(focusedPrayer)}</Text>
         <Text style={[styles.countdown, { color: palette.accent }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -140,7 +156,7 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
       </View>
 
       <View
-        style={styles.timePanel}
+        style={[styles.timePanel,desktopRow&&styles.desktopTimePanel]}
         accessibilityLabel={`${t(focusedPrayer)}. ${t("adhan")}, ${focusedAdhan}. ${t("iqamah")}, ${focusedIqamah ?? t("unavailable")}.`}
       >
         <View style={styles.timeBlock}>
@@ -153,30 +169,19 @@ export function PrayerHero({ focusPrayer }: { focusPrayer?: CongregationalPrayer
           <Text style={[styles.timeValue, { color: palette.accent }]}>{focusedIqamah ?? "--"}</Text>
         </View>
       </View>
+      </View>
 
-      <ScrollView
+      {isMacQuranHost ? <View style={[styles.selector,styles.desktopSelector]} accessibilityLabel="Prayer selector">
+        {selectorButtons}
+      </View> : <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.selectorContent}
         style={styles.selector}
         accessibilityLabel="Prayer selector"
       >
-        <PrayerSelectorButton
-          label={language === "ur" ? "اب" : "Now"}
-          selected={selectedPrayer === null}
-          accent={palette.accent}
-          onPress={() => setSelectedPrayer(null)}
-        />
-        {congregationalPrayerOrder.map((name) => (
-          <PrayerSelectorButton
-            key={name}
-            label={t(name)}
-            selected={selectedPrayer === name}
-            accent={prayerPalettes[name].accent}
-            onPress={() => setSelectedPrayer(name)}
-          />
-        ))}
-      </ScrollView>
+        {selectorButtons}
+      </ScrollView>}
     </GlassCard>
   );
 }
@@ -185,12 +190,14 @@ function PrayerSelectorButton({
   label,
   selected,
   accent,
-  onPress
+  onPress,
+  desktop = false
 }: {
   label: string;
   selected: boolean;
   accent: string;
   onPress: () => void;
+  desktop?: boolean;
 }) {
   return (
     <Pressable
@@ -198,8 +205,10 @@ function PrayerSelectorButton({
       accessibilityState={{ selected }}
       accessibilityLabel={`Show ${label} prayer times`}
       onPress={onPress}
+      onAccessibilityTap={desktop ? onPress : undefined}
       style={({ pressed }) => [
         styles.selectorButton,
+        desktop&&styles.desktopSelectorButton,
         selected && { backgroundColor: "rgba(255,255,255,0.18)", borderColor: accent },
         pressed && styles.selectorPressed
       ]}
@@ -210,6 +219,14 @@ function PrayerSelectorButton({
 }
 
 const styles = StyleSheet.create({
+  measure:{position:"absolute",left:0,right:0,height:0},
+  desktopCard:{padding:24,borderRadius:26,gap:20},
+  focusContent:{gap:spacing.lg},
+  desktopFocusContent:{flexDirection:"row",alignItems:"center",gap:32,paddingVertical:4},
+  desktopPrayerHeading:{flex:1,minWidth:0},
+  desktopTimePanel:{flex:1,minWidth:0,paddingVertical:24},
+  desktopSelector:{flexDirection:"row",flexWrap:"wrap",justifyContent:"center",padding:6,gap:4,marginHorizontal:0},
+  desktopSelectorButton:{flexGrow:1,flexBasis:68,minHeight:44,minWidth:60},
   card: {
     gap: spacing.lg,
     paddingTop: spacing.lg
