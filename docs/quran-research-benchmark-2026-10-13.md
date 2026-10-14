@@ -3,6 +3,13 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest phone-component safety correction:
+[native inference rejection withdraws stale feedback](quran-native-rejection-safety-2026-10-14.md).
+The actual component's injected failure previously retained speech/highlights;
+the scoped catch now clears history using the failed capture clock and ignores
+old-ayah errors. 57 controlled checks pass, not physical-native or acoustic
+qualification. Recognition percentages and production remain unchanged.
+
 Latest fixed evidence-selection experiment:
 [grouped acoustic mass with unknown evidence retained](quran-lexical-mass-consensus-2026-10-14.md).
 Replay of the same 48 frozen outputs regresses script edits from 6/192 to

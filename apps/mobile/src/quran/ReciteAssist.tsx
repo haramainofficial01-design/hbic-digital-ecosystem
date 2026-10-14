@@ -184,7 +184,17 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
             if (mounted.current && token === epoch.current && !controller.signal.aborted) { completion.current.reset(); setMessage("Next ayah could not load. Stop and retry; no progress was graded."); }
           }).finally(() => { if (pendingAdvance.current === controller) { pendingAdvance.current = null; advancing.current = false; } });
         }
-      }).catch(() => { if (mounted.current && token === epoch.current) setMessage("Recognition is unavailable. Tap Stop, then retry in a quiet place."); })
+      }).catch(() => {
+        if (!mounted.current || token !== epoch.current || key !== verseKey.current) return;
+        // A rejected native inference is missing evidence, not quiet speech.
+        // Withdraw prior highlights/support, retaining the failed capture clock
+        // so the same audio cannot become an independent confirmation on retry.
+        setHeard(""); completion.current.reset();
+        setFeedback(tracker.current.observe(text.current, {text: "", quality: 0, words: [],
+          evidenceValid: false, startSample, endSample}));
+        if (review.current) { review.current.observations++; review.current.unclear++; }
+        setMessage("Recognition is unavailable. Tap Stop, then retry in a quiet place.");
+      })
         .finally(() => { pcm.fill(0); budget.finished(Date.now(), Date.now() - startedAt); processing.current = null; });
     };
     timer.current = setInterval(analyze, 500);

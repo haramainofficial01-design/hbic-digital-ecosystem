@@ -8,6 +8,11 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest phone failure-path safeguard: [native inference rejection clears stale
+feedback](quran-native-rejection-safety-2026-10-14.md). 57 controlled checks pass;
+this fixes missing-evidence handling, not acoustic accuracy, natural-word
+qualification or physical-native performance. No deployment is performed.
+
 Latest comparison-side diagnostic: [altered-speech fidelity](quran-control-fidelity-2026-10-13.md).
 Both frozen experimental RNNT decoders exactly preserve only 5/18 scripted
 alterations; greedy returns canonical text instead in four cases, beam in three.
