@@ -1,7 +1,7 @@
 /** Probability-math / capture-timeline fixtures only, never speech accuracy. */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acousticWordpieceBeam, acousticTokenPath, acousticBeamEvidence } from "../scripts/recitationAcousticBeam";
+import { acousticWordpieceBeam, acousticWordpieceCandidates, acousticTokenPath, acousticBeamEvidence } from "../scripts/recitationAcousticBeam";
 const logs = (rows: number[][]) => Float32Array.from(rows.flat().map(Math.log));
 test("wordpiece search sums actual paths, preserving blank-separated repetitions", () => {
   const result = acousticWordpieceBeam(logs([[.4, .35, .25], [.4, .35, .25]]), 3, 0);
@@ -32,6 +32,39 @@ test("sparse high-vocabulary search supports last blank ID and low-ranked prefix
   assert.equal(sparse.tokensPruned, true); assert.ok(sparse.ids.every(id => id > 0 && id < 4));
   assert.ok(acousticTokenPath(logs(rows), 5, 4, sparse.ids));
   assert.deepEqual(acousticWordpieceBeam(logs([[0, 0, 0, 0, 1]]), 5, 4).ids, []);
+});
+test("all retained acoustic candidates match exhaustive CTC sums without receiving a reference", () => {
+  const rows = [[.33, .25, .42], [.3, .5, .2], [.3, .25, .45]], paths = new Map<string, number>();
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) for (let c = 0; c < 3; c++) {
+    const sequence = [a, b, c], ids = sequence.filter((id, i) => id !== 0 && (!i || id !== sequence[i - 1]));
+    const key = ids.map(id => String.fromCharCode(id)).join("");
+    paths.set(key, (paths.get(key) ?? 0) + rows[0][a] * rows[1][b] * rows[2][c]);
+  }
+  const expected = [...paths].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const evidence = logs(rows), before = evidence.slice(), actual = acousticWordpieceCandidates(evidence, 3, 0, 32);
+  assert.equal(actual.candidates.length, expected.length);
+  expected.forEach(([key, probability], i) => {
+    assert.deepEqual(actual.candidates[i].ids, Array.from(key, id => id.charCodeAt(0)));
+    assert.ok(Math.abs(Math.exp(actual.candidates[i].retainedPathLogScore) - probability) < 1e-6);
+  });
+  assert.ok(Math.abs(actual.candidates.reduce((n, c) => n + Math.exp(c.retainedPathLogScore), 0) - 1) < 1e-6);
+  assert.equal(actual.prefixesPruned, false); assert.equal(actual.tokensPruned, false);
+  assert.equal(actual.referenceConditioned, false); assert.equal(actual.confidenceQualified, false);
+  assert.deepEqual(evidence, before);
+  const { candidates, ...search } = actual;
+  assert.deepEqual(acousticWordpieceBeam(evidence, 3, 0, 32), { ...candidates[0], ...search });
+});
+test("retained-list bounds, acoustic ties, blank-only and repeated symbols remain explicit", () => {
+  const tied = acousticWordpieceCandidates(logs([[.2, .4, .4]]), 3, 0, 2);
+  assert.deepEqual(tied.candidates.map(c => c.ids), [[1], [2]]);
+  assert.equal(tied.runnerUpMargin, 0); assert.equal(tied.prefixesPruned, true);
+  assert.equal(tied.candidates.length, 2);
+  const silence = acousticWordpieceCandidates(logs([[1, 0], [1, 0]]), 2, 0);
+  assert.deepEqual(silence.candidates, [{ ids: [], retainedPathLogScore: 0 }]);
+  assert.equal(silence.runnerUpMargin, null);
+  assert.deepEqual(acousticWordpieceCandidates(logs([[0, 1], [1, 0], [0, 1]]), 2, 0).candidates[0].ids, [1, 1]);
+  assert.throws(() => acousticWordpieceCandidates(logs([[.5, .5]]), 2, 0, 33), /Bounded/);
+  assert.throws(() => acousticWordpieceCandidates(new Float32Array([NaN, 0]), 2, 0), /Invalid/);
 });
 test("long research recordings require explicit scope; default controls stay bounded", () => {
   const silence=new Float32Array(651*2).fill(-Infinity);

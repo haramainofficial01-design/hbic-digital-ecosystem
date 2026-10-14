@@ -25,7 +25,9 @@ function validate(logprobs: Float32Array, vocabSize: number, blankId: number, re
     if (Math.abs(normalization) > .002) throw Error("Normalized actual CTC emissions required");
   }
 }
-export function acousticWordpieceBeam(logprobs: Float32Array, vocabSize: number, blankId: number, width = 8, tokensPerFrame = 12,
+/** Ranked retained hypotheses for offline coverage diagnostics. These are
+ * pruned acoustic path sums, NOT probabilities or a gold-directed selector. */
+export function acousticWordpieceCandidates(logprobs: Float32Array, vocabSize: number, blankId: number, width = 8, tokensPerFrame = 12,
   scope: "controls" | "research-benchmark" = "controls") {
   if (scope !== "controls" && scope !== "research-benchmark") throw Error("Explicit bounded acoustic scope required");
   validate(logprobs, vocabSize, blankId, scope === "research-benchmark");
@@ -70,10 +72,18 @@ export function acousticWordpieceBeam(logprobs: Float32Array, vocabSize: number,
     beam = ranked.slice(0, width);
     if (!beam.length) throw Error("Acoustic search has no finite path");
   }
-  const best = beam[0], score = add(best.blank, best.nonblank);
-  return { ids: Array.from(best.key, id => id.charCodeAt(0)), retainedPathLogScore: score,
-    runnerUpMargin: beam.length > 1 ? score - add(beam[1].blank, beam[1].nonblank) : null,
+  const candidates = beam.map(path => ({ ids: Array.from(path.key, id => id.charCodeAt(0)),
+    retainedPathLogScore: add(path.blank, path.nonblank) }));
+  return { candidates,
+    runnerUpMargin: candidates.length > 1 ? candidates[0].retainedPathLogScore - candidates[1].retainedPathLogScore : null,
     width, tokensPerFrame, prefixesPruned, tokensPruned, referenceConditioned: false as const, confidenceQualified: false as const };
+}
+
+/** Keep the existing best-only API and decoding choices unchanged. */
+export function acousticWordpieceBeam(logprobs: Float32Array, vocabSize: number, blankId: number, width = 8, tokensPerFrame = 12,
+  scope: "controls" | "research-benchmark" = "controls") {
+  const { candidates, ...search } = acousticWordpieceCandidates(logprobs, vocabSize, blankId, width, tokensPerFrame, scope);
+  return { ...candidates[0], ...search };
 }
 
 /** Maximum acoustic path for the INDEPENDENTLY DECODED token hypothesis only.

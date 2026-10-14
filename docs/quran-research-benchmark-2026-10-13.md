@@ -3,6 +3,13 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest changed-decoder experiment:
+[independent acoustic lexical alternatives](quran-acoustic-lexical-candidates-2026-10-14.md).
+On the same 48 historical controls, the fixed first-unique duration policy
+improves exact altered scripts from 4/18 to 9/18, with 52/192 scripted word edits
+including 13 whole-scope abstentions. Four of six substitutions remain uncovered.
+This is useful offline progress, not fresh natural gold, 99% or release readiness.
+
 Latest reference-free word-candidate experiment:
 [phonetic lexical segmentation](quran-lexical-segmentation-2026-10-14.md).
 Replay of 48 frozen actual outputs finds only 4/18 exact altered scripts with
