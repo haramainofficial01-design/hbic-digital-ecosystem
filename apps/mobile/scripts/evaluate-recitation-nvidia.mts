@@ -15,14 +15,14 @@ import {wordEdits} from "./recitationQualification";
 import {decodeNvidiaRnntEvidence} from "./nvidiaRecitationEvidence";
 
 const split=process.argv[2];if(split!=="calibration"&&split!=="heldout")throw Error("Explicit calibration or heldout split required.");
-const mode=process.argv[3]??"ctc";if(mode!=="ctc"&&mode!=="rnnt")throw Error("Explicit supported decoder required.");
+const mode=process.argv[3]??"ctc";if(!["ctc","rnnt","rnnt-beam-4"].includes(mode))throw Error("Explicit supported decoder required.");
 const scope=process.argv[4]??"rolling";if(scope!=="rolling"&&scope!=="whole")throw Error("Explicit supported evaluation scope required.");
 const root=resolve("output/quran-development/sherpa-comparison");
 const python=resolve(process.env.RECITE_NVIDIA_PYTHON??"output/quran-development/nvidia-evaluation-runtime/bin/python");
 if(!python.includes("/output/quran-development/"))throw Error("Use the isolated ignored development Python runtime.");
 const worker=resolve("apps/mobile/scripts/nvidia-recitation-worker.py"), output=resolve(root,`nvidia-${scope}-${mode}-${split}-${Date.now()}-${randomUUID()}.json`);
 const sha=(bytes:string|Uint8Array)=>createHash("sha256").update(bytes).digest("hex");
-const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/evaluate-recitation-nvidia.mts","apps/mobile/scripts/nvidiaRecitationEvidence.ts","apps/mobile/src/quran/recitationTracking.ts","apps/mobile/src/quran/reciteAssistFeedback.ts"].map(path=>[path.split("/").at(-1)!,sha(readFileSync(path))]));
+const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/rnnt_beam.py","apps/mobile/scripts/evaluate-recitation-nvidia.mts","apps/mobile/scripts/nvidiaRecitationEvidence.ts","apps/mobile/src/quran/recitationTracking.ts","apps/mobile/src/quran/reciteAssistFeedback.ts"].map(path=>[path.split("/").at(-1)!,sha(readFileSync(path))]));
 const processWorker=spawn(python,[worker,root,mode,scope],{stdio:["pipe","pipe","pipe"]});
 let stderr="";processWorker.stderr.on("data",data=>{stderr=(stderr+String(data)).slice(-3000);});
 const lines=createInterface({input:processWorker.stdout});
@@ -44,8 +44,11 @@ async function recognize(pcm:Float32Array,startSample:number):Promise<Recitation
     if(compact.pcm.length<16000)return empty;
     const response=await bounded(new Promise<any>((resolve,reject)=>{pending={resolve,reject};processWorker.stdin.write(JSON.stringify({pcm:Buffer.from(compact.pcm.buffer).toString("base64")})+"\n",error=>{if(error){pending?.reject(error);pending=null;}});}));
     if(response.mode!==mode||typeof response.text!=="string"||response.vocabSize!==1025||response.blankId!==1024||!Number.isInteger(response.timeSteps)||response.timeSteps<1||response.timeSteps>(scope==="whole"?200:100))throw Error("Invalid acoustic evidence.");
-    if(mode==="rnnt"){
+    if(mode.startsWith("rnnt")){
       if(response.symbolLimitReached!==false)throw Error("RNNT symbol limit truncation cannot count as a valid analysis.");
+      if(mode==="rnnt-beam-4"&&(response.search?.reference_conditioned!==false||response.search?.confidence_qualified!==false
+        ||response.search?.width!==4||response.search?.tokens_per_node!==4||response.search?.symbols_per_frame!==10))
+        throw Error("Disclosed bounded independent acoustic beam required.");
       const evidence=decodeNvidiaRnntEvidence(response.emissions,response.timeSteps,compact.pcm.length,compact.spans,startSample,pcm.length);
       return {...empty,text:response.text,...evidence};
     }
@@ -67,7 +70,8 @@ function save(){
   const edits=results.reduce((sum,r)=>sum+r.goldEdits.errors,0),words=results.reduce((sum,r)=>sum+r.goldEdits.words,0),ms=results.flatMap(r=>r.inferenceMs);
   writeFileSync(output,JSON.stringify({model:`Experimental NVIDIA original ${mode.toUpperCase()} head + pinned community encoder`,split,mode,scope,complete,newInference:true,canonicalPrompt:false,codeSha256,
     assets:{official:"d29d19d7c054a5fc010ac6815e9cbb0dd1b21a30e0a7f7f2982e1fecaf0c3e31",encoder:"a74e77489a9e48d689bac080a30c5e54b35e5f54171273771dba9c72752eade3"},versions:ready?.versions,
-    limits:["Only actual licensed public RAM waveform controls; no personal audio.","Approximate splices and baseline-success selection, NOT natural spoken-error gold.","Recording-disjoint but NOT proven speaker-disjoint or training-disjoint.","Three controlled quiet-tail windows are not independent recitations.","Confidence is uncalibrated; desktop CPU timing is not mobile accuracy, latency or battery qualification.","No production/store substitution; 99% accuracy has NOT been established."],
+    decoder:mode==="rnnt-beam-4"?{width:4,tokensPerNode:4,symbolsPerFrame:10,referenceConditioned:false,confidenceQualified:false}:undefined,
+    limits:["Only actual licensed public RAM waveform controls; no personal audio.","Approximate splices and baseline-success selection, NOT natural spoken-error gold.","Recording-disjoint but NOT proven speaker-disjoint or training-disjoint.","Three controlled quiet-tail windows are not independent recitations.","Beam search sums retained RNNT paths with a fixed beam/top-token/symbol bound; not exhaustive global decoding or calibrated correctness confidence.","Competitive symbol-bound truncation is an analysis failure, never a perfect partial transcript.","Confidence is uncalibrated; desktop CPU timing is not mobile accuracy, latency or battery qualification.","No production/store substitution; 99% accuracy has NOT been established."],
     summary:{expectedCases:48,cases:results.length,failures:failures.length,positiveCases:positive.length,negativeCases:negative.length,liveOperationMetricsApplicable:scope==="rolling",trueOperations:scope==="rolling"?tp:null,wrongOperationAlerts:scope==="rolling"?wrong:null,falsePositiveControls:scope==="rolling"?fp:null,precision:scope==="rolling"&&complete&&!failures.length&&tp+fp+wrong?tp/(tp+fp+wrong):null,recall:scope==="rolling"&&complete&&!failures.length&&positive.length?tp/positive.length:null,
       categories:scope==="rolling"?Object.fromEntries(["omission","repetition","substitution"].map(kind=>[kind,{total:positive.filter(r=>r.category===kind).length,detected:positive.filter(r=>r.category===kind&&r.detected).length}])):null,
       controlledScriptWords:words,controlledScriptEdits:edits,controlledScriptReferenceWer:complete&&!failures.length&&words?edits/words:null,windows:ms.length,desktopInferenceMs:{p50:percentile(ms,.5),p95:percentile(ms,.95)}},failures,results},null,2));
@@ -107,7 +111,7 @@ try{
     }catch(error){failures.push({index:row.index,reason:error instanceof Error?error.message:"Actual recognition failed."});save();}
     finally{padded?.fill(0);}
   }
-  complete=results.length+failures.length===48;save();console.log(JSON.stringify({finished:complete,split,output,failures:failures.length}));
-  if(failures.length)process.exitCode=1;
+  complete=results.length===48&&failures.length===0;save();console.log(JSON.stringify({finished:complete,split,output,failures:failures.length}));
+  if(!complete)process.exitCode=1;
 }catch(error){failures.push({index:-1,reason:error instanceof Error?error.message:"Evaluation startup failed."});save();throw error;}
 finally{processWorker.stdin.end();lines.close();processWorker.kill("SIGTERM");}

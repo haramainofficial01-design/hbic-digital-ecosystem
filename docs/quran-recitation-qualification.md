@@ -8,6 +8,12 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest actual decoder experiment: [reference-free RNNT beam-4 calibration](quran-rnnt-beam-evidence-2026-10-13.md).
+All 48 real-waveform controls completed, but scripted WER stayed at 16/192
+(8.33%), two formerly exact transcripts regressed and desktop median inference
+rose to 1,104 ms. The candidate is rejected, not integrated or presented as
+99% speech/mistake accuracy. Production and stores remain unchanged.
+
 Latest tracker-integrity follow-up: [malformed observation safety and frozen
 real-model replay](quran-observation-integrity-2026-10-13.md). Invalid token data
 can no longer be silently removed and interpreted as a skipped word. This is
