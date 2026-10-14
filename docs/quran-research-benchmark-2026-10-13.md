@@ -3,6 +3,11 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Newest offline diagnostic: [script-reference error budget](quran-word-error-budget-2026-10-13.md).
+The saved original RNNT output has 124 substitutions, 12 deletions and 13
+insertions in 1,512 reference words. These are ASR/script differences, not
+human-reviewed learner mistakes, improved recognition or new inference.
+
 ## Approved access and immutable inputs
 
 Separate access to
