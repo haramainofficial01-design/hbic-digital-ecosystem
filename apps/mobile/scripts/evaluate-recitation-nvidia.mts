@@ -13,6 +13,7 @@ import {compactQuietPausesWithTimeline} from "../src/quran/reciteAssistFeedback"
 import {decodeRecitationEvidence,RecitationTracker,recitationLexeme,type RecitationObservation} from "../src/quran/recitationTracking";
 import {wordEdits} from "./recitationQualification";
 import {decodeNvidiaRnntEvidence} from "./nvidiaRecitationEvidence";
+import {controlRecognitionFidelity} from "./recitationControlFidelity";
 
 const split=process.argv[2];if(split!=="calibration"&&split!=="heldout")throw Error("Explicit calibration or heldout split required.");
 const mode=process.argv[3]??"ctc";if(!["ctc","rnnt","rnnt-beam-4"].includes(mode))throw Error("Explicit supported decoder required.");
@@ -22,7 +23,7 @@ const python=resolve(process.env.RECITE_NVIDIA_PYTHON??"output/quran-development
 if(!python.includes("/output/quran-development/"))throw Error("Use the isolated ignored development Python runtime.");
 const worker=resolve("apps/mobile/scripts/nvidia-recitation-worker.py"), output=resolve(root,`nvidia-${scope}-${mode}-${split}-${Date.now()}-${randomUUID()}.json`);
 const sha=(bytes:string|Uint8Array)=>createHash("sha256").update(bytes).digest("hex");
-const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/rnnt_beam.py","apps/mobile/scripts/evaluate-recitation-nvidia.mts","apps/mobile/scripts/nvidiaRecitationEvidence.ts","apps/mobile/src/quran/recitationTracking.ts","apps/mobile/src/quran/reciteAssistFeedback.ts"].map(path=>[path.split("/").at(-1)!,sha(readFileSync(path))]));
+const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/rnnt_beam.py","apps/mobile/scripts/evaluate-recitation-nvidia.mts","apps/mobile/scripts/recitationControlFidelity.ts","apps/mobile/scripts/nvidiaRecitationEvidence.ts","apps/mobile/src/quran/recitationTracking.ts","apps/mobile/src/quran/reciteAssistFeedback.ts"].map(path=>[path.split("/").at(-1)!,sha(readFileSync(path))]));
 const processWorker=spawn(python,[worker,root,mode,scope],{stdio:["pipe","pipe","pipe"]});
 let stderr="";processWorker.stderr.on("data",data=>{stderr=(stderr+String(data)).slice(-3000);});
 const lines=createInterface({input:processWorker.stdout});
@@ -74,6 +75,9 @@ function save(){
     limits:["Only actual licensed public RAM waveform controls; no personal audio.","Approximate splices and baseline-success selection, NOT natural spoken-error gold.","Recording-disjoint but NOT proven speaker-disjoint or training-disjoint.","Three controlled quiet-tail windows are not independent recitations.","Beam search sums retained RNNT paths with a fixed beam/top-token/symbol bound; not exhaustive global decoding or calibrated correctness confidence.","Competitive symbol-bound truncation is an analysis failure, never a perfect partial transcript.","Confidence is uncalibrated; desktop CPU timing is not mobile accuracy, latency or battery qualification.","No production/store substitution; 99% accuracy has NOT been established."],
     summary:{expectedCases:48,cases:results.length,failures:failures.length,positiveCases:positive.length,negativeCases:negative.length,liveOperationMetricsApplicable:scope==="rolling",trueOperations:scope==="rolling"?tp:null,wrongOperationAlerts:scope==="rolling"?wrong:null,falsePositiveControls:scope==="rolling"?fp:null,precision:scope==="rolling"&&complete&&!failures.length&&tp+fp+wrong?tp/(tp+fp+wrong):null,recall:scope==="rolling"&&complete&&!failures.length&&positive.length?tp/positive.length:null,
       categories:scope==="rolling"?Object.fromEntries(["omission","repetition","substitution"].map(kind=>[kind,{total:positive.filter(r=>r.category===kind).length,detected:positive.filter(r=>r.category===kind&&r.detected).length}])):null,
+      alteredControlFidelity:{cases:positive.length,exactScriptedSpeech:positive.filter(r=>r.fidelity.exactScriptedSpeech).length,
+        canonicalInsteadOfScriptedSpeech:positive.filter(r=>r.fidelity.canonicalInsteadOfScriptedSpeech).length,
+        neitherExact:positive.filter(r=>r.fidelity.neitherExact).length,naturalMistakeDetectionQualified:false},
       controlledScriptWords:words,controlledScriptEdits:edits,controlledScriptReferenceWer:complete&&!failures.length&&words?edits/words:null,windows:ms.length,desktopInferenceMs:{p50:percentile(ms,.5),p95:percentile(ms,.95)}},failures,results},null,2));
 }
 try{
@@ -106,7 +110,9 @@ try{
         ms.push(latencyMs);observations.push({...observation,latencyMs,feedback});
       }
       const finalTranscript=scope==="whole"?observations.at(-1)?.text??"":tracker.snapshot().map(word=>word.text).join(" ");
-      results.push({...row,positive:row.expected!==null,scopedExpected:row.text,detected,anyAlert,finalTranscript,goldEdits:wordEdits(row.spokenGold.join(" "),finalTranscript),inferenceMs:ms,observations});
+      const fidelity=controlRecognitionFidelity(row.text,row.spokenGold.join(" "),finalTranscript);
+      if(fidelity.scriptedPositive!==(row.expected!==null))throw Error("Planted control and scripted reference disagree; no manufactured positive");
+      results.push({...row,positive:row.expected!==null,scopedExpected:row.text,detected,anyAlert,finalTranscript,goldEdits:wordEdits(row.spokenGold.join(" "),finalTranscript),fidelity,inferenceMs:ms,observations});
       save();console.log(JSON.stringify({complete:results.length,split,category:row.category,detected,anyAlert}));
     }catch(error){failures.push({index:row.index,reason:error instanceof Error?error.message:"Actual recognition failed."});save();}
     finally{padded?.fill(0);}

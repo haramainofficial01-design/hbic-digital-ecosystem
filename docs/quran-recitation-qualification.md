@@ -8,6 +8,12 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest comparison-side diagnostic: [altered-speech fidelity](quran-control-fidelity-2026-10-13.md).
+Both frozen experimental RNNT decoders exactly preserve only 5/18 scripted
+alterations; greedy returns canonical text instead in four cases, beam in three.
+This is an existing-output diagnostic, not natural mistake accuracy or new
+inference. Future evaluations keep these failures visible; neither is promoted.
+
 Latest actual decoder experiment: [reference-free RNNT beam-4 calibration](quran-rnnt-beam-evidence-2026-10-13.md).
 All 48 real-waveform controls completed, but scripted WER stayed at 16/192
 (8.33%), two formerly exact transcripts regressed and desktop median inference
