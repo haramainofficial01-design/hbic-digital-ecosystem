@@ -48,3 +48,11 @@ test("repeated phrases do not pick an arbitrary location until actual context is
   assert.equal(recitationFollowingIndex(repeated, observation([word("كل", 4000), word("امر", 12000)])), null);
   assert.equal(recitationFollowingIndex(repeated, observation([word("كل", 4000), word("امر", 12000), word("سلام", 20000)])), 3);
 });
+test("malformed quality or word fields cannot produce a navigation cursor", () => {
+  const good=observation([word("الحمد",4000),word("لله",12000)]);
+  for(const quality of [NaN,Infinity,-1,1.1])assert.equal(recitationFollowingIndex(expected,{...good,quality}),null);
+  assert.equal(recitationFollowingIndex(expected,{...good,words:[good.words[0],{...good.words[1],edge:undefined as unknown as boolean}]}),null);
+  assert.equal(recitationFollowingIndex(expected,{...good,words:[good.words[0],{...good.words[1],text:undefined as unknown as string}]}),null);
+  const fractional={...good,words:good.words.map(w=>({...w,startSample:w.startSample+.25,endSample:w.endSample+.75}))};
+  assert.equal(recitationFollowingIndex(expected,fractional),1,"fractional CTC sample mappings remain legitimate");
+});

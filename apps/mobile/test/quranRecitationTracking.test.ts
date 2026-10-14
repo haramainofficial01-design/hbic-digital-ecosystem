@@ -189,3 +189,54 @@ test("a weak repeated anchor does not certify a second acoustic copy, but separa
   assert.deepEqual(twice(tracker, expected, heard).differences, []);
   assert.equal(tracker.snapshot().filter(w => w.text === "لله").length, 2);
 });
+
+test("a malformed interior token must not be silently dropped and turned into an omission", () => {
+  for (const bad of [NaN, Infinity, -1, 1.1]) {
+    const tracker = new RecitationTracker();
+    const heard = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000, bad), word("العالمين", 32000)];
+    const first = tracker.observe(expected, observation(heard, 64000));
+    const second = tracker.observe(expected, observation(heard, 80000));
+    for (const result of [first, second]) {
+      assert.equal(result.status, "uncertain"); assert.deepEqual(result.differences, []);
+      assert.equal(result.stableComplete, false); assert.equal(result.followingIndex, undefined);
+    }
+    assert.deepEqual(tracker.snapshot(), []);
+  }
+});
+test("backward, out-of-scope or empty word evidence cannot become a different spoken sequence", () => {
+  const valid = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];
+  for (const heard of [
+    valid.map((w, i) => i === 2 ? {...w, startSample: -1} : w),
+    valid.map((w, i) => i === 2 ? {...w, endSample: 100000} : w),
+    [valid[0], valid[2], valid[1], valid[3]],
+    valid.map((w, i) => i === 2 ? {...w, text: ""} : w),
+    valid.map((w, i) => i === 2 ? {...w, endSample: w.startSample} : w),
+  ]) {
+    const tracker = new RecitationTracker(), result = twice(tracker, expected, heard);
+    assert.equal(result.status, "uncertain"); assert.deepEqual(result.differences, []);
+    assert.equal(result.stableComplete, false); assert.deepEqual(tracker.snapshot(), []);
+  }
+});
+test("malformed fresh evidence withdraws old stability and needs fresh observations to recover", () => {
+  const tracker = new RecitationTracker(), guard = new ReciteCompletionGuard();
+  const valid = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];
+  const stable = twice(tracker, expected, valid);
+  assert.equal(stable.stableComplete, true); assert.equal(guard.observe(stable, 80000), false);
+  const bad = tracker.observe(expected, observation(valid.map((w, i) => i === 2 ? {...w, confidence: NaN} : w), 90000));
+  assert.equal(guard.observe(bad, 90000), false); assert.deepEqual(tracker.snapshot(), []);
+  assert.equal(tracker.observe(expected, observation(valid, 90000)).status, "uncertain", "same samples cannot be recycled after a failed result");
+  const recovered = tracker.observe(expected, observation(valid, 100000));
+  assert.equal(recovered.stableComplete, false); assert.equal(guard.observe(recovered, 100000), false);
+  const next = tracker.observe(expected, observation(valid, 110000));
+  assert.equal(next.stableComplete, true); assert.equal(guard.observe(next, 110000), false);
+  assert.equal(guard.observe(tracker.observe(expected, observation(valid, 120000)), 120000), true);
+});
+test("invalid fresh quality cannot leave cached evidence certified or create a new error", () => {
+  const valid=[word("الحمد",4000),word("لله",12000),word("رب",22000),word("العالمين",32000)];
+  for(const quality of [NaN,Infinity,-1,1.1]){
+    const tracker=new RecitationTracker();assert.equal(twice(tracker,expected,valid).stableComplete,true);
+    const result=tracker.observe(expected,{...observation(valid,90000),quality});
+    assert.equal(result.status,"uncertain");assert.equal(result.stableComplete,false);
+    assert.deepEqual(result.differences,[]);assert.deepEqual(tracker.snapshot(),[]);
+  }
+});

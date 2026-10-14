@@ -24,8 +24,14 @@ test("recitation and test UI share a single private capture, review/delete corre
     // the test's init function into the browser. It is not app/model code.
     await page.addInitScript("globalThis.__name = value => value;");
     await page.addInitScript(()=>{
-      const qa:any=(window as any).qa={streams:[],contexts:[],workers:[],requests:0,revoked:[],closed:0};
+      const qa:any=(window as any).qa={streams:[],contexts:[],workers:[],requests:0,revoked:[],closed:0,recordedBytes:0};
       const NativeContext=window.AudioContext, revoke=URL.revokeObjectURL.bind(URL);
+      const NativeRecorder=window.MediaRecorder;
+      class ObservedRecorder extends NativeRecorder {
+        constructor(stream:MediaStream,options?:MediaRecorderOptions){super(stream,options);
+          this.addEventListener('dataavailable',event=>{qa.recordedBytes+=event.data.size;});}
+      }
+      window.MediaRecorder=ObservedRecorder;
       URL.revokeObjectURL=url=>{qa.revoked.push(url);revoke(url);};
       Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async()=>{qa.requests++;if(qa.denied)throw new DOMException('Microphone denied','NotAllowedError');const context=new NativeContext();const destination=context.createMediaStreamDestination(),osc=context.createOscillator();osc.connect(destination);osc.start();await context.resume();qa.contexts.push(context);qa.streams.push(destination.stream);return destination.stream;}});
       class FixtureWorker{onmessage:any;onerror:any;constructor(){qa.workers.push(this);}terminate(){qa.closed++;}postMessage(data:any){if(data.type==='prepare')setTimeout(()=>this.onmessage?.({data:{type:'ready'}}),0);else qa.lastRequest=data;}emit(data:any){this.onmessage?.({data});}}
@@ -47,6 +53,17 @@ test("recitation and test UI share a single private capture, review/delete corre
       words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600},{text:'لله',confidence:.99,edge:false,startSample:12000,endSample:13600}],startSample:0,endSample:64000}});});
     await page.locator('[aria-current="location"]').waitFor();
     assert.equal((await page.locator('[aria-current="location"]').innerText()).trim(),'لله');
+    // Malformed worker evidence must not silently drop an interior word,
+    // retain the prior cursor or show a skipped-word correction in the UI.
+    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,
+      observation:{text:'الحمد لله رب العالمين',quality:1,startSample:0,endSample:80000,
+        words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600},
+          {text:'لله',confidence:.99,edge:false,startSample:12000,endSample:13600},
+          {text:'رب',confidence:NaN,edge:false,startSample:22000,endSample:23600},
+          {text:'العالمين',confidence:.99,edge:false,startSample:32000,endSample:33600}]}});});
+    await page.getByText('Couldn’t hear clearly enough—no mistake marked.',{exact:true}).waitFor();
+    assert.equal(await page.locator('[aria-current="location"]').count(),0);
+    assert.equal(await page.getByText('Possible word difference. Reveal and review with the reference.',{exact:true}).count(),0);
     await page.getByRole('button',{name:'Stop & Review',exact:true}).click();await page.getByRole('link',{name:'Download to my device'}).waitFor();
     assert.equal(await page.evaluate(()=>(window as any).qa.streams.every((s:MediaStream)=>s.getTracks().every(t=>t.readyState==='ended'))),true);
     await page.getByLabel('Recording playback speed').selectOption('1.5');await page.getByRole('button',{name:'Loop Off',exact:true}).click();
@@ -73,7 +90,8 @@ test("recitation and test UI share a single private capture, review/delete corre
     // from actual recognition, rather than silently losing private recording.
     await page.evaluate(()=>sessionStorage.setItem('no-recognition','1'));await page.reload();
     await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Record Only',exact:true}).click();
-    await page.getByRole('button',{name:'Stop & Review',exact:true}).waitFor();await page.waitForTimeout(150);
+    await page.getByRole('button',{name:'Stop & Review',exact:true}).waitFor();
+    await page.waitForFunction(()=>(window as any).qa.recordedBytes>0,{},{timeout:10000});
     await page.getByRole('button',{name:'Stop & Review',exact:true}).click();await page.getByRole('link',{name:'Download to my device'}).waitFor();
     assert.equal(await page.evaluate(()=>(window as any).qa.requests),1);
     assert.equal(await page.evaluate(()=>(window as any).qa.streams[0].getTracks()[0].readyState),'ended');

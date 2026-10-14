@@ -19,6 +19,27 @@ export interface RecitationObservation {
 }
 export interface AudioSpan { compactStart: number; originalStart: number; length: number }
 
+function validCaptureBounds(observation: RecitationObservation) {
+  return Number.isSafeInteger(observation.startSample) && observation.startSample >= 0
+    && Number.isSafeInteger(observation.endSample) && observation.endSample > observation.startSample;
+}
+/** A malformed token is not an omitted spoken word. Validate the ENTIRE
+ * observation before aligning or accumulating temporal support; filtering out
+ * a broken interior token could otherwise fabricate an omission or completion.
+ * Fractional CTC boundaries are valid, but all words must remain chronological
+ * and inside the original capture. Low finite confidence remains uncertainty. */
+export function validRecitationObservation(observation: RecitationObservation) {
+  return validCaptureBounds(observation) && Number.isFinite(observation.quality)
+    && observation.quality >= 0 && observation.quality <= 1 && Array.isArray(observation.words)
+    && observation.words.length <= 240 && observation.words.every((word, i, spoken) =>
+      word && typeof word.text === "string" && !!recitationLexeme(word.text) && typeof word.edge === "boolean"
+      && Number.isFinite(word.startSample) && Number.isFinite(word.endSample)
+      && word.startSample >= observation.startSample && word.endSample <= observation.endSample
+      && word.endSample > word.startSample && (i === 0 || word.startSample >= spoken[i - 1].startSample
+        && word.endSample >= spoken[i - 1].endSample)
+      && Number.isFinite(word.confidence) && word.confidence >= 0 && word.confidence <= 1);
+}
+
 /** Quran annotations are retained for display, but are not spoken words.
  * Never change the licensed canonical text itself. No phonetic letter folding:
  * e.g. قلب/كلب must not become the same lexical word. */
@@ -136,14 +157,8 @@ const emptyFeedback = (expected: string): ReciteFeedback => ({status: "uncertain
  * Revisions/weak/clipped/new unrelated speech cannot reuse a stale cursor. */
 export function recitationFollowingIndex(expected: string, observation: RecitationObservation): number | null {
   const words = recitationDisplayWords(expected);
-  if (!words.length || words.length > 200 || observation.words.length > 240 || !Number.isFinite(observation.quality)
-    || observation.quality < .7 || !Number.isSafeInteger(observation.startSample) || observation.startSample < 0
-    || !Number.isSafeInteger(observation.endSample) || observation.endSample <= observation.startSample) return null;
+  if (!words.length || words.length > 200 || !validRecitationObservation(observation) || observation.quality < .7) return null;
   const spoken = observation.words.map(word => ({ ...word }));
-  if (spoken.some((word, i) => !Number.isFinite(word.startSample) || !Number.isFinite(word.endSample)
-    || word.startSample < observation.startSample || word.endSample > observation.endSample || word.endSample <= word.startSample
-    || i > 0 && (word.startSample < spoken[i - 1].startSample || word.endSample < spoken[i - 1].endSample)
-    || !Number.isFinite(word.confidence) || word.confidence < 0 || word.confidence > 1 || !recitationLexeme(word.text))) return null;
   const vocabulary = new Set(words.map(recitationLexeme));
   for (let i = 0; i + 1 < spoken.length; i++) {
     const a = spoken[i], b = spoken[i + 1], joined = recitationLexeme(a.text + b.text);
@@ -186,16 +201,18 @@ export class RecitationTracker {
   snapshot(): RecitationWord[] { return this.history.map(word => ({text: word.text, startSample: word.startSample, endSample: word.endSample,
     confidence: word.confidence, edge: word.edge})); }
   observe(expected: string, observation: RecitationObservation): ReciteFeedback {
-    if (!Number.isSafeInteger(observation.startSample) || observation.startSample < 0 || !Number.isSafeInteger(observation.endSample)
-      || observation.endSample <= this.lastEnd || observation.endSample < observation.startSample
-      || observation.words.length > 240 || !Number.isFinite(observation.quality)) return emptyFeedback(expected);
+    if (!validCaptureBounds(observation) || observation.endSample <= this.lastEnd) return emptyFeedback(expected);
     this.lastEnd = observation.endSample;
+    if (!validRecitationObservation(observation)) {
+      // Retain the clock so failed/same samples cannot become independent
+      // support on retry. Withdraw history rather than keeping a prior green
+      // assessment through an invalid NEW observation. Fresh valid evidence
+      // must build its own stability again; no learner error is inferred.
+      this.history = []; return emptyFeedback(expected);
+    }
     if (observation.quality < .7 || !observation.words.length) return emptyFeedback(expected);
     const used = new Set<TrackedWord>();
     for (const word of observation.words) {
-      if (!Number.isFinite(word.startSample) || !Number.isFinite(word.endSample) || word.endSample <= word.startSample
-        || word.startSample < observation.startSample || word.endSample > observation.endSample || !Number.isFinite(word.confidence)
-        || word.confidence < 0 || word.confidence > 1 || !recitationLexeme(word.text)) continue;
       const context = Math.max(0, Math.min(word.startSample - observation.startSample, observation.endSample - word.endSample));
       const middle = (word.startSample + word.endSample) / 2;
       // CTC emission boundaries move slightly when a rolling window starts

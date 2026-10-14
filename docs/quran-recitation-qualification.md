@@ -8,6 +8,13 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest tracker-integrity follow-up: [malformed observation safety and frozen
+real-model replay](quran-observation-integrity-2026-10-13.md). Invalid token data
+can no longer be silently removed and interpreted as a skipped word. This is
+an evidence-contract safety fix, **not improved acoustic accuracy**: all 2,408
+saved decoder observations retain identical feedback, and recognition release
+qualification remains FAIL. No production or store change was performed.
+
 Latest development follow-up: [broader real-audio safety checks and practice
 controls](quran-recitation-safety-evidence-2026-10-13.md). The new all-observation
 exercise found three false warnings on labelled-clean natural clips; a complete
