@@ -3,6 +3,13 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest fixed evidence-selection experiment:
+[grouped acoustic mass with unknown evidence retained](quran-lexical-mass-consensus-2026-10-14.md).
+Replay of the same 48 frozen outputs regresses script edits from 6/192 to
+15/192 and introduces two canonical-instead repeated-word failures through
+raw RNNT fallback. The method is rejected; no new voices/inference, fresh
+natural gold, native validation or app deployment is implied.
+
 Latest changed acoustic-search experiment:
 [width 32 with paired restoration accounting](quran-wide-lexical-search-2026-10-14.md).
 All 48 new v3 inferences complete with matching original posteriors. The combined
