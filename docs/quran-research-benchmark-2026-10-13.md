@@ -3,6 +3,12 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest changed recognition-selection experiment:
+[exact acoustic corroboration of raw RNNT](quran-rnnt-corroboration-2026-10-14.md).
+All 48 frozen cases are retained: word edits stay 6/192, but exact altered
+scripts fall 14/18 → 13/18. One pause improves and one substitution regresses;
+model agreement is not correctness. Rejected, not integrated, 99% or fresh gold.
+
 Latest owned-microphone lifecycle safeguard:
 [rejected shutdown remains unconfirmed and retryable](quran-capture-stop-safety-2026-10-14.md).
 A failed native stop no longer drops capture ownership or claims idle/off;
