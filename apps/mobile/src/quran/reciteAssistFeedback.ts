@@ -35,11 +35,17 @@ export class ReciteCompletionGuard {
 /** A signal-quality indicator, NOT a calibrated probability of user correctness. */
 export function acousticQuality(result: AsrTranscribeResult) {
   const { logprobs, timeSteps, vocabSize, blankId } = result.acoustic;
-  if (!Number.isInteger(timeSteps) || !Number.isInteger(vocabSize) || timeSteps < 1 || vocabSize < 2 || logprobs.length !== timeSteps * vocabSize) return 0;
+  if (!Number.isInteger(timeSteps) || !Number.isInteger(vocabSize) || timeSteps < 1 || vocabSize < 2
+    || !Number.isSafeInteger(blankId) || blankId < 0 || blankId >= vocabSize || logprobs.length !== timeSteps * vocabSize) return 0;
   let sum = 0, voiced = 0;
   for (let t = 0; t < timeSteps; t++) {
     let max = -Infinity, winner = blankId;
-    for (let v = 0; v < vocabSize; v++) { const score = logprobs[t * vocabSize + v]; if (score > max) { max = score; winner = v; } }
+    for (let v = 0; v < vocabSize; v++) {
+      const score = logprobs[t * vocabSize + v];
+      if (Number.isNaN(score) || score > 0) return 0;
+      if (score > max) { max = score; winner = v; }
+    }
+    if (!Number.isFinite(max)) return 0;
     if (winner !== blankId && Number.isFinite(max)) { voiced++; sum += Math.min(1, Math.exp(max)); }
   }
   // SentencePiece may encode a valid two-word ayah with only two emissions.

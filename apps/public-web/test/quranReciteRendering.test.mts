@@ -53,6 +53,16 @@ test("recitation and test UI share a single private capture, review/delete corre
       words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600},{text:'لله',confidence:.99,edge:false,startSample:12000,endSample:13600}],startSample:0,endSample:64000}});});
     await page.locator('[aria-current="location"]').waitFor();
     assert.equal((await page.locator('[aria-current="location"]').innerText()).trim(),'لله');
+    // Explicit decoder failure is distinct from ordinary quiet capture. It
+    // must clear both cached speech text and the navigation/assessment cursor.
+    await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,
+      observation:{text:'CORRUPT OUTPUT MUST NOT DISPLAY',quality:1,evidenceValid:false,startSample:0,endSample:72000,
+        words:[{text:'الحمد',confidence:.99,edge:false,startSample:4000,endSample:5600},
+          {text:'لله',confidence:.99,edge:false,startSample:12000,endSample:13600}]}});});
+    await page.getByText('Couldn’t hear clearly enough—no mistake marked.',{exact:true}).waitFor();
+    assert.equal(await page.locator('[aria-current="location"]').count(),0);
+    assert.equal(await page.getByLabel('Recognized speech').count(),0);
+    assert.equal(await page.getByText('CORRUPT OUTPUT MUST NOT DISPLAY',{exact:true}).count(),0);
     // Malformed worker evidence must not silently drop an interior word,
     // retain the prior cursor or show a skipped-word correction in the UI.
     await page.evaluate(()=>{const q=(window as any).qa;q.workers.at(-1).emit({type:'observation',request:q.lastRequest.request,

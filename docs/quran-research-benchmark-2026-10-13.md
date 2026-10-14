@@ -3,6 +3,11 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest shared app/web safeguard:
+[corrupt CTC output rejection](quran-ctc-output-integrity-2026-10-14.md).
+An invalid inference frame cannot be silently dropped into a skipped-word flag;
+197 checks and a known-valid-source regression pass. This is not new accuracy gold.
+
 Latest qualification integrity fix:
 [recording/PCM identity safeguard](quran-qualification-identity-2026-10-14.md).
 Duplicated scopes or conflicting speaker labels cannot produce an independent-

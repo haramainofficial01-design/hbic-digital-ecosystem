@@ -139,7 +139,8 @@ export function QuranReciteAssist({verse, concealed, blocked = false, stopPlayba
         if (data.request === captureEpoch.current) budget.current.finished(Date.now(), Date.now() - startedAt.current);
         if (data.type === "error" && (data.request === undefined || data.request === captureEpoch.current)) {stop(); setMessage(data.message ?? "Recognition is unavailable. Please retry.");}
         if (data.type === "observation" && data.observation && selected.current && stream.current && data.request === captureEpoch.current) {
-          if (data.observation.text.trim()) setHeard(data.observation.text);
+          if (data.observation.evidenceValid === false) setHeard("");
+          else if (data.observation.text.trim()) setHeard(data.observation.text);
           const result = tracker.current.observe(selected.current.textUthmani, data.observation); setFeedback(result);
           setMessage(result.status === "uncertain" ? result.followingIndex !== undefined ? "Following your voice; the rest is still uncertain." : "Couldn’t hear clearly enough—no mistake marked." : result.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words. This is not a score.");
         }

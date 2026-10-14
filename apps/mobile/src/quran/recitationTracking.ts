@@ -16,6 +16,8 @@ export interface RecitationObservation {
   words: RecitationWord[];
   startSample: number;
   endSample: number;
+  /** Explicit decoder failure, not silence or a missing spoken word. */
+  evidenceValid?: boolean;
 }
 export interface AudioSpan { compactStart: number; originalStart: number; length: number }
 
@@ -29,7 +31,8 @@ function validCaptureBounds(observation: RecitationObservation) {
  * Fractional CTC boundaries are valid, but all words must remain chronological
  * and inside the original capture. Low finite confidence remains uncertainty. */
 export function validRecitationObservation(observation: RecitationObservation) {
-  return validCaptureBounds(observation) && Number.isFinite(observation.quality)
+  return validCaptureBounds(observation) && (observation.evidenceValid === undefined || observation.evidenceValid === true)
+    && Number.isFinite(observation.quality)
     && observation.quality >= 0 && observation.quality <= 1 && Array.isArray(observation.words)
     && observation.words.length <= 240 && observation.words.every((word, i, spoken) =>
       word && typeof word.text === "string" && !!recitationLexeme(word.text) && typeof word.edge === "boolean"
@@ -101,10 +104,13 @@ export function decodeRecitationWords(result: AsrTranscribeResult, vocab: Record
 }
 /** Timings and the same acoustic-quality statistic share one argmax pass. */
 export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Record<string, string>,
-  compactSamples: number, spans: AudioSpan[], startSample = 0, originalSamples = compactSamples) {
+  compactSamples: number, spans: AudioSpan[], startSample = 0, originalSamples = compactSamples):
+  {words: RecitationWord[]; quality: number; evidenceValid?: boolean} {
   const { logprobs, timeSteps, vocabSize, blankId } = result.acoustic;
+  const invalid = () => ({words: [] as RecitationWord[], quality: 0, evidenceValid: false as const});
   if (!Number.isInteger(timeSteps) || timeSteps < 1 || !Number.isInteger(vocabSize) || vocabSize < 2
-    || logprobs.length !== timeSteps * vocabSize || compactSamples < 1 || originalSamples < 1) return { words: [] as RecitationWord[], quality: 0 };
+    || !Number.isSafeInteger(blankId) || blankId < 0 || blankId >= vocabSize
+    || logprobs.length !== timeSteps * vocabSize || compactSamples < 1 || originalSamples < 1) return invalid();
   let voiced = 0, qualitySum = 0;
   const original = (sample: number, side: "start" | "end") => {
     const bounded = Math.max(0, Math.min(compactSamples, sample));
@@ -119,7 +125,15 @@ export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Rec
   let current: RecitationWord | null = null;
   for (let t = 0; t < timeSteps; t++) {
     let score = -Infinity, id = blankId;
-    for (let v = 0; v < vocabSize; v++) if (logprobs[t * vocabSize + v] > score) { score = logprobs[t * vocabSize + v]; id = v; }
+    for (let v = 0; v < vocabSize; v++) {
+      const value = logprobs[t * vocabSize + v];
+      // -Infinity is a legitimate zero-probability alternative. NaN, +Infinity
+      // or positive log probabilities invalidate the ENTIRE observation; do
+      // not skip a broken token/frame and fabricate an omitted spoken word.
+      if (Number.isNaN(value) || value > 0) return invalid();
+      if (value > score) { score = value; id = v; }
+    }
+    if (!Number.isFinite(score)) return invalid();
     if (id !== blankId && Number.isFinite(score)) { voiced++; qualitySum += Math.min(1, Math.exp(score)); }
     if (id !== blankId && id !== previous) {
       const piece = vocab[String(id)] ?? "";

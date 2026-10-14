@@ -94,7 +94,7 @@ async function recognizeRecitation(pcm: Float32Array, startSample: number): Prom
     const decoded = held.decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize);
     const result: AsrTranscribeResult = {...decoded, acoustic: {...acoustic, blankId: 1024}};
     const evidence = decodeRecitationEvidence(result, held.vocab, speech.pcm.length, speech.spans, startSample, pcm.length);
-    return {text: result.text, ...evidence, startSample, endSample: startSample + pcm.length};
+    return {text: evidence.evidenceValid === false ? "" : result.text, ...evidence, startSample, endSample: startSample + pcm.length};
   } finally { speech.pcm.fill(0); }
 }
 export async function acquireReciteAssist(onProgress: (message: string) => void) {

@@ -140,7 +140,8 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
       tail.analyzed(recentVoice); recentVoice = false; budget.started(endSample); const startedAt = Date.now();
       processing.current = held.recognize(pcm, startSample).then((result) => {
         if (!mounted.current || token !== epoch.current || key !== verseKey.current) return;
-        if (result.text.trim()) setHeard(result.text);
+        if (result.evidenceValid === false) setHeard("");
+        else if (result.text.trim()) setHeard(result.text);
         const observed = parseAyahReference(key);
         if (savedAudio.current && observed?.chapter === savedAudio.current.record.chapter) savedAudio.current.record.to = observed.ayah;
         if (review.current) review.current.observations++;

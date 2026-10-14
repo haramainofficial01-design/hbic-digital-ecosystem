@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { AsrTranscribeResult } from "@tilawi/quran-asr";
 import { acousticQuality, compactQuietPausesWithTimeline, ReciteAudioWindow, ReciteCompletionGuard } from "../src/quran/reciteAssistFeedback";
-import { decodeRecitationWords, recitationDisplayWords, recitationLexeme, wholeWordAnchor, RecitationTracker, type RecitationObservation, type RecitationWord } from "../src/quran/recitationTracking";
+import { decodeRecitationWords, decodeRecitationEvidence, recitationDisplayWords, recitationLexeme, wholeWordAnchor, RecitationTracker, type RecitationObservation, type RecitationWord } from "../src/quran/recitationTracking";
 
 // Synthetic unit evidence only. Human/waveform qualification is a separate script.
 const expected = "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ";
@@ -13,6 +13,62 @@ const twice = (tracker: RecitationTracker, text: string, words: RecitationWord[]
   tracker.observe(text, observation(words, 64000));
   return tracker.observe(text, observation(words, 80000));
 };
+const acousticFixture = () => {
+  const ids = [0, 1, 0, 2, 0, 3, 0, 4, 0], logprobs = new Float32Array(ids.length * 5).fill(-15);
+  ids.forEach((id, frame) => {logprobs[frame * 5 + id] = Math.log(.99);});
+  return {text: "الحمد لله رب العالمين", tokenIds: [1, 2, 3, 4], acoustic: {logprobs, timeSteps: 9, vocabSize: 5, blankId: 0}};
+};
+const acousticVocab = {"0": "<blank>", "1": "▁الحمد", "2": "▁لله", "3": "▁رب", "4": "▁العالمين"};
+const decodeFixture = (result: AsrTranscribeResult) => decodeRecitationEvidence(result, acousticVocab, 48000,
+  [{compactStart: 0, originalStart: 0, length: 48000}], 0, 80000);
+
+test("a corrupt CTC frame cannot disappear into a high-confidence skipped-word warning", () => {
+  for (const value of [NaN, Infinity, .1]) for (const offset of [5 * 5 + 3, 5 * 5 + 4]) {
+    const result = acousticFixture(); result.acoustic.logprobs[offset] = value;
+    const evidence = decodeFixture(result), tracker = new RecitationTracker();
+    assert.equal(acousticQuality(result), 0);
+    assert.equal(evidence.evidenceValid, false); assert.equal(evidence.quality, 0); assert.deepEqual(evidence.words, []);
+    for (const endSample of [64000, 80000]) {
+      const feedback = tracker.observe(expected, {text: "", ...evidence, startSample: 0, endSample});
+      assert.equal(feedback.status, "uncertain"); assert.deepEqual(feedback.differences, []);
+      assert.equal(feedback.stableComplete, false); assert.equal(feedback.followingIndex, undefined);
+    }
+    assert.deepEqual(tracker.snapshot(), []);
+  }
+});
+test("corrupt new acoustic output clears old stability and cannot reuse the same capture", () => {
+  const tracker = new RecitationTracker(), good = decodeFixture(acousticFixture());
+  for (const endSample of [64000, 80000]) tracker.observe(expected, {text: "", ...good, startSample: 0, endSample});
+  const broken = acousticFixture(); broken.acoustic.logprobs[28] = NaN;
+  const invalid = decodeFixture(broken);
+  assert.equal(tracker.observe(expected, {text: "", ...invalid, startSample: 0, endSample: 90000}).stableComplete, false);
+  assert.deepEqual(tracker.snapshot(), []);
+  assert.equal(tracker.observe(expected, {text: "", ...good, startSample: 0, endSample: 90000}).stableComplete, false);
+  assert.deepEqual(tracker.snapshot(), []);
+  assert.equal(tracker.observe(expected, {text: "", ...good, startSample: 0, endSample: 100000}).stableComplete, false);
+  assert.equal(tracker.observe(expected, {text: "", ...good, startSample: 0, endSample: 110000}).stableComplete, true);
+});
+test("impossible blank IDs, tensor shapes and all-zero-probability frames fail closed", () => {
+  for (const blankId of [-1, 5, NaN, .5]) {
+    const result = acousticFixture(); result.acoustic.blankId = blankId;
+    assert.equal(decodeFixture(result).evidenceValid, false);
+    assert.equal(acousticQuality(result), 0);
+  }
+  const badShape = acousticFixture(); badShape.acoustic.timeSteps = 10;
+  assert.equal(decodeFixture(badShape).evidenceValid, false);
+  const noWinner = acousticFixture(); noWinner.acoustic.logprobs.fill(-Infinity, 25, 30);
+  assert.equal(decodeFixture(noWinner).evidenceValid, false);
+  assert.equal(acousticQuality(noWinner), 0);
+});
+test("zero-probability alternatives and valid blank-only silence do not become corrupted speech", () => {
+  const result = acousticFixture(); result.acoustic.logprobs[5 * 5 + 4] = -Infinity;
+  const evidence = decodeFixture(result);
+  assert.notEqual(evidence.evidenceValid, false); assert.equal(evidence.words.length, 4);
+  const silence = acousticFixture(); silence.acoustic.logprobs.fill(-Infinity);
+  for (let frame = 0; frame < 9; frame++) silence.acoustic.logprobs[frame * 5] = 0;
+  const quiet = decodeFixture(silence);
+  assert.notEqual(quiet.evidenceValid, false); assert.equal(quiet.quality, 0); assert.deepEqual(quiet.words, []);
+});
 test("acoustic quality accepts short real CTC emissions but rejects malformed/blank evidence", () => {
   const make = (ids: number[]) => {
     const logprobs = new Float32Array(ids.length * 3).fill(-20);

@@ -64,7 +64,7 @@ worker.onmessage = async ({data}: MessageEvent) => {
         const acoustic = {logprobs: tensor.data as Float32Array, timeSteps: tensor.dims[1], vocabSize: tensor.dims[2], blankId: 1024};
         const result = {...decoder.decode(acoustic.logprobs, acoustic.timeSteps, acoustic.vocabSize), acoustic};
         const evidence = decodeRecitationEvidence(result, vocab, speech.pcm.length, speech.spans, startSample, pcm.length);
-        observation = {...observation, text: result.text, ...evidence};
+        observation = {...observation, text: evidence.evidenceValid === false ? "" : result.text, ...evidence};
       }
       worker.postMessage({type: "observation", observation, request: data.request});
     } catch (error) { worker.postMessage({type: "error", request: data.request, message: error instanceof Error ? error.message : "Recognition could not run."}); }
