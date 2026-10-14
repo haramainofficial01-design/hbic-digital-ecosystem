@@ -3,6 +3,13 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest complete-transcript selection experiment:
+[fixed phonetic / raw RNNT fallback](quran-lexical-rnnt-fallback-2026-10-14.md).
+On the same 48 historical controls, scripted word edits drop from 16/192 for
+RNNT alone to 9/192; complete altered scripts improve to 12/18. One previously
+exact pause scope regresses. This is frozen-output calibration replay, not new
+natural inference, 99% qualification, live following or a release.
+
 Latest partial-evidence decoder:
 [mandatory lexical anchors with explicit gaps](quran-partial-consensus-2026-10-14.md).
 Replay retains anchors in all 13 previously discarded duration-mode scopes,
