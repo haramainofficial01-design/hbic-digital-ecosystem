@@ -3,6 +3,12 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest reference-free word-candidate experiment:
+[phonetic lexical segmentation](quran-lexical-segmentation-2026-10-14.md).
+Replay of 48 frozen actual outputs finds only 4/18 exact altered scripts with
+duration handling; all six substitutions remain uncovered. The candidate is
+rejected, not integrated or represented as new inference/fresh qualification.
+
 Latest shared app/web safeguard:
 [corrupt CTC output rejection](quran-ctc-output-integrity-2026-10-14.md).
 An invalid inference frame cannot be silently dropped into a skipped-word flag;
