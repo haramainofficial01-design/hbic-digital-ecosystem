@@ -3,6 +3,12 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest partial-evidence decoder:
+[mandatory lexical anchors with explicit gaps](quran-partial-consensus-2026-10-14.md).
+Replay retains anchors in all 13 previously discarded duration-mode scopes,
+but complete altered-script recognition remains 9/18. Partial strings are not
+full transcripts or safe input for skipped-word feedback; 99% is not established.
+
 Latest changed-decoder experiment:
 [independent acoustic lexical alternatives](quran-acoustic-lexical-candidates-2026-10-14.md).
 On the same 48 historical controls, the fixed first-unique duration policy
