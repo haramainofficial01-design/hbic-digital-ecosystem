@@ -3,6 +3,12 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest changed-candidate speech check:
+[original-frontend correction](quran-frontend-speech-check-2026-10-14.md).
+All 48 fixed calibration waveforms/transcripts match the prior run; script WER
+remains 16/192 (8.3333%). This closes that numerical-fidelity hypothesis without
+claiming new held-out data, improved word recognition or 99% qualification.
+
 Newest offline diagnostic: [script-reference error budget](quran-word-error-budget-2026-10-13.md).
 The saved original RNNT output has 124 substitutions, 12 deletions and 13
 insertions in 1,512 reference words. These are ASR/script differences, not
