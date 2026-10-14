@@ -55,7 +55,7 @@ function browser(js:string){
   return r.stdout.trim();
 }
 const results:any[]=[],failures:any[]=[];let runtime:any,complete=false;
-const codeSha256=Object.fromEntries([worker,"apps/mobile/scripts/zipformer/benchmark.mts","apps/mobile/scripts/recitation-phonetic-reference.py","apps/mobile/scripts/recitationPhoneticComparison.ts","apps/mobile/scripts/recitationAcousticBeam.ts","apps/mobile/scripts/recitationQualification.ts","apps/mobile/scripts/recitationLevel.ts"].map(file=>[file.split("/").at(-1),sha(readFileSync(file))]));
+const codeSha256=Object.fromEntries([worker,...(wordModel?["apps/mobile/scripts/rnnt_beam.py","apps/mobile/scripts/nvidia_frontend_contract.py"]:[]),"apps/mobile/scripts/zipformer/benchmark.mts","apps/mobile/scripts/recitation-phonetic-reference.py","apps/mobile/scripts/recitationPhoneticComparison.ts","apps/mobile/scripts/recitationAcousticBeam.ts","apps/mobile/scripts/recitationQualification.ts","apps/mobile/scripts/recitationLevel.ts"].map(file=>[file.split("/").at(-1),sha(readFileSync(file))]));
 function save(){
   const ms=results.map(row=>row.elapsedMs).sort((a,b)=>a-b);
   const unique=[...new Map<string,any>(results.map(row=>[row.identity,row])).values()];

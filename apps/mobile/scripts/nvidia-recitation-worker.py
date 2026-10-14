@@ -20,6 +20,7 @@ import sentencepiece as spm
 import torch
 import yaml
 from rnnt_beam import rnnt_beam
+from nvidia_frontend_contract import validate_frontend_config
 
 OFFICIAL_HASH = "d29d19d7c054a5fc010ac6815e9cbb0dd1b21a30e0a7f7f2982e1fecaf0c3e31"
 ENCODER_HASH = "a74e77489a9e48d689bac080a30c5e54b35e5f54171273771dba9c72752eade3"
@@ -60,6 +61,7 @@ def main():
         tokenizer = spm.SentencePieceProcessor(model_proto=bundle.extractfile("./" + tokenizer_path).read())
     window = state["preprocessor.featurizer.window"]
     filters = state["preprocessor.featurizer.fb"]
+    frontend_contract = validate_frontend_config(config["preprocessor"], window, filters)
     weight = state["ctc_decoder.decoder_layers.0.weight"]
     bias = state["ctc_decoder.decoder_layers.0.bias"]
     if tokenizer.get_piece_size() != 1024 or weight.shape != (1025, 512, 1):
@@ -77,6 +79,7 @@ def main():
     options.inter_op_num_threads = 1
     session = ort.InferenceSession(str(encoder), options, providers=["CPUExecutionProvider"])
     print(json.dumps({"ready": True, "mode": mode, "blankId": 1024,
+                      "frontend": frontend_contract,
                       "canonicalPrompt": False, "forcedAlignment": False, "wordRecognitionQualified": False,
                       "vocab": {str(i): tokenizer.id_to_piece(i) for i in range(1024)},
                       "versions": {"torch": torch.__version__, "onnxruntime": ort.__version__,
@@ -98,9 +101,15 @@ def main():
         with torch.no_grad():
             spectrum = torch.stft(x, n_fft=512, hop_length=160, win_length=400,
                                   window=window, center=True, return_complex=True)
-            features = torch.log(torch.matmul(filters, spectrum.abs().square()) + 2 ** -24)
-            features = (features - features.mean(dim=-1, keepdim=True)) / (
-                features.std(dim=-1, keepdim=True, correction=1) + 1e-5)
+            # Match original NeMo v2 evaluation operations, including float32
+            # reduction order. mean/std are mathematically equivalent but can
+            # differ materially for near-constant log energies (e.g. silence).
+            features = torch.log(torch.matmul(filters,
+                torch.sqrt(torch.view_as_real(spectrum).pow(2).sum(-1)).pow(2)) + 2 ** -24)
+            feature_mean = features.sum(axis=2) / features.shape[-1]
+            feature_std = torch.sqrt((features - feature_mean.unsqueeze(2)).pow(2).sum(axis=2)
+                                     / (features.shape[-1] - 1.0)) + 1e-5
+            features = (features - feature_mean.unsqueeze(2)) / feature_std.unsqueeze(2)
             encoded, lengths = session.run(None, {"audio_signal": features.numpy(),
                 "length": np.array([features.shape[-1]], dtype=np.int64)})
         frames = int(lengths[0])
@@ -190,7 +199,7 @@ def main():
                 del projected, prediction, hidden, probabilities
         print(json.dumps(response, ensure_ascii=False), flush=True)
         pcm.fill(0)
-        del response, request, data, pcm, x, spectrum, features, encoded
+        del response, request, data, pcm, x, spectrum, features, feature_mean, feature_std, encoded
 
 
 if __name__ == "__main__":
