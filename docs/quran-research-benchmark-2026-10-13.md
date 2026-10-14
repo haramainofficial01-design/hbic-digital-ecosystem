@@ -228,3 +228,66 @@ engineering fixes, retains failed evidence, and reports only actionable changes
 or an exact external approval requirement. It must not endlessly rerun identical
 benchmarks, train on evaluation-only audio, publish unverified capabilities or
 silently change the user's foreground screen.
+
+## 13 October evening follow-up: paired regression audit
+
+This is a **new analysis of existing outputs**, not new inference, fresh held-out
+data, model improvement or a changed recognition pipeline. No audio was fetched,
+stored or uploaded; no foreground application, production or store was changed.
+
+The new `recitationPairedAudit.ts` comparison recomputes each stored metric from
+the actual output; refuses incomplete runs, mismatched original WAV/PCM hashes,
+reference scopes, altered denominators and conflicting duplicate recordings;
+and deduplicates by **WAV SHA-256**, not merely recording names. It keeps script
+WER and raw Unicode-phone character edits separate and never manufactures
+learner mistake labels, spoken word locations or independent-speaker confidence.
+
+All four paired audits succeeded over 200 entries / **199 distinct waveforms**,
+with zero input/count/pairing failures. Source reports and their frozen hashes
+are listed above. Results against their respective unmodified baseline:
+
+| Candidate | Reference denominator | Baseline → candidate edits | Recordings improved / regressed / equal count | Changed output strings | Exact baseline strings becoming different |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| v3 fixed RMS level | 12,496 phone characters | 904 → 889 | 10 / 4 / 185 | 17 | 0 |
+| v3 prefix-8 | 12,496 phone characters | 904 → 901 | 4 / 3 / 192 | 7 | 0 |
+| v3.1 greedy | 12,496 phone characters | 904 → 958 | 40 / 51 / 108 | 98 | 12 |
+| NVIDIA RNNT fixed RMS level | 1,512 script-reference words | 149 → 149 | 3 / 3 / 193 | 15 | **3** |
+
+The RNNT aggregate WER concealed regressions: three formerly exact normalized
+script-reference transcripts acquired word differences, none of its different
+transcripts became exact, and the exact-reference recording count fell from
+101 to 98. This is **not** a false-correction rate or proof the reference matches
+audible speech, but it does rule out claiming that the unchanged aggregate
+score establishes safer word recognition.
+
+The affected RNNT duration bucket is 5–under-10 seconds: 82 recordings, 625
+reference words, 59 → 61 edits, 1 improved / 3 regressed / 78 equal; all three
+exact-to-different transitions are there. Under 5 seconds: 78 recordings,
+310 words, 43 → 41 edits, 2 / 0 / 76. At least 10 seconds: 39 recordings,
+577 words, 47 → 47 edits, 0 / 0 / 39. These are duration groups, **not** speaker
+demographics, microphone classes or confidence intervals.
+
+Decision: do not promote the fixed gain, prefix decoder or v3.1 from this
+evidence. No expected answer may choose a different decoder per recording.
+Fresh, independently reviewed natural word-error gold and native validation
+remain necessary; the 99% release gate is still **FAIL**.
+
+Reproduce entirely offline:
+
+```sh
+npx tsx apps/mobile/scripts/zipformer/paired-audit.mts \
+  <existing-baseline-report.json> <frozen-baseline-sha256> \
+  <existing-candidate-report.json> <frozen-candidate-sha256>
+```
+
+Analysis code SHA-256:
+`9a1dd638610db86ad6061d1ca449d5f5dff191c83d31e5d4533e285e24028d4c`.
+Pinned metadata SHA-256:
+`5d54d855872fc2f110840c80683a1ca2799efcd18d244cf18662e421e6fd9c1f`.
+Private per-recording transcripts remain only in the existing ignored research
+reports; the audit emits aggregate numbers and hashes, not audio or transcripts.
+The synthetic evidence-contract tests validate rejection/paired-count logic,
+not recognition accuracy. **28 relevant regressions passed**, including six new
+paired-audit checks; strict TypeScript and diff checks passed. All four real
+saved-report audits passed. No native rebuild is warranted for these
+offline-only scripts.
