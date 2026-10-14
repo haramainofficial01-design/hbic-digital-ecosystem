@@ -8,6 +8,11 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest capture-lifecycle safeguard: [rejected stop preserves ownership and an
+explicit retry state](quran-capture-stop-safety-2026-10-14.md). 79 controlled
+checks pass; no false microphone-off claim after rejection. This is not new
+speech/native qualification or deployment; measured recognition is unchanged.
+
 Latest phone failure-path safeguard: [native inference rejection clears stale
 feedback](quran-native-rejection-safety-2026-10-14.md). 57 controlled checks pass;
 this fixes missing-evidence handling, not acoustic accuracy, natural-word

@@ -16,8 +16,12 @@ export class OwnedPcmCapture {
     if (this.stopping) return this.stopping;
     if (!this.owns) return Promise.resolve();
     const starting = this.starting;
-    this.stopping = (async () => { await starting?.catch(() => {}); await job(); })()
-      .finally(() => { this.owns = false; this.stopping = null; });
+    this.stopping = (async () => {
+      await starting?.catch(() => {}); await job();
+      // A rejected native stop cannot certify microphone shutdown. Retain
+      // ownership for an explicit retry and reject competing starts meanwhile.
+      this.owns = false;
+    })().finally(() => { this.stopping = null; });
     return this.stopping;
   }
 }

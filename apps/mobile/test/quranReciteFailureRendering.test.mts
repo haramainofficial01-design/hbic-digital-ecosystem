@@ -21,8 +21,8 @@ async function bundle(before:boolean){
     "expo-file-system":"export class Directory{};export class File{};export const Paths={};",
     "@tilawi/expo-pcm-recorder":`export const isPcmRecorderAvailable=true;
       export const addPcmChunkListener=fn=>{window.qa.pcm=fn;return{remove(){window.qa.pcm=null}}};
-      export const startPcmRecording=async()=>{window.qa.starts++};
-      export const stopPcmRecording=async()=>{window.qa.stops++};`,
+      export const startPcmRecording=async()=>{window.qa.starts++;if(window.qa.startFailures>0){window.qa.startFailures--;throw Error('FICTIONAL start rejection')}};
+      export const stopPcmRecording=async()=>{window.qa.stops++;if(window.qa.stopFailures>0){window.qa.stopFailures--;throw Error('FICTIONAL stop rejection')}};`,
     "LocalizedText":`import React from 'react';export const Text=({children,accessibilityLabel})=>React.createElement('span',{'aria-label':accessibilityLabel},children);
       export const Alert={alert(_,__,buttons){buttons.find(b=>b.text==='Start').onPress()}};`,
     "AppButton":`import React from 'react';export const AppButton=({label,onPress,disabled})=>React.createElement('button',{onClick:onPress,disabled},label);`,
@@ -136,5 +136,84 @@ test("failed inference withdraws an old possible-word warning instead of present
     await page.evaluate(()=>(window as any).qa.unmount());
     await page.waitForFunction(()=>(window as any).qa.disposes===1);
     assert.equal(await page.evaluate(()=>(window as any).qa.requests.every((r:any)=>r.pcm.every((v:number)=>v===0))),true);
+  }finally{await browser.close()}
+});
+test("rejected native shutdown remains busy and retryable rather than claiming idle or microphone off",async()=>{
+  const browser=await chromium.launch({headless:true});
+  try{const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+    await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>(window as any).qa.stopFailures=1);
+    await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.getByText('Microphone shutdown could not be confirmed.',{exact:false}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Start Recite Assist',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).count(),0);
+    assert.equal(await page.getByText('Session stopped.',{exact:false}).count(),0);
+    assert.deepEqual(await page.evaluate(()=>{const q=(window as any).qa;return{starts:q.starts,stops:q.stops,busy:q.busy,disposed:q.disposes}}),
+      {starts:1,stops:1,busy:true,disposed:1});
+    await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>{const q=(window as any).qa;return{starts:q.starts,stops:q.stops,busy:q.busy,disposed:q.disposes}}),
+      {starts:1,stops:2,busy:false,disposed:1});
+    await page.evaluate(()=>(window as any).qa.unmount());
+    assert.equal(await page.evaluate(()=>(window as any).qa.stops),2,"idle teardown does not stop another feature");
+  }finally{await browser.close()}
+});
+test("failed pause does not claim microphone-off; bounded stop recovery can be retried",async()=>{
+  const browser=await chromium.launch({headless:true});
+  try{const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+    await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>(window as any).qa.stopFailures=2);
+    await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).click();
+    await page.getByText('Microphone shutdown could not be confirmed.',{exact:false}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Resume Recite Assist',exact:true}).count(),0);
+    assert.equal(await page.getByText('Paused. The microphone is off.',{exact:false}).count(),0);
+    assert.equal(await page.evaluate(()=>(window as any).qa.stops),2,"one bounded recovery, no retry loop");
+    assert.equal(await page.evaluate(()=>(window as any).qa.busy),true);
+    await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>(window as any).qa.stops),3);
+    await page.evaluate(()=>(window as any).qa.unmount());
+  }finally{await browser.close()}
+});
+test("start/resume failure messages cannot overwrite an unconfirmed shutdown warning",async()=>{
+  const browser=await chromium.launch({headless:true});
+  try{for(const resume of [false,true]){
+    const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
+    if(resume){
+      await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+      await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).click();
+      await page.getByRole('button',{name:'Resume Recite Assist',exact:true}).waitFor();
+    }
+    await page.evaluate(()=>{const q=(window as any).qa;q.startFailures=1;q.stopFailures=1});
+    await page.getByRole('button',{name:resume?'Resume Recite Assist':'Start Recite Assist',exact:true}).click();
+    await page.getByText('Microphone shutdown could not be confirmed.',{exact:false}).waitFor();
+    assert.equal(await page.getByText('Microphone could not resume. Tap Start to retry.',{exact:true}).count(),0);
+    assert.equal(await page.getByText('FICTIONAL start rejection',{exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Start Recite Assist',exact:true}).count(),0);
+    await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>(window as any).qa.unmount());await page.close();
+  }}finally{await browser.close()}
+});
+test("automatic completion cannot overwrite an unconfirmed microphone shutdown warning",async()=>{
+  const browser=await chromium.launch({headless:true});
+  try{const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+    await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>{const q=(window as any).qa;q.pcm(Array(32000).fill(.1));q.feed()});
+    for(let count=1;count<=3;count++){
+      await page.waitForFunction(count=>(window as any).qa.requests.length===count,count);
+      if(count===3)await page.evaluate(()=>(window as any).qa.stopFailures=1);
+      await page.evaluate(()=>(window as any).qa.good());
+      if(count<3){await page.getByLabel('Recognized speech',{exact:true}).waitFor();await page.evaluate(()=>(window as any).qa.feed())}
+    }
+    await page.getByText('Microphone shutdown could not be confirmed.',{exact:false}).waitFor();
+    assert.equal(await page.getByText('Selected ayah reached.',{exact:false}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Start Recite Assist',exact:true}).count(),0);
+    await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>(window as any).qa.unmount());
   }finally{await browser.close()}
 });

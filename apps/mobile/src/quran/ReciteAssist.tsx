@@ -22,7 +22,7 @@ export interface ReciteAssistHandle { toggleRecording: () => boolean }
 interface ReciteAssistProps { verse: QuranVerse; stopPlayback: () => void; blocked: boolean; concealed: boolean; fontLoaded: boolean; onBusyChange: (busy: boolean) => void; onAdvance?: (signal: AbortSignal) => Promise<void>; recognitionMode?: "efficient" | "responsive"; onReview?: (key: string, attemptId: string, feedback: ReciteFeedback) => void; saveAudio?: boolean; onRecording?: (recording: QuranRecording, allowSessionReview: boolean) => Promise<void>; testMode?: boolean; onRevealWord?: (index: number) => void }
 export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function ReciteAssist({ verse, stopPlayback, blocked, concealed, fontLoaded, onBusyChange, onAdvance, recognitionMode = "efficient", onReview, saveAudio = false, onRecording, testMode = false, onRevealWord }, ref) {
   const { theme } = useAppTheme();
-  const [phase, setPhase] = useState<"idle" | "preparing" | "listening" | "pausing" | "paused" | "resuming">("idle");
+  const [phase, setPhase] = useState<"idle" | "preparing" | "listening" | "pausing" | "paused" | "resuming" | "stop_failed">("idle");
   const [message, setMessage] = useState("Follows recited words and flags possible word differences. Not a Tajweed assessment.");
   const [feedback, setFeedback] = useState<ReciteFeedback | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -63,7 +63,8 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
     completion.current.reset(); advancing.current = false;
     const held = engine.current; engine.current = null;
     stopping.current = (async () => {
-      await pcmCapture.stop(stopPcmRecording).catch(() => {});
+      let captureStopped = true;
+      await pcmCapture.stop(stopPcmRecording).catch(() => { captureStopped = false; });
       await processing.current?.catch(() => {});
       const clip = savedAudio.current; savedAudio.current = null;
       if (clip) {
@@ -78,11 +79,14 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
         }
       }
       if (held) await held.dispose().catch(() => {});
-      busy.current = false;
+      busy.current = !captureStopped;
       if (mounted.current) {
         const result = review.current;
         if (result) setSummary(`${Math.ceil((Date.now() - result.started) / 1000)} seconds · ${result.reached} ayahs reached · ${result.observations} listening observations. ${result.unclear} unclear; ${result.differences} with possible word differences. Review with the reference; no score was assigned.${storageWarning.current ? ` ${storageWarning.current}` : ""}`);
-        setPhase("idle"); setMessage(storageWarning.current ?? (clip ? "Session stopped. Review audio was handled by your private recording preference and was not uploaded." : "Session stopped. Microphone audio was not saved or uploaded."));
+        setPhase(captureStopped ? "idle" : "stop_failed");
+        if (!captureStopped) { setHeard(""); setFeedback(null); }
+        setMessage(!captureStopped ? "Microphone shutdown could not be confirmed. Tap Stop Recitation to retry. If it keeps failing, close the app before continuing."
+          : storageWarning.current ?? (clip ? "Session stopped. Review audio was handled by your private recording preference and was not uploaded." : "Session stopped. Microphone audio was not saved or uploaded."));
       }
       review.current = null;
     })().finally(() => { stopping.current = null; });
@@ -168,7 +172,7 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
           if (review.current) review.current.reached++;
           const reached = parseAyahReference(key); if (savedAudio.current && reached?.chapter === savedAudio.current.record.chapter) savedAudio.current.record.to = reached.ayah;
           if (!advance.current) {
-            void stop().then(() => { if (mounted.current) setMessage("Selected ayah reached. Reveal and review your recitation; no score was assigned."); });
+            void stop().then(() => { if (mounted.current && !busy.current) setMessage("Selected ayah reached. Reveal and review your recitation; no score was assigned."); });
             return;
           }
           const controller = new AbortController(); pendingAdvance.current = controller;
@@ -206,7 +210,8 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
     automaticFromKey.current = null;
     if (timer.current) clearInterval(timer.current); timer.current = null;
     microphone.current?.remove(); microphone.current = null;
-    await pcmCapture.stop(stopPcmRecording).catch(() => {});
+    try { await pcmCapture.stop(stopPcmRecording); }
+    catch { await stop(); return; } // Never label a rejected native stop as paused/off.
     await processing.current?.catch(() => {});
     window.current.clear(); tracker.current.reset(); lastAnalyzed.current = -1; completion.current.reset();
     if (mounted.current && engine.current) { setPhase("paused"); setMessage("Paused. The microphone is off. Resume from the current ayah."); }
@@ -215,7 +220,7 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
     if (phase !== "paused" || !engine.current || stopping.current) return;
     setPhase("resuming"); const token = ++epoch.current;
     try { await capture(engine.current, token); }
-    catch { await stop(); if (mounted.current) setMessage("Microphone could not resume. Tap Start to retry."); }
+    catch { await stop(); if (mounted.current && !busy.current) setMessage("Microphone could not resume. Tap Start to retry."); }
   }
   async function start(recordAudio = saveAudio) {
     if (busy.current || blocked || !isPcmRecorderAvailable) return;
@@ -245,7 +250,7 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
     } catch (error) {
       await stop();
       if (held) await held.dispose();
-      if (mounted.current) setMessage(error instanceof Error ? error.message : "On-device recognition is unavailable.");
+      if (mounted.current && !busy.current) setMessage(error instanceof Error ? error.message : "On-device recognition is unavailable.");
     }
   }
   function requestStart(recordAudio = saveAudio) {

@@ -3,6 +3,12 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest owned-microphone lifecycle safeguard:
+[rejected shutdown remains unconfirmed and retryable](quran-capture-stop-safety-2026-10-14.md).
+A failed native stop no longer drops capture ownership or claims idle/off;
+retries and warning priority are verified in 79 controlled checks. No new
+speech inference, physical-microphone qualification or deployment is implied.
+
 Latest phone-component safety correction:
 [native inference rejection withdraws stale feedback](quran-native-rejection-safety-2026-10-14.md).
 The actual component's injected failure previously retained speech/highlights;
