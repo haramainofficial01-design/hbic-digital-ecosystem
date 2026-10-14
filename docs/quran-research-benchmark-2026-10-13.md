@@ -3,6 +3,13 @@
 **The requested 99% / 99.99% mistake-detection accuracy is not established.**
 These experiments are not shipped in the app, website, OTA or store releases.
 
+Latest changed acoustic-search experiment:
+[width 32 with paired restoration accounting](quran-wide-lexical-search-2026-10-14.md).
+All 48 new v3 inferences complete with matching original posteriors. The combined
+script edit budget improves 9/192 → 6/192, but a substituted word is newly
+returned as canonical text and another previously exact scope regresses. Wider
+search is not promoted; 99%, live following and native qualification remain absent.
+
 Latest complete-transcript selection experiment:
 [fixed phonetic / raw RNNT fallback](quran-lexical-rnnt-fallback-2026-10-14.md).
 On the same 48 historical controls, scripted word edits drop from 16/192 for

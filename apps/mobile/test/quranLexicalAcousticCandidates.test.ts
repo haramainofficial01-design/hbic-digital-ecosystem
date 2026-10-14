@@ -2,8 +2,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {lexicalSegmenter} from "../scripts/zipformer/lexicalSegmentation";
-import {lexicalAcousticCandidates} from "../scripts/zipformer/lexicalAcousticCandidates";
+import {lexicalAcousticCandidates,lexicalSearchWidth} from "../scripts/zipformer/lexicalAcousticCandidates";
 const parse=lexicalSegmenter([{word:"واحد",phones:"m"},{word:"اثنان",phones:"n"}]);
+test("explicit wider search preserves the default and refuses sweeps/unbounded arguments",()=>{
+  assert.equal(lexicalSearchWidth(),8);assert.equal(lexicalSearchWidth(['8']),8);
+  assert.equal(lexicalSearchWidth(['32']),32);
+  for(const args of [['0'],['33'],['16'],[''],['32','8'],[32 as never]])assert.throws(()=>lexicalSearchWidth(args),/Explicit/);
+});
+test("a candidate at acoustic rank 32 stays rank 32 and is not silently promoted to rank one",()=>{
+  const acoustic=Array.from({length:32},(_,i)=>({phones:i===31?'m':'x',retainedPathLogScore:-(i+1)}));
+  const result=lexicalAcousticCandidates(acoustic,parse);
+  assert.equal(result.candidates.length,32);assert.equal(result.top.proposal.status,'uncovered');
+  assert.equal(result.firstUnique?.rank,32);assert.equal(result.acousticRankDrop,31);
+  assert.equal(result.confidenceQualified,false);
+});
 test("lexical alternative selection uses unchanged acoustic rank, never reference or shortest words",()=>{
   const result=lexicalAcousticCandidates([{phones:"x",retainedPathLogScore:-1},
     {phones:"mn",retainedPathLogScore:-2},{phones:"m",retainedPathLogScore:-3}],parse);

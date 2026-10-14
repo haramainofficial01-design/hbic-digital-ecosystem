@@ -11,13 +11,20 @@ const sha=(bytes:string|Uint8Array)=>createHash("sha256").update(bytes).digest("
 const load=(path:string,pin:string)=>{const bytes=readFileSync(path);
   if(bytes.length>8_000_000||sha(bytes)!==pin)throw Error("Pinned bounded complete real-output evidence required");
   return {data:JSON.parse(bytes.toString()),sha256:pin};};
-const phone=load("output/quran-development/zipformer-comparison/lexical-nbest-calibration-1791988724075-499c571d-b894-45f9-aaa9-38844fdc9bdb.json",
-  "5b1407cabae9c266b79471828569d05c23fb7295d01da094946a16c8a2d7d531");
+const args=process.argv.slice(2);
+if(args.length!==0&&args.length!==2)throw Error("Explicit local phonetic report and SHA-256, or unchanged default required");
+const phonePath=args[0]??"output/quran-development/zipformer-comparison/lexical-nbest-calibration-1791988724075-499c571d-b894-45f9-aaa9-38844fdc9bdb.json";
+const phoneHash=args[1]??"5b1407cabae9c266b79471828569d05c23fb7295d01da094946a16c8a2d7d531";
+if(resolve(phonePath,"..")!==resolve("output/quran-development/zipformer-comparison")
+  ||!/^lexical-nbest-calibration-[0-9]+-[a-f0-9-]{36}\.json$/.test(phonePath.split('/').at(-1)!)
+  ||!/^[a-f0-9]{64}$/.test(phoneHash))throw Error("Bounded existing local phonetic report with an explicit integrity pin required");
+const phone=load(phonePath,phoneHash);
+const width=phone.data.predeclared?.width;
 const rnnt=load("output/quran-development/sherpa-comparison/nvidia-whole-rnnt-calibration.json",
   "cc2478eef679764a0fd5b4bf62fa4e345cbd4025c683ed07e851058da06fb310");
 if(phone.data.complete!==true||phone.data.summary?.expectedCases!==48||phone.data.summary?.analyzed!==48
   ||phone.data.results?.length!==48||phone.data.failures?.length!==0||phone.data.predeclared?.split!=="calibration"
-  ||phone.data.predeclared?.width!==8||phone.data.predeclared?.tokensPerFrame!==12||phone.data.predeclared?.compactQuiet!==true
+  ||![8,32].includes(width)||phone.data.predeclared?.tokensPerFrame!==12||phone.data.predeclared?.compactQuiet!==true
   ||phone.data.modelSha256!=="6a5ddafa9c5e5c01260d30264031b341785bdc152e9ef1d569b41c8c278508eb"
   ||rnnt.data.complete!==true||rnnt.data.mode!=="rnnt"||rnnt.data.scope!=="whole"||rnnt.data.split!=="calibration"
   ||rnnt.data.canonicalPrompt!==false||rnnt.data.results?.length!==48||rnnt.data.failures?.length!==0
@@ -32,7 +39,7 @@ const rows=phone.data.results.map((p:any)=>{
     ||!Array.isArray(r.spokenGold)||r.spokenGold.some((word:unknown)=>typeof word!=="string")
     ||typeof r.scopedExpected!=="string"||typeof r.finalTranscript!=="string")throw Error("All original waveform/sample/category/script pairs required");
   seen.add(p.index);const exp=p.experiments?.[1];
-  if(exp?.duration!==true||exp.referenceConditioned!==false||!Array.isArray(exp.candidates)||exp.candidates.length>8
+  if(exp?.duration!==true||exp.referenceConditioned!==false||!Array.isArray(exp.candidates)||exp.candidates.length>width
     ||exp.firstUnique&&exp.firstUnique.proposal.status!=="unique")throw Error("Fixed duration-mode independent lexical proposals required");
   const proposal=exp.firstUnique?.proposal??{status:"uncovered",proposedWords:null};
   const selected=lexicalRnntFallback(proposal,r.finalTranscript); // NO script or expected answer
@@ -71,7 +78,7 @@ const count=(selected:Row[])=>({cases:selected.length,scriptWords:selected.reduc
   oracleMinimumEdits:selected.reduce((n:number,r:Row)=>n+r.oracleMinimumEdits,0),oracleNotSelectable:true});
 const output=resolve("output/quran-development/zipformer-comparison",`lexical-rnnt-fallback-${Date.now()}-${randomUUID()}.json`);
 const report={complete:true,analysisFailures:0,matchedOriginalWaveforms:48,expectedCases:48,newInference:false,freshHeldout:false,
-  predeclared:{policy:"duration-mode first complete unique independently ranked lexical proposal, otherwise unchanged raw RNNT",width:8,
+  predeclared:{policy:"duration-mode first complete unique independently ranked lexical proposal, otherwise unchanged raw RNNT",width,
     agreementUsedForSelection:false,canonicalReferenceUsedForSelection:false,goldUsedForSelection:false},
   inputsSha256:{phoneticCandidates:phone.sha256,rnntTranscripts:rnnt.sha256},
   codeSha256:Object.fromEntries(["apps/mobile/scripts/zipformer/lexicalRnntFallback.ts",

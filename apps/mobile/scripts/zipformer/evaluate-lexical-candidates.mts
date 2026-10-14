@@ -11,7 +11,9 @@ import {acousticWordpieceCandidates} from "../recitationAcousticBeam";
 import {compactQuietPausesWithTimeline} from "../../src/quran/reciteAssistFeedback";
 import {wordEdits} from "../recitationQualification";
 import {lexicalSegmenter} from "./lexicalSegmentation";
-import {lexicalAcousticCandidates} from "./lexicalAcousticCandidates";
+import {lexicalAcousticCandidates,lexicalSearchWidth} from "./lexicalAcousticCandidates";
+
+const width=lexicalSearchWidth(process.argv.slice(2));
 
 const sha=(bytes:string|Uint8Array)=>createHash("sha256").update(bytes).digest("hex");
 const frozen=(path:string,pin:string)=>{const bytes=readFileSync(path);
@@ -57,7 +59,7 @@ function count(rows:any[],mode:number){
 function save(){writeFileSync(output,JSON.stringify({complete,newInference:true,freshHeldout:false,
   modelSha256:old.data.modelSha256,model:manifest.repository,revision:manifest.revision,license:manifest.license,runtime,
   codeSha256,inputsSha256:{lexicon:lex.sha256,oldPhonetics:old.sha256,scriptedScopes:scripts.sha256},
-  predeclared:{split:"calibration",expectedCases:48,width:8,tokensPerFrame:12,inputScale:1,compactQuiet:true,
+  predeclared:{split:"calibration",expectedCases:48,width,tokensPerFrame:12,inputScale:1,compactQuiet:true,
     selection:"first complete unique lexical parse in independent acoustic rank, or abstain",
     lexicalDurationModes:[false,true],newReferencePrompt:false,canonicalRestoration:false},
   summary:{expectedCases:48,analyzed:results.length,failures:failures.length,
@@ -121,7 +123,7 @@ try{
         ||!Number.isInteger(recognized.timeSteps)||recognized.timeSteps<1||recognized.timeSteps>650||typeof recognized.phonemes!=="string")throw Error("Actual bounded posterior required");
       acoustic=Buffer.from(recognized.logprobs,"base64");
       if(acoustic.length!==recognized.timeSteps*251*4)throw Error("Invalid actual acoustic dimensions");
-      const decoderBegin=performance.now(),search=acousticWordpieceCandidates(new Float32Array(acoustic.buffer,acoustic.byteOffset,acoustic.length/4),251,250,8,12);
+      const decoderBegin=performance.now(),search=acousticWordpieceCandidates(new Float32Array(acoustic.buffer,acoustic.byteOffset,acoustic.length/4),251,250,width,12);
       const phoneCandidates=search.candidates.map(candidate=>({phones:candidate.ids.map(id=>inventory[id]).join(""),retainedPathLogScore:candidate.retainedPathLogScore}));
       const proposals=parsers.map(p=>lexicalAcousticCandidates(phoneCandidates,p.parse));
       const decoderMs=performance.now()-decoderBegin;

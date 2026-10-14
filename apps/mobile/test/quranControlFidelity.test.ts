@@ -26,6 +26,15 @@ test("neither-exact transcripts remain distinct from faithful or canonical outpu
   const r=controlRecognitionFidelity(canonical,"الحمد لله العالمين","الشمس لله العالمين");
   assert.equal(r.neitherExact,true);assert.equal(r.exactScriptedSpeech,false);assert.equal(r.canonicalInsteadOfScriptedSpeech,false);
 });
+test("unchanged scalar edit count can hide a new canonical-instead failure",()=>{
+  const expected="قل هو الله",spoken="قل رب الله";
+  const before=controlRecognitionFidelity(expected,spoken,"قل احد الله");
+  const after=controlRecognitionFidelity(expected,spoken,expected);
+  assert.equal(before.scriptedWordEdits,1);assert.equal(after.scriptedWordEdits,1);
+  assert.equal(before.canonicalInsteadOfScriptedSpeech,false);assert.equal(after.canonicalInsteadOfScriptedSpeech,true);
+  assert.equal(before.exactScriptedSpeech,false);assert.equal(after.exactScriptedSpeech,false);
+  assert.equal(after.naturalMistakeDetectionQualified,false);
+});
 test("failed/missing recognition cannot use cached perfect text to claim fidelity",()=>{
   for(const [analyzed,failed]of[[false,false],[true,true]]){
     const r=controlRecognitionFidelity(canonical,"الحمد لله العالمين","الحمد لله العالمين",analyzed,failed);

@@ -5,6 +5,13 @@
  * are unqualified and may restore mistakes. Coverage is not confidence. */
 import type {lexicalSegmenter} from "./lexicalSegmentation";
 
+/** One explicit bounded candidate, never a parameter sweep or gold-tuned width. */
+export function lexicalSearchWidth(args:readonly string[]=[]):8|32{
+  if(!Array.isArray(args)||args.length>1||args.length===1&&!['8','32'].includes(args[0]))
+    throw Error("Explicit lexical search width 8 or 32 required");
+  return args[0]==='32'?32:8;
+}
+
 export function lexicalAcousticCandidates(
   acoustic: {phones:string;retainedPathLogScore:number}[], parse:ReturnType<typeof lexicalSegmenter>) {
   if(!Array.isArray(acoustic)||!acoustic.length||acoustic.length>32
