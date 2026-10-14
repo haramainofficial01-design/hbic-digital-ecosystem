@@ -22,6 +22,7 @@ try{
   writeFileSync(output,JSON.stringify({...result,evidenceSha256:createHash("sha256").update(bytes).digest("hex"),
     qualificationCodeSha256:createHash("sha256").update(readFileSync("apps/mobile/scripts/recitationQualification.ts")).digest("hex")},null,2));
   console.log(JSON.stringify({status:result.status,evaluatedCases:result.evaluatedCases,uniqueSpeakers:result.uniqueSpeakers,
+    declaredSpeakerGroups:result.declaredSpeakerGroups,corpusIdentity:result.corpusIdentity,
     wordRecognition:result.wordRecognition,reasons:result.reasons,output}));
   if(result.status!=="PASS")process.exitCode=1;
 }catch(error){console.error(JSON.stringify({status:"FAIL",reason:error instanceof Error?error.message:"Invalid qualification evidence."}));process.exitCode=1;}

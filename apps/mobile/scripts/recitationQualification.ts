@@ -9,6 +9,10 @@ type Difference = {kind: Kind | "extra_word"; index: number | null};
 export interface QualificationCase {
   id: string; speaker: string; recording: string; split: "calibration" | "heldout";
   origin: "natural" | "waveform-control" | "unit-fixture";
+  /** Hash of the exact evaluated mono PCM scope, computed privately by the
+   * input adapter, not a renamed file/participant ID. Required to qualify
+   * natural evidence; absent legacy evidence remains an explicit FAIL. */
+  pcmSha256?: string;
   /** An independently checked VERBATIM transcript of the audible scope, not
    * merely the canonical ayah that the learner intended to recite. */
   /** Selected canonical reference, for annotation coordinates only. It must
@@ -69,6 +73,8 @@ function validateEvidence(evidence: QualificationEvidence) {
     if(!c||typeof c!=="object"||[c.id,c.speaker,c.recording,c.reference,c.spokenGold,c.recognized].some(value=>typeof value!=="string")
       || !["calibration","heldout"].includes(c.split)||!["natural","waveform-control","unit-fixture"].includes(c.origin)
       || typeof c.analyzed!=="boolean"||typeof c.recognitionFailed!=="boolean"||!Array.isArray(c.gold)||!Array.isArray(c.predicted))throw Error("Invalid corpus case.");
+    if(c.pcmSha256!==undefined&&(typeof c.pcmSha256!=="string"||!/^[a-f0-9]{64}$/.test(c.pcmSha256)))
+      throw Error("Invalid evaluated PCM scope hash.");
     for(const annotations of [c.gold,c.predicted]){
       const seen=new Set<string>();
       for(const difference of annotations){
@@ -93,21 +99,36 @@ export function qualifyRecitation(evidence: QualificationEvidence) {
   if(!evidence.testSetFrozenBeforeTuning||evidence.heldoutUsedForTuning)reasons.push("A fresh, frozen held-out test set is required; tuning on it invalidates qualification.");
   if(!heldout.length||heldout.some(c=>c.origin!=="natural"))reasons.push("Qualification requires natural recitations, not fabricated transcripts or spliced controls.");
   if(heldout.some(c=>calibrationSpeakers.has(c.speaker)||calibrationRecordings.has(c.recording)))reasons.push("Held-out speakers/recordings overlap calibration.");
-  const identities=new Set<string>();
+  const identities=new Set<string>(), recordingSpeakers=new Map<string,string>(), pcmScopes=new Set<string>();
+  let conflictingRecordingSpeakers=0, duplicatePcmScopes=0, missingNaturalPcmHashes=0;
   for(const c of evidence.cases){
     if(identities.has(c.id)||!c.id||!c.speaker||!c.recording)reasons.push("Missing or duplicate corpus identities.");identities.add(c.id);
+    const priorSpeaker=recordingSpeakers.get(c.recording);
+    if(priorSpeaker!==undefined&&priorSpeaker!==c.speaker)conflictingRecordingSpeakers++;
+    else recordingSpeakers.set(c.recording,c.speaker);
+    if(c.origin==="natural"&&!c.pcmSha256)missingNaturalPcmHashes++;
+    if(c.pcmSha256){if(pcmScopes.has(c.pcmSha256))duplicatePcmScopes++;pcmScopes.add(c.pcmSha256);}
     const referenceWords=words(c.reference).length;
     if(!referenceWords||!words(c.spokenGold).length||c.gold.length>100||c.predicted.length>100
       || [...c.gold,...c.predicted].some(d=>d.index===null||!Number.isSafeInteger(d.index)||d.index<0
         ||(d.kind==="extra_word"?d.index>referenceWords:d.index>=referenceWords)))reasons.push("Independent spoken gold and word-localized error annotations required.");
   }
+  if(conflictingRecordingSpeakers)reasons.push("One recording is assigned conflicting speakers; independent speaker counts cannot be established.");
+  if(duplicatePcmScopes)reasons.push("Duplicate evaluated PCM scopes cannot increase qualification denominators or cross calibration/held-out splits.");
+  if(missingNaturalPcmHashes)reasons.push("Exact evaluated PCM scope hashes required for natural evidence; filename identities cannot exclude duplicated audio.");
+  const corpusIdentityChecksPassed=!conflictingRecordingSpeakers&&!duplicatePcmScopes&&!missingNaturalPcmHashes;
   const bySpeaker=new Map<string,QualificationCase[]>();for(const c of heldout)bySpeaker.set(c.speaker,[...(bySpeaker.get(c.speaker)??[]),c]);
   const metric=(name:string, relevant:(c:QualificationCase)=>boolean, correct:(c:QualificationCase)=>boolean)=>{
     const groups=[...bySpeaker.values()].map(g=>g.filter(relevant)).filter(g=>g.length);
     const successes=groups.filter(g=>g.every(c=>c.analyzed&&!c.recognitionFailed&&correct(c))).length, trials=groups.length;
-    const lower=trials?binomialLower(successes,trials,.05/6):null;
+    // Conflicting/duplicated/missing scope identities cannot support an
+    // independent-speaker confidence interval, even with perfect declarations.
+    const lower=corpusIdentityChecksPassed&&trials?binomialLower(successes,trials,.05/6):null;
     if(lower===null||lower<.99)reasons.push(`${name}: 99% target is not established at familywise 95% confidence.`);
-    return {name,independentSpeakers:trials,successfulSpeakers:successes,observed:trials?successes/trials:null,lowerConfidenceBound:lower};
+    return {name,independentSpeakers:corpusIdentityChecksPassed?trials:null,
+      successfulSpeakers:corpusIdentityChecksPassed?successes:null,
+      declaredSpeakerGroups:trials,successfulDeclaredGroups:successes,
+      observed:corpusIdentityChecksPassed&&trials?successes/trials:null,lowerConfidenceBound:lower};
   };
   const metrics=MISTAKE_CATEGORIES.map(kind=>metric(`${kind} recall`,c=>c.gold.some(g=>g.kind===kind),c=>c.gold.filter(g=>g.kind===kind).every(g=>c.predicted.some(p=>same(g,p)))));
   metrics.push(metric("correction precision",c=>c.predicted.length>0,c=>c.predicted.every(p=>c.gold.some(g=>same(g,p)))));
@@ -121,6 +142,9 @@ export function qualifyRecitation(evidence: QualificationEvidence) {
   if(heldout.some(c=>!c.analyzed||c.recognitionFailed))reasons.push("Missing/failed analyses count as failures; they cannot be dropped from the corpus.");
   return {status:reasons.length?"FAIL" as const:"PASS" as const, target:.99, confidence:.95,
     units:"Independent speakers; every relevant utterance per speaker must pass", metrics,
+    corpusIdentity:{checksPassed:corpusIdentityChecksPassed,conflictingRecordingSpeakers,duplicatePcmScopes,missingNaturalPcmHashes,
+      scope:"Metadata consistency only; hashes/consent/speaker separation still require independent audit. Counts are diagnostic, not qualified independence, when checks fail."},
     wordRecognition:{...counts,wer,accuracy:wer===null?null:Math.max(0,1-wer)},
-    evaluatedCases:heldout.length,uniqueSpeakers:bySpeaker.size,reasons:[...new Set(reasons)]};
+    evaluatedCases:heldout.length,uniqueSpeakers:corpusIdentityChecksPassed?bySpeaker.size:null,
+    declaredSpeakerGroups:bySpeaker.size,reasons:[...new Set(reasons)]};
 }
