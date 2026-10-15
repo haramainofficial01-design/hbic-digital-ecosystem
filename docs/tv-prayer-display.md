@@ -57,6 +57,41 @@ Fire Stick will remain stable over a full prayer day. Staff should use the
 documented Silk kiosk setup, test the updated public URL on the actual device,
 and keep the previous display available until it passes that test.
 
+### Production deployment — 15 October 2026
+
+- Isolated release source `ae2357dfefb1d4eca9b94b968c955610939fc492` on
+  `release/tv-display-2026-10-15` is based on the previously deployed
+  `252ee4d8445b9e878c0203272577ecb1e32e75ed`. Only the five display optimisation
+  files differ; later Quran research and other feature-branch changes are not
+  included. Both source branches are pushed to the canonical repository.
+- Existing Vercel public project deployment
+  `dpl_DTjoTyeVnzjWPXsyArrUJNZqbKF2` completed its production build and was
+  promoted after staged checks. Vercel's alias records independently confirm
+  `hbic.ca`, `www.hbic.ca`, `hbic-calgary.vercel.app` and
+  `hbic-calgary-app.vercel.app` all point to this deployment. The previous
+  `dpl_5HG6c67foG1TyAd8AiFoBtaBmjNt` remains the rollback deployment.
+- The live `/display` HTML's JavaScript contains the new display implementation.
+  Headless checks against both the staged deployment and `https://hbic.ca`
+  passed at 1280×720 clear, 1920×1080 rain, and 3840×2160 snow: six visible
+  prayer cards, advancing seconds, no page overflow and no browser exceptions.
+  A locally simulated public API failure retained the confirmed schedule and
+  advancing clock; recovery removed the reconnecting label. Screenshots were
+  inspected. These browser checks do not substitute for a Fire Stick soak test.
+- Before promotion, public prayer times, publication version 16 and all display
+  settings matched the existing production response. Home, Quran, Academy,
+  donations and display-admin GET checks returned 200. No private records or
+  publication settings were changed by verification.
+
+Repeat the read-only live check explicitly with:
+
+```sh
+HBIC_TV_VERIFY_URL=https://hbic.ca npx tsx --test apps/public-web/test/tvDisplayLive.test.mts
+```
+
+The test is skipped unless the URL is explicitly provided. Its optional
+`HBIC_TV_VERIFY_SCREENSHOTS=1` captures are written under ignored `output/`.
+Reload the existing Fire Stick bookmark once to load the updated code.
+
 ## Staff publishing
 
 1. Open `/display-admin` from a trusted staff computer, or choose **Prayer Display** in the existing web admin dashboard.
