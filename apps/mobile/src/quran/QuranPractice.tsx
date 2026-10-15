@@ -146,7 +146,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
         disabled={practiceBusy} value={library.library.preferences.saveAssistAudio} onValueChange={saveAssistAudio => void update(s => ({ ...s, preferences: { ...s.preferences, saveAssistAudio } }))
           .catch(() => setError("Recording preference could not be saved. Please retry."))} /></View> : null}
     </QuranSurface> : null}
-    {assistEnabled && captureMode === "assist" && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
+    {assistEnabled && captureMode === "assist" && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy || !displayVerse} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
       testMode={mode === "test"} onRevealWord={index => setHints(n => Math.max(n, index + 1))}
       recognitionMode={library.library.preferences.recognitionMode} onReview={remember} saveAudio={library.library.preferences.saveAssistAudio}
       onRecording={(record, allowReview) => recording.accept(record, library.library.preferences.recordingRetention !== "session", allowReview)}

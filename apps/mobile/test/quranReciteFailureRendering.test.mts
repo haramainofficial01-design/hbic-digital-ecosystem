@@ -28,15 +28,16 @@ async function bundle(before:boolean){
     "AppButton":`import React from 'react';export const AppButton=({label,onPress,disabled})=>React.createElement('button',{onClick:onPress,disabled},label);`,
     "ThemeProvider":"export const useAppTheme=()=>({theme:{mode:'light',colors:{}}});",
     "QuranControls":`import React from 'react';export const QuranSurface=({children})=>React.createElement('section',null,children);`,
-    "reciteAssistEngine":`export async function acquireReciteAssist(){return{recognize(pcm,start){return new Promise((resolve,reject)=>{
+    "reciteAssistEngine":`export async function acquireReciteAssist(){if(window.qa.holdPreparation)await new Promise(resolve=>window.qa.finishPreparation=resolve);return{recognize(pcm,start){return new Promise((resolve,reject)=>{
       window.qa.requests.push({pcm,start,end:start+pcm.length,resolve,reject})})},async dispose(){window.qa.disposes++}}}`
   };
   const result=await build({write:false,bundle:true,platform:"browser",format:"iife",jsx:"automatic",define:{"process.env.NODE_ENV":'"production"'},
     stdin:{resolveDir:root,loader:"tsx",contents:`import React from 'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import ReciteAssist from '${component}';
       const qa=Object.assign(window.qa??={}, {requests:[],starts:0,stops:0,disposes:0,now:10000});Date.now=()=>qa.now;
       window.setInterval=fn=>{qa.tick=fn;return 1};window.clearInterval=()=>{qa.tick=null};
-      function Fixture(){const[key,setKey]=React.useState('1:2');qa.select=()=>flushSync(()=>setKey('1:3'));
-        return <ReciteAssist verse={{verseKey:key,textUthmani:'الحمد لله رب العالمين'}} stopPlayback={()=>{}} blocked={false} concealed={false} fontLoaded={false} onBusyChange={busy=>qa.busy=busy}/>}
+      function Fixture(){const[key,setKey]=React.useState('1:2'),[blocked,setBlocked]=React.useState(false);qa.select=()=>flushSync(()=>setKey('1:3'));qa.block=value=>flushSync(()=>setBlocked(value));qa.renderedVerseKey=key;
+        const advance=qa.autoAdvance?async signal=>{qa.advanceCalls=(qa.advanceCalls||0)+1;qa.advanceSignal=signal;await new Promise(resolve=>qa.resolveAdvance=resolve);if(signal.aborted){qa.abortedAdvances=(qa.abortedAdvances||0)+1;return}setKey('1:3');qa.appliedAdvances=(qa.appliedAdvances||0)+1}:undefined;
+        return <ReciteAssist verse={{verseKey:key,textUthmani:'الحمد لله رب العالمين'}} stopPlayback={()=>{}} blocked={blocked} concealed={false} fontLoaded={false} onBusyChange={busy=>qa.busy=busy} onAdvance={advance}/>}
       const root=createRoot(document.getElementById('root'));root.render(<Fixture/>);qa.unmount=()=>flushSync(()=>root.unmount());
       qa.feed=()=>{qa.now+=3000;qa.pcm(Array(16000).fill(.1));qa.tick()};
       qa.good=(skip=false)=>{const r=qa.requests.at(-1);r.resolve({text:skip?'الحمد لله العالمين':'الحمد لله رب العالمين',quality:.99,startSample:r.start,endSample:r.end,
@@ -216,4 +217,57 @@ test("automatic completion cannot overwrite an unconfirmed microphone shutdown w
     await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
     await page.evaluate(()=>(window as any).qa.unmount());
   }finally{await browser.close()}
+});
+test("a newly blocked passage cannot disable Cancel preparation or Stop on the real assist component",async()=>{
+  const script=await bundle(false),browser=await chromium.launch({headless:true});
+  try{for(const preparing of [true,false]){
+    const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>window.qa={holdPreparation:${preparing}};${script}</script>`);
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+    if(preparing)await page.waitForFunction(()=>typeof(window as any).qa.finishPreparation==='function');
+    else await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>(window as any).qa.block(true));
+    const stop=page.getByRole('button',{name:preparing?'Cancel preparation':'Stop Recitation',exact:true});
+    assert.ok(await stop.isEnabled());await stop.click();
+    const start=page.getByRole('button',{name:'Start Recite Assist',exact:true});
+    await start.waitFor();assert.ok(await start.isDisabled());
+    if(preparing){
+      await page.evaluate(()=>(window as any).qa.finishPreparation());
+      await page.waitForFunction(()=>(window as any).qa.disposes===1);
+    }
+    assert.deepEqual(await page.evaluate(()=>{const q=(window as any).qa;return{starts:q.starts,stops:q.stops,busy:q.busy,disposed:q.disposes}}),
+      {starts:preparing?0:1,stops:preparing?0:1,busy:false,disposed:1});
+    await page.evaluate(()=>(window as any).qa.unmount());await page.close();
+  }}finally{await browser.close()}
+});
+test("automatic loading keeps capture alive, but Stop aborts a late next-ayah result",async()=>{
+  const script=await bundle(false),browser=await chromium.launch({headless:true});
+  try{for(const cancel of [false,true]){
+    const page=await browser.newPage();await page.setContent(`<div id="root"></div><script>window.qa={autoAdvance:true};${script}</script>`);
+    await page.getByRole('button',{name:'Start Recite Assist',exact:true}).click();
+    await page.getByRole('button',{name:'Pause Recite Assist',exact:true}).waitFor();
+    await page.evaluate(()=>{const q=(window as any).qa;q.pcm(Array(32000).fill(.1));q.feed()});
+    for(let count=1;count<=3;count++){
+      await page.waitForFunction(count=>(window as any).qa.requests.length===count,count);
+      await page.evaluate(()=>(window as any).qa.good());
+      if(count<3){await page.getByLabel('Recognized speech',{exact:true}).waitFor();await page.evaluate(()=>(window as any).qa.feed())}
+    }
+    await page.getByText('Opening the next ayah…',{exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>{const q=(window as any).qa;return{starts:q.starts,stops:q.stops,busy:q.busy,disposed:q.disposes,advanceCalls:q.advanceCalls}}),
+      {starts:1,stops:0,busy:true,disposed:0,advanceCalls:1});
+    // A pending/mismatched next passage cannot remove the user's stop action.
+    await page.evaluate(()=>(window as any).qa.block(true));
+    assert.ok(await page.getByRole('button',{name:'Stop Recitation',exact:true}).isEnabled());
+    if(cancel){
+      await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+      await page.getByRole('button',{name:'Start Recite Assist',exact:true}).waitFor();
+      assert.equal(await page.evaluate(()=>(window as any).qa.advanceSignal.aborted),true);
+    }
+    await page.evaluate(()=>(window as any).qa.resolveAdvance());
+    await page.waitForFunction(cancel=>cancel?(window as any).qa.abortedAdvances===1:(window as any).qa.appliedAdvances===1,cancel);
+    assert.equal(await page.evaluate(()=>(window as any).qa.renderedVerseKey),cancel?'1:2':'1:3');
+    assert.deepEqual(await page.evaluate(()=>{const q=(window as any).qa;return{starts:q.starts,stops:q.stops,busy:q.busy,disposed:q.disposes,applied:q.appliedAdvances??0}}),
+      {starts:1,stops:cancel?1:0,busy:!cancel,disposed:cancel?1:0,applied:cancel?0:1});
+    if(!cancel)await page.getByRole('button',{name:'Stop Recitation',exact:true}).click();
+    await page.evaluate(()=>(window as any).qa.unmount());await page.close();
+  }}finally{await browser.close()}
 });

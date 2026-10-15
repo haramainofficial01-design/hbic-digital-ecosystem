@@ -25,7 +25,7 @@ async function bundle() {
 import{QuranPractice}from'./apps/mobile/src/quran/QuranPractice';import{emptyQuranState}from'@hbic/shared';
 import data from'./apps/mobile/assets/quran/tanzil-uthmani.json';
 const chapter={id:1,nameSimple:'Al-Fatihah',nameArabic:'الفاتحة',versesCount:7};
-const getVerse=async ayah=>({...data.chapters[0].verses[ayah-1],verseNumber:ayah,verseKey:'1:'+ayah,audioUrl:'https://example.invalid/ui-only.wav',translation:'UI translation fixture',translationName:'Saheeh International'});
+const getVerse=async ayah=>{if(window.qaHoldAyahs?.includes(ayah))await new Promise(resolve=>(window.qaPendingVerses??=[]).push({ayah,resolve}));return({...data.chapters[0].verses[ayah-1],verseNumber:ayah,verseKey:'1:'+ayah,audioUrl:'https://example.invalid/ui-only.wav',translation:'UI translation fixture',translationName:'Saheeh International'});};
 function Fixture(){const[state,setState]=useState(emptyQuranState());window.qaState=state;
 const update=useCallback(async transform=>{setState(s=>transform(s))},[]);
 const library={ready:true,library:state,update,memorize:async()=>{window.qaReviewed=true}};
@@ -47,7 +47,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);` }, plugins: [{n
         : args.path === "mac" ? `export const isMacQuranHost=false;`
         : args.path === "icons" ? `import React from'react';export const Ionicons=()=> <span aria-hidden='true'>◇</span>;`
         : args.path === "recording" ? `import{useState}from'react';export function useQuranRecording(){const[phase,setPhase]=useState('idle');return{phase,error:null,temporary:null,accept:async()=>{},start:async()=>{window.qaAudioStarts=(window.qaAudioStarts||0)+1;setPhase('recording')},stop:async()=>{setPhase('idle')},keepTemporary:async()=>{},eraseTemporary:async()=>{}}}`
-        : `import React,{useState}from'react';export default function Assist({onBusyChange,blocked,saveAudio,concealed,testMode,stopPlayback}){const[busy,setBusy]=useState(false);window.qaConcealed=concealed;return <div aria-label='Recite Assist UI adapter'><button disabled={blocked} onClick={()=>{if(!busy)stopPlayback();setBusy(!busy);onBusyChange(!busy);window.qaAssistStarts=(window.qaAssistStarts||0)+(busy?0:1)}}>{busy?'Stop Recitation':testMode?'Start Recitation Test':saveAudio?'Recite and Record':'Start Recite Assist'}</button></div>}` }));
+        : `import React,{useEffect,useState}from'react';export default function Assist({verse,onAdvance,onBusyChange,blocked,saveAudio,concealed,testMode,stopPlayback}){const[busy,setBusy]=useState(false);useEffect(()=>{window.qaAssistMounts=(window.qaAssistMounts||0)+1;return()=>window.qaAssistUnmounts=(window.qaAssistUnmounts||0)+1},[]);window.qaConcealed=concealed;window.qaAssistVerseKey=verse.verseKey;window.qaAssistBlocked=blocked;window.qaAdvance=onAdvance;return <div aria-label='Recite Assist UI adapter'><button disabled={blocked&&!busy} onClick={()=>{if(!busy)stopPlayback();setBusy(!busy);onBusyChange(!busy);window.qaAssistStarts=(window.qaAssistStarts||0)+(busy?0:1)}}>{busy?'Stop Recitation':testMode?'Start Recitation Test':saveAudio?'Recite and Record':'Start Recite Assist'}</button></div>}` }));
     } }] });
   return out.outputFiles[0].text;
 }
@@ -110,4 +110,58 @@ test("self-test still hides its ayah, supports hints/reveal and prevents recordi
     assert.equal(await page.evaluate(() => (window as any).qaReviewed), true);
     assert.equal(await page.evaluate(() => (window as any).qaConcealed), true);
   } finally {await page.close(); await browser.close();}
+});
+
+test("manual and self-test selection cannot start word tracking against the previous ayah while loading", async () => {
+  const script = await bundle(), browser = await chromium.launch({headless: true});
+  try { for (const mode of ["practice", "test"]) {
+    const page = await browser.newPage({viewport: {width: 390, height: 900}});
+    try {
+      await page.setContent(`<div id='root'></div><script>window.qaMode=${JSON.stringify(mode)};${script}</script>`);
+      if (mode === "practice") await page.getByRole("button", {name: "Start Recite Assist", exact: true}).waitFor();
+      else await page.getByRole("button", {name: "Word hint", exact: true}).waitFor();
+      await page.waitForFunction(() => Boolean((window as any).qaState));
+      // With three questions, a zero Fisher-Yates draw selects ayah 2 first.
+      await page.evaluate(() => { (window as any).qaHoldAyahs = [2]; Math.random = () => 0; });
+      await page.getByRole("button", {name: mode === "practice" ? "Next ayah" : "Start self-test", exact: true}).click();
+      await page.waitForFunction(() => (window as any).qaPendingVerses?.some((row: any) => row.ayah === 2));
+      const start = page.getByRole("button", {name: mode === "practice" ? "Start Recite Assist" : "Start Recitation Test", exact: true});
+      assert.ok(await start.isDisabled());
+      assert.equal(await page.evaluate(() => (window as any).qaAssistVerseKey), "1:1");
+      assert.equal(await page.evaluate(() => (window as any).qaAssistStarts ?? 0), 0);
+      assert.ok(await page.getByRole("status").count() > 0);
+      await page.evaluate(() => { const qa = window as any; qa.qaHoldAyahs = []; qa.qaPendingVerses.splice(0).forEach((row: any) => row.resolve()); });
+      await page.waitForFunction(() => (window as any).qaAssistVerseKey === "1:2" && !(window as any).qaAssistBlocked);
+      assert.ok(await start.isEnabled());
+      await start.click();
+      assert.equal(await page.evaluate(() => (window as any).qaAssistStarts), 1);
+      assert.equal(await page.evaluate(() => (window as any).qaCaptureActive), true);
+      await page.getByRole("button", {name: "Stop Recitation", exact: true}).click();
+    } finally { await page.close(); }
+  }} finally { await browser.close(); }
+});
+
+test("automatic next-ayah loading preserves the mounted capture path until the requested text resolves", async () => {
+  const script = await bundle(), browser = await chromium.launch({headless: true});
+  const page = await browser.newPage({viewport: {width: 390, height: 900}});
+  try {
+    await page.setContent(`<div id='root'></div><script>${script}</script>`);
+    await page.getByRole("button", {name: "Start Recite Assist", exact: true}).click();
+    await page.evaluate(() => {
+      const qa = window as any; qa.qaHoldAyahs = [2];
+      qa.qaAdvancePromise = qa.qaAdvance(new AbortController().signal);
+    });
+    await page.waitForFunction(() => (window as any).qaPendingVerses?.some((row: any) => row.ayah === 2));
+    assert.ok(await page.getByRole("button", {name: "Stop Recitation", exact: true}).isEnabled());
+    assert.equal(await page.evaluate(() => (window as any).qaCaptureActive), true);
+    assert.equal(await page.evaluate(() => (window as any).qaAssistMounts), 1);
+    assert.equal(await page.evaluate(() => (window as any).qaAssistUnmounts ?? 0), 0);
+    assert.equal(await page.evaluate(() => (window as any).qaAssistVerseKey), "1:1");
+    await page.evaluate(() => { const qa = window as any; qa.qaHoldAyahs = []; qa.qaPendingVerses.splice(0).forEach((row: any) => row.resolve()); });
+    await page.waitForFunction(() => (window as any).qaAssistVerseKey === "1:2");
+    assert.equal(await page.evaluate(() => (window as any).qaCaptureActive), true);
+    assert.equal(await page.evaluate(() => (window as any).qaAssistMounts), 1);
+    assert.equal(await page.evaluate(() => (window as any).qaAssistStarts), 1);
+    await page.getByRole("button", {name: "Stop Recitation", exact: true}).click();
+  } finally { await page.close(); await browser.close(); }
 });

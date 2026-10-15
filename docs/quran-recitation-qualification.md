@@ -8,6 +8,12 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest target-selection safeguard: [pending ayah start/stop safety](quran-pending-verse-safety-2026-10-15.md).
+New recognition cannot start against the previous verse while a selected
+practice/self-test ayah loads; Stop/Cancel remain available and cancelled
+sequential fetches cannot navigate late. 255 mobile/browser Quran checks pass.
+This is not a new acoustic result, qualified 99% or a production/store release.
+
 Latest shared workflow safeguards: [unknown emissions, acoustic overlap and
 fresh final-word completion](quran-word-evidence-safety-2026-10-15.md). 251 Quran
 checks pass. Frozen replay retains all 2,408 observations: one underlying
