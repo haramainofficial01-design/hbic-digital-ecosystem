@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AsrTranscribeResult } from "@tilawi/quran-asr";
-import { acousticQuality, compactQuietPausesWithTimeline, ReciteAudioWindow, ReciteCompletionGuard } from "../src/quran/reciteAssistFeedback";
+import { acousticQuality, compactQuietPausesWithTimeline, ReciteAudioWindow, ReciteCompletionGuard, type ReciteFeedback } from "../src/quran/reciteAssistFeedback";
 import { decodeRecitationWords, decodeRecitationEvidence, recitationDisplayWords, recitationLexeme, wholeWordAnchor, RecitationTracker, type RecitationObservation, type RecitationWord } from "../src/quran/recitationTracking";
 
 // Synthetic unit evidence only. Human/waveform qualification is a separate script.
@@ -48,6 +48,32 @@ test("an emitted token missing from the vocabulary cannot look like a skipped wo
     assert.equal(feedback.status, "uncertain");
     assert.deepEqual(feedback.differences, []);
     assert.equal(feedback.stableComplete, false);
+  }
+});
+test("winning unknown or special tokens are missing evidence, never a skipped word", () => {
+  const vocabulary = { ...acousticVocab, "5": "<unk>" };
+  const fixture = () => {
+    const original = acousticFixture(), logprobs = new Float32Array(9 * 6).fill(-15);
+    for (let frame = 0; frame < 9; frame++) logprobs.set(original.acoustic.logprobs.subarray(frame * 5, frame * 5 + 5), frame * 6);
+    return { ...original, acoustic: { ...original.acoustic, logprobs, vocabSize: 6 } };
+  };
+  const decode = (result: AsrTranscribeResult, special = "<unk>") => decodeRecitationEvidence(result,
+    { ...vocabulary, "5": special }, 48000, [{compactStart: 0, originalStart: 0, length: 48000}], 0, 80000);
+  // The mere existence of an unknown-vocabulary alternative must not discard
+  // valid words, normal SentencePiece boundaries or legitimate blank frames.
+  assert.deepEqual(decode(fixture()), decodeFixture(acousticFixture()));
+  for (const special of ["<unk>", "<pad>", "<blank>"]) for (const positions of [[0], [5], [8], [5, 6]]) {
+    const result = fixture();
+    for (const frame of positions) result.acoustic.logprobs[frame * 6 + 5] = Math.log(.995);
+    const evidence = decode(result, special), tracker = new RecitationTracker();
+    assert.equal(evidence.evidenceValid, false);
+    assert.equal(evidence.quality, 0); assert.deepEqual(evidence.words, []);
+    for (const endSample of [64000, 80000]) {
+      const feedback = tracker.observe(expected, {text: "", ...evidence, startSample: 0, endSample});
+      assert.equal(feedback.status, "uncertain"); assert.deepEqual(feedback.differences, []);
+      assert.equal(feedback.stableComplete, false); assert.equal(feedback.followingIndex, undefined);
+    }
+    assert.deepEqual(tracker.snapshot(), []);
   }
 });
 test("corrupt new acoustic output clears old stability and cannot reuse the same capture", () => {
@@ -117,6 +143,21 @@ test("canonical Quran is unchanged; nonspoken marks and joined orthography do no
   const result = twice(tracker, "قُلْ يَـٰٓأَيُّهَا ٱلْكَـٰفِرُونَ", [word("قل", 4000), word("يا", 9000), word("ايها", 14000), word("الكافرون", 24000)]);
   assert.deepEqual(result.differences, []); assert.ok(result.words.every(word => word.state === "matched"));
 });
+test("overlapping acoustic words cannot be concatenated into a certified canonical word", () => {
+  const text = "قُلْ يَـٰٓأَيُّهَا ٱلْكَـٰفِرُونَ";
+  const heard = [word("قل", 4000), { ...word("يا", 9000), endSample: 17000 },
+    { ...word("ايها", 14000), endSample: 20000 }, word("الكافرون", 24000)];
+  const overlapping = twice(new RecitationTracker(), text, heard);
+  assert.notEqual(overlapping.words[1].state, "matched");
+  assert.equal(overlapping.stableComplete, false); assert.equal(overlapping.followingIndex, 0);
+  // Adjacent or genuinely separated split pieces remain valid orthographic
+  // support, with the same positive timing contract as the voice follower.
+  for (const startSample of [17000, 18000]) {
+    const adjacent = twice(new RecitationTracker(), text, heard.map((word, index) => index === 2 ? { ...word, startSample } : word));
+    assert.ok(adjacent.words.every(word => word.state === "matched"));
+    assert.equal(adjacent.stableComplete, true); assert.equal(adjacent.followingIndex, 2);
+  }
+});
 test("standalone SentencePiece word boundary is not mistaken for clipped speech", () => {
   const vocab = {"0": "<blank>", "1": "▁", "2": "جمع", "3": "▁مالا"}, ids = [1, 0, 2, 0, 3, 0, 0];
   const logprobs = new Float32Array(ids.length * 4).fill(-15);
@@ -172,6 +213,74 @@ test("same capture cannot accumulate stability or advance an ayah; reset erases 
   assert.equal(guard.observe(full, 80000), false); assert.equal(guard.observe(full, 80000), false); assert.equal(guard.observe(full, 120000), true);
   const ring = new ReciteAudioWindow(); ring.append([.1, .2]); assert.equal(ring.snapshotWithTimeline().endSample, 2);
   ring.clear(); assert.equal(ring.snapshotWithTimeline().endSample, 0);
+});
+test("an actual uncertain-result guard reset cannot be undone by unrelated fresh speech", () => {
+  const tracker = new RecitationTracker(), guard = new ReciteCompletionGuard();
+  const heard = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];
+  // Match the component: uncertain feedback resets its completion guard;
+  // ordinary following feedback is observed with its real capture clock.
+  const analyze = (capture: RecitationObservation) => {
+    const feedback = tracker.observe(expected, capture);
+    if (feedback.status === "uncertain") { guard.reset(); return {feedback, advance: false}; }
+    return {feedback, advance: guard.observe(feedback, capture.endSample)};
+  };
+  assert.equal(analyze(observation(heard, 64000)).advance, false);
+  const beforeQuiet = analyze(observation(heard, 80000));
+  assert.equal(beforeQuiet.feedback.stableComplete, true); assert.equal(beforeQuiet.advance, false);
+  const quiet = analyze({...observation([], 96000), quality: 0});
+  assert.equal(quiet.feedback.status, "uncertain"); assert.equal(quiet.advance, false);
+  const unrelated = [word("الرحمن", 110000), word("الرحيم", 122000)];
+  for (const endSample of [160000, 176000]) {
+    const result = analyze(observation(unrelated, endSample, 100000));
+    assert.equal(result.feedback.stableComplete, false); assert.equal(result.advance, false);
+  }
+  assert.ok(tracker.snapshot().some(word => word.text === "الحمد"), "historical text remains available, not re-certified");
+});
+test("long passages complete with a fresh final anchor while early words remain outside the rolling window", () => {
+  // Controlled timing fixture, not a natural-voice or accuracy benchmark.
+  const text = "الحمد لله رب العالمين الرحمن الرحيم مالك يوم الدين إياك نعبد نستعين";
+  for (const pauseSamples of [0, 96000]) {
+    const tracker = new RecitationTracker(), guard = new ReciteCompletionGuard();
+    const heard = text.split(" ").map((text, index) => word(text, 4000 + index * 12000 + (index >= 6 ? pauseSamples : 0)));
+    const early = [64000, 80000, 96000];
+    const later = pauseSamples ? [192000, 208000, 224000, 240000, 256000, 272000] : [112000, 128000, 144000, 160000, 176000];
+    let latest: ReciteFeedback | undefined, advanced = false;
+    const analyze = (endSample: number, quiet = false) => {
+      const startSample = Math.max(0, endSample - 96000);
+      const words = quiet ? [] : heard.filter(word => word.startSample >= startSample && word.endSample <= endSample);
+      latest = tracker.observe(text, {...observation(words, endSample, startSample), quality: quiet ? 0 : .99});
+      if (latest.status === "uncertain") guard.reset(); else advanced ||= guard.observe(latest, endSample);
+    };
+    for (const endSample of early) analyze(endSample);
+    if (pauseSamples) for (const endSample of [112000, 128000, 144000, 160000]) analyze(endSample, true);
+    for (const endSample of later) analyze(endSample);
+    assert.ok(heard[0].endSample < later.at(-1)! - 96000, "opening has left the current six-second window");
+    assert.equal(tracker.snapshot().length, heard.length);
+    assert.equal(latest?.stableComplete, true); assert.ok(latest?.words.every(word => word.state === "matched"));
+    assert.equal(advanced, true);
+  }
+});
+test("quiet feedback preserves history but fresh strong final-word evidence is required to recover completion", () => {
+  const tracker = new RecitationTracker(), heard = [word("الحمد", 4000), word("لله", 12000), word("رب", 22000), word("العالمين", 32000)];
+  assert.equal(twice(tracker, expected, heard).stableComplete, true);
+  assert.equal(tracker.observe(expected, {...observation([], 90000), quality: 0}).stableComplete, false);
+  assert.equal(tracker.snapshot().length, heard.length);
+  const clipped = tracker.observe(expected, observation(heard.map((word, index) => index === 3 ? {...word, edge: true} : word), 100000));
+  assert.equal(clipped.stableComplete, false, "an old strong final copy cannot borrow the new clipped token's clock");
+  const weak = tracker.observe(expected, observation(heard.map((word, index) => index === 3 ? {...word, confidence: .85} : word), 110000));
+  assert.equal(weak.stableComplete, false);
+  assert.equal(tracker.observe(expected, observation(heard, 120000)).stableComplete, true);
+});
+test("a joined final word requires fresh strong evidence for both acoustic fragments", () => {
+  const text = "قُلْ يَـٰٓأَيُّهَا";
+  const heard = [word("قل", 4000), word("يا", 12000), word("ايها", 18000)];
+  const tracker = new RecitationTracker();
+  assert.equal(twice(tracker, text, heard).stableComplete, true);
+  for (const staleIndex of [1, 2]) {
+    const feedback = tracker.observe(text, observation(heard.map((word, index) => index === staleIndex ? {...word, edge: true} : word), staleIndex === 1 ? 90000 : 100000));
+    assert.equal(feedback.stableComplete, false, "one fresh fragment cannot refresh the whole joined canonical word");
+  }
+  assert.equal(tracker.observe(text, observation(heard, 110000)).stableComplete, true);
 });
 test("a low-confidence canonical hallucination cannot certify a skipped word or complete an ayah", () => {
   const tracker = new RecitationTracker();

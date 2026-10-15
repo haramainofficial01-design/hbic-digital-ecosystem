@@ -137,7 +137,11 @@ export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Rec
     // A mismatched/incomplete vocabulary is invalid acoustic evidence. Silently
     // dropping an emitted interior token could otherwise fabricate an omission.
     const piece = id === blankId ? "" : vocab[String(id)];
-    if (id !== blankId && (typeof piece !== "string" || !piece)) return invalid();
+    // An emitted <unk> is missing lexical evidence, not silence. Dropping it
+    // between two known words could turn unheard speech into a skipped-word
+    // correction, or join pieces across the unknown sound. Only the actual
+    // blank ID may be discarded; nonwinning special alternatives are harmless.
+    if (id !== blankId && (typeof piece !== "string" || !piece || piece.startsWith("<"))) return invalid();
     if (id !== blankId && Number.isFinite(score)) { voiced++; qualitySum += Math.min(1, Math.exp(score)); }
     if (id !== blankId && id !== previous) {
       if (piece && !piece.startsWith("<")) {
@@ -163,7 +167,12 @@ export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Rec
     || startSample + originalSamples - word.endSample < 1600 })) };
 }
 
-interface TrackedWord extends RecitationWord { support: number; context: number; lastEnd: number }
+interface TrackedWord extends RecitationWord {
+  support: number;
+  context: number;
+  /** Latest observation with an actual confident, interior copy of this word. */
+  lastEnd: number;
+}
 const emptyFeedback = (expected: string): ReciteFeedback => ({status: "uncertain", attempted: 0, differences: [], stableComplete: false,
   words: recitationDisplayWords(expected).map(text => ({text, state: "not_heard"}))});
 
@@ -257,9 +266,11 @@ export class RecitationTracker {
           || (overlaps(candidate) && word.confidence >= candidate.confidence + .15));
         if (preferred) Object.assign(candidate, word, {context, support: agrees ? candidate.support : 1});
         else if (!agrees) candidate.support = 0;
-        candidate.lastEnd = observation.endSample;
+        // A clipped/weak new token cannot lend its capture clock to an older,
+        // stronger copy for completion. Its older text may remain for review.
+        if (!word.edge && word.confidence >= .9) candidate.lastEnd = observation.endSample;
       } else if (!word.edge) {
-        const tracked = {...word, support: 1, context, lastEnd: observation.endSample};
+        const tracked = {...word, support: 1, context, lastEnd: word.confidence >= .9 ? observation.endSample : -1};
         this.history.push(tracked); used.add(tracked);
       }
     }
@@ -283,8 +294,10 @@ export class RecitationTracker {
     const vocabulary = new Set(words.map(recitationLexeme));
     for (let i = 0; i + 1 < spoken.length; i++) {
       const a = spoken[i], b = spoken[i + 1], joined = recitationLexeme(a.text + b.text);
-      if (vocabulary.has(joined) && !vocabulary.has(recitationLexeme(a.text)) && b.startSample - a.endSample < 24000) {
-        spoken.splice(i, 2, {...a, text: joined, endSample: b.endSample, confidence: Math.min(a.confidence, b.confidence), support: Math.min(a.support, b.support)});
+      if (vocabulary.has(joined) && !vocabulary.has(recitationLexeme(a.text)) && b.startSample >= a.endSample
+        && b.startSample - a.endSample < 24000) {
+        spoken.splice(i, 2, {...a, text: joined, endSample: b.endSample, confidence: Math.min(a.confidence, b.confidence),
+          support: Math.min(a.support, b.support), lastEnd: Math.min(a.lastEnd, b.lastEnd)});
       }
     }
     const judged = alignRecitationWords(words, spoken.map(word => word.text));
@@ -345,7 +358,13 @@ export class RecitationTracker {
       }
     }
     const complete = states.every(word => word.state === "matched") && !differences.length;
-    const stableComplete = complete && judged.words.filter(word => word.expectedIndex !== null && word.recognizedIndex !== null)
+    const finalHeard = judged.words.find(word => word.expectedIndex === words.length - 1)?.recognizedIndex ?? null;
+    // Keep earlier stable words outside the rolling window for long ayahs and
+    // ordinary pauses, but unrelated new speech must not recertify an old
+    // complete transcript. The final canonical anchor must be strong/interior
+    // in THIS observation; joined words require both current acoustic pieces.
+    const stableComplete = complete && finalHeard !== null && spoken[finalHeard].lastEnd === this.lastEnd
+      && judged.words.filter(word => word.expectedIndex !== null && word.recognizedIndex !== null)
       .every(word => stable(word.recognizedIndex));
     return {status: differences.length ? "possible_difference" : states.some(word => word.state === "matched") ? "following" : "uncertain",
       words: states, differences, stableComplete, attempted: complete ? words.length : states.filter(word => word.state !== "not_heard").length};

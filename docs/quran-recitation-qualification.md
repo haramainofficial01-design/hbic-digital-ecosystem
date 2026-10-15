@@ -8,6 +8,13 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest shared workflow safeguards: [unknown emissions, acoustic overlap and
+fresh final-word completion](quran-word-evidence-safety-2026-10-15.md). 251 Quran
+checks pass. Frozen replay retains all 2,408 observations: one underlying
+clipped/weak-final-token control loses a stale completion in both decoders;
+mistake counts and natural results remain unchanged. This prevents false
+software certification, not a new acoustic/99% result or production release.
+
 Latest changed-decoder follow-up: [exact full-CTC phone-string ranking](quran-exact-phone-ranking-2026-10-15.md).
 All 48 actual posterior hashes match the prior source. Although acoustic ranks
 change, selected transcripts remain identical: 6/192 historical script edits
