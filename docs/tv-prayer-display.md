@@ -24,11 +24,11 @@ There is one prayer schedule. `/display` reads the same published content and ge
 
 ## Refresh and offline behaviour
 
-The kiosk updates its clock and countdown every second and checks the display endpoint every minute. It refreshes immediately after the Fire TV reconnects and at Calgary date rollover. Current weather refreshes every 15 minutes and is omitted silently if unavailable, so weather can never obscure or interrupt prayer times.
+The kiosk updates its digital seconds and analog hands every second. The minute-resolution countdown and prayer cards update at their next visible minute change or exact adhan/iqamah boundary, without unnecessary second-by-second rerenders. It checks the display endpoint every minute, refreshes immediately after reconnection and at Calgary date rollover. Current weather refreshes every 15 minutes and is omitted silently if unavailable, so weather can never obscure or interrupt prayer times.
 
-The live clock and prayer schedule tick on their own wall-second-aligned timers, separately from the animated sky and weather scene. The latter recomputes on a 30-second cadence; the visible clock/countdown still updates each second. When the page is hidden, the live timers and network refreshes pause and recalculate immediately when it becomes visible again. Inactive weather-particle animations are paused, while the active weather and daylight visuals remain enabled. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
+The live clock has its own wall-second-aligned timer. The sky recomputes every 30 seconds; the prayer schedule wakes only when its visible content can change. When the page is hidden, live timers and network refreshes pause and recalculate immediately when it becomes visible again. Only the active weather scene is mounted. The six prayer tiles use static translucent layers instead of continuously repainting GPU backdrop blurs; the visible glass styling and weather effects remain. Identical display polls do not replace the rendered tree or rewrite its local cache, and stalled requests time out so later reconnects can retry. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
 
-Each successful prayer payload is stored as the last-known-good browser snapshot. During a network interruption the display keeps showing that confirmed schedule and labels it as cached while retrying. A recovered connection updates the screen without navigation or a full-page reload.
+Each changed, confirmed prayer payload is stored as the last-known-good browser snapshot. A newer cached snapshot is never overwritten by an older server response during startup, and a snapshot for yesterday is never selected for today. During a network interruption the display keeps showing the last confirmed schedule and labels it as cached while retrying. A recovered connection updates the screen without navigation or a full-page reload.
 
 ## Fire TV installation
 
@@ -40,6 +40,22 @@ Each successful prayer payload is stored as the last-known-good browser snapshot
 6. On the actual Fire TV, leave the page open for several minutes and confirm the seconds and countdown advance smoothly, active weather remains visible, and reconnecting Wi-Fi refreshes without reloading. Browser emulation and a successful site build do not substitute for this device check.
 
 Keep the previous television system available until staff have verified the production URL on the actual Fire TV and deliberately switched the input/bookmark.
+
+## 15 October 2026 performance verification
+
+The display-only optimisation keeps the same canonical prayer source, daily
+rollover, Jumu’ah, notice, current weather, QR and social sections. Twelve TV
+unit tests and the public-web typecheck/build pass. Headless production-render
+checks at 1280×720 (clear), 1920×1080 (rain), and 3840×2160 (snow) show six
+prayer cards, advancing clock seconds, no document overflow and no browser
+exceptions. The rendered rain layout was visually inspected. A simulated
+display API failure retained the last confirmed schedule while seconds
+advanced; reconnect cleared the cached-state label without reloading.
+
+These checks do **not** prove that Amazon's Downloader browser on the masjid's
+Fire Stick will remain stable over a full prayer day. Staff should use the
+documented Silk kiosk setup, test the updated public URL on the actual device,
+and keep the previous display available until it passes that test.
 
 ## Staff publishing
 

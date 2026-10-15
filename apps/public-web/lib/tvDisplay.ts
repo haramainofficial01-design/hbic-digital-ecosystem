@@ -39,6 +39,25 @@ export interface TvDisplayPayload {
   display: TvDisplayPublicSettings;
 }
 
+/** Ignore generatedAt/current-focus fields that change as time passes; the
+ * display computes those locally. Preserve every field actually shown on TV. */
+export function displayRenderSignature(payload: TvDisplayPayload) {
+  const { snapshot, display } = payload;
+  return JSON.stringify([
+    payload.contentVersion, snapshot.serviceDate, snapshot.scheduleRevision,
+    snapshot.prayers, snapshot.tomorrowFajrDate, snapshot.tomorrowFajrIqamah,
+    snapshot.jumuahState, snapshot.hijriDate, snapshot.availability,
+    snapshot.state, snapshot.stale, display
+  ]);
+}
+
+export function preferCachedDisplay(initial: TvDisplayPayload, cached: TvDisplayPayload, now: Date) {
+  if (!snapshotMatchesCalgaryDate(cached.snapshot, now) || cached.contentVersion < initial.contentVersion) return false;
+  if (cached.contentVersion > initial.contentVersion) return true;
+  return Date.parse(cached.snapshot.sourceUpdatedAt) > Date.parse(initial.snapshot.sourceUpdatedAt)
+    && displayRenderSignature(cached) !== displayRenderSignature(initial);
+}
+
 export interface TvWeatherReading {
   temperature: number;
   condition: string;
@@ -288,6 +307,18 @@ export function deriveDisplayFocus(snapshot: WidgetPrayerSnapshot, now: Date): D
 
   const tomorrow = deriveNextDisplayPrayer(snapshot, now);
   return tomorrow ? { ...tomorrow, primaryKind: "adhan", secondaryDate: tomorrow.iqamahDate } : null;
+}
+
+/** The TV countdown shows minutes, not seconds. Wake its prayer subtree only
+ * when the label can change or the exact next adhan/iqamah arrives. The clock
+ * hands and digital seconds continue on their separate one-second timer. */
+export function nextDisplayScheduleUpdateMs(snapshot: WidgetPrayerSnapshot, now: Date) {
+  const target = deriveDisplayFocus(snapshot, now)?.date.getTime();
+  if (target === undefined || !Number.isFinite(target)) return 60_000;
+  const remaining = target - now.getTime();
+  if (remaining <= 0) return 50;
+  const nextLabelChange = remaining >= 60_000 ? remaining % 60_000 + 1 : remaining;
+  return Math.max(50, Math.min(60_000, remaining, nextLabelChange));
 }
 
 export function deriveCurrentPrayerKey(snapshot: WidgetPrayerSnapshot, now: Date): PrayerName | undefined {

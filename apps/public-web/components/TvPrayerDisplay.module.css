@@ -852,9 +852,10 @@
   padding: clamp(11px, 1.15vw, 22px) clamp(10px, 1vw, 20px);
   border: 1px solid rgba(177, 218, 236, .15);
   border-radius: clamp(14px, 1.25vw, 24px);
-  background: rgba(160, 204, 224, .065);
+  background: linear-gradient(180deg, rgba(160, 204, 224, .09), rgba(160, 204, 224, .055));
   box-shadow: inset 0 1px rgba(255, 255, 255, .1), inset 0 -1px rgba(0, 0, 0, .12), 0 15px 36px rgba(0, 0, 0, .11);
-  backdrop-filter: blur(16px) saturate(125%);
+  /* An animated sky behind six live backdrop filters continuously repaints on
+     small TV GPUs. The static translucent layers keep the glass appearance. */
 }
 
 .prayerTileTop {
