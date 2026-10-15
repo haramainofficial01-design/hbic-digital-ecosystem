@@ -8,6 +8,14 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest native setup safeguard: if the on-device session opens but its vocabulary
+or decoder fails to initialize, the session is now released before a retry.
+If native release itself fails, the app refuses another model allocation until
+restart. Four controlled fault-injection cases pass (4/4), and the mobile
+typecheck passes.
+No audio/model inference or physical-device session was used; recognition,
+mistake detection, live following and the 99% qualification gate are unchanged.
+
 Latest capture-lifecycle safeguard: [rejected stop preserves ownership and an
 explicit retry state](quran-capture-stop-safety-2026-10-14.md). 79 controlled
 checks pass; no false microphone-off claim after rejection. This is not new

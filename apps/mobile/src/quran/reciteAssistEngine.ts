@@ -20,6 +20,8 @@ let release: (() => Promise<void>) | null = null;
 const leases = new Set<symbol>();
 let lastInference: Promise<unknown> = Promise.resolve();
 let closing: Promise<void> | null = null;
+let nativeCloseFailed = false;
+const restartAfterCloseFailure = "Recognition could not release its native session. Restart the app before retrying.";
 /** Simulator diagnostics only; never reveals microphone content or model data. */
 export function reciteAssistDiagnostics() {
   return __DEV__ ? { leases: leases.size, preparing: pending !== null, closing: closing !== null, native: release !== null } : null;
@@ -48,6 +50,7 @@ async function verified(file: File, expected: string) {
   } finally { handle.close(); }
 }
 async function prepareReciteAssist(onProgress: (message: string) => void) {
+  if (nativeCloseFailed) throw new Error(restartAfterCloseFailure);
   if (!pending) pending = (async () => {
     const dir = new Directory(Paths.document, "recite-assist", revision); dir.create({ intermediates: true, idempotent: true });
     const files = new Map<string, File>();
@@ -68,15 +71,26 @@ async function prepareReciteAssist(onProgress: (message: string) => void) {
     const ort: typeof import("onnxruntime-react-native") = require("onnxruntime-react-native");
     const native = await ort.InferenceSession.create(files.get("fastconformer_full_mixed.onnx")!.uri.replace(/^file:\/\//, ""),
       { graphOptimizationLevel: "all", intraOpNumThreads: 1, interOpNumThreads: 1 });
+    let vocab: Record<string, string>;
+    let decoder: TextCTCDecoder;
+    try {
+      vocab = JSON.parse(await files.get("vocab.json")!.text());
+      decoder = new TextCTCDecoder(vocab, 1024);
+    } catch (error) {
+      // A session that opened successfully still owns native memory when its
+      // accompanying data is unreadable. Do not leave it alive for the retry.
+      try { await native.release(); }
+      catch { nativeCloseFailed = true; throw new Error(restartAfterCloseFailure); }
+      throw error;
+    }
     release = () => native.release();
-    const vocab: Record<string, string> = JSON.parse(await files.get("vocab.json")!.text());
     return { async run(audio: Float32Array) {
       const output = await native.run({ audio_signal: new ort.Tensor("float32", audio, [1, audio.length]),
         length: new ort.Tensor("int64", BigInt64Array.from([BigInt(audio.length)]), [1]) });
       const tensor = output[native.outputNames[0]];
       if (tensor.type !== "float32" || tensor.dims.length !== 3 || tensor.dims[0] !== 1) throw new Error("Recognition model output is invalid.");
       return { logprobs: tensor.data as Float32Array, timeSteps: tensor.dims[1], vocabSize: tensor.dims[2] };
-    }, decoder: new TextCTCDecoder(vocab, 1024), vocab };
+    }, decoder, vocab };
   })().catch((error) => { pending = null; throw error; });
   return pending;
 }
@@ -115,7 +129,8 @@ export async function acquireReciteAssist(onProgress: (message: string) => void)
         await lastInference.catch(() => {});
         if (leases.size) return;
         const done = release; release = null; pending = null;
-        if (done) await done();
+        if (done) try { await done(); }
+        catch { nativeCloseFailed = true; throw new Error(restartAfterCloseFailure); }
       })().finally(() => { closing = null; });
       await closing;
     }
