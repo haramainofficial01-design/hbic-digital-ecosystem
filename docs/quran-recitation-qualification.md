@@ -8,6 +8,12 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest changed-decoder follow-up: [exact full-CTC phone-string ranking](quran-exact-phone-ranking-2026-10-15.md).
+All 48 actual posterior hashes match the prior source. Although acoustic ranks
+change, selected transcripts remain identical: 6/192 historical script edits
+and one canonical-instead failure, with additional decoder cost. No candidate
+promotion, 99% claim or production/store change.
+
 Latest independent recognition candidate: [15 October Tadabur Whisper Medium
 comparison](quran-tadabur-comparison-2026-10-15.md). All 48 historical calibration
 waveforms completed, but 30/192 script-word edits, 10/18 located raw detections,
