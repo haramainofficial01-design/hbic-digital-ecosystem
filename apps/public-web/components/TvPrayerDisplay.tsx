@@ -7,10 +7,13 @@ import {
   deriveCurrentPrayerKey,
   deriveDisplayFocus,
   deriveDisplayAtmosphere,
+  displayRenderSignature,
   deriveWeatherVisualState,
   isAppLaunchTeaserActive,
   isJumuahDisplayWindow,
   isDisplayAnnouncementActive,
+  nextDisplayScheduleUpdateMs,
+  preferCachedDisplay,
   snapshotMatchesCalgaryDate,
   socialHandle,
   type TvDisplayPayload,
@@ -140,6 +143,33 @@ function useAlignedClock(initialDate: string) {
   return now;
 }
 
+function usePrayerScheduleClock(initialDate: string, snapshot: TvDisplayPayload["snapshot"]) {
+  const [now, setNow] = useState(() => new Date(initialDate));
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      const current = new Date();
+      setNow(current);
+      timer = window.setTimeout(tick, nextDisplayScheduleUpdateMs(snapshot, current));
+    };
+    const resume = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+      tick();
+    };
+    resume();
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [snapshot]);
+
+  return now;
+}
+
 const weatherPreviewReadings: Record<TvWeatherMode, TvWeatherReading> = {
   clear: { temperature: 18, condition: "Clear", weatherCode: 0, cloudCover: 3, windSpeed: 7, windDirection: 240 },
   clouds: { temperature: 11, condition: "Cloudy", weatherCode: 3, cloudCover: 86, windSpeed: 18, windDirection: 275 },
@@ -257,7 +287,8 @@ function ClockArea({
   );
 }
 
-const WeatherScene = memo(function WeatherScene() {
+const WeatherScene = memo(function WeatherScene({ mode }: { mode: TvWeatherMode }) {
+  if (mode === "clear") return null;
   return (
     <div className={styles.weatherScene}>
       <div className={styles.cloudField}>
@@ -265,8 +296,8 @@ const WeatherScene = memo(function WeatherScene() {
         <i className={styles.cloudTwo} />
         <i className={styles.cloudThree} />
       </div>
-      <div className={styles.fogField}><i /><i /></div>
-      <div className={styles.rainField}>
+      {mode === "fog" ? <div className={styles.fogField}><i /><i /></div> : null}
+      {mode === "rain" || mode === "storm" ? <div className={styles.rainField}>
         {rainParticles.map((particle, index) => (
           <i
             key={index}
@@ -278,8 +309,8 @@ const WeatherScene = memo(function WeatherScene() {
             } as CSSProperties}
           />
         ))}
-      </div>
-      <div className={styles.snowField}>
+      </div> : null}
+      {mode === "snow" ? <div className={styles.snowField}>
         {snowParticles.map((particle, index) => (
           <i
             key={index}
@@ -291,8 +322,8 @@ const WeatherScene = memo(function WeatherScene() {
             } as CSSProperties}
           />
         ))}
-      </div>
-      <div className={styles.stormFlash} />
+      </div> : null}
+      {mode === "storm" ? <div className={styles.stormFlash} /> : null}
     </div>
   );
 });
@@ -330,13 +361,15 @@ const PrayerTile = memo(function PrayerTile({
 function LivePrayerSchedule({
   snapshot,
   previewJumuah,
+  weatherMode,
   onJumuahThemeChange
 }: {
   snapshot: TvDisplayPayload["snapshot"];
   previewJumuah: boolean;
+  weatherMode: TvWeatherMode;
   onJumuahThemeChange: (active: boolean) => void;
 }) {
-  const now = useAlignedClock(snapshot.generatedAt);
+  const now = usePrayerScheduleClock(snapshot.generatedAt, snapshot);
 
   const focus = useMemo(() => deriveDisplayFocus(snapshot, now), [snapshot, now]);
   const currentKey = useMemo(() => deriveCurrentPrayerKey(snapshot, now), [snapshot, now]);
@@ -356,8 +389,9 @@ function LivePrayerSchedule({
         ) : (
           <div className={styles.heroLabel}>{focus?.primaryKind === "iqamah" ? "Iqamah next" : "Next prayer"}</div>
         )}
-        <div className={styles.heroWeatherFilm} aria-hidden="true">
-          {heroWeatherMarks.map((mark, index) => (
+        {weatherMode !== "clear" ? <div className={styles.heroWeatherFilm} aria-hidden="true">
+          {weatherMode === "rain" || weatherMode === "snow" || weatherMode === "storm" ?
+            heroWeatherMarks.map((mark, index) => (
             <i
               key={index}
               style={{
@@ -367,8 +401,8 @@ function LivePrayerSchedule({
                 "--mark-scale": mark.scale
               } as CSSProperties}
             />
-          ))}
-        </div>
+            )) : null}
+        </div> : null}
         <div className={styles.heroPrayer}>
           <div className={styles.heroPrayerName}>
             <h2>{focus?.entry.name ?? "Prayer times"}</h2>
@@ -406,8 +440,8 @@ function LivePrayerSchedule({
 
 export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayPayload }) {
   const [payload, setPayload] = useState(initialPayload);
-  // Keep the atmospheric canvas on a relaxed cadence. The second-by-second
-  // clock and prayer countdown are isolated in small components below.
+  // Keep the atmospheric canvas on a relaxed cadence. Digital/analog seconds
+  // and the minute-resolution prayer schedule have separate timers below.
   const [now, setNow] = useState(() => new Date(initialPayload.snapshot.generatedAt));
   const [weather, setWeather] = useState<TvWeatherReading | null>(null);
   const [offline, setOffline] = useState(false);
@@ -419,6 +453,8 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
   const [previewWeather, setPreviewWeather] = useState<TvWeatherMode | null>(null);
   const [debugMetrics, setDebugMetrics] = useState<Record<string, string | number> | null>(null);
   const requestedServiceDate = useRef("");
+  const acceptedPayload = useRef(initialPayload);
+  const renderedPayloadSignature = useRef(displayRenderSignature(initialPayload));
   const displayInFlight = useRef(false);
   const weatherInFlight = useRef(false);
   const onJumuahThemeChange = useCallback((active: boolean) => {
@@ -428,30 +464,51 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
   const refreshDisplay = useCallback(async () => {
     if (document.visibilityState === "hidden" || displayInFlight.current) return;
     displayInFlight.current = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const response = await fetch(publicDisplayUrl());
+      const response = await fetch(publicDisplayUrl(), { signal: controller.signal });
       const data = await response.json() as TvDisplayPayload & { error?: string };
       if (!response.ok || data.ok !== true) throw new Error(data.error || "Display data unavailable");
-      setPayload(data);
-      writeLocalCache(cacheKey, JSON.stringify(data));
+      const receivedAt = new Date();
+      if (!snapshotMatchesCalgaryDate(data.snapshot, receivedAt)) throw new Error("Daily schedule has not refreshed yet");
+      if (preferCachedDisplay(data, acceptedPayload.current, receivedAt)) {
+        setOffline(false);
+        return;
+      }
+      const signature = displayRenderSignature(data);
+      if (signature !== renderedPayloadSignature.current) {
+        acceptedPayload.current = data;
+        renderedPayloadSignature.current = signature;
+        setPayload(data);
+        writeLocalCache(cacheKey, JSON.stringify(data));
+      }
       setOffline(false);
     } catch {
       setOffline(true);
-    } finally { displayInFlight.current = false; }
+    } finally {
+      window.clearTimeout(timeout);
+      displayInFlight.current = false;
+    }
   }, []);
 
   const refreshWeather = useCallback(async () => {
     if (document.visibilityState === "hidden" || weatherInFlight.current) return;
     weatherInFlight.current = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const response = await fetch("/api/display/weather");
+      const response = await fetch("/api/display/weather", { signal: controller.signal });
       const data = await response.json() as TvWeatherReading & { ok?: boolean };
       if (!response.ok || data.ok === false || typeof data.temperature !== "number") return;
-      setWeather(data);
+      setWeather((current) => current && JSON.stringify(current) === JSON.stringify(data) ? current : data);
       writeLocalCache(weatherCacheKey, JSON.stringify(data));
     } catch {
       // Weather is optional and must never displace or interrupt prayer times.
-    } finally { weatherInFlight.current = false; }
+    } finally {
+      window.clearTimeout(timeout);
+      weatherInFlight.current = false;
+    }
   }, []);
 
   useEffect(() => {
@@ -460,14 +517,20 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
     if (cached) {
       try {
         const value = JSON.parse(cached) as TvDisplayPayload;
-        if (value.ok && value.snapshot?.prayers?.length && value.contentVersion > initialPayload.contentVersion) {
+        if (value.ok && value.snapshot?.prayers?.length && preferCachedDisplay(initialPayload, value, new Date())) {
+          acceptedPayload.current = value;
+          renderedPayloadSignature.current = displayRenderSignature(value);
           setPayload(value);
+        } else {
+          writeLocalCache(cacheKey, JSON.stringify(initialPayload));
         }
       } catch {
         removeLocalCache(cacheKey);
+        writeLocalCache(cacheKey, JSON.stringify(initialPayload));
       }
+    } else {
+      writeLocalCache(cacheKey, JSON.stringify(initialPayload));
     }
-    writeLocalCache(cacheKey, JSON.stringify(initialPayload));
     const cachedWeather = readLocalCache(weatherCacheKey);
     if (cachedWeather) {
       try {
@@ -603,7 +666,7 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       <div className={styles.celestialField} aria-hidden="true">
         <div className={styles.sunAura} />
         <div className={styles.sunDisc}><span /></div>
-        <WeatherScene />
+        <WeatherScene mode={weatherVisual.mode} />
       </div>
       {debugMetrics ? (
         <aside className={styles.debugPanel}>
@@ -635,6 +698,7 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       <LivePrayerSchedule
         snapshot={payload.snapshot}
         previewJumuah={previewJumuah}
+        weatherMode={weatherVisual.mode}
         onJumuahThemeChange={onJumuahThemeChange}
       />
 
@@ -706,12 +770,12 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
                 <div className={styles.storeQr}>
                   <span><AppStoreMark /> App Store</span>
                   <svg className={styles.storeArrow} viewBox="0 0 42 18" aria-hidden="true"><path d="M2 9h34" /><path d="m29 3 7 6-7 6" /></svg>
-                  <Image src="/app/app-store-qr.png" alt="Scan to download Masjid Bilal from the Apple App Store" width={720} height={720} />
+                  <Image src="/app/app-store-qr.png" alt="Scan to download Masjid Bilal from the Apple App Store" width={720} height={720} sizes="(min-width: 3000px) 192px, 96px" />
                 </div>
                 <div className={styles.storeQr}>
                   <span><GooglePlayMark /> Google Play</span>
                   <svg className={styles.storeArrow} viewBox="0 0 42 18" aria-hidden="true"><path d="M2 9h34" /><path d="m29 3 7 6-7 6" /></svg>
-                  <Image src="/app/google-play-qr.png" alt="Scan to download Masjid Bilal from Google Play" width={720} height={720} />
+                  <Image src="/app/google-play-qr.png" alt="Scan to download Masjid Bilal from Google Play" width={720} height={720} sizes="(min-width: 3000px) 192px, 96px" />
                 </div>
               </div>
             </div>

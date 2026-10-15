@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWidgetPrayerSnapshot, defaultContent } from "@hbic/shared";
+import { createWidgetPrayerSnapshot, defaultContent, toPublicContent } from "@hbic/shared";
 import {
   deriveCurrentPrayerKey,
   deriveDisplayFocus,
+  nextDisplayScheduleUpdateMs,
   deriveDisplayAtmosphere,
+  displayRenderSignature,
+  preferCachedDisplay,
   deriveWeatherVisualState,
   deriveNextDisplayPrayer,
   isAppLaunchTeaserActive,
@@ -69,6 +72,16 @@ test("TV focus promotes iqamah at the exact adhan boundary and advances at iqama
   assert.equal(atIqamah?.primaryKind, "adhan");
 });
 
+test("TV prayer rendering wakes at countdown changes and exact prayer boundaries", () => {
+  const snapshot = createWidgetPrayerSnapshot(defaultContent, new Date("2026-07-10T03:45:00.000Z"));
+  const maghrib = snapshot.prayers.find((entry) => entry.key === "maghrib")!;
+  const adhan = new Date(maghrib.adhanDate).getTime();
+  assert.equal(nextDisplayScheduleUpdateMs(snapshot, new Date(adhan - 125_000)), 5_001);
+  assert.equal(nextDisplayScheduleUpdateMs(snapshot, new Date(adhan - 35_000)), 35_000);
+  assert.equal(nextDisplayScheduleUpdateMs(snapshot, new Date(adhan - 100)), 100);
+  assert.equal(deriveDisplayFocus(snapshot, new Date(adhan))?.primaryKind, "iqamah");
+});
+
 test("after Isha the display rolls over to tomorrow Fajr", () => {
   const now = new Date("2026-07-10T05:30:00.000Z"); // 11:30 PM Calgary on July 9
   const snapshot = createWidgetPrayerSnapshot(defaultContent, now);
@@ -98,6 +111,27 @@ test("Calgary midnight makes the prior daily snapshot ineligible", () => {
 
   assert.equal(snapshotMatchesCalgaryDate(snapshot, beforeMidnight), true);
   assert.equal(snapshotMatchesCalgaryDate(snapshot, afterMidnight), false);
+});
+
+test("unchanged polls do not rerender and yesterday's cache cannot replace today's schedule", () => {
+  const now = new Date("2026-07-10T18:00:00.000Z");
+  const snapshot = createWidgetPrayerSnapshot(defaultContent, now);
+  const publicContent = toPublicContent(defaultContent);
+  const display = {...publicContent.displaySettings, social: publicContent.settings.social,
+    contact: {address: publicContent.settings.address, phone: publicContent.settings.phone}};
+  const current = {ok: true as const, contentVersion: 8, snapshot, display};
+  const generatedOnly = {...current, snapshot: {...snapshot, generatedAt: new Date(now.getTime() + 60_000).toISOString()}};
+  assert.equal(displayRenderSignature(current), displayRenderSignature(generatedOnly));
+  const changedPrayer = {...current, snapshot: {...snapshot, prayers: snapshot.prayers.map((entry) =>
+    entry.key === "maghrib" ? {...entry, iqamah: "9:00 PM"} : entry)}};
+  assert.notEqual(displayRenderSignature(current), displayRenderSignature(changedPrayer));
+  const newerScheduleCache = {...changedPrayer, snapshot: {...changedPrayer.snapshot,
+    sourceUpdatedAt: new Date(Date.parse(snapshot.sourceUpdatedAt) + 1_000).toISOString()}};
+  assert.equal(preferCachedDisplay(current, newerScheduleCache, now), true);
+  assert.equal(preferCachedDisplay(newerScheduleCache, current, now), false);
+  const yesterday = {...current, contentVersion: 9, snapshot: createWidgetPrayerSnapshot(defaultContent, new Date("2026-07-09T18:00:00.000Z"))};
+  assert.equal(preferCachedDisplay(current, yesterday, now), false);
+  assert.equal(preferCachedDisplay(current, {...current, contentVersion: 9}, now), true);
 });
 
 test("TV atmosphere brightens toward Dhuhr and darkens through Isha", () => {
