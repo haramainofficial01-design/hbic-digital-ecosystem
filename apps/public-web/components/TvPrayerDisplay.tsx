@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatCountdown, masjidTimeZone, type PrayerName, type WidgetPrayerEntry } from "@hbic/shared";
 import {
   deriveCurrentPrayerKey,
@@ -52,6 +52,94 @@ const heroWeatherMarks = Array.from({ length: 9 }, (_, index) => ({
   scale: .7 + (index % 4) * .16
 }));
 
+const calgaryClockPartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: masjidTimeZone,
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23"
+});
+
+const calgaryDigitalClockFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: masjidTimeZone,
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit"
+});
+
+const calgaryTimeLabelFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: masjidTimeZone,
+  hour: "numeric",
+  minute: "2-digit"
+});
+
+const calgaryDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: masjidTimeZone,
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric"
+});
+
+function readLocalCache(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    // Some embedded TV browsers disable storage or expose a full storage area.
+    return null;
+  }
+}
+
+function writeLocalCache(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // The live schedule remains usable when this browser cannot persist a cache.
+  }
+}
+
+function removeLocalCache(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Storage is an optional offline enhancement, not a rendering dependency.
+  }
+}
+
+function useAlignedClock(initialDate: string) {
+  const [now, setNow] = useState(() => new Date(initialDate));
+
+  useEffect(() => {
+    let timer: number | undefined;
+
+    const clearTimer = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+    };
+
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      const current = new Date();
+      setNow(current);
+      timer = window.setTimeout(tick, 1_005 - current.getMilliseconds());
+    };
+
+    const visibilityChanged = () => {
+      clearTimer();
+      if (document.visibilityState !== "hidden") tick();
+    };
+
+    tick();
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => {
+      clearTimer();
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+  }, []);
+
+  return now;
+}
+
 const weatherPreviewReadings: Record<TvWeatherMode, TvWeatherReading> = {
   clear: { temperature: 18, condition: "Clear", weatherCode: 0, cloudCover: 3, windSpeed: 7, windDirection: 240 },
   clouds: { temperature: 11, condition: "Cloudy", weatherCode: 3, cloudCover: 86, windSpeed: 18, windDirection: 275 },
@@ -99,11 +187,7 @@ function SocialMark({ platform }: { platform: "instagram" | "youtube" | "tiktok"
 }
 
 function timeLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: masjidTimeZone,
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(date);
+  return calgaryTimeLabelFormatter.format(date);
 }
 
 function weatherIcon(condition: string) {
@@ -117,13 +201,7 @@ function weatherIcon(condition: string) {
 }
 
 function AnalogClock({ now }: { now: Date }) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: masjidTimeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(now);
+  const parts = calgaryClockPartsFormatter.formatToParts(now);
   const value = (type: "hour" | "minute" | "second") => Number(parts.find((part) => part.type === type)?.value ?? 0);
   const hour = value("hour");
   const minute = value("minute");
@@ -144,7 +222,82 @@ function AnalogClock({ now }: { now: Date }) {
   );
 }
 
-function PrayerTile({
+function ClockArea({
+  initialNow,
+  displayWeather,
+  showGregorianDate,
+  showHijriDate,
+  hijriDate
+}: {
+  initialNow: string;
+  displayWeather: TvWeatherReading | null;
+  showGregorianDate: boolean;
+  showHijriDate: boolean;
+  hijriDate?: string;
+}) {
+  const now = useAlignedClock(initialNow);
+
+  return (
+    <div className={styles.clockArea}>
+      <div className={styles.clockRow}>
+        {displayWeather ? (
+          <div className={styles.weather} aria-label={`Calgary weather: ${displayWeather.temperature} degrees, ${displayWeather.condition}`}>
+            <span aria-hidden="true">{weatherIcon(displayWeather.condition)}</span>
+            <b>{displayWeather.temperature < 0 ? "−" : ""}{Math.abs(displayWeather.temperature)}°C</b>
+            <i>·</i>
+            <em>{displayWeather.condition}</em>
+          </div>
+        ) : null}
+        <AnalogClock now={now} />
+        <strong className={styles.clock}>{calgaryDigitalClockFormatter.format(now)}</strong>
+      </div>
+      {showGregorianDate ? <span className={styles.date}>{calgaryDateFormatter.format(now)}</span> : null}
+      {showHijriDate && hijriDate ? <span className={styles.hijri}>{hijriDate}</span> : null}
+    </div>
+  );
+}
+
+const WeatherScene = memo(function WeatherScene() {
+  return (
+    <div className={styles.weatherScene}>
+      <div className={styles.cloudField}>
+        <i className={styles.cloudOne} />
+        <i className={styles.cloudTwo} />
+        <i className={styles.cloudThree} />
+      </div>
+      <div className={styles.fogField}><i /><i /></div>
+      <div className={styles.rainField}>
+        {rainParticles.map((particle, index) => (
+          <i
+            key={index}
+            style={{
+              "--particle-x": `${particle.x}%`,
+              "--particle-delay": `${particle.delay}s`,
+              "--particle-duration": `${particle.duration}s`,
+              "--particle-scale": particle.scale
+            } as CSSProperties}
+          />
+        ))}
+      </div>
+      <div className={styles.snowField}>
+        {snowParticles.map((particle, index) => (
+          <i
+            key={index}
+            style={{
+              "--particle-x": `${particle.x}%`,
+              "--particle-delay": `${particle.delay}s`,
+              "--particle-duration": `${particle.duration}s`,
+              "--particle-scale": particle.scale
+            } as CSSProperties}
+          />
+        ))}
+      </div>
+      <div className={styles.stormFlash} />
+    </div>
+  );
+});
+
+const PrayerTile = memo(function PrayerTile({
   prayer,
   state,
   awaitingIqamah = false
@@ -172,289 +325,28 @@ function PrayerTile({
       </span>
     </div>
   );
-}
+});
 
-export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayPayload }) {
-  const [payload, setPayload] = useState(initialPayload);
-  // The serialized snapshot timestamp keeps the server render and first client
-  // render identical. The one-second clock takes over immediately after mount.
-  const [now, setNow] = useState(() => new Date(initialPayload.snapshot.generatedAt));
-  const [weather, setWeather] = useState<TvWeatherReading | null>(null);
-  const [offline, setOffline] = useState(false);
-  const [previewJumuah, setPreviewJumuah] = useState(false);
-  const [previewWeather, setPreviewWeather] = useState<TvWeatherMode | null>(null);
-  const [debugMetrics, setDebugMetrics] = useState<Record<string, string | number> | null>(null);
-  const requestedServiceDate = useRef("");
-  const displayInFlight = useRef(false);
-  const weatherInFlight = useRef(false);
+function LivePrayerSchedule({
+  snapshot,
+  previewJumuah,
+  onJumuahThemeChange
+}: {
+  snapshot: TvDisplayPayload["snapshot"];
+  previewJumuah: boolean;
+  onJumuahThemeChange: (active: boolean) => void;
+}) {
+  const now = useAlignedClock(snapshot.generatedAt);
 
-  const refreshDisplay = useCallback(async () => {
-    if (document.visibilityState === "hidden" || displayInFlight.current) return;
-    displayInFlight.current = true;
-    try {
-      const response = await fetch(publicDisplayUrl());
-      const data = await response.json() as TvDisplayPayload & { error?: string };
-      if (!response.ok || data.ok !== true) throw new Error(data.error || "Display data unavailable");
-      setPayload(data);
-      window.localStorage.setItem(cacheKey, JSON.stringify(data));
-      setOffline(false);
-    } catch {
-      setOffline(true);
-    } finally { displayInFlight.current = false; }
-  }, []);
-
-  const refreshWeather = useCallback(async () => {
-    if (document.visibilityState === "hidden" || weatherInFlight.current) return;
-    weatherInFlight.current = true;
-    try {
-      const response = await fetch("/api/display/weather");
-      const data = await response.json() as TvWeatherReading & { ok?: boolean };
-      if (!response.ok || data.ok === false || typeof data.temperature !== "number") return;
-      setWeather(data);
-      window.localStorage.setItem(weatherCacheKey, JSON.stringify(data));
-    } catch {
-      // Weather is optional and must never displace or interrupt prayer times.
-    } finally { weatherInFlight.current = false; }
-  }, []);
-
-  useEffect(() => {
-    document.body.classList.add("tv-display-active");
-    const cached = window.localStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        const value = JSON.parse(cached) as TvDisplayPayload;
-        if (value.ok && value.snapshot?.prayers?.length && value.contentVersion > initialPayload.contentVersion) {
-          setPayload(value);
-        }
-      } catch {
-        window.localStorage.removeItem(cacheKey);
-      }
-    }
-    window.localStorage.setItem(cacheKey, JSON.stringify(initialPayload));
-    const cachedWeather = window.localStorage.getItem(weatherCacheKey);
-    if (cachedWeather) {
-      try {
-        const value = JSON.parse(cachedWeather) as TvWeatherReading;
-        if (typeof value.temperature === "number" && typeof value.condition === "string") setWeather(value);
-      } catch {
-        window.localStorage.removeItem(weatherCacheKey);
-      }
-    }
-    return () => document.body.classList.remove("tv-display-active");
-  }, [initialPayload]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setPreviewJumuah(params.get("previewJumuah") === "1");
-    const requestedWeather = params.get("previewWeather") as TvWeatherMode | null;
-    setPreviewWeather(requestedWeather && requestedWeather in weatherPreviewReadings ? requestedWeather : null);
-    if (!params.has("debugDisplay")) return;
-    const update = () => setDebugMetrics({
-      userAgent: navigator.userAgent,
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-      visualWidth: Math.round(window.visualViewport?.width ?? window.innerWidth),
-      visualHeight: Math.round(window.visualViewport?.height ?? window.innerHeight),
-      screenWidth: window.screen.width,
-      screenHeight: window.screen.height,
-      devicePixelRatio: window.devicePixelRatio,
-      layout: window.innerHeight <= 600 ? "TV compact landscape" : window.innerWidth <= 1100 ? "TV narrow landscape" : "TV standard",
-      build: initialPayload.contentVersion
-    });
-    update();
-    window.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("resize", update);
-    };
-  }, [initialPayload.contentVersion]);
-
-  useEffect(() => {
-    const clock = window.setInterval(() => setNow(new Date()), 1_000);
-    const contentRefresh = window.setInterval(() => void refreshDisplay(), 60_000);
-    const weatherRefresh = window.setInterval(() => void refreshWeather(), 5 * 60_000);
-    const reconnect = () => {
-      void refreshDisplay();
-      void refreshWeather();
-    };
-    window.addEventListener("online", reconnect);
-    window.addEventListener("focus", reconnect);
-    document.addEventListener("visibilitychange", reconnect);
-    void refreshWeather();
-    return () => {
-      window.clearInterval(clock);
-      window.clearInterval(contentRefresh);
-      window.clearInterval(weatherRefresh);
-      window.removeEventListener("online", reconnect);
-      window.removeEventListener("focus", reconnect);
-      document.removeEventListener("visibilitychange", reconnect);
-    };
-  }, [refreshDisplay, refreshWeather]);
-
-  useEffect(() => {
-    if (snapshotMatchesCalgaryDate(payload.snapshot, now)) {
-      requestedServiceDate.current = "";
-      return;
-    }
-    const serviceDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: masjidTimeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).format(now);
-    if (requestedServiceDate.current !== serviceDate) {
-      requestedServiceDate.current = serviceDate;
-      void refreshDisplay();
-    }
-  }, [now, payload.snapshot, refreshDisplay]);
-
-  const focus = useMemo(() => deriveDisplayFocus(payload.snapshot, now), [payload.snapshot, now]);
-  const currentKey = useMemo(() => deriveCurrentPrayerKey(payload.snapshot, now), [payload.snapshot, now]);
-  const atmosphere = useMemo(() => deriveDisplayAtmosphere(payload.snapshot, now), [payload.snapshot, now]);
-  const displayWeather = previewWeather ? weatherPreviewReadings[previewWeather] : weather;
-  const weatherVisual = useMemo(() => deriveWeatherVisualState(displayWeather), [displayWeather]);
-  const jumuahTheme = useMemo(
-    () => previewJumuah || isJumuahDisplayWindow(payload.snapshot, now),
-    [payload.snapshot, now, previewJumuah]
-  );
-  const weatherDrift = Math.sin((weatherVisual.windDirection + 180) * Math.PI / 180)
-    * (8 + Math.min(18, weatherVisual.windSpeed * .35));
-  const atmosphereStyle = {
-    "--sky-top": atmosphere.skyTop,
-    "--sky-middle": atmosphere.skyMiddle,
-    "--sky-bottom": atmosphere.skyBottom,
-    "--blue-glow": atmosphere.blueGlow,
-    "--daylight": atmosphere.daylight.toFixed(3),
-    "--sun-progress": atmosphere.sunProgress.toFixed(4),
-    "--sun-altitude": atmosphere.sunAltitude.toFixed(4),
-    "--sun-visibility": atmosphere.sunVisibility.toFixed(4),
-    "--sun-warmth": atmosphere.sunWarmth.toFixed(4),
-    "--sun-x": `${6 + atmosphere.sunProgress * 88}%`,
-    "--sun-y": `${64 - atmosphere.sunAltitude * 40}%`,
-    "--sun-weather-dim": weatherVisual.sunDimming.toFixed(3),
-    "--sun-render-opacity": (atmosphere.sunVisibility * weatherVisual.sunDimming).toFixed(4),
-    "--sun-overlay-opacity": (atmosphere.sunVisibility * weatherVisual.sunDimming * .72).toFixed(4),
-    "--weather-intensity": weatherVisual.intensity.toFixed(3),
-    "--weather-cloudiness": weatherVisual.cloudiness.toFixed(3),
-    "--weather-cloud-opacity": (weatherVisual.cloudiness * .72).toFixed(3),
-    "--weather-particle-opacity": (.15 + weatherVisual.intensity * .48).toFixed(3),
-    "--weather-film-opacity": (weatherVisual.intensity * .62).toFixed(3),
-    "--weather-motion-duration": `${weatherVisual.motionDuration.toFixed(1)}s`,
-    "--weather-drift-x": `${weatherDrift.toFixed(2)}vw`,
-    "--weather-half-drift-x": `${(weatherDrift * .46).toFixed(2)}vw`,
-    "--weather-wind-lean": `${(Math.sin(weatherVisual.windDirection * Math.PI / 180) * Math.min(12, weatherVisual.windSpeed * .24)).toFixed(2)}deg`
-  } as CSSProperties;
-  const activeNotice = isDisplayAnnouncementActive(payload.display.announcement, now)
-    ? payload.display.announcement.message.trim()
-    : "";
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: masjidTimeZone,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  }).format(now);
-  const clock = new Intl.DateTimeFormat("en-CA", {
-    timeZone: masjidTimeZone,
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(now);
+  const focus = useMemo(() => deriveDisplayFocus(snapshot, now), [snapshot, now]);
+  const currentKey = useMemo(() => deriveCurrentPrayerKey(snapshot, now), [snapshot, now]);
+  const jumuahTheme = previewJumuah || isJumuahDisplayWindow(snapshot, now);
   const countdown = focus ? formatCountdown(focus.date, now) : "Schedule unavailable";
-  const youtube = socialHandle(payload.display.social.youtube);
-  const instagram = socialHandle(payload.display.social.instagram);
-  const tiktok = socialHandle(payload.display.social.tiktok);
-  const launchTeaserActive = isAppLaunchTeaserActive(now);
+
+  useEffect(() => onJumuahThemeChange(jumuahTheme), [jumuahTheme, onJumuahThemeChange]);
 
   return (
-    <main
-      className={styles.display}
-      data-hbic-publication-revision={payload.contentVersion}
-      data-atmosphere={atmosphere.phase}
-      data-jumuah={jumuahTheme ? "true" : "false"}
-      data-weather={weatherVisual.mode}
-      data-windy={weatherVisual.windy ? "true" : "false"}
-      style={atmosphereStyle}
-    >
-      <div className={styles.daylightWash} aria-hidden="true" />
-      <div className={styles.celestialField} aria-hidden="true">
-        <div className={styles.sunAura} />
-        <div className={styles.sunDisc}><span /></div>
-        <div className={styles.weatherScene}>
-          <div className={styles.cloudField}>
-            <i className={styles.cloudOne} />
-            <i className={styles.cloudTwo} />
-            <i className={styles.cloudThree} />
-          </div>
-          <div className={styles.fogField}><i /><i /></div>
-          <div className={styles.rainField}>
-            {rainParticles.map((particle, index) => (
-              <i
-                key={index}
-                style={{
-                  "--particle-x": `${particle.x}%`,
-                  "--particle-delay": `${particle.delay}s`,
-                  "--particle-duration": `${particle.duration}s`,
-                  "--particle-scale": particle.scale
-                } as CSSProperties}
-              />
-            ))}
-          </div>
-          <div className={styles.snowField}>
-            {snowParticles.map((particle, index) => (
-              <i
-                key={index}
-                style={{
-                  "--particle-x": `${particle.x}%`,
-                  "--particle-delay": `${particle.delay}s`,
-                  "--particle-duration": `${particle.duration}s`,
-                  "--particle-scale": particle.scale
-                } as CSSProperties}
-              />
-            ))}
-          </div>
-          <div className={styles.stormFlash} />
-        </div>
-      </div>
-      {debugMetrics ? (
-        <aside className={styles.debugPanel}>
-          <strong>HBIC display diagnostics</strong>
-          {Object.entries(debugMetrics).map(([key, value]) => <span key={key}>{key}: {value}</span>)}
-        </aside>
-      ) : null}
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <div className={styles.logoShell}>
-            <Image src="/brand/hbic-logo.png" alt="Masjid Bilal" width={88} height={88} priority />
-          </div>
-          <div>
-            <p>Hazrat Bilal Islamic Centre</p>
-            <h1>{payload.display.title}</h1>
-            <span>Calgary, Alberta</span>
-          </div>
-        </div>
-
-        <div className={styles.clockArea}>
-          <div className={styles.clockRow}>
-            {payload.display.showWeather && displayWeather ? (
-              <div className={styles.weather} aria-label={`Calgary weather: ${displayWeather.temperature} degrees, ${displayWeather.condition}`}>
-                <span aria-hidden="true">{weatherIcon(displayWeather.condition)}</span>
-                <b>{displayWeather.temperature < 0 ? "−" : ""}{Math.abs(displayWeather.temperature)}°C</b>
-                <i>·</i>
-                <em>{displayWeather.condition}</em>
-              </div>
-            ) : null}
-            <AnalogClock now={now} />
-            <strong className={styles.clock}>{clock}</strong>
-          </div>
-          {payload.display.showGregorianDate ? <span className={styles.date}>{date}</span> : null}
-          {payload.display.showHijriDate && payload.snapshot.hijriDate ? (
-            <span className={styles.hijri}>{payload.snapshot.hijriDate}</span>
-          ) : null}
-        </div>
-      </header>
-
+    <>
       <section className={styles.hero} aria-label="Next prayer">
         {jumuahTheme ? (
           <div className={styles.jumuahOccasion} aria-label="The Day of Jumu’ah">
@@ -495,7 +387,7 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       </section>
 
       <section className={styles.prayerGrid} aria-label="Today's prayer and iqamah times">
-        {payload.snapshot.prayers.map((prayer) => {
+        {snapshot.prayers.map((prayer) => {
           const adhanMs = Date.parse(prayer.adhanDate);
           const awaitingIqamah = prayer.key === focus?.entry.key && focus.primaryKind === "iqamah";
           const state = prayer.key === focus?.entry.key
@@ -508,6 +400,243 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
           return <PrayerTile key={prayer.key} prayer={prayer} state={state} awaitingIqamah={awaitingIqamah} />;
         })}
       </section>
+    </>
+  );
+}
+
+export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayPayload }) {
+  const [payload, setPayload] = useState(initialPayload);
+  // Keep the atmospheric canvas on a relaxed cadence. The second-by-second
+  // clock and prayer countdown are isolated in small components below.
+  const [now, setNow] = useState(() => new Date(initialPayload.snapshot.generatedAt));
+  const [weather, setWeather] = useState<TvWeatherReading | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [previewJumuah, setPreviewJumuah] = useState(false);
+  const [jumuahTheme, setJumuahTheme] = useState(() => isJumuahDisplayWindow(
+    initialPayload.snapshot,
+    new Date(initialPayload.snapshot.generatedAt)
+  ));
+  const [previewWeather, setPreviewWeather] = useState<TvWeatherMode | null>(null);
+  const [debugMetrics, setDebugMetrics] = useState<Record<string, string | number> | null>(null);
+  const requestedServiceDate = useRef("");
+  const displayInFlight = useRef(false);
+  const weatherInFlight = useRef(false);
+  const onJumuahThemeChange = useCallback((active: boolean) => {
+    setJumuahTheme((current) => current === active ? current : active);
+  }, []);
+
+  const refreshDisplay = useCallback(async () => {
+    if (document.visibilityState === "hidden" || displayInFlight.current) return;
+    displayInFlight.current = true;
+    try {
+      const response = await fetch(publicDisplayUrl());
+      const data = await response.json() as TvDisplayPayload & { error?: string };
+      if (!response.ok || data.ok !== true) throw new Error(data.error || "Display data unavailable");
+      setPayload(data);
+      writeLocalCache(cacheKey, JSON.stringify(data));
+      setOffline(false);
+    } catch {
+      setOffline(true);
+    } finally { displayInFlight.current = false; }
+  }, []);
+
+  const refreshWeather = useCallback(async () => {
+    if (document.visibilityState === "hidden" || weatherInFlight.current) return;
+    weatherInFlight.current = true;
+    try {
+      const response = await fetch("/api/display/weather");
+      const data = await response.json() as TvWeatherReading & { ok?: boolean };
+      if (!response.ok || data.ok === false || typeof data.temperature !== "number") return;
+      setWeather(data);
+      writeLocalCache(weatherCacheKey, JSON.stringify(data));
+    } catch {
+      // Weather is optional and must never displace or interrupt prayer times.
+    } finally { weatherInFlight.current = false; }
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.add("tv-display-active");
+    const cached = readLocalCache(cacheKey);
+    if (cached) {
+      try {
+        const value = JSON.parse(cached) as TvDisplayPayload;
+        if (value.ok && value.snapshot?.prayers?.length && value.contentVersion > initialPayload.contentVersion) {
+          setPayload(value);
+        }
+      } catch {
+        removeLocalCache(cacheKey);
+      }
+    }
+    writeLocalCache(cacheKey, JSON.stringify(initialPayload));
+    const cachedWeather = readLocalCache(weatherCacheKey);
+    if (cachedWeather) {
+      try {
+        const value = JSON.parse(cachedWeather) as TvWeatherReading;
+        if (typeof value.temperature === "number" && typeof value.condition === "string") setWeather(value);
+      } catch {
+        removeLocalCache(weatherCacheKey);
+      }
+    }
+    return () => document.body.classList.remove("tv-display-active");
+  }, [initialPayload]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setPreviewJumuah(params.get("previewJumuah") === "1");
+    const requestedWeather = params.get("previewWeather") as TvWeatherMode | null;
+    setPreviewWeather(requestedWeather && requestedWeather in weatherPreviewReadings ? requestedWeather : null);
+    if (!params.has("debugDisplay")) return;
+    const update = () => setDebugMetrics({
+      userAgent: navigator.userAgent,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      visualWidth: Math.round(window.visualViewport?.width ?? window.innerWidth),
+      visualHeight: Math.round(window.visualViewport?.height ?? window.innerHeight),
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      devicePixelRatio: window.devicePixelRatio,
+      layout: window.innerHeight <= 600 ? "TV compact landscape" : window.innerWidth <= 1100 ? "TV narrow landscape" : "TV standard",
+      build: initialPayload.contentVersion
+    });
+    update();
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
+  }, [initialPayload.contentVersion]);
+
+  useEffect(() => {
+    const updateAtmosphereClock = () => {
+      if (document.visibilityState !== "hidden") setNow(new Date());
+    };
+    const atmosphereClock = window.setInterval(updateAtmosphereClock, 30_000);
+    const contentRefresh = window.setInterval(() => void refreshDisplay(), 60_000);
+    const weatherRefresh = window.setInterval(() => void refreshWeather(), 15 * 60_000);
+    const reconnect = () => {
+      if (document.visibilityState === "hidden") return;
+      setNow(new Date());
+      void refreshDisplay();
+      void refreshWeather();
+    };
+    window.addEventListener("online", reconnect);
+    window.addEventListener("focus", reconnect);
+    document.addEventListener("visibilitychange", reconnect);
+    void refreshWeather();
+    return () => {
+      window.clearInterval(atmosphereClock);
+      window.clearInterval(contentRefresh);
+      window.clearInterval(weatherRefresh);
+      window.removeEventListener("online", reconnect);
+      window.removeEventListener("focus", reconnect);
+      document.removeEventListener("visibilitychange", reconnect);
+    };
+  }, [refreshDisplay, refreshWeather]);
+
+  useEffect(() => {
+    if (snapshotMatchesCalgaryDate(payload.snapshot, now)) {
+      requestedServiceDate.current = "";
+      return;
+    }
+    const serviceDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: masjidTimeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(now);
+    if (requestedServiceDate.current !== serviceDate) {
+      requestedServiceDate.current = serviceDate;
+      void refreshDisplay();
+    }
+  }, [now, payload.snapshot, refreshDisplay]);
+
+  const atmosphere = useMemo(() => deriveDisplayAtmosphere(payload.snapshot, now), [payload.snapshot, now]);
+  const displayWeather = previewWeather ? weatherPreviewReadings[previewWeather] : weather;
+  const weatherVisual = useMemo(() => deriveWeatherVisualState(displayWeather), [displayWeather]);
+  const weatherDrift = Math.sin((weatherVisual.windDirection + 180) * Math.PI / 180)
+    * (8 + Math.min(18, weatherVisual.windSpeed * .35));
+  const atmosphereStyle = {
+    "--sky-top": atmosphere.skyTop,
+    "--sky-middle": atmosphere.skyMiddle,
+    "--sky-bottom": atmosphere.skyBottom,
+    "--blue-glow": atmosphere.blueGlow,
+    "--daylight": atmosphere.daylight.toFixed(3),
+    "--sun-progress": atmosphere.sunProgress.toFixed(4),
+    "--sun-altitude": atmosphere.sunAltitude.toFixed(4),
+    "--sun-visibility": atmosphere.sunVisibility.toFixed(4),
+    "--sun-warmth": atmosphere.sunWarmth.toFixed(4),
+    "--sun-x": `${6 + atmosphere.sunProgress * 88}%`,
+    "--sun-y": `${64 - atmosphere.sunAltitude * 40}%`,
+    "--sun-weather-dim": weatherVisual.sunDimming.toFixed(3),
+    "--sun-render-opacity": (atmosphere.sunVisibility * weatherVisual.sunDimming).toFixed(4),
+    "--sun-overlay-opacity": (atmosphere.sunVisibility * weatherVisual.sunDimming * .72).toFixed(4),
+    "--weather-intensity": weatherVisual.intensity.toFixed(3),
+    "--weather-cloudiness": weatherVisual.cloudiness.toFixed(3),
+    "--weather-cloud-opacity": (weatherVisual.cloudiness * .72).toFixed(3),
+    "--weather-particle-opacity": (.15 + weatherVisual.intensity * .48).toFixed(3),
+    "--weather-film-opacity": (weatherVisual.intensity * .62).toFixed(3),
+    "--weather-motion-duration": `${weatherVisual.motionDuration.toFixed(1)}s`,
+    "--weather-drift-x": `${weatherDrift.toFixed(2)}vw`,
+    "--weather-half-drift-x": `${(weatherDrift * .46).toFixed(2)}vw`,
+    "--weather-wind-lean": `${(Math.sin(weatherVisual.windDirection * Math.PI / 180) * Math.min(12, weatherVisual.windSpeed * .24)).toFixed(2)}deg`
+  } as CSSProperties;
+  const activeNotice = isDisplayAnnouncementActive(payload.display.announcement, now)
+    ? payload.display.announcement.message.trim()
+    : "";
+  const youtube = socialHandle(payload.display.social.youtube);
+  const instagram = socialHandle(payload.display.social.instagram);
+  const tiktok = socialHandle(payload.display.social.tiktok);
+  const launchTeaserActive = isAppLaunchTeaserActive(now);
+
+  return (
+    <main
+      className={styles.display}
+      data-hbic-publication-revision={payload.contentVersion}
+      data-atmosphere={atmosphere.phase}
+      data-jumuah={jumuahTheme ? "true" : "false"}
+      data-weather={weatherVisual.mode}
+      data-windy={weatherVisual.windy ? "true" : "false"}
+      style={atmosphereStyle}
+    >
+      <div className={styles.daylightWash} aria-hidden="true" />
+      <div className={styles.celestialField} aria-hidden="true">
+        <div className={styles.sunAura} />
+        <div className={styles.sunDisc}><span /></div>
+        <WeatherScene />
+      </div>
+      {debugMetrics ? (
+        <aside className={styles.debugPanel}>
+          <strong>HBIC display diagnostics</strong>
+          {Object.entries(debugMetrics).map(([key, value]) => <span key={key}>{key}: {value}</span>)}
+        </aside>
+      ) : null}
+      <header className={styles.header}>
+        <div className={styles.brand}>
+          <div className={styles.logoShell}>
+            <Image src="/brand/hbic-logo.png" alt="Masjid Bilal" width={88} height={88} priority />
+          </div>
+          <div>
+            <p>Hazrat Bilal Islamic Centre</p>
+            <h1>{payload.display.title}</h1>
+            <span>Calgary, Alberta</span>
+          </div>
+        </div>
+
+        <ClockArea
+          initialNow={initialPayload.snapshot.generatedAt}
+          displayWeather={payload.display.showWeather ? displayWeather : null}
+          showGregorianDate={payload.display.showGregorianDate}
+          showHijriDate={payload.display.showHijriDate}
+          hijriDate={payload.snapshot.hijriDate}
+        />
+      </header>
+
+      <LivePrayerSchedule
+        snapshot={payload.snapshot}
+        previewJumuah={previewJumuah}
+        onJumuahThemeChange={onJumuahThemeChange}
+      />
 
       <section className={styles.secondary}>
         {payload.display.showJumuah && payload.snapshot.jumuahState.enabled ? (

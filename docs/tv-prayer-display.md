@@ -26,6 +26,8 @@ There is one prayer schedule. `/display` reads the same published content and ge
 
 The kiosk updates its clock and countdown every second and checks the display endpoint every minute. It refreshes immediately after the Fire TV reconnects and at Calgary date rollover. Current weather refreshes every 15 minutes and is omitted silently if unavailable, so weather can never obscure or interrupt prayer times.
 
+The live clock and prayer schedule tick on their own wall-second-aligned timers, separately from the animated sky and weather scene. The latter recomputes on a 30-second cadence; the visible clock/countdown still updates each second. When the page is hidden, the live timers and network refreshes pause and recalculate immediately when it becomes visible again. Inactive weather-particle animations are paused, while the active weather and daylight visuals remain enabled. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
+
 Each successful prayer payload is stored as the last-known-good browser snapshot. During a network interruption the display keeps showing that confirmed schedule and labels it as cached while retrying. A recovered connection updates the screen without navigation or a full-page reload.
 
 ## Fire TV installation
@@ -35,6 +37,7 @@ Each successful prayer payload is stored as the last-known-good browser snapshot
 3. Put Silk into full-screen mode and disable the screen saver/sleep timer for the display device.
 4. Confirm the television’s date and time are automatic. The kiosk itself renders all prayer logic in `America/Edmonton`.
 5. Verify the full schedule is inside the television’s safe area. The page is designed for 1280×720, 1366×768, 1920×1080, and 4K without scrolling.
+6. On the actual Fire TV, leave the page open for several minutes and confirm the seconds and countdown advance smoothly, active weather remains visible, and reconnecting Wi-Fi refreshes without reloading. Browser emulation and a successful site build do not substitute for this device check.
 
 Keep the previous television system available until staff have verified the production URL on the actual Fire TV and deliberately switched the input/bookmark.
 

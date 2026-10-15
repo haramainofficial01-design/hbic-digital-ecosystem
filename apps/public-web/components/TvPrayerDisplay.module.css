@@ -270,7 +270,7 @@
     2vw -2vw 0 -1.3vw rgba(225, 236, 241, .14);
   filter: blur(clamp(13px, 1.4vw, 27px));
   animation: weatherCloudDrift var(--weather-motion-duration) linear infinite;
-  will-change: transform;
+  animation-play-state: paused;
 }
 
 .cloudOne {
@@ -298,6 +298,14 @@
 .display[data-weather="snow"] .cloudField,
 .display[data-weather="storm"] .cloudField {
   opacity: var(--weather-cloud-opacity);
+}
+
+.display[data-weather="clouds"] .cloudField i,
+.display[data-weather="fog"] .cloudField i,
+.display[data-weather="rain"] .cloudField i,
+.display[data-weather="snow"] .cloudField i,
+.display[data-weather="storm"] .cloudField i {
+  animation-play-state: running;
 }
 
 .display[data-weather="rain"] .cloudField i,
@@ -328,12 +336,17 @@
   animation: weatherRainFall var(--particle-duration) linear infinite;
   animation-delay: var(--particle-delay);
   transform-origin: center;
-  will-change: transform;
+  animation-play-state: paused;
 }
 
 .display[data-weather="rain"] .rainField,
 .display[data-weather="storm"] .rainField {
   opacity: 1;
+}
+
+.display[data-weather="rain"] .rainField i,
+.display[data-weather="storm"] .rainField i {
+  animation-play-state: running;
 }
 
 .snowField i {
@@ -348,11 +361,15 @@
   opacity: var(--weather-particle-opacity);
   animation: weatherSnowFall var(--particle-duration) ease-in-out infinite;
   animation-delay: var(--particle-delay);
-  will-change: transform;
+  animation-play-state: paused;
 }
 
 .display[data-weather="snow"] .snowField {
   opacity: 1;
+}
+
+.display[data-weather="snow"] .snowField i {
+  animation-play-state: running;
 }
 
 .fogField {
@@ -369,6 +386,7 @@
   background: rgba(200, 218, 230, .13);
   filter: blur(24px);
   animation: weatherFogDrift var(--weather-motion-duration) ease-in-out infinite alternate;
+  animation-play-state: paused;
 }
 
 .fogField i:first-child { top: 28vh; }
@@ -378,6 +396,10 @@
   opacity: var(--weather-cloud-opacity);
 }
 
+.display[data-weather="fog"] .fogField i {
+  animation-play-state: running;
+}
+
 .stormFlash {
   background: rgba(211, 231, 255, .2);
   opacity: 0;
@@ -385,6 +407,7 @@
 
 .display[data-weather="storm"] .stormFlash {
   animation: weatherStormFlash 15s ease-in-out infinite;
+  animation-play-state: running;
 }
 
 @keyframes weatherCloudDrift {
