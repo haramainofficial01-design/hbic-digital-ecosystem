@@ -1,4 +1,4 @@
-/** Explicit local comparison: official MIT assets only. No API/account, audio
+/** Explicit local comparisons with pinned upstream assets. No API/account, audio
  * upload, application dependency, release configuration or native model change. */
 import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -19,16 +19,39 @@ export const whisperRecitationModel = {
     "vocab.json": { git: "0f3456460629e21d559c6daa23ab6ce3644e8271", size: 1036558 }
   }
 };
-export async function prepareWhisperRecitation() {
-  const directory = resolve("output/quran-development/whisper-turbo-comparison/assets");
+// ASR only: no reciter classifier, identity mapping or canonical-text matching
+// assets. Research use is governed by the publisher's CC BY-NC 4.0 terms.
+export const tadaburRecitationModel = {
+  repository: "rakansuliman/tadabur-whisper-medium", revision: "e82c2d827ad0df27e31042f7fb87c73df1da2c8b", license: "CC-BY-NC-4.0",
+  files: {
+    "README.md": { git: "7fdd598a58641263fe9aae0fa4e1c33839fc48e1", size: 16007 },
+    "added_tokens.json": { git: "e3d256c988462aa153dcabe2aa38b8e9b436c06f", size: 34604 },
+    "config.json": { git: "476e0c6199b7a18f3af9d65f9be613e5684c942d", size: 1297 },
+    "generation_config.json": { git: "33f9518292f034a00beeeaa821d1d7f4b021ccb3", size: 2940 },
+    "merges.txt": { git: "6038932a2a1f09a66991b1c2adae0d14066fa29e", size: 493869 },
+    "model.safetensors": { sha256: "9e3e7472373fa6570350e0c67c624307b18a35b2efee62cb00d6f46b944b6f27", size: 3055544304 },
+    "normalizer.json": { git: "dd6ae819ad738ac1a546e9f9282ef325c33b9ea0", size: 52666 },
+    "preprocessor_config.json": { git: "91876762a536a746d268353c5cba57286e76b058", size: 339 },
+    "processor_config.json": { git: "8f4a2ece16dab84436c57d685719ddd2e6a9927c", size: 409 },
+    "special_tokens_map.json": { git: "bf69932dca4b3719b59fdd8f6cc1978109509f6c", size: 2194 },
+    "tokenizer.json": { git: "7e30a8ca85fc59e4ce975a4e6d488771714891fb", size: 3930494 },
+    "tokenizer_config.json": { git: "d13b786c04765fb1a06492b53587752cd67665ea", size: 282683 },
+    "vocab.json": { git: "90e797dd4fd05d9dea443d702ca06be2463c5f2f", size: 1036584 }
+  }
+};
+export const whisperRecitationModels = { "whisper-turbo": whisperRecitationModel, "tadabur-medium": tadaburRecitationModel };
+export async function prepareWhisperRecitation(variant = "whisper-turbo") {
+  if (!Object.hasOwn(whisperRecitationModels, variant)) throw Error("Explicit pinned Whisper comparison required");
+  const selected = whisperRecitationModels[variant];
+  const directory = resolve(`output/quran-development/${variant}-comparison/assets`);
   await mkdir(directory, { recursive: true });
   const verified = {};
-  for (const [name, expected] of Object.entries(whisperRecitationModel.files)) {
+  for (const [name, expected] of Object.entries(selected.files)) {
     const file = resolve(directory, name), temporary = `${file}.download`;
     try { verified[name] = await verifyPinnedRecitationAsset(file, expected); continue; } catch { /* Separate verified replacement only. */ }
     let resumeAt = (await stat(temporary).catch(() => ({ size: 0 }))).size;
     if (resumeAt >= expected.size) resumeAt = 0;
-    const url = `https://huggingface.co/${whisperRecitationModel.repository}/resolve/${whisperRecitationModel.revision}/${name}`;
+    const url = `https://huggingface.co/${selected.repository}/resolve/${selected.revision}/${name}`;
     if (!resumeAt) await writeFile(temporary, new Uint8Array());
     console.log(JSON.stringify({ downloading: name, bytes: expected.size, resumeAt }));
     if (expected.size > 8 * 1024 * 1024) await downloadQwenRanges(url, temporary, expected.size, resumeAt);
@@ -43,7 +66,7 @@ export async function prepareWhisperRecitation() {
     verified[name] = await verifyPinnedRecitationAsset(temporary, expected);
     await rename(temporary, file);
   }
-  await writeFile(resolve(directory, "verified-manifest.json"), JSON.stringify({ ...whisperRecitationModel, verifiedSha256: verified }, null, 2));
+  await writeFile(resolve(directory, "verified-manifest.json"), JSON.stringify({ ...selected, verifiedSha256: verified }, null, 2));
   console.log(JSON.stringify({ ready: true, modelSha256: verified["model.safetensors"] }));
 }
-if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) await prepareWhisperRecitation();
+if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) await prepareWhisperRecitation(process.argv[2]);

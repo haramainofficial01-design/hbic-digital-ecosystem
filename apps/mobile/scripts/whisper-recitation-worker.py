@@ -1,6 +1,6 @@
 """Independent local waveform-only baseline, never an expected-ayah prompt.
 
-Official MIT Whisper weights through the existing isolated Transformers runtime.
+Pinned Whisper weights through the existing isolated Transformers runtime.
 No API, user recording, reference forcing, invented word times or native export.
 """
 import base64
@@ -12,7 +12,11 @@ from pathlib import Path
 
 def main():
     root = Path(sys.argv[1]).resolve()
-    if root != Path("output/quran-development/whisper-turbo-comparison").resolve():
+    approved = {
+        "whisper-turbo-comparison": ("openai/whisper-large-v3-turbo", "41f01f3fe87f28c78e2fbf8b568835947dd65ed9", "MIT", "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1"),
+        "tadabur-medium-comparison": ("rakansuliman/tadabur-whisper-medium", "e82c2d827ad0df27e31042f7fb87c73df1da2c8b", "CC-BY-NC-4.0", "9e3e7472373fa6570350e0c67c624307b18a35b2efee62cb00d6f46b944b6f27")
+    }
+    if root.name not in approved or root != Path("output/quran-development", root.name).resolve():
         raise ValueError("Explicit ignored comparison directory required")
     sys.path.insert(0, str(Path("output/quran-development/qwen-comparison/libraries").resolve()))
     import numpy as np
@@ -21,11 +25,12 @@ def main():
     from transformers import AutoProcessor, WhisperForConditionalGeneration
 
     manifest = json.loads((root / "assets/verified-manifest.json").read_text())
-    if (manifest["repository"] != "openai/whisper-large-v3-turbo"
-            or manifest["revision"] != "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
-            or manifest["license"] != "MIT"
-            or manifest["verifiedSha256"]["model.safetensors"] != "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1"):
-        raise ValueError("Pinned official model provenance required")
+    repository, revision, license_id, model_hash = approved[root.name]
+    if (manifest["repository"] != repository or manifest["revision"] != revision
+            or manifest["license"] != license_id or manifest["verifiedSha256"]["model.safetensors"] != model_hash):
+        raise ValueError("Pinned upstream model provenance required")
+    if any(name.startswith(("reciter_", "quran_", "sheikh_", "surah_")) for name in manifest["verifiedSha256"]):
+        raise ValueError("Only ASR assets, never speaker identity or canonical restoration")
     for name, expected in manifest["verifiedSha256"].items():
         if Path(name).name != name:
             raise ValueError("Unexpected asset path")
@@ -45,7 +50,9 @@ def main():
     processor = AutoProcessor.from_pretrained(root / "assets", local_files_only=True, trust_remote_code=False)
     model = WhisperForConditionalGeneration.from_pretrained(root / "assets", local_files_only=True,
         trust_remote_code=False, dtype=dtype, attn_implementation="sdpa").to(device).eval()
-    print(json.dumps({"ready": True, "device": device, "dtype": str(dtype), "beamWidth": 5,
+    tadabur = root.name == "tadabur-medium-comparison"
+    beam_width = 1 if tadabur else 5
+    print(json.dumps({"ready": True, "device": device, "dtype": str(dtype), "beamWidth": beam_width,
         "versions": {"torch": torch.__version__, "numpy": np.__version__, "transformers": transformers.__version__},
         "canonicalPrompt": False, "forcedAlignment": False}), flush=True)
     for line in sys.stdin:
@@ -63,8 +70,9 @@ def main():
         try:
             inputs = processor(pcm, sampling_rate=16000, return_tensors="pt", return_attention_mask=True).to(device, dtype)
             with torch.inference_mode():
+                options = {"suppress_tokens": [], "forced_decoder_ids": None} if tadabur else {}
                 output = model.generate(**inputs, language="ar", task="transcribe", do_sample=False,
-                    num_beams=5, max_new_tokens=128, return_timestamps=False)
+                    num_beams=beam_width, max_new_tokens=128, return_timestamps=False, **options)
             text = processor.batch_decode(output, skip_special_tokens=True)[0]
             eos = model.generation_config.eos_token_id
             eos = [eos] if isinstance(eos, int) else eos

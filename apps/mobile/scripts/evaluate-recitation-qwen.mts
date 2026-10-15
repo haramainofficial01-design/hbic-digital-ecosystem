@@ -7,18 +7,20 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { transcriptDifferences } from "./recitationTranscriptDifferences";
 import { wordEdits } from "./recitationQualification";
+import { controlRecognitionFidelity } from "./recitationControlFidelity";
+import { comparisonScope, type ComparisonCase } from "./recitationComparisonScope";
 
 const variant = process.argv[2] ?? "0.6B", mode = process.argv[3] ?? "auto";
 const split = process.argv[4] ?? "calibration";
-if (!["0.6B", "1.7B", "whisper-turbo", "wav2vec-quran"].includes(variant) || !["auto", "cpu-f32", "mps-f32"].includes(mode)) throw Error("Pinned model and supported runtime required");
+if (!["0.6B", "1.7B", "whisper-turbo", "tadabur-medium", "wav2vec-quran"].includes(variant) || !["auto", "cpu-f32", "mps-f32"].includes(mode)) throw Error("Pinned model and supported runtime required");
 if (!["calibration", "heldout"].includes(split)) throw Error("Explicit development corpus split required");
 const root = resolve(`output/quran-development/${variant === "0.6B" ? "qwen-comparison" : variant === "1.7B" ? "qwen-1.7b-comparison" : `${variant}-comparison`}`);
 const manifest = JSON.parse(readFileSync(resolve(root, "assets/verified-manifest.json"), "utf8"));
-const output = resolve(root, `${variant === "wav2vec-quran" ? variant : variant === "whisper-turbo" ? variant : "qwen"}-whole-${split}-${mode}-${Date.now()}-${randomUUID()}.json`);
-const workerPath = resolve(`apps/mobile/scripts/${variant === "wav2vec-quran" ? "wav2vec-quran-worker" : `${variant === "whisper-turbo" ? "whisper" : "qwen"}-recitation-worker`}.py`);
+const output = resolve(root, `${["0.6B", "1.7B"].includes(variant) ? "qwen" : variant}-whole-${split}-${mode}-${Date.now()}-${randomUUID()}.json`);
+const workerPath = resolve(`apps/mobile/scripts/${variant === "wav2vec-quran" ? "wav2vec-quran-worker" : `${["whisper-turbo", "tadabur-medium"].includes(variant) ? "whisper" : "qwen"}-recitation-worker`}.py`);
 const python = resolve("output/quran-development/nvidia-evaluation-runtime/bin/python");
 const sha = (data: string | Uint8Array) => createHash("sha256").update(data).digest("hex");
-const codeSha256 = Object.fromEntries([workerPath, "apps/mobile/scripts/evaluate-recitation-qwen.mts", "apps/mobile/scripts/recitationTranscriptDifferences.ts", "apps/mobile/src/quran/recitationTracking.ts"].map(file => [file.split("/").at(-1), sha(readFileSync(file))]));
+const codeSha256 = Object.fromEntries([workerPath, "apps/mobile/scripts/evaluate-recitation-qwen.mts", "apps/mobile/scripts/recitationTranscriptDifferences.ts", "apps/mobile/scripts/recitationQualification.ts", "apps/mobile/scripts/recitationControlFidelity.ts", "apps/mobile/scripts/recitationComparisonScope.ts", "apps/mobile/src/quran/recitationTracking.ts"].map(file => [file.split("/").at(-1), sha(readFileSync(file))]));
 const child = spawn(python, [workerPath, root, mode], { stdio: ["pipe", "pipe", "pipe"] });
 let stderr = "", pending: { resolve: (value: any) => void; reject: (error: Error) => void } | null = null;
 child.stderr.on("data", data => { stderr = (stderr + String(data)).slice(-2000); });
@@ -41,14 +43,14 @@ const bounded = <T,>(promise: Promise<T>) => new Promise<T>((resolve, reject) =>
 const startup = bounded(new Promise<any>((resolve, reject) => { pending = { resolve, reject }; }));
 const results: any[] = [], failures: { index: number; reason: string; words: number; diagnostic?: unknown }[] = [];
 let complete = false, runtime: unknown;
+let planned: ComparisonCase[] = [];
 const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.max(0, Math.ceil(values.length * p) - 1)] ?? null;
 function save() {
   const tp = results.filter(row => row.detected).length, predictions = results.flatMap(row => row.differences).length;
   const negatives = results.filter(row => row.expected === null), positive = results.filter(row => row.expected !== null);
-  const words = results.reduce((n, row) => n + row.edits.words, 0) + failures.reduce((n, row) => n + row.words, 0);
-  const edits = results.reduce((n, row) => n + row.edits.errors, 0) + failures.reduce((n, row) => n + row.words, 0);
+  const scope = comparisonScope(planned, results);
   const ms = results.map(row => row.elapsedMs);
-  writeFileSync(output, JSON.stringify({ model: manifest.repository, revision: manifest.revision,
+  writeFileSync(output, JSON.stringify({ model: manifest.repository, revision: manifest.revision, license: manifest.license,
     modelSha256: manifest.verifiedSha256["model.safetensors"], codeSha256, runtime, complete, newInference: true,
     canonicalPrompt: false, forcedAlignment: false, scope: "offline whole-clip diagnostic", split,
     limits: ["Approximate licensed waveform splices selected by prior baseline success, NOT naturally recited mistake gold.",
@@ -62,18 +64,32 @@ function save() {
       controlledOperationRecall: complete && !failures.length ? tp / 18 : null, negativeControlsWithAnyDifference: negatives.filter(row => row.differences.length).length,
       positiveControlsWithWrongDifferences: positive.filter(row => row.differences.some((d: any) => d.kind !== row.expected || d.index !== row.expectedIndex)).length,
       categories: Object.fromEntries(["omission", "repetition", "substitution"].map(kind => [kind, { total: 6, detected: positive.filter(row => row.expected === kind && row.detected).length }])),
-      controlledScriptWords: words, controlledScriptEdits: edits, controlledScriptReferenceWer: complete && words ? edits / words : null,
+      controlledScriptWords: scope.words, controlledScriptEdits: scope.errors, controlledScriptReferenceWer: complete ? scope.wer : null,
+      exactScriptedSpeech: results.filter(row => row.fidelity.exactScriptedSpeech).length,
+      exactAlteredSpeech: positive.filter(row => row.fidelity.exactScriptedSpeech).length,
+      canonicalInsteadOfAlteredSpeech: positive.filter(row => row.fidelity.canonicalInsteadOfScriptedSpeech).length,
+      missingCases: scope.missingCases, plannedCases: planned,
       desktopInferenceMs: { p50: percentile(ms, .5), p95: percentile(ms, .95) } }, failures, results }, null, 2));
 }
 try {
-  runtime = await startup;
-  if (!(runtime as any).ready || (runtime as any).canonicalPrompt !== false || (runtime as any).forcedAlignment !== false) throw Error("Invalid recognition startup");
+  // Handle a model-startup rejection while checking the independent RAM
+  // manifest, rather than leaving an unhandled promise or hiding its scope.
+  const ready = startup.then(value => ({ value }), error => ({ error }));
   const response = await fetch("http://127.0.0.1:3011/cases", { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw Error("Licensed local RAM controls unavailable");
   const cases = await response.json();
   if (!Array.isArray(cases) || cases.length !== 96) throw Error("Expected the unchanged 96 controls");
   const selected = cases.filter(row => row.split === split);
   if (selected.length !== 48 || new Set(selected.map(row => row.index)).size !== 48) throw Error("Expected all 48 development cases in the chosen split");
+  planned = selected.map(row => {
+    if (!Array.isArray(row.spokenGold) || !row.spokenGold.length || row.spokenGold.some((word: unknown) => typeof word !== "string" || !word.trim())
+      || typeof row.audioSha256 !== "string" || !/^[a-f0-9]{64}$/.test(row.audioSha256)) throw Error("Invalid independent control manifest");
+    return { index: row.index, words: row.spokenGold.length, audioSha256: row.audioSha256 };
+  });
+  const loaded = await ready;
+  if ("error" in loaded) throw loaded.error;
+  runtime = loaded.value;
+  if (!(runtime as any).ready || (runtime as any).canonicalPrompt !== false || (runtime as any).forcedAlignment !== false) throw Error("Invalid recognition startup");
   for (const row of selected) {
     let bytes: Uint8Array | undefined, pcm: Buffer | undefined, recognized: any;
     try {
@@ -96,7 +112,8 @@ try {
       const detected = row.expected !== null && differences.some(d => d.kind === row.expected && d.index === row.expectedIndex);
       results.push({ index: row.index, group: row.groupHash, category: row.category, expected: row.expected, expectedIndex: row.expectedIndex,
         audioSha256: row.audioSha256, reference: row.text, spokenGold: row.spokenGold, transcript: recognized.text, generatedTokens: recognized.generatedTokens,
-        detected, differences, edits: wordEdits(row.spokenGold.join(" "), recognized.text), elapsedMs });
+        detected, differences, edits: wordEdits(row.spokenGold.join(" "), recognized.text),
+        fidelity: controlRecognitionFidelity(row.text, row.spokenGold.join(" "), recognized.text), elapsedMs });
       console.log(JSON.stringify({ completed: results.length, category: row.category, detected, differences: differences.length }));
     } catch (error) { failures.push({ index: row.index, words: Array.isArray(row.spokenGold) ? row.spokenGold.length : 0,
       reason: error instanceof Error ? error.message : "Actual inference failed", diagnostic: recognized }); }

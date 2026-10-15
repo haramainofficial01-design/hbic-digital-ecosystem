@@ -1,4 +1,4 @@
-# Recite Assist qualification — updated 13 October 2026
+# Recite Assist qualification — updated 15 October 2026
 
 **Authorized only as an optional early preview, not a qualified assessment.**
 After reviewing the limitations, the user explicitly requested publishing the
@@ -7,6 +7,15 @@ download/microphone consent and prominent warnings that it misses many mistakes
 and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
+
+Latest independent recognition candidate: [15 October Tadabur Whisper Medium
+comparison](quran-tadabur-comparison-2026-10-15.md). All 48 historical calibration
+waveforms completed, but 30/192 script-word edits, 10/18 located raw detections,
+7/30 negative controls with differences and three canonical-restoration failures
+reject this candidate as a replacement. New inference does not establish 99%
+for ordinary recitation, hidden-verse tests, mistake correction or live voice
+following. Prior best experimental measurements and the native app model remain
+unchanged; no production or store release is performed.
 
 Latest native setup safeguard: if the on-device session opens but its vocabulary
 or decoder fails to initialize, the session is now released before a retry.

@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { downloadQwenRanges, qwenComparisonDirectory, qwenRecitationModels, verifyPinnedRecitationAsset } from "../scripts/prepare-qwen-recitation.mjs";
 import { muaalemRecitationModel } from "../scripts/prepare-muaalem-recitation.mjs";
-import { whisperRecitationModel } from "../scripts/prepare-whisper-recitation.mjs";
+import { whisperRecitationModel, tadaburRecitationModel, whisperRecitationModels, prepareWhisperRecitation } from "../scripts/prepare-whisper-recitation.mjs";
 import { wav2vecQuranModel } from "../scripts/prepare-wav2vec-quran.mjs";
 import { zipformerRecitationModel, zipformerRecitationModels } from "../scripts/verify-zipformer-recitation.mjs";
 
@@ -74,6 +74,22 @@ test("complete assets must match both pinned byte length and digest before loadi
     await assert.rejects(verifyPinnedRecitationAsset(file, { size: bytes.length, sha256: "0".repeat(64) }), /integrity/);
     await assert.rejects(verifyPinnedRecitationAsset(file, { size: bytes.length, git: "0".repeat(40) }), /integrity/);
   });
+});
+
+test("Quran-specific Whisper research is pinned and excludes identity and answer-restoration assets", async () => {
+  assert.deepEqual(Object.keys(whisperRecitationModels), ["whisper-turbo", "tadabur-medium"]);
+  assert.equal(tadaburRecitationModel.repository, "rakansuliman/tadabur-whisper-medium");
+  assert.equal(tadaburRecitationModel.license, "CC-BY-NC-4.0");
+  assert.equal(tadaburRecitationModel.revision, "e82c2d827ad0df27e31042f7fb87c73df1da2c8b");
+  assert.equal(tadaburRecitationModel.files["model.safetensors"].sha256, "9e3e7472373fa6570350e0c67c624307b18a35b2efee62cb00d6f46b944b6f27");
+  assert.equal(Object.keys(tadaburRecitationModel.files).length, 13);
+  for (const [name, pin] of Object.entries(tadaburRecitationModel.files)) {
+    assert.doesNotMatch(name, /^(?:reciter_|quran_|sheikh_|surah_)/);
+    assert.ok(Number.isSafeInteger(pin.size) && pin.size > 0);
+    assert.match(pin.git ?? pin.sha256, /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
+  }
+  for (const variant of ["../../production", "constructor", "toString", "unverified"])
+    await assert.rejects(prepareWhisperRecitation(variant), /pinned/);
 });
 
 async function withDownloadServer(responder, operation) {
