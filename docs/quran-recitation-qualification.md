@@ -16,6 +16,12 @@ typecheck passes.
 No audio/model inference or physical-device session was used; recognition,
 mistake detection, live following and the 99% qualification gate are unchanged.
 
+Latest vocabulary-integrity safeguard: [a missing emitted token no longer
+becomes an apparent skipped word](quran-vocabulary-integrity-2026-10-14.md).
+The fault-injection regression, 232 mobile Quran tests and frozen replay pass.
+This is not a new recognition or natural mistake-accuracy measurement; the 99%
+qualification gate remains FAIL.
+
 Latest capture-lifecycle safeguard: [rejected stop preserves ownership and an
 explicit retry state](quran-capture-stop-safety-2026-10-14.md). 79 controlled
 checks pass; no false microphone-off claim after rejection. This is not new

@@ -134,9 +134,12 @@ export function decodeRecitationEvidence(result: AsrTranscribeResult, vocab: Rec
       if (value > score) { score = value; id = v; }
     }
     if (!Number.isFinite(score)) return invalid();
+    // A mismatched/incomplete vocabulary is invalid acoustic evidence. Silently
+    // dropping an emitted interior token could otherwise fabricate an omission.
+    const piece = id === blankId ? "" : vocab[String(id)];
+    if (id !== blankId && (typeof piece !== "string" || !piece)) return invalid();
     if (id !== blankId && Number.isFinite(score)) { voiced++; qualitySum += Math.min(1, Math.exp(score)); }
     if (id !== blankId && id !== previous) {
-      const piece = vocab[String(id)] ?? "";
       if (piece && !piece.startsWith("<")) {
         if (piece.startsWith("▁")) {
           if (current && recitationLexeme(current.text)) words.push(current);

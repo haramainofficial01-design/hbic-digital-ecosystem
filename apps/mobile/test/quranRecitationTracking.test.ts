@@ -36,6 +36,20 @@ test("a corrupt CTC frame cannot disappear into a high-confidence skipped-word w
     assert.deepEqual(tracker.snapshot(), []);
   }
 });
+test("an emitted token missing from the vocabulary cannot look like a skipped word", () => {
+  const {"3": _missing, ...incompleteVocab} = acousticVocab;
+  const evidence = decodeRecitationEvidence(acousticFixture(), incompleteVocab, 48000,
+    [{compactStart: 0, originalStart: 0, length: 48000}], 0, 80000);
+  assert.equal(evidence.evidenceValid, false);
+  assert.deepEqual(evidence.words, []);
+  const tracker = new RecitationTracker();
+  for (const endSample of [64000, 80000]) {
+    const feedback = tracker.observe(expected, {text: "", ...evidence, startSample: 0, endSample});
+    assert.equal(feedback.status, "uncertain");
+    assert.deepEqual(feedback.differences, []);
+    assert.equal(feedback.stableComplete, false);
+  }
+});
 test("corrupt new acoustic output clears old stability and cannot reuse the same capture", () => {
   const tracker = new RecitationTracker(), good = decodeFixture(acousticFixture());
   for (const endSample of [64000, 80000]) tracker.observe(expected, {text: "", ...good, startSample: 0, endSample});
