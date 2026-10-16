@@ -18,6 +18,14 @@ beyond the previously documented stale final-word completion withdrawals.
 These are controlled software checks, not new measured speech accuracy or a
 native qualification; no production, OTA or store release was performed.
 
+Latest distinct-model follow-up: [cross-acoustic event corroboration](quran-cross-acoustic-results-2026-10-15.md).
+All 96 saved-score scopes and 192 original baseline decisions/margins replay
+exactly, with no new waveform inference. One calibration repetition improves
+(15/18 → 16/18), but the other 48 controls remain unchanged at 13/18 located
+events, 14 predictions, one wrong classification and 0/30 negative alerts:
+92.86% precision / 72.22% recall. Model agreement is not independent truth,
+new word accuracy or a qualified 99% result. No production/model promotion.
+
 Latest changed-proposal experiment: [supplementary independent substitution
 proposals](quran-supplementary-proposals-2026-10-15.md). All 48 new local acoustic
 inferences reproduce original posteriors/baseline scores exactly. Forty-two new
