@@ -86,3 +86,21 @@ Pending signed builds, artifact checks, upload and review submission. Code
 backup, build completion, store acceptance, review submission and public
 availability must each be confirmed separately below. Do not interpret this
 document as a completed release or use the old 1.7.6 artifact/build numbers.
+
+### Started native release jobs
+
+- Verified/pushed source: `dfaafbb0ec33cd8c5f4e455c9bff3b7fc7eedc36`.
+- iOS/Watch build 37: `f206828b-0839-44c8-9adf-a9bcf42ab7f6`.
+- Android build 42: `e179ff6f-901d-4043-820d-44a50967ec58`.
+- Existing EAS production environment/credentials were reused; Academy remains
+  enabled. No signing/capability change was requested or reported by the build
+  service. Local Swift prayer-snapshot tests and 54 new-phrase translation
+  presence checks also passed; presence checks are not independent linguistic
+  certification.
+- Apple 1.7.7 metadata is prepared for release after approval, retaining 32
+  existing real-app asset placements. No component fixture was uploaded as a
+  store screenshot. Review submission remains pending signed-artifact checks.
+- Existing Google production track was confirmed at 1.7.6 (41), completed;
+  no new Google release was committed during that read-only inspection.
+- Exact build statuses, download hashes and verification/submission reports
+  are retained under ignored `output/release-1.7.7/`, not committed credentials.
