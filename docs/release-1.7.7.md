@@ -82,10 +82,12 @@ it does not assess Tajweed or replace a qualified teacher.
 
 ### Delivery status
 
-Pending signed builds, artifact checks, upload and review submission. Code
-backup, build completion, store acceptance, review submission and public
-availability must each be confirmed separately below. Do not interpret this
-document as a completed release or use the old 1.7.6 artifact/build numbers.
+iOS/Watch build **37** has passed signed-artifact checks and Apple processing
+(`VALID`). Version **1.7.7** is **WAITING_FOR_REVIEW**, with release after
+approval. This is a confirmed review submission, not public availability.
+Android build **42** is still building; its artifact checks, final native smoke
+test and Google submission remain pending. The existing 1.7.6 (41) production
+track is not evidence that this new version has shipped.
 
 ### Started native release jobs
 
@@ -97,10 +99,24 @@ document as a completed release or use the old 1.7.6 artifact/build numbers.
   service. Local Swift prayer-snapshot tests and 54 new-phrase translation
   presence checks also passed; presence checks are not independent linguistic
   certification.
-- Apple 1.7.7 metadata is prepared for release after approval, retaining 32
+- Apple 1.7.7 metadata is configured for release after approval, retaining 32
   existing real-app asset placements. No component fixture was uploaded as a
-  store screenshot. Review submission remains pending signed-artifact checks.
+  store screenshot. Signed build 37 passed deep code-signature, four target
+  version/identifier, privacy-purpose, keychain, Watch Quran and compiled
+  runtime-feature checks before upload.
 - Existing Google production track was confirmed at 1.7.6 (41), completed;
   no new Google release was committed during that read-only inspection.
 - Exact build statuses, download hashes and verification/submission reports
   are retained under ignored `output/release-1.7.7/`, not committed credentials.
+
+### Apple submission confirmation
+
+- Verified IPA SHA-256:
+  `3fc87b22d328122464d5e356872e7729cbd36925b1cb1a1cc8d128f9c83a1f0f`.
+- EAS upload submission: `01a44374-33bb-4eb0-92a1-71cdeb9304ba`, completed.
+- Apple processed build: `24738045-e148-4dd7-9a58-7e2315578db2` (`VALID`).
+- App Store version: `438c29d8-bbec-4f66-b700-96631cabcca7`.
+- Apple review submission: `d8f2822e-ef23-4347-b6d7-b3bef40d9416`,
+  `WAITING_FOR_REVIEW`.
+- No research-only recognizer or corpus entered the artifact. The 99% gate
+  remains unmet; store submission does not alter qualification evidence.
