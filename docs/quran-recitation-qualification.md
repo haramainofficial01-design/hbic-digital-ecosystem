@@ -10,8 +10,9 @@ uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
 Latest repeated-word/completion safeguards: [adjacent repetition locations,
 accepted Quran spellings and uncertain interior words](quran-repetition-location-safety-2026-10-15.md).
-Three reproducible software failures are fixed without new fuzzy rules or
-weaker thresholds. All 264 mobile/browser Quran checks, both typechecks and
+Three reproducible software failures, including mixed accepted written
+spellings of repeated words, are fixed without new fuzzy rules or weaker
+thresholds. All 269 mobile/browser Quran checks, both typechecks and
 the complete 2,408-observation frozen replay pass; no additional replay changes
 beyond the previously documented stale final-word completion withdrawals.
 These are controlled software checks, not new measured speech accuracy or a

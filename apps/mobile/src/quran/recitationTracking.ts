@@ -339,15 +339,21 @@ export class RecitationTracker {
           else states[ei].state = "uncertain";
         }
       } else if (word.operation === "insertion" && hi !== null) {
+        // Both acoustic copies must anchor to the SAME existing canonical
+        // word. Its accepted written forms can differ (e.g. a dagger-alef
+        // spelling); this never creates a new fuzzy/substring equivalence.
+        const repeatCandidates = anchors.filter(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
+          && wholeWordAnchor(words[anchor.expectedIndex!], spoken[hi].text)
+          && wholeWordAnchor(words[anchor.expectedIndex!], spoken[anchor.recognizedIndex!].text));
         const repeated = (hi > 0 && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi - 1].text))
-          || (hi + 1 < spoken.length && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi + 1].text));
+          || (hi + 1 < spoken.length && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi + 1].text))
+          || repeatCandidates.length > 0;
         const before = anchors.find(anchor => anchor.recognizedIndex === hi - 1), after = anchors.find(anchor => anchor.recognizedIndex === hi + 1);
         // A stable prefix beside an uncertain word fragment is not an extra
         // word. Non-repetitions require immediate stable exact neighbors;
         // repetitions require BOTH acoustic copies, not one stable copy and
         // an unstable anchor at the same written word.
-        const repeatReferences = repeated ? anchors.filter(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
-          && wholeWordAnchor(words[anchor.expectedIndex!], spoken[hi].text) && stable(anchor.recognizedIndex)) : [];
+        const repeatReferences = repeatCandidates.filter(anchor => stable(anchor.recognizedIndex));
         const stableRepeat = repeatReferences.length > 0;
         const stableExtra = !repeated && hi > firstHeard && hi < lastHeard && stable(before?.recognizedIndex ?? null) && stable(after?.recognizedIndex ?? null);
         if ((stableExtra || stableRepeat) && stable(hi)) {

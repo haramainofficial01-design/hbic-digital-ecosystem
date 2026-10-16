@@ -17,6 +17,9 @@ correctness work, not a newly measured speech-accuracy result or release.
    adjacent repetition check now uses the existing `wholeWordAnchor` rule, not
    a new fuzzy/phonetic rule. Different words remain different; the canonical
    Quran text, normalization and acoustic thresholds are unchanged.
+   A follow-up also reproduces and fixes mixed accepted spellings across the
+   two actual copies: both must match the **same adjacent canonical word**.
+   Merely finding a compatible word earlier in the passage is insufficient.
 3. An extra uncertain interior token could leave all canonical words matched
    and incorrectly permit completion. It now withholds completion without
    inventing a learner-error warning. Retraction by later clear overlapping
@@ -43,7 +46,7 @@ also explicitly verifies clean completion. The tracker/voice-following focused
 suite has **62/62** passing checks. These fixtures are controlled text/timing
 contracts, not real learner voices or a word-error qualification corpus.
 
-The complete **264/264** shared mobile/browser Quran regression suite and both
+The complete **269/269** shared mobile/browser Quran regression suite and both
 app/site typechecks pass. Strict standalone changed-script/test typechecking
 also passes.
 Independent review confirmed private observation identity and recovery/join
@@ -76,8 +79,8 @@ iOS/Android thermal/lifecycle tests or successful 99% gate is claimed.
 
 | Source/artifact | SHA-256 |
 | --- | --- |
-| Shared tracker after all three fixes | `b13d13b311a9a87fc25ab959e273ffb9b25f1fad1eb811dcdd92ca547cf82172` |
-| Tracker regression tests | `cab8d0d3bf2d1676a927dbb42313bd54758961de87078f290c49537d0ac68719` |
+| Shared tracker including mixed accepted spellings | `6f8fe915b89a5a7e0f8b8e661a0d3a769a924f88779233935c669718053c28e7` |
+| Tracker regression tests | `c005f3a90cdf4776bb99160bef395459d3d712d4d26a224b10bf5ca09e4be053` |
 | Frozen natural evidence | `f175c9a9b67ff864b5df19319394da858c91828278ce0d57ef4dcdd843f4b48a` |
 | Frozen controls evidence | `ffa329a70c19ad3a40f74aebaf8f039e0d39b2d0ae6317d67c905461f479092e` |
 | Read-only replay script | `bc4216193136d1f0bc738ba567168230869dbfa22b91de5adcad75500d6f7a34` |

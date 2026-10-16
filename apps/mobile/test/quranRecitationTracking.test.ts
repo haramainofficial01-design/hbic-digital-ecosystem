@@ -196,10 +196,11 @@ test("repetition hints follow their adjacent acoustic copy, not an earlier ident
     assert.equal(feedback.stableComplete, false);
   }
 });
-test("accepted dagger-alef spellings retain repetition detection and the adjacent correction position", () => {
+test("accepted and mixed dagger-alef spellings retain repetition detection and the adjacent correction position", () => {
+  for (const pair of [["العالمين", "العالمين"], ["العلمين", "العلمين"], ["العلمين", "العالمين"], ["العالمين", "العلمين"]])
   for (const {text, spoken, index} of [
-    {text: expected, spoken: ["الحمد", "لله", "رب", "العلمين", "العلمين"], index: 3},
-    {text: "ٱلْعَـٰلَمِينَ ٱلْحَمْدُ ٱلْعَـٰلَمِينَ رَبِّ", spoken: ["العلمين", "الحمد", "العلمين", "العلمين", "رب"], index: 2}
+    {text: expected, spoken: ["الحمد", "لله", "رب", ...pair], index: 3},
+    {text: "ٱلْعَـٰلَمِينَ ٱلْحَمْدُ ٱلْعَـٰلَمِينَ رَبِّ", spoken: ["العلمين", "الحمد", ...pair, "رب"], index: 2}
   ]) {
     const heard = spoken.map((text, index) => word(text, 4000 + index * 8000));
     const feedback = twice(new RecitationTracker(), text, heard);
@@ -213,6 +214,17 @@ test("accepted dagger-alef spellings retain repetition detection and the adjacen
     ["الحمد", "لله", "رب", "العلمون", "العلمون"].map((text, index) => word(text, 4000 + index * 8000)));
   assert.ok(different.differences.every(difference => difference.kind !== "repetition"));
   assert.notEqual(different.words[3].state, "matched"); assert.equal(different.stableComplete, false);
+  const unrelated = twice(new RecitationTracker(), "ٱلْعَـٰلَمِينَ ٱلْحَمْدُ ٱلْعَـٰلَمِينَ رَبِّ",
+    ["العلمين", "الحمد", "العلمين", "العلمون", "رب"].map((text, index) => word(text, 4000 + index * 8000)));
+  assert.ok(unrelated.differences.every(difference => difference.kind !== "repetition"));
+  assert.equal(unrelated.stableComplete, false, "a different interior word is not an accepted alias");
+  for (const pair of [["العلمين", "العالمين"], ["العالمين", "العلمين"]]) for (const uncertainIndex of [2, 3]) {
+    const spoken = ["العلمين", "الحمد", ...pair, "رب"];
+    const weak = twice(new RecitationTracker(), "ٱلْعَـٰلَمِينَ ٱلْحَمْدُ ٱلْعَـٰلَمِينَ رَبِّ",
+      spoken.map((text, index) => word(text, 4000 + index * 8000, index === uncertainIndex ? .82 : .99)));
+    assert.ok(weak.differences.every(difference => difference.kind !== "repetition"), "both actual accepted copies must be stable");
+    assert.equal(weak.stableComplete, false, "an uncertain interior alias cannot become clean completion");
+  }
 });
 test("a stable earlier identical word cannot locate a repetition beside an uncertain acoustic copy", () => {
   const text = "قل ربنا علمنا قال ربنا ارحمنا", spoken = ["قل", "ربنا", "علمنا", "قال", "ربنا", "ربنا", "ارحمنا"];
