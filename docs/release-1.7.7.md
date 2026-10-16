@@ -85,9 +85,12 @@ it does not assess Tajweed or replace a qualified teacher.
 iOS/Watch build **37** has passed signed-artifact checks and Apple processing
 (`VALID`). Version **1.7.7** is **WAITING_FOR_REVIEW**, with release after
 approval. This is a confirmed review submission, not public availability.
-Android build **42** is still building; its artifact checks, final native smoke
-test and Google submission remain pending. The existing 1.7.6 (41) production
-track is not evidence that this new version has shipped.
+Android build **42** has completed, passed signed-artifact checks and passed
+the final AAB-derived native UI smoke test. Google accepted the exact AAB,
+validated the production edit and committed it with
+`changesNotSentForReview=false`. This confirms upload and submission through
+Google's review flow, with an intended full rollout after approval. It is not
+independent confirmation of public store approval or availability.
 
 ### Started native release jobs
 
@@ -120,3 +123,45 @@ track is not evidence that this new version has shipped.
   `WAITING_FOR_REVIEW`.
 - No research-only recognizer or corpus entered the artifact. The 99% gate
   remains unmet; store submission does not alter qualification evidence.
+
+### Final Android artifact and native smoke test
+
+- Verified AAB SHA-256:
+  `7b564dc58e40944eeae90ad24c16e565d10b70e17798104c260b0f61f1644eb9`.
+- Package `ca.hbic.calgary.app`, version 1.7.7, version code 42. Its signature,
+  compiled current features, recording permission, absence of research-only
+  models/private credentials and all 42 inspected ELF64 libraries' 16 KB LOAD
+  alignment passed. R8 renamed 88.4% of mapped classes.
+- A universal **QA-only debug-signed APK** was derived from that final AAB.
+  The uploaded AAB is unchanged and keeps its original production signature.
+  Installed QA APK SHA-256:
+  `bb966b37d7a28239c73cdb9cf6c6435a2b6f42a216d1fae9caee9c4a4a803e27`.
+- The dedicated Android 36 headless emulator passed all six smoke flows:
+  canonical reader; concealed self-test/hint/reveal with selected source words
+  checked exactly; hiding full text while retaining the requested hint;
+  self-reviewed next card resetting to concealed; private library; dark card.
+  Native screenshots were also visually inspected in both themes.
+- Initial QA driver assumptions were corrected: controls need scrolling rather
+  than one viewport, Android exposes individual selectable words rather than
+  their non-accessible wrapper label, hiding retains a requested hint, and
+  short drags prevent automated fling overshoot. No app source or signed build
+  was changed to accommodate these checks; initial reports remain private.
+- The submission guard now requires the passing native report to match this
+  exact AAB hash. The host microphone was disabled, no audio was recorded, no
+  research model was downloaded, and the read-only test emulator was closed.
+  This is native UI evidence, **not** real-voice accuracy, thermal, physical
+  Android/iPhone microphone, or native Mac interaction qualification.
+
+### Google submission confirmation
+
+- Version 1.7.7 (42), `Masjid Bilal 1.7.7 (42)`.
+- Google's upload response matched version code **42** and the verified AAB
+  SHA-256 above. The existing six real-app phone screenshots were retained;
+  component-adapter fixtures were not substituted for store screenshots.
+- The production release edit validated and committed successfully with
+  review requested. `completed` describes the intended rollout, not a separate
+  public-review approval signal. No account permissions or billing changes
+  were made, and no OTA or mass push was published.
+- Runtime source remains the original pushed release commit `dfaafbb`; later
+  commits record verification and delivery only. Code backup and both store
+  submissions are complete; public approval remains with Apple and Google.
