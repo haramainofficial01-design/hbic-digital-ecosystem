@@ -181,6 +181,65 @@ test("different audio timestamps preserve repeated words; overlapping windows ne
   assert.ok(repeated.differences.some(difference => difference.kind === "repetition"));
   assert.ok(repeated.differences.some(difference => difference.kind === "repetition" && difference.index === 1), "correction hint points to the actual repeated reference word");
 });
+test("repetition hints follow their adjacent acoustic copy, not an earlier identical canonical word", () => {
+  // These are controlled lexical/timing fixtures, not evaluated natural voices
+  // or a substitute for independently reviewed Quran mistake annotations.
+  for (const {text, indices} of [
+    {text: "الحمد لله رب العالمين", indices: [0, 1, 3]},
+    {text: "قل ربنا علمنا قال ربنا ارحمنا", indices: [1, 4]},
+    {text: "قل ربنا علمنا ربنا قال ربنا ارحمنا", indices: [1, 3, 5]}
+  ]) for (const index of indices) {
+    const spoken = text.split(" "); spoken.splice(index + 1, 0, spoken[index]);
+    const heard = spoken.map((text, at) => word(text, 4000 + at * 7000));
+    const feedback = twice(new RecitationTracker(), text, heard);
+    assert.deepEqual(feedback.differences, [{kind: "repetition", index}], `wrong correction position for repeated word ${index}`);
+    assert.equal(feedback.stableComplete, false);
+  }
+});
+test("accepted dagger-alef spellings retain repetition detection and the adjacent correction position", () => {
+  for (const {text, spoken, index} of [
+    {text: expected, spoken: ["الحمد", "لله", "رب", "العلمين", "العلمين"], index: 3},
+    {text: "ٱلْعَـٰلَمِينَ ٱلْحَمْدُ ٱلْعَـٰلَمِينَ رَبِّ", spoken: ["العلمين", "الحمد", "العلمين", "العلمين", "رب"], index: 2}
+  ]) {
+    const heard = spoken.map((text, index) => word(text, 4000 + index * 8000));
+    const feedback = twice(new RecitationTracker(), text, heard);
+    assert.deepEqual(feedback.differences, [{kind: "repetition", index}]);
+    assert.equal(feedback.stableComplete, false, "an accepted written alias cannot hide an actual repeated acoustic copy");
+  }
+  // The existing whole-word orthographic rule is unchanged: a genuinely
+  // different word is not promoted to an alias or a localized repetition.
+  assert.equal(wholeWordAnchor("ٱلْعَـٰلَمِينَ", "العلمون"), false);
+  const different = twice(new RecitationTracker(), expected,
+    ["الحمد", "لله", "رب", "العلمون", "العلمون"].map((text, index) => word(text, 4000 + index * 8000)));
+  assert.ok(different.differences.every(difference => difference.kind !== "repetition"));
+  assert.notEqual(different.words[3].state, "matched"); assert.equal(different.stableComplete, false);
+});
+test("a stable earlier identical word cannot locate a repetition beside an uncertain acoustic copy", () => {
+  const text = "قل ربنا علمنا قال ربنا ارحمنا", spoken = ["قل", "ربنا", "علمنا", "قال", "ربنا", "ربنا", "ارحمنا"];
+  for (const uncertainIndex of [4, 5]) {
+    const heard = spoken.map((text, index) => word(text, 4000 + index * 7000, index === uncertainIndex ? .82 : .99));
+    const feedback = twice(new RecitationTracker(), text, heard);
+    assert.deepEqual(feedback.differences, []);
+    assert.equal(feedback.stableComplete, false);
+  }
+});
+test("uncertain interior insertions cannot certify completion, but clear new evidence can retract them", () => {
+  for (const confidence of [.55, .82]) {
+    const tracker = new RecitationTracker(), guard = new ReciteCompletionGuard();
+    const heard = [word("الحمد", 4000), word("لله", 12000), word("الشمس", 17000, confidence), word("رب", 22000), word("العالمين", 32000)];
+    for (const endSample of [64000, 80000]) {
+      const feedback = tracker.observe(expected, observation(heard, endSample));
+      assert.deepEqual(feedback.differences, []); assert.equal(feedback.stableComplete, false);
+      assert.equal(guard.observe(feedback, endSample), false);
+    }
+    const clean = heard.filter((_, index) => index !== 2);
+    const recovered = tracker.observe(expected, observation(clean, 90000));
+    assert.ok(recovered.words.every(word => word.state === "matched"), "earlier clear words remain available for review");
+    assert.deepEqual(recovered.differences, []); assert.equal(recovered.stableComplete, true);
+    assert.equal(guard.observe(recovered, 90000), false, "one recovery observation cannot bypass the completion guard");
+    assert.equal(guard.observe(tracker.observe(expected, observation(clean, 100000)), 100000), true);
+  }
+});
 test("no mistake on a single unstable observation; stable omissions/substitutions have internal anchors", () => {
   const tracker = new RecitationTracker(), skipped = [word("الحمد", 4000), word("لله", 12000), word("العالمين", 32000)];
   assert.deepEqual(tracker.observe(expected, observation(skipped, 64000)).differences, []);
@@ -203,6 +262,7 @@ test("starting mid-ayah and valid neighboring ayahs are not labeled as omitted/e
   tracker.reset();
   const result = twice(tracker, expected, [word("الرحمن", 500), word("الرحيم", 2500), word("الحمد", 7000), word("لله", 14000), word("رب", 24000), word("العالمين", 34000), word("الرحمن", 46000), word("الرحيم", 54000)]);
   assert.deepEqual(result.differences, []); assert.ok(result.words.every(word => word.state === "matched"));
+  assert.equal(result.stableComplete, true);
 });
 test("same capture cannot accumulate stability or advance an ayah; reset erases timeline", () => {
   const tracker = new RecitationTracker(), heard = [word("الحمد", 4000), word("لله", 12000), word("العالمين", 32000)];

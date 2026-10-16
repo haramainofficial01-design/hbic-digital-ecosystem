@@ -8,6 +8,24 @@ and may misidentify words. This decision does not change the measurements below
 or establish dependable recitation/Tajweed accuracy. No microphone audio was
 uploaded or added to Git. Academy, prayer data and signing are unchanged.
 
+Latest repeated-word/completion safeguards: [adjacent repetition locations,
+accepted Quran spellings and uncertain interior words](quran-repetition-location-safety-2026-10-15.md).
+Three reproducible software failures are fixed without new fuzzy rules or
+weaker thresholds. All 264 mobile/browser Quran checks, both typechecks and
+the complete 2,408-observation frozen replay pass; no additional replay changes
+beyond the previously documented stale final-word completion withdrawals.
+These are controlled software checks, not new measured speech accuracy or a
+native qualification; no production, OTA or store release was performed.
+
+Latest changed-proposal experiment: [supplementary independent substitution
+proposals](quran-supplementary-proposals-2026-10-15.md). All 48 new local acoustic
+inferences reproduce original posteriors/baseline scores exactly. Forty-two new
+encoded candidates yield zero changed predictions: still 15/18 detections,
+15 predictions and 0/30 negative alerts on inspected calibration controls.
+The three misses receive no new mapped paths. This fixed addition is rejected
+as an improvement; 99% recognition, correction and live-following remain
+unqualified, with prior other-split experimental measurements unchanged.
+
 Latest target-selection safeguard: [pending ayah start/stop safety](quran-pending-verse-safety-2026-10-15.md).
 New recognition cannot start against the previous verse while a selected
 practice/self-test ayah loads; Stop/Cancel remain available and cancelled

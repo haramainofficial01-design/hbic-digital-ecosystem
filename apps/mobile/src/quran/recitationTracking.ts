@@ -282,11 +282,11 @@ export class RecitationTracker {
     this.history.sort((a, b) => a.startSample - b.startSample);
     // The UI caps a session at two minutes; independently cap text-side memory.
     if (this.history.length > 240) { this.reset(); return emptyFeedback(expected); }
-    const assessment = this.assess(expected), followingIndex = recitationFollowingIndex(expected, observation);
+    const assessment = this.assess(expected, used), followingIndex = recitationFollowingIndex(expected, observation);
     return followingIndex === null ? assessment : { ...assessment, followingIndex };
   }
-  private assess(expected: string): ReciteFeedback {
-    const words = recitationDisplayWords(expected), spoken = this.history.map(word => ({...word}));
+  private assess(expected: string, observed: ReadonlySet<TrackedWord>): ReciteFeedback {
+    const words = recitationDisplayWords(expected), spoken = this.history.map(word => ({...word, observedNow: observed.has(word)}));
     if (!words.length || words.length > 200 || spoken.length < 2
       || spoken.map(word => recitationLexeme(word.text)).join("").length < 8) return emptyFeedback(expected);
     // A single Quran display word can be two ASR words (e.g. يٰأيها / يا أيها).
@@ -297,7 +297,7 @@ export class RecitationTracker {
       if (vocabulary.has(joined) && !vocabulary.has(recitationLexeme(a.text)) && b.startSample >= a.endSample
         && b.startSample - a.endSample < 24000) {
         spoken.splice(i, 2, {...a, text: joined, endSample: b.endSample, confidence: Math.min(a.confidence, b.confidence),
-          support: Math.min(a.support, b.support), lastEnd: Math.min(a.lastEnd, b.lastEnd)});
+          support: Math.min(a.support, b.support), lastEnd: Math.min(a.lastEnd, b.lastEnd), observedNow: a.observedNow || b.observedNow});
       }
     }
     const judged = alignRecitationWords(words, spoken.map(word => word.text));
@@ -341,23 +341,33 @@ export class RecitationTracker {
       } else if (word.operation === "insertion" && hi !== null) {
         const repeated = (hi > 0 && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi - 1].text))
           || (hi + 1 < spoken.length && recitationLexeme(spoken[hi].text) === recitationLexeme(spoken[hi + 1].text));
-        const repeatsAnchor = repeated && anchors.some(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
-          && recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text));
         const before = anchors.find(anchor => anchor.recognizedIndex === hi - 1), after = anchors.find(anchor => anchor.recognizedIndex === hi + 1);
         // A stable prefix beside an uncertain word fragment is not an extra
         // word. Non-repetitions require immediate stable exact neighbors;
         // repetitions require BOTH acoustic copies, not one stable copy and
         // an unstable anchor at the same written word.
-        const stableRepeat = repeatsAnchor && anchors.some(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
-          && recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text) && stable(anchor.recognizedIndex));
+        const repeatReferences = repeated ? anchors.filter(anchor => Math.abs(anchor.recognizedIndex! - hi) === 1
+          && wholeWordAnchor(words[anchor.expectedIndex!], spoken[hi].text) && stable(anchor.recognizedIndex)) : [];
+        const stableRepeat = repeatReferences.length > 0;
         const stableExtra = !repeated && hi > firstHeard && hi < lastHeard && stable(before?.recognizedIndex ?? null) && stable(after?.recognizedIndex ?? null);
         if ((stableExtra || stableRepeat) && stable(hi)) {
-          const reference = repeated ? anchors.find(anchor => recitationLexeme(words[anchor.expectedIndex!]) === recitationLexeme(spoken[hi].text)) : null;
-          differences.push({kind: repeated ? "repetition" : "extra_word", index: reference?.expectedIndex ?? null});
+          // Localize with the SAME adjacent stable acoustic copy that proves
+          // this repetition, not the first occurrence of that word elsewhere
+          // in the ayah. Ambiguous neighboring canonical positions get no hint.
+          const locations = new Set(repeatReferences.map(anchor => anchor.expectedIndex!));
+          differences.push({kind: repeated ? "repetition" : "extra_word", index: locations.size === 1 ? [...locations][0] : null});
         }
       }
     }
-    const complete = states.every(word => word.state === "matched") && !differences.length;
+    // An uncertain extra sound inside the selected canonical span is not a
+    // certified mistake, but cannot become a clean completion either. A later
+    // clear interior decode may retract its historical support; do not let a
+    // retracted, no-longer-observed extra block recovery forever. Neighboring
+    // ayahs outside the matched span retain their existing allowance.
+    const unresolvedInterior = judged.words.some(word => word.operation === "insertion" && word.recognizedIndex !== null
+      && word.recognizedIndex > firstHeard && word.recognizedIndex < lastHeard
+      && (spoken[word.recognizedIndex].support > 0 || spoken[word.recognizedIndex].observedNow));
+    const complete = states.every(word => word.state === "matched") && !differences.length && !unresolvedInterior;
     const finalHeard = judged.words.find(word => word.expectedIndex === words.length - 1)?.recognizedIndex ?? null;
     // Keep earlier stable words outside the rolling window for long ayahs and
     // ordinary pauses, but unrelated new speech must not recertify an old
