@@ -10,6 +10,7 @@ import { useQuranRecording } from "./useQuranRecording";
 import { rememberRecitationFeedback } from "./mistakeReview";
 import type { ReciteFeedback } from "./reciteAssistFeedback";
 import {recitationDisplayWords} from "./recitationTracking";
+import { PracticeChrome, PracticeConcealedCard, PracticeFlashcard, PracticeProgress, PracticeWordLine } from "./QuranPracticePresentation";
 import type { QuranLibrary, QuranMode, ReturnTypeQuranAudio } from "./types";
 // Expo's ES2015 compilation target needs a lazy require rather than import().
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -32,6 +33,10 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   const [hints, setHints] = useState(0), [temporary, setTemporary] = useState(false);
   const [reviewAyah, setReviewAyah] = useState(initialAyah);
   const [assistBusy, setAssistBusy] = useState(false);
+  const [liveFeedback, setLiveFeedback] = useState<{ key: string; feedback: ReciteFeedback } | null>(null);
+  const showFeedback = useCallback((key: string, feedback: ReciteFeedback | null) => {
+    setLiveFeedback(previous => feedback ? { key, feedback } : previous?.key === key ? null : previous);
+  }, []);
   const [captureMode, setCaptureMode] = useState<"assist" | "audio">(assistEnabled ? "assist" : "audio");
   const [optionsOpen, setOptionsOpen] = useState(false), [recordingOptionsOpen, setRecordingOptionsOpen] = useState(false);
   const [current, setCurrent] = useState<QuranVerse | null>(null), [error, setError] = useState<string | null>(null);
@@ -46,8 +51,9 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   }), audio.stop, library.library.preferences.recordingRetention !== "session");
   const { update } = library;
   const remember = useCallback((key: string, attemptId: string, feedback: ReciteFeedback) => {
+    if (mode === "test" && temporary) return;
     void update(state => rememberRecitationFeedback(state, key, attemptId, feedback)).catch(() => setError("Possible-word review could not be saved."));
-  }, [update]);
+  }, [update, mode, temporary]);
   const recordingBusy = recording.phase !== "idle";
   const practiceBusy = recordingBusy || assistBusy;
   useEffect(() => { onCaptureActivity?.(recording.phase === "recording" || assistBusy); }, [recording.phase, assistBusy, onCaptureActivity]);
@@ -79,14 +85,25 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
   const displayVerse = current?.verseNumber === selectedAyah ? current : null;
   const memorizationStatus = library.library.memorization.find((p) => passageId(p) === passageId(passage))?.status ?? "not_started";
   const showText = mode === "test" ? revealed : !hidden;
+  // Keep the capture mounted while canonical content is pending; only its
+  // Start action is blocked. This presentation move must not release a lease.
+  const assist = assistEnabled && captureMode === "assist" && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy || !displayVerse} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy} inline onFeedback={showFeedback}
+    testMode={mode === "test"} onRevealWord={index => setHints(n => Math.max(n, index + 1))}
+    recognitionMode={library.library.preferences.recognitionMode} onReview={remember} saveAudio={library.library.preferences.saveAssistAudio}
+    onRecording={(record, allowReview) => recording.accept(record, library.library.preferences.recordingRetention !== "session", allowReview)}
+    onAdvance={mode !== "test" && selectedAyah < passage.to ? async (signal) => {
+      const next = selectedAyah + 1; const verse = await getVerse(next);
+      if (signal.aborted) return;
+      setCurrent(verse); setReviewAyah(next);
+    } : undefined} /></Suspense> : null;
   return <View style={styles.content}>
     <Text style={[styles.title, { color: theme.colors.text }]}>{mode === "test" ? "Test yourself" : mode === "memorize" ? "Memorization" : "Recitation practice"}</Text>
     <Text style={{ ...textStyle, color: theme.colors.muted }}>{chapter.nameSimple} · {chapter.versesCount} ayahs</Text>
-    <Text style={{ ...textStyle, color: theme.colors.muted }}>Listen, hide the ayah, use a hint, and review your recall. Self-review is private, not a recitation grade.</Text>
-    {mode === "test" && questions.length ? <QuranSurface>
+    <Text style={{ ...textStyle, color: theme.colors.muted }}>Private practice · no recitation grade</Text>
+    {mode === "test" && questions.length ? <PracticeChrome>
       <Text style={textStyle}>Ayahs {passage.from}–{passage.to} · {temporary ? "Temporary review" : "Saved self-review"}</Text>
       <AppButton label="Change test range" variant="ghost" disabled={practiceBusy} onPress={() => { audio.stop(); setQuestions([]); setQuestionIndex(0); setHints(0); setRevealed(false); }} />
-    </QuranSurface> : <QuranSurface>
+    </PracticeChrome> : <QuranSurface>
       <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: "600" }}>Ayahs {from}–{to}{mode !== "test" ? ` · ${repeat}× ${repeatMode === "passage" ? "whole passage" : "each ayah"}` : " · self-test"}</Text>
       <AppButton label={optionsOpen ? "Close passage options" : "Edit passage & options"} variant="ghost" disabled={practiceBusy} onPress={() => setOptionsOpen(!optionsOpen)} />
       {!optionsOpen ? <>
@@ -111,16 +128,20 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
       </>}
       </>}
     </QuranSurface>}
-    {questions.length && questionIndex >= questions.length ? <QuranSurface><Text style={[styles.title, { color: theme.colors.text }]}>Session complete</Text><Text style={textStyle}>{questions.length} passages reviewed by you. This is not an automatic recitation assessment.</Text></QuranSurface> : <QuranSurface>
+    {questions.length && questionIndex >= questions.length ? <QuranSurface><Text style={[styles.title, { color: theme.colors.text }]}>Session complete</Text><Text style={textStyle}>{questions.length} passages reviewed by you. This is not an automatic recitation assessment.</Text></QuranSurface> : <PracticeFlashcard transitionKey={`${mode}:${selectedAyah}:${questionIndex}`}>
+      {mode === "test" ? <PracticeProgress reviewed={questionIndex} total={questions.length} /> : null}
       <Text style={{ color: theme.colors.teal, fontWeight: "700", marginBottom: 12 }}>{mode === "test" && question ? `Question ${questionIndex + 1} of ${questions.length} · ${chapter.id}:${question}` : `Passage ${passageId(passage)}`}</Text>
       {mode !== "test" && valid ? <View style={styles.row}><AppButton label="Previous ayah" variant="ghost" disabled={practiceBusy || selectedAyah <= passage.from} onPress={() => setReviewAyah(selectedAyah - 1)} /><Text style={textStyle}>Ayah {selectedAyah}</Text><AppButton label="Next ayah" variant="ghost" disabled={practiceBusy || selectedAyah >= passage.to} onPress={() => setReviewAyah(selectedAyah + 1)} /></View> : null}
       {!displayVerse && !error ? <ActivityIndicator color={theme.colors.teal} /> : null}
       {displayVerse ? <>
-        {showText || hints > 0 ? <Text selectable style={[styles.arabic, { color: theme.colors.text, fontFamily: fontLoaded ? "QuranNaskh" : undefined, fontSize: library.library.preferences.arabicSize,
-          lineHeight: library.library.preferences.arabicSize * 2.1 }]}>{showText ? displayVerse.textUthmani : recitationDisplayWords(displayVerse.textUthmani).slice(0, hints).join(" ")}</Text>
-          : <View style={[styles.hidden, { backgroundColor: theme.colors.tintSoft }]}><Text style={[textStyle, { textAlign: "center" }]}>Recite from memory</Text><Text style={{ color: theme.colors.muted, textAlign: "center", marginTop: 8 }}>Reveal the ayah when you’re ready to review.</Text></View>}
+        {showText ? <PracticeWordLine text={displayVerse.textUthmani} feedback={liveFeedback?.key === displayVerse.verseKey ? liveFeedback.feedback : null} fontLoaded={fontLoaded} size={library.library.preferences.arabicSize} />
+          : hints > 0 ? <Text selectable style={[styles.arabic, { color: theme.colors.text, fontFamily: fontLoaded ? "QuranNaskh" : undefined, fontSize: library.library.preferences.arabicSize,
+            lineHeight: library.library.preferences.arabicSize * 2.1 }]}>{recitationDisplayWords(displayVerse.textUthmani).slice(0, hints).join(" ")}</Text> : <PracticeConcealedCard />}
         {showText && library.library.preferences.showTranslation ? <Text style={textStyle}>{displayVerse.translation}</Text> : null}
         {showText ? <Text style={{ color: theme.colors.subtle, fontSize: 12, marginTop: 12 }}>{displayVerse.translationName}</Text> : null}
+      </> : null}
+      {assist}
+      {displayVerse ? <>
         <View style={styles.row}>
           <AppButton label={mode === "test" ? revealed ? "Hide ayah" : "Reveal ayah" : hidden ? "Reveal" : "Hide"} variant="secondary" icon="eye-outline" onPress={() => mode === "test" ? setRevealed(!revealed) : setHidden(!hidden)} />
           {!showText ? <AppButton label="Word hint" variant="secondary" disabled={hints >= recitationDisplayWords(displayVerse.textUthmani).length} onPress={() => setHints((n) => n + 1)} /> : null}
@@ -131,7 +152,7 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
           <AppButton label="Needs revision · next" variant="secondary" disabled={practiceBusy} onPress={() => void reviewed("needs_revision")} />
         </View> : null}
       </> : null}
-    </QuranSurface>}
+    </PracticeFlashcard>}
     {error ? <QuranMessage message={error} /> : null}
     {assistEnabled ? <QuranSurface>
       <Text style={[styles.subtitle, { color: theme.colors.text }]}>Recitation Mode</Text>
@@ -146,15 +167,6 @@ export function QuranPractice({ mode, chapter, getVerse, audio, library, fontLoa
         disabled={practiceBusy} value={library.library.preferences.saveAssistAudio} onValueChange={saveAssistAudio => void update(s => ({ ...s, preferences: { ...s.preferences, saveAssistAudio } }))
           .catch(() => setError("Recording preference could not be saved. Please retry."))} /></View> : null}
     </QuranSurface> : null}
-    {assistEnabled && captureMode === "assist" && library.ready && current && valid && (mode !== "test" || Boolean(question)) && !(questions.length && questionIndex >= questions.length) ? <Suspense fallback={<ActivityIndicator />}><ReciteAssist verse={current} stopPlayback={audio.stop} blocked={recordingBusy || !displayVerse} concealed={!showText} fontLoaded={fontLoaded} onBusyChange={setAssistBusy}
-      testMode={mode === "test"} onRevealWord={index => setHints(n => Math.max(n, index + 1))}
-      recognitionMode={library.library.preferences.recognitionMode} onReview={remember} saveAudio={library.library.preferences.saveAssistAudio}
-      onRecording={(record, allowReview) => recording.accept(record, library.library.preferences.recordingRetention !== "session", allowReview)}
-      onAdvance={mode !== "test" && selectedAyah < passage.to ? async (signal) => {
-        const next = selectedAyah + 1; const verse = await getVerse(next);
-        if (signal.aborted) return;
-        setCurrent(verse); setReviewAyah(next);
-      } : undefined} /></Suspense> : null}
     <QuranSurface>
       <Text style={[styles.subtitle, { color: theme.colors.text }]}>{captureMode === "audio" ? "Audio Recording" : "Your Recordings"}</Text>
       <Text style={{ ...textStyle, color: theme.colors.muted }}>Microphone starts only when you choose. Audio stays on this device. {captureMode === "assist" ? "Word-tracking sessions last up to two minutes." : "Audio-only recordings last up to five minutes."}</Text>

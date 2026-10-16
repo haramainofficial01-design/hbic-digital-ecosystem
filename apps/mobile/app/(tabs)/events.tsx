@@ -48,7 +48,7 @@ export default function EventsScreen() {
               onPress={() => setFilter(item)}
               style={[styles.chip, { backgroundColor: active ? theme.colors.teal : theme.colors.cardStrong, borderColor: theme.colors.border }]}
             >
-              <Text style={[styles.chipText, { color: active ? theme.colors.white : theme.colors.text }]}>{item}</Text>
+              <Text style={[styles.chipText, { color: active ? theme.colors.onTint : theme.colors.text }]}>{item}</Text>
             </Pressable>
           );
         })}

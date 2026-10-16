@@ -7,6 +7,8 @@ import {
 } from "expo-router/unstable-native-tabs";
 import { useAppLanguage } from "../../src/i18n/LanguageProvider";
 import { useAppTheme } from "../../src/theme/ThemeProvider";
+import { Tabs } from "expo-router";
+import { isMacQuranHost } from "../../src/quran/macRuntime";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -56,6 +58,10 @@ const tabs: TabDefinition[] = [
 export default function TabLayout() {
   const { theme } = useAppTheme();
   const { t } = useAppLanguage();
+
+  if (isMacQuranHost) return <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" }, sceneStyle: { backgroundColor: theme.colors.background } }}>
+    {tabs.map(tab => <Tabs.Screen key={tab.name} name={tab.name} options={{ title: t(tab.label) }} />)}
+  </Tabs>;
 
   return (
     <NativeTabs

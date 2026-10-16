@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppLanguage } from "../i18n/LanguageProvider";
@@ -9,6 +9,7 @@ import { spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { isMacQuranHost } from "../quran/macRuntime";
 import { desktopAppLayout } from "./desktopLayout";
+import { useAppViewport } from "./AppViewport";
 
 export function AppScreen({ children, style, onReady, onInteraction }: PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
@@ -17,10 +18,10 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
 }>) {
   const { theme } = useAppTheme();
   const { isRtl } = useAppLanguage();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useAppViewport();
   const { lastUpdatedAt, loading, refresh, refreshError, source } = usePublishedContent();
   const isWide = width >= 768;
-  const desktop = desktopAppLayout(width, isMacQuranHost);
+  const desktop = desktopAppLayout(width, isMacQuranHost, fontScale);
   const cachedAt = lastUpdatedAt
     ? new Date(lastUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : null;

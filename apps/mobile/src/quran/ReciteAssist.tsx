@@ -19,8 +19,8 @@ import { OwnedPcmCapture } from "./ownedPcmCapture";
 
 /** Explicit early preview; never a verified recitation/Tajweed assessment. */
 export interface ReciteAssistHandle { toggleRecording: () => boolean }
-interface ReciteAssistProps { verse: QuranVerse; stopPlayback: () => void; blocked: boolean; concealed: boolean; fontLoaded: boolean; onBusyChange: (busy: boolean) => void; onAdvance?: (signal: AbortSignal) => Promise<void>; recognitionMode?: "efficient" | "responsive"; onReview?: (key: string, attemptId: string, feedback: ReciteFeedback) => void; saveAudio?: boolean; onRecording?: (recording: QuranRecording, allowSessionReview: boolean) => Promise<void>; testMode?: boolean; onRevealWord?: (index: number) => void }
-export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function ReciteAssist({ verse, stopPlayback, blocked, concealed, fontLoaded, onBusyChange, onAdvance, recognitionMode = "efficient", onReview, saveAudio = false, onRecording, testMode = false, onRevealWord }, ref) {
+interface ReciteAssistProps { verse: QuranVerse; stopPlayback: () => void; blocked: boolean; concealed: boolean; fontLoaded: boolean; onBusyChange: (busy: boolean) => void; onAdvance?: (signal: AbortSignal) => Promise<void>; recognitionMode?: "efficient" | "responsive"; onReview?: (key: string, attemptId: string, feedback: ReciteFeedback) => void; saveAudio?: boolean; onRecording?: (recording: QuranRecording, allowSessionReview: boolean) => Promise<void>; testMode?: boolean; onRevealWord?: (index: number) => void; inline?: boolean; onFeedback?: (key: string, feedback: ReciteFeedback | null) => void }
+export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function ReciteAssist({ verse, stopPlayback, blocked, concealed, fontLoaded, onBusyChange, onAdvance, recognitionMode = "efficient", onReview, saveAudio = false, onRecording, testMode = false, onRevealWord, inline = false, onFeedback }, ref) {
   const { theme } = useAppTheme();
   const [phase, setPhase] = useState<"idle" | "preparing" | "listening" | "pausing" | "paused" | "resuming" | "stop_failed">("idle");
   const [message, setMessage] = useState("Follows recited words and flags possible word differences. Not a Tajweed assessment.");
@@ -49,11 +49,21 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
   const savedAudio = useRef<{ writer: PcmReviewWriter; record: QuranRecording } | null>(null);
   const storageWarning = useRef<string | null>(null);
   const recordingCallback = useRef(onRecording); recordingCallback.current = onRecording;
+  const presentationCallback = useRef(onFeedback); presentationCallback.current = onFeedback;
+  const feedbackKey = useRef<string | null>(null);
+  // Presentation cannot move the recognition target or accumulate stability.
+  // Clear the old target synchronously on effect cleanup; publish only active
+  // current-verse observations, never old feedback during a manual fetch.
+  useEffect(() => {
+    presentationCallback.current?.(verse.verseKey, phase === "listening" && !blocked && feedbackKey.current === verse.verseKey ? feedback : null);
+    return () => presentationCallback.current?.(verse.verseKey, null);
+  }, [verse.verseKey, feedback, phase, blocked]);
   const stop = useCallback(() => {
     if (stopping.current) return stopping.current;
     if (!busy.current && !engine.current && !savedAudio.current) return Promise.resolve();
     const allowSessionReview = mounted.current && AppState.currentState === "active";
     ++epoch.current;
+    presentationCallback.current?.(verseKey.current, null);
     pendingAdvance.current?.abort(); pendingAdvance.current = null;
     automaticFromKey.current = null;
     if (timer.current) clearInterval(timer.current); timer.current = null;
@@ -144,6 +154,7 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
       tail.analyzed(recentVoice); recentVoice = false; budget.started(endSample); const startedAt = Date.now();
       processing.current = held.recognize(pcm, startSample).then((result) => {
         if (!mounted.current || token !== epoch.current || key !== verseKey.current) return;
+        feedbackKey.current = key;
         if (result.evidenceValid === false) setHeard("");
         else if (result.text.trim()) setHeard(result.text);
         const observed = parseAyahReference(key);
@@ -260,16 +271,17 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
     return true;
   }
   useImperativeHandle(ref, () => ({toggleRecording: () => requestStart(true)}));
-  return <QuranSurface>
+  const Surface = inline ? View : QuranSurface;
+  return <Surface>
     <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: "700" }}>{testMode ? "Recitation Test" : "Recite Assist"}</Text>
     <Text style={{ color: theme.colors.teal, fontSize: 14, marginTop: 6 }}>Ayah {verse.verseKey}</Text>
-    <Text style={{ color: theme.mode === "light" ? "#795500" : theme.colors.gold, fontSize: 12, fontWeight: "600", marginTop: 6 }}>EARLY PREVIEW · NOT A VERIFIED RECITATION ASSESSMENT</Text>
-    <Text style={{ color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 8 }}>Can miss or misidentify words. Always review with the Quran reference or a qualified teacher. No Tajweed or pronunciation assessment.</Text>
+    <Text style={{ color: theme.colors.warningText, fontSize: 12, fontWeight: "600", marginTop: 6 }}>{inline ? "Early preview · may miss or misidentify words" : "EARLY PREVIEW · NOT A VERIFIED RECITATION ASSESSMENT"}</Text>
+    {!inline ? <Text style={{ color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 8 }}>Can miss or misidentify words. Always review with the Quran reference or a qualified teacher. No Tajweed or pronunciation assessment.</Text> : null}
     <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 23, marginVertical: 12 }}>{message}</Text>
     {!isPcmRecorderAvailable ? <Text style={{ color: theme.colors.muted }}>On-device recognition is unavailable on this device. Reading, listening and self-tests remain available.</Text> : <AppButton label={phase === "idle" ? testMode ? "Start Recitation Test" : saveAudio ? "Recite and Record" : "Start Recite Assist" : phase === "preparing" ? "Cancel preparation" : "Stop Recitation"} icon={phase === "idle" ? "mic-outline" : "stop-circle-outline"} disabled={phase === "idle" && blocked} onPress={() => requestStart()} />}
     {heard && !concealed ? <View style={{marginTop: 12}}><Text style={{color: theme.colors.muted, fontSize: 12}}>Recognized speech · may contain transcription errors</Text><Text accessibilityLabel="Recognized speech" style={{color: theme.colors.text, textAlign: "right", writingDirection: "rtl", fontSize: 18, marginTop: 6}}>{heard}</Text></View> : null}
     {feedback?.differences.map((difference, index) => <View key={`${difference.kind}:${difference.index}:${index}`} style={{marginTop: 10}}>
-      <Text style={{color: theme.colors.gold, fontWeight: "600"}}>Possible {difference.kind === "omission" ? "skipped word" : difference.kind === "substitution" ? "different word" : difference.kind === "repetition" ? "repeated word" : "extra word"}{difference.index !== null ? ` · Word ${difference.index + 1}` : ""}</Text>
+      <Text accessibilityRole="alert" style={{color: theme.colors.danger, fontWeight: "600"}}>Possible {difference.kind === "omission" ? "skipped word" : difference.kind === "substitution" ? "different word" : difference.kind === "repetition" ? "repeated word" : "extra word"}{difference.index !== null ? ` · Word ${difference.index + 1}` : ""}</Text>
       {difference.index !== null && onRevealWord ? <AppButton label="Show correction hint" variant="secondary" onPress={() => onRevealWord(difference.index!)} /> : null}
     </View>)}
     {phase === "listening" || phase === "paused" || phase === "pausing" || phase === "resuming" ? <View style={{ marginTop: 10 }}><AppButton variant="secondary"
@@ -278,10 +290,10 @@ export default forwardRef<ReciteAssistHandle, ReciteAssistProps>(function Recite
       onPress={() => void (phase === "paused" ? resume() : pause())} /></View> : null}
     {summary ? <View style={{ marginTop: 16 }}><Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: "700" }}>Session review</Text><Text style={{ color: theme.colors.muted, fontSize: 14, lineHeight: 22, marginTop: 6 }}>{summary}</Text></View> : null}
     {feedback ? <View style={{ marginTop: 16, gap: 10 }}><Text style={{ color: theme.colors.muted, fontSize: 14 }}>{feedback.status === "uncertain" ? feedback.followingIndex !== undefined ? "Following your voice; the rest is still uncertain." : "Couldn’t hear clearly enough—no mistake marked." : feedback.status === "possible_difference" ? "Possible word difference. Reveal and review with the reference." : "Following the recited words."}</Text>
-      {!concealed ? <View style={{ flexDirection: "row-reverse", flexWrap: "wrap", gap: 7 }}>{feedback.words.map((word, i) => <Text key={i} style={{ fontSize: 25, lineHeight: 49, writingDirection: "rtl", paddingHorizontal: 4, borderRadius: 5,
-        fontFamily: fontLoaded ? "QuranNaskh" : undefined, color: word.state === "matched" ? theme.colors.teal : theme.colors.text,
+      {!concealed && !inline ? <View style={{ flexDirection: "row-reverse", flexWrap: "wrap", gap: 7 }}>{feedback.words.map((word, i) => <Text key={i} style={{ fontSize: 25, lineHeight: 49, writingDirection: "rtl", paddingHorizontal: 4, borderRadius: 5,
+        fontFamily: fontLoaded ? "QuranNaskh" : undefined, color: word.state === "possible_difference" || feedback.differences.some(d => d.index === i) ? theme.colors.danger : word.state === "matched" ? theme.colors.teal : theme.colors.text,
         borderBottomWidth: 2, borderBottomColor: feedback.followingIndex === i ? theme.colors.teal : "transparent",
-        backgroundColor: word.state === "possible_difference" ? theme.colors.tintSoft : "transparent" }}>{word.text}</Text>)}</View> : <Text style={{ color: theme.colors.muted, fontSize: 14 }}>Text stays hidden until you choose Reveal.</Text>}
+        backgroundColor: word.state === "possible_difference" ? theme.colors.tintSoft : "transparent" }}>{word.text}</Text>)}</View> : concealed ? <Text style={{ color: theme.colors.muted, fontSize: 14 }}>Text stays hidden until you choose Reveal.</Text> : null}
       <Text style={{ color: theme.colors.subtle, fontSize: 12 }}>On-device model: Tilawi / Muhammad Dur, CC BY 4.0. Quran text: Tanzil, CC BY 3.0. No numerical recitation score.</Text></View> : null}
-  </QuranSurface>;
+  </Surface>;
 });

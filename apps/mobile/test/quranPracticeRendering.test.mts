@@ -5,12 +5,15 @@ import test from "node:test";
 import { build } from "esbuild";
 import { chromium } from "playwright";
 import { resolve } from "node:path";
+import { mkdirSync } from "node:fs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const native = `import React from'react';
 const flat=s=>Array.isArray(s)?Object.assign({},...s.filter(Boolean).map(flat)):s||{};
-function css(value,view){const s=flat(typeof value==='function'?value({pressed:false}):value);if(view){s.display='flex';s.flexDirection=s.flexDirection||'column'}for(const [a,b,c]of[['paddingHorizontal','paddingLeft','paddingRight'],['paddingVertical','paddingTop','paddingBottom'],['marginVertical','marginTop','marginBottom']])if(s[a]!=null){s[b]=s[c]=s[a];delete s[a]}if(s.flex!=null)s.flex=s.flex+' 1 0%';delete s.transform;return s}
-export const View=({children,style})=><div style={css(style,true)}>{children}</div>;
+function css(value,view){const s=flat(typeof value==='function'?value({pressed:false}):value);if(view){s.display='flex';s.flexDirection=s.flexDirection||'column';s.flexShrink=s.flexShrink??0}for(const [a,b,c]of[['paddingHorizontal','paddingLeft','paddingRight'],['paddingVertical','paddingTop','paddingBottom'],['marginVertical','marginTop','marginBottom']])if(s[a]!=null){s[b]=s[c]=s[a];delete s[a]}if(s.flex!=null)s.flex=s.flex+' 1 0%';if(typeof s.lineHeight==='number')s.lineHeight=s.lineHeight+'px';if(s.borderWidth!=null||s.borderBottomWidth!=null)s.borderStyle='solid';delete s.transform;return s}
+export const View=({children,style,testID,accessibilityLabel,accessibilityRole,accessibilityValue})=><div data-testid={testID} aria-label={accessibilityLabel} role={accessibilityRole} aria-valuenow={accessibilityValue?.now} aria-valuemax={accessibilityValue?.max} style={css(style,true)}>{children}</div>;
+export const Animated={View};
+export const AccessibilityInfo={isReduceTransparencyEnabled:async()=>true,addEventListener:()=>({remove(){}})};
 export const Text=({children,style,accessibilityLabel,accessibilityRole})=><span aria-label={accessibilityLabel} role={accessibilityRole} style={css(style,false)}>{children}</span>;
 export const TextInput=({value,onChangeText,style,accessibilityLabel,editable=true})=><input aria-label={accessibilityLabel} value={value} disabled={!editable} onChange={e=>onChangeText?.(e.target.value)} style={css(style,false)}/>;
 export const Pressable=({children,style,accessibilityLabel,accessibilityRole,accessibilityState,disabled,onPress})=><button type='button' role={accessibilityRole||'button'} aria-label={accessibilityLabel} aria-checked={accessibilityState?.checked} aria-selected={accessibilityState?.selected} disabled={disabled} onClick={onPress} style={css(style,true)}>{children}</button>;
@@ -38,6 +41,8 @@ createRoot(document.getElementById('root')).render(<Fixture/>);` }, plugins: [{n
       b.onResolve({filter: /theme\/ThemeProvider$/}, () => ({path: "theme", namespace: "qa"}));
       b.onResolve({filter: /^@expo\/vector-icons$/}, () => ({path: "icons", namespace: "qa"}));
       b.onResolve({filter: /macRuntime$/}, () => ({path: "mac", namespace: "qa"}));
+      b.onResolve({filter: /NativeGlassSurface$/}, () => ({path: "glass", namespace: "qa"}));
+      b.onResolve({filter: /useQuranTransition$/}, () => ({path: "transition", namespace: "qa"}));
       b.onResolve({filter: /^\.\/useQuranRecording$/}, () => ({path: "recording", namespace: "qa"}));
       b.onResolve({filter: /^\.\/ReciteAssist$/}, () => ({path: "assist", namespace: "qa"}));
       b.onLoad({filter: /.*/, namespace: "qa"}, args => ({loader: "tsx", resolveDir: root, contents: args.path === "native" ? native
@@ -45,9 +50,11 @@ createRoot(document.getElementById('root')).render(<Fixture/>);` }, plugins: [{n
         : args.path === "language" ? `export const useAppLanguage=()=>({translate:s=>s});`
         : args.path === "theme" ? `import{lightTheme,darkTheme}from'${resolve(root, "apps/mobile/src/theme/theme.ts")}';export const useAppTheme=()=>({theme:window.qaDark?darkTheme:lightTheme});`
         : args.path === "mac" ? `export const isMacQuranHost=false;`
+        : args.path === "glass" ? `export{View as NativeGlassSurface}from'react-native';`
+        : args.path === "transition" ? `export const useQuranTransition=()=>({opacity:1});`
         : args.path === "icons" ? `import React from'react';export const Ionicons=()=> <span aria-hidden='true'>◇</span>;`
         : args.path === "recording" ? `import{useState}from'react';export function useQuranRecording(){const[phase,setPhase]=useState('idle');return{phase,error:null,temporary:null,accept:async()=>{},start:async()=>{window.qaAudioStarts=(window.qaAudioStarts||0)+1;setPhase('recording')},stop:async()=>{setPhase('idle')},keepTemporary:async()=>{},eraseTemporary:async()=>{}}}`
-        : `import React,{useEffect,useState}from'react';export default function Assist({verse,onAdvance,onBusyChange,blocked,saveAudio,concealed,testMode,stopPlayback}){const[busy,setBusy]=useState(false);useEffect(()=>{window.qaAssistMounts=(window.qaAssistMounts||0)+1;return()=>window.qaAssistUnmounts=(window.qaAssistUnmounts||0)+1},[]);window.qaConcealed=concealed;window.qaAssistVerseKey=verse.verseKey;window.qaAssistBlocked=blocked;window.qaAdvance=onAdvance;return <div aria-label='Recite Assist UI adapter'><button disabled={blocked&&!busy} onClick={()=>{if(!busy)stopPlayback();setBusy(!busy);onBusyChange(!busy);window.qaAssistStarts=(window.qaAssistStarts||0)+(busy?0:1)}}>{busy?'Stop Recitation':testMode?'Start Recitation Test':saveAudio?'Recite and Record':'Start Recite Assist'}</button></div>}` }));
+        : `import React,{useEffect,useState}from'react';export default function Assist({verse,onAdvance,onBusyChange,blocked,saveAudio,concealed,testMode,stopPlayback,onFeedback,onReview}){const[busy,setBusy]=useState(false);useEffect(()=>{window.qaAssistMounts=(window.qaAssistMounts||0)+1;return()=>window.qaAssistUnmounts=(window.qaAssistUnmounts||0)+1},[]);window.qaConcealed=concealed;window.qaAssistVerseKey=verse.verseKey;window.qaAssistBlocked=blocked;window.qaAdvance=onAdvance;window.qaFeedback=(key,feedback)=>onFeedback?.(key,feedback);window.qaReview=(feedback)=>onReview?.(verse.verseKey,'fixture-attempt',feedback);return <div aria-label='Recite Assist UI adapter'><button disabled={blocked&&!busy} onClick={()=>{if(!busy)stopPlayback();setBusy(!busy);onBusyChange(!busy);window.qaAssistStarts=(window.qaAssistStarts||0)+(busy?0:1)}}>{busy?'Stop Recitation':testMode?'Start Recitation Test':saveAudio?'Recite and Record':'Start Recite Assist'}</button></div>}` }));
     } }] });
   return out.outputFiles[0].text;
 }
@@ -164,4 +171,37 @@ test("automatic next-ayah loading preserves the mounted capture path until the r
     assert.equal(await page.evaluate(() => (window as any).qaAssistStarts), 1);
     await page.getByRole("button", {name: "Stop Recitation", exact: true}).click();
   } finally { await page.close(); await browser.close(); }
+});
+
+test("flashcards show only current-verse cues, keep hidden text concealed, and temporary tests do not save flags", async () => {
+  const script = await bundle(), browser = await chromium.launch({headless: true});
+  const out = resolve(root, "output/release-1.7.7/ui"); mkdirSync(out, {recursive: true});
+  try {for (const width of [320, 390, 1280]) for (const dark of [false, true]) {
+    const page = await browser.newPage({viewport: {width, height: 950}});
+    try {
+      await page.setContent(`<style>*{box-sizing:border-box}body{margin:0;padding:12px;font-family:system-ui;background:${dark ? "#031827" : "#F2FBFC"}}button{font:inherit;border:0}input{min-width:0}</style><div id='root'></div><script>window.qaMode='test';window.qaDark=${dark};${script}</script>`);
+      await page.getByRole("button", {name: "Edit passage & options", exact: true}).click();
+      await page.getByRole("switch").first().check();
+      await page.getByRole("button", {name: "Start self-test", exact: true}).click();
+      await page.getByRole("button", {name: "Start Recitation Test", exact: true}).waitFor();
+      const feedback = await page.evaluate(() => {
+        const key = (window as any).qaAssistVerseKey;
+        // Explicit presentation fixtures, never model/real-voice evidence.
+        return {key, feedback: {status: "possible_difference", attempted: 3, stableComplete: false, followingIndex: 1,
+          words: Array.from(document.querySelectorAll("[data-testid^='quran-practice-word-']")).map(x => ({text: x.textContent?.replace("◇", ""), state: "matched"})),
+          differences: [{kind: "repetition", index: 1}]}};
+      });
+      assert.equal(await page.getByLabel("Canonical Quran text").count(), 0, "listening must not reveal hidden canonical words");
+      await page.getByRole("button", {name: "Reveal ayah", exact: true}).click();
+      const canonical = await page.locator("[data-testid^='quran-practice-word-'] > span:first-child").allTextContents();
+      feedback.feedback.words = canonical.map(text => ({text, state: "matched"}));
+      await page.evaluate(({key, feedback}) => { (window as any).qaFeedback(key, feedback); (window as any).qaReview(feedback); }, feedback);
+      await page.getByLabel(`${canonical[1]} · Possible word difference`, {exact: true}).waitFor();
+      assert.equal(await page.evaluate(() => (window as any).qaState.mistakes.length), 0, "temporary tests must not save word flags");
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}/${dark}`);
+      if (width === 390 || width === 1280) await page.screenshot({path: resolve(out, `practice-card-${width}-${dark ? "dark" : "light"}.png`), fullPage: true});
+      await page.evaluate(({key, feedback}) => (window as any).qaFeedback(key === "1:1" ? "1:2" : "1:1", feedback), feedback);
+      assert.equal(await page.getByLabel(`${canonical[1]} · Possible word difference`, {exact: true}).count(), 0, "a mismatched ayah cannot keep a current-word cue");
+    } finally {await page.close();}
+  }} finally {await browser.close();}
 });

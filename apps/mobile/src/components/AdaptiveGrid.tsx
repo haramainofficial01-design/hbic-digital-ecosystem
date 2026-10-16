@@ -1,10 +1,11 @@
 import { Children, type PropsWithChildren } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useAppViewport } from "./AppViewport";
 import { spacing } from "../theme/theme";
 
 export function AdaptiveGrid({ children, breakpoint = 760 }: PropsWithChildren<{ breakpoint?: number }>) {
-  const { width } = useWindowDimensions();
-  const twoColumns = width >= breakpoint;
+  const { width, fontScale } = useAppViewport();
+  const twoColumns = width >= breakpoint && fontScale <= 1.4;
 
   return (
     <View style={styles.grid}>
@@ -23,7 +24,8 @@ const styles = StyleSheet.create({
     alignItems: "stretch"
   },
   column: {
-    width: "100%"
+    width: "100%",
+    minWidth: 0
   },
   columnWide: {
     width: "48%",

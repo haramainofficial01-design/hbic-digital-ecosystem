@@ -1,12 +1,13 @@
 import { Children, type PropsWithChildren } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useAppViewport } from "./AppViewport";
 import { isMacQuranHost } from "../quran/macRuntime";
 import { desktopAppLayout } from "./desktopLayout";
 import { spacing } from "../theme/theme";
 
 /** Balanced Mac sections; keep the existing phone/tablet content order. */
 export function DesktopColumns({ children }: PropsWithChildren) {
-  const { width, fontScale } = useWindowDimensions();
+  const { width, fontScale } = useAppViewport();
   const columns = desktopAppLayout(width, isMacQuranHost, fontScale).columns;
   return (
     <View style={[styles.stack, columns === 2 && styles.row]}>

@@ -86,7 +86,7 @@ export default function HijriCalendarScreen() {
             const isWhiteDay = Boolean(content.featureFlags.whiteDaysEnabled && hijri?.isWhiteDay);
             return (
               <View key={key} style={[styles.cell, styles.dateCell, isToday && { backgroundColor: theme.colors.teal }, isWhiteDay && !isToday && { backgroundColor: "rgba(231,198,107,.2)" }]} accessibilityLabel={day === null ? undefined : `${gregorianDate}, ${hijri?.label ?? "Hijri date unavailable"}${isWhiteDay ? ", White Day" : ""}`}>
-                {day !== null ? <><Text style={[styles.gregorianDay, isToday && styles.todayText]}>{day}</Text><Text style={[styles.hijriDay, isToday && styles.todayText]}>{hijri?.day ?? "—"}</Text>{isWhiteDay ? <View style={[styles.whiteDayDot, isToday && { backgroundColor: "#fff" }]} /> : null}</> : null}
+                {day !== null ? <><Text style={[styles.gregorianDay, isToday && { color: theme.colors.onTint }]}>{day}</Text><Text style={[styles.hijriDay, isToday && { color: theme.colors.onTint }]}>{hijri?.day ?? "—"}</Text>{isWhiteDay ? <View style={[styles.whiteDayDot, isToday && { backgroundColor: theme.colors.onTint }]} /> : null}</> : null}
               </View>
             );
           })}

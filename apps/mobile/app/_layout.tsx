@@ -2,7 +2,8 @@ import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "../src/i18n/LanguageProvider";
 import { OnboardingExperience } from "../src/onboarding/OnboardingExperience";
@@ -16,6 +17,7 @@ import {
   resolveNotificationDestination
 } from "../src/services/notifications";
 import { ThemeProvider, useAppTheme } from "../src/theme/ThemeProvider";
+import { MacAppFrame } from "../src/components/MacAppFrame";
 
 export default function RootLayout() {
   return (
@@ -36,19 +38,26 @@ export default function RootLayout() {
 function AppShell() {
   const { theme, resolvedMode } = useAppTheme();
   const { active: onboardingActive } = useOnboarding();
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (mounted) setReduceMotion(value); }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    return () => { mounted = false; subscription.remove(); };
+  }, []);
 
   return (
     <>
       <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} />
       {!onboardingActive ? <NotificationRouter /> : null}
-      <Stack
+      <MacAppFrame><Stack
         initialRouteName="(tabs)"
         screenOptions={{
           headerShown: false,
-          animation: "fade_from_bottom",
+          animation: reduceMotion ? "none" : "fade_from_bottom",
           contentStyle: { backgroundColor: theme.colors.background }
         }}
-      />
+      /></MacAppFrame>
       <OnboardingExperience />
     </>
   );

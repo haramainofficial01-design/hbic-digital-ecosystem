@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { useAppViewport } from "../components/AppViewport";
 import { Text } from "../i18n/LocalizedText";
 import type { QuranChapter } from "@hbic/shared";
 import { useAppTheme } from "../theme/ThemeProvider";
@@ -19,7 +20,8 @@ export function QuranHome({ library, chapters, onMode, onOpen, fontLoaded, audio
   onOpen: (chapter: number, ayah: number) => void; fontLoaded: boolean; audioAvailable: boolean;
 }) {
   const { theme } = useAppTheme();
-  const expanded = useWindowDimensions().width >= 1000;
+  const { width, fontScale } = useAppViewport();
+  const expanded = width >= 1000 && fontScale <= 1.4;
   const state = library.library;
   const resume = state.lastRead ?? { chapter: 1, ayah: 1 };
   const last = chapters.find((c) => c.id === resume.chapter);

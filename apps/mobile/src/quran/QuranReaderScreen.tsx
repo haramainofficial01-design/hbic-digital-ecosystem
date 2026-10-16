@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, FlatList, Keyboard, Pressable, StyleSheet, View, useWindowDimensions, type ViewToken } from "react-native";
+import { ActivityIndicator, Animated, FlatList, Keyboard, Pressable, StyleSheet, View, type ViewToken } from "react-native";
+import { useAppViewport } from "../components/AppViewport";
 import { Text, TextInput } from "../i18n/LocalizedText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
@@ -41,7 +42,7 @@ const titles: Record<QuranMode, string> = { home: "Quran & Recite", read: "Reade
 export default function QuranReaderScreen() {
   const router = useRouter(), params = useLocalSearchParams<{ chapter?: string; ayah?: string; view?: string }>();
   const { theme } = useAppTheme();
-  const { width } = useWindowDimensions();
+  const { width } = useAppViewport();
   const workspace = quranWorkspaceLayout(width, isMacQuranHost ? "mac" : "mobile");
   const [sidebarVisible, setSidebarVisible] = useState(true), [inspectorVisible, setInspectorVisible] = useState(true);
   const [fontLoaded] = useFonts({ QuranNaskh: require("../../assets/fonts/NotoNaskhArabic.ttf") });

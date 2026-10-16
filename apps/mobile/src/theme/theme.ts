@@ -31,6 +31,9 @@ export interface AppTheme {
     border: string;
     borderStrong: string;
     tint: string;
+    onTint: string;
+    onDanger: string;
+    warningText: string;
     tintSoft: string;
     navy: string;
     deepNavy: string;
@@ -65,6 +68,9 @@ export const lightTheme: AppTheme = {
     border: "rgba(8,123,131,0.22)",
     borderStrong: "rgba(8,123,131,0.42)",
     tint: colors.teal,
+    onTint: "#FFFFFF",
+    onDanger: "#FFFFFF",
+    warningText: "#795500",
     tintSoft: "#E6F7F8",
     navy: colors.navy,
     deepNavy: colors.deepNavy,
@@ -99,6 +105,9 @@ export const darkTheme: AppTheme = {
     border: "rgba(255,255,255,0.13)",
     borderStrong: "rgba(231,198,107,0.36)",
     tint: "#28C0C8",
+    onTint: "#031827",
+    onDanger: "#031827",
+    warningText: colors.gold,
     tintSoft: "rgba(40,192,200,0.13)",
     navy: colors.navy,
     deepNavy: colors.deepNavy,

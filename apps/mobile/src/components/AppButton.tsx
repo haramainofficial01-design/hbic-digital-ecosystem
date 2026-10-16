@@ -31,7 +31,7 @@ export function AppButton({ label, onPress, variant = "primary", icon, style, di
           ? "transparent"
           : theme.colors.tint;
   const borderColor = variant === "ghost" ? "transparent" : theme.colors.borderStrong;
-  const labelColor = isSecondary ? theme.colors.text : theme.colors.white;
+  const labelColor = isSecondary ? theme.colors.text : variant === "danger" ? theme.colors.onDanger : theme.colors.onTint;
 
   return (
     <Pressable
@@ -42,6 +42,7 @@ export function AppButton({ label, onPress, variant = "primary", icon, style, di
       disabled={disabled}
       android_ripple={{ color: theme.colors.borderStrong, borderless: false }}
       onPress={onPress}
+      onAccessibilityTap={disabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor, borderColor },
