@@ -1,0 +1,96 @@
+export const bilalCompanionName = "Bilal Companion";
+export const bilalCompanionWelcome = "Assalamu alaikum. I’m Bilal Companion. Ask me about Masjid Bilal, prayer times, programs or using the app.";
+export const bilalCompanionDisclaimer = "Public HBIC information, not a staff member or a religious authority. Please don’t share personal, student or payment details.";
+export const bilalCompanionSuggestions = ["Today’s prayer times", "Quran Academy", "Donation options", "Contact the masjid"];
+
+export interface CompanionSource { id: string; title: string; href: string }
+export interface CompanionFact extends CompanionSource { text: string; terms: string[] }
+export interface CompanionRequest { question: string; previousQuestions: string[] }
+export interface CompanionReply {
+  ok: true; answer: string; sources: CompanionSource[]; mode: "published-info";
+  asOf: string; contentVersion: number; topicIds: string[]; needsHuman: boolean;
+}
+
+const paths = new Set(["/", "/contact", "/about", "/prayer-times", "/quran-academy", "/quran", "/events", "/programs", "/donate", "/community", "/youth", "/app", "/privacy"]);
+export function safeCompanionLink(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value, "https://hbic.ca");
+    if (url.origin !== "https://hbic.ca" || url.username || url.password || !paths.has(url.pathname)) return null;
+    return `https://hbic.ca${url.pathname}${url.hash}`;
+  } catch { return null; }
+}
+
+export function validateCompanionRequest(value: unknown): CompanionRequest | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some(key => !["question", "previousQuestions"].includes(key))) return null;
+  if (typeof input.question !== "string" || !input.question.trim() || input.question.length > 800 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(input.question)) return null;
+  const previous = input.previousQuestions ?? [];
+  if (!Array.isArray(previous) || previous.length > 4 || previous.some(text => typeof text !== "string" || text.length > 800)) return null;
+  return { question: input.question.trim(), previousQuestions: previous as string[] };
+}
+
+export function normalizeCompanionQuestion(text: string) {
+  return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f\u064b-\u065f\u0670]/g, "").replace(/[’‘]/g, "'").replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\s+/g, " ").trim();
+}
+
+/** These questions never reach any private data store. No external model is used. */
+export function companionBoundary(question: string): "private" | "religious" | "political" | null {
+  const q = normalizeCompanionQuestion(question);
+  if (/\b(?:api key|secret key|system prompt|environment variable|service account|bank account|payout|roster|student list|admin password|credit card number|cvv)\b/.test(q) ||
+    /\b(?:my|our) (?:child|son|daughter|family|account|payment|receipt|balance|attendance|enrollment|enrolment|password)\b/.test(q) ||
+    /\b(?:refund|charged twice|double charged|overcharged|exempt|exemption|waive my|how much do i owe|cancel my|cancel our)\b/.test(q) ||
+    /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(question) || /(?:\d[ -]?){10,}/.test(question)) return "private";
+  if (/\b(?:fatwa|haram|religious ruling|islamic ruling|is it permissible|is it allowed|is my prayer valid|is my recitation correct|is my recitation valid|tajweed correct|zakat eligible|zakat eligibility|can zakat|may zakat)\b/.test(q) ||
+    /\b(?:halal|halal or haram)\b/.test(q) && !/restaurant|directory/.test(q) || /فتوى|فتوی|حرام|حکم شرعی/.test(q)) return "religious";
+  if (/\b(?:who should i vote|how should i vote|vote yes|vote no|support separation|oppose separation|which party|which candidate|referendum|election|separate from canada)\b/.test(q)) return "political";
+  return null;
+}
+
+export function companionVisibleOnRoute(pathname: string, native = false) {
+  if (/^\/(?:admin|display|prayer-display|quran|quran-academy|academy|donate|checkout|payment)(?:\/|$)/.test(pathname)) return false;
+  return !native || ["/", "/prayer", "/events", "/more", "/settings", "/contact", "/programs", "/youth", "/community", "/media", "/about"].includes(pathname);
+}
+
+export function selectCompanionFacts(request: CompanionRequest, facts: CompanionFact[]): CompanionFact[] {
+  let q = normalizeCompanionQuestion(request.question);
+  if (/^(?:what about|and |how much|what time|is it |are they |when |where |how do i |can i |does it )/.test(q) && q.split(" ").length <= 8) {
+    const previous = request.previousQuestions.at(-1);
+    if (previous) q += ` ${normalizeCompanionQuestion(previous)}`;
+  }
+  if (/academy|class|classes/.test(q) && /how much|cost|price|fee|tuition|pay|payment|renew|subscription/.test(q)) q += " academy fees tuition";
+  if (/academy|class|classes/.test(q) && /class today|class tonight|holiday|calendar|cancel|activity/.test(q)) q += " parent calendar";
+  const words = new Set(q.split(" "));
+  const scored = facts.map(fact => ({ fact, score: fact.terms.reduce((score, term) => {
+    const token = normalizeCompanionQuestion(term);
+    return score + (token.includes(" ") ? q.includes(token) ? 5 : 0 : words.has(token) ? 2 : 0);
+  }, 0) })).filter(item => item.score >= 2).sort((a, b) => b.score - a.score);
+  if (!scored.length) return [];
+  return scored.filter(item => item.score >= scored[0].score * .55).slice(0, 3).map(item => item.fact);
+}
+
+/** Only server-authored statements are returned. There is no outside AI
+ * service, generated fact, payment action or privileged account lookup. */
+export function companionReply(input: {
+  request: CompanionRequest; facts: CompanionFact[]; now: Date; contentVersion: number;
+  ready?: boolean;
+}): CompanionReply {
+  const { request, facts, now, contentVersion } = input;
+  const contact: CompanionSource = { id: "contact", title: "Contact Masjid Bilal", href: "https://hbic.ca/contact" };
+  const base = { ok: true as const, mode: "published-info" as CompanionReply["mode"], asOf: now.toISOString(), contentVersion, topicIds: [] as string[], needsHuman: true };
+  const boundary = companionBoundary(request.question);
+  if (boundary === "private") return { ...base, answer: "I can help with public information, but I can’t view or change personal accounts, payments, attendance or enrollment. Please use your secure Quran Academy account, or contact the office. Don’t enter personal or payment details here.", sources: [contact, { id: "academy-account", title: "Secure Quran Academy account", href: "https://hbic.ca/quran-academy" }] };
+  if (boundary === "religious") return { ...base, answer: "Please ask a qualified teacher or contact the masjid team for a religious ruling, recitation assessment or Zakat eligibility question. I’m an information assistant, not an imam or a religious authority.", sources: [contact] };
+  if (boundary === "political") return { ...base, answer: "I help with published Masjid Bilal services and app information. I don’t recommend political parties, candidates or referendum choices. Please consult the relevant official election authority for voting information.", sources: [contact] };
+  if (input.ready === false) return { ...base, answer: "I can’t verify the latest published information right now. Please try again shortly or contact the masjid. I won’t guess prayer times, fees or schedules.", sources: [contact] };
+  // Future/different dates require an actual schedule for that date, not today's times.
+  const normalized = normalizeCompanionQuestion(request.question);
+  if (/\b(?:tomorrow|next week|next month|yesterday|monday|tuesday|wednesday|thursday|saturday|sunday|january|february|march|april|june|july|august|september|october|november|december)\b|\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(request.question.toLowerCase()) && /\b(?:prayer|fajr|adhan|iqamah|maghrib|isha|dhuhr|asr|sunrise)\b/.test(normalized)) {
+    return { ...base, answer: "I only quote a prayer timetable verified for its stated Calgary date. I can’t infer another day’s adhan or iqamah from today’s schedule. Check the live Prayer Times page or contact the office for that date.", sources: [{ id: "prayer", title: "Live prayer timetable", href: "https://hbic.ca/prayer-times" }] };
+  }
+  const selected = selectCompanionFacts(request, facts);
+  if (!selected.length) return { ...base, answer: "I couldn’t find a verified answer in HBIC’s published information. The office can confirm that detail. You can also ask me about prayer times, Quran Academy, donations, programs or using the app.", sources: [contact] };
+  const sources = [...new Map(selected.map(({ id, title, href }) => [href, { id, title, href }])).values()];
+  return { ...base, answer: selected.map(fact => fact.text).join("\n\n"), sources, topicIds: selected.map(fact => fact.id), needsHuman: false };
+}

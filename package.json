@@ -21,6 +21,7 @@
     "build:web": "npm --workspace @hbic/public-web run build",
     "build:admin": "npm --workspace @hbic/admin-web run build",
     "test:prayer": "tsx --test packages/shared/test/prayer.test.ts",
+    "test:companion": "tsx --test packages/shared/test/bilalCompanion.test.ts apps/public-web/test/bilalCompanionKnowledge.test.ts apps/public-web/test/bilalCompanionRoute.test.mts apps/public-web/test/bilalCompanionRendering.test.mts apps/mobile/test/bilalCompanionRendering.test.mts",
     "test:prayer-sync": "tsx --test apps/public-web/test/prayerSync.test.ts",
     "test:onboarding": "tsx --test apps/mobile/test/onboarding.test.ts",
     "test:rating": "tsx --test apps/mobile/test/ratingCampaign.test.ts apps/mobile/test/ratingRendering.test.mts apps/public-web/test/ratingPublication.test.mts apps/admin-web/test/ratingAdminRendering.test.mts",

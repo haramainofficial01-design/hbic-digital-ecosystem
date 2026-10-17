@@ -18,6 +18,7 @@ import {
 } from "../src/services/notifications";
 import { ThemeProvider, useAppTheme } from "../src/theme/ThemeProvider";
 import { MacAppFrame } from "../src/components/MacAppFrame";
+import { BilalCompanion } from "../src/companion/BilalCompanion";
 
 export default function RootLayout() {
   return (
@@ -58,6 +59,7 @@ function AppShell() {
           contentStyle: { backgroundColor: theme.colors.background }
         }}
       /></MacAppFrame>
+      <BilalCompanion />
       <OnboardingExperience />
     </>
   );

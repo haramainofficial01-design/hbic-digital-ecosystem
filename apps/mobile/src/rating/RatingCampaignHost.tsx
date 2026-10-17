@@ -12,9 +12,11 @@ import { nativeReviewAvailable, requestNativeReview } from "./nativeReview";
 import { RatingInvitation } from "./RatingInvitation";
 import { openAppReview } from "./storeLinks";
 import { getRatingHomeInteraction, subscribeRatingHomeInteraction } from "./homeActivity";
+import { getCompanionActive, subscribeCompanionActive } from "../companion/activity";
 
 export function RatingCampaignHost({ homeReady }: { homeReady: boolean }) {
   const lastInteractionAt = useSyncExternalStore(subscribeRatingHomeInteraction, getRatingHomeInteraction, getRatingHomeInteraction);
+  const companionActive = useSyncExternalStore(subscribeCompanionActive, getCompanionActive, getCompanionActive);
   const focused = useIsFocused();
   const { active: onboarding } = useOnboarding();
   const { content, loading, source, refreshError } = usePublishedContent();
@@ -65,7 +67,7 @@ export function RatingCampaignHost({ homeReady }: { homeReady: boolean }) {
     ...(snapshot?.jumuah ?? []).flatMap(session => [session.khutbahDate, session.iqamahDate])
   ].filter((value): value is string => Boolean(value)).map(value => Date.parse(value));
   const input: RatingEligibility = {
-    platform: Platform.OS, campaign, homeReady: homeReady && !loading, homeFocused: focused,
+    platform: Platform.OS, campaign, homeReady: homeReady && !loading && !companionActive, homeFocused: focused,
     foreground, onboarding, contentFresh: source === "api" && !refreshError
       && !content.announcements.some(item => item.urgent && isVisibleItem(item)),
     notificationCheckComplete: notificationsReady, nativeReviewAvailable, deferredUntil,

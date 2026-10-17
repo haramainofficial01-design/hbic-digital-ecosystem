@@ -27,7 +27,7 @@ export default async function PrivacyPage() {
           <p>
             This policy explains how Hazrat Bilal Islamic Centre handles information through the Masjid Bilal mobile app and this website.
           </p>
-          <p className="legal-updated">Effective and last updated: October 11, 2026</p>
+          <p className="legal-updated">Effective and last updated: October 17, 2026</p>
         </header>
 
         <div className="legal-layout">
@@ -35,6 +35,7 @@ export default async function PrivacyPage() {
             <strong>On this page</strong>
             <a href="#scope">Scope</a>
             <a href="#information">Information we handle</a>
+            <a href="#bilal-companion">Bilal Companion</a>
             <a href="#use">How information is used</a>
             <a href="#sharing">Service providers and sharing</a>
             <a href="#retention">Retention and deletion</a>
@@ -96,6 +97,19 @@ export default async function PrivacyPage() {
               <h3>Information we do not collect in the current app</h3>
               <p>
                 The current Masjid Bilal app does not require a public user account, does not contain third-party advertising, does not use an advertising identifier, does not include a user analytics or crash-reporting SDK, and does not collect or transmit your precise location. Qibla direction features use device sensors locally when available.
+              </p>
+            </section>
+
+            <section id="bilal-companion">
+              <h2>Bilal Companion</h2>
+              <p>
+                Bilal Companion is HBIC&apos;s public-information assistant, not a live staff member, imam or general-purpose AI model. When you send a question, our server matches it with published HBIC information and returns source links. No external AI service receives your question. It cannot access private student, attendance, payment or account records, take payments, enroll anyone, or provide religious rulings.
+              </p>
+              <p>
+                The current question and up to four earlier questions from this chat are processed by HBIC&apos;s server to understand short follow-ups. We do not save the chat to a database or include its text in application logs. Conversation history stays in this open app or browser session; Clear chat removes it, and reloading or restarting clears it. Do not enter personal, child, account, card or other sensitive details. General hosting connection and security information is handled as described above. A short-lived, server-instance-specific hash of the connecting address limits excessive requests; it is not a saved chat profile.
+              </p>
+              <p>
+                Answers quote available published information and may not cover your question. Source links let you check the original page. Live times and fees require a connection and current published evidence; if they cannot be verified, the companion asks you to check the relevant page or contact the office.
               </p>
             </section>
 

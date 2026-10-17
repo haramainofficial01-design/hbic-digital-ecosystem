@@ -1,5 +1,6 @@
 export * from "./constants";
 export * from "./ratingCampaign";
+export * from "./bilalCompanion";
 export * from "./donations";
 export * from "./content";
 export * from "./eventLifecycle";

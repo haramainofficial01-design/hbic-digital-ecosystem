@@ -55,13 +55,14 @@ window.mount=()=>{reactRoot=createRoot(document.getElementById('root'));flushSyn
     plugins: [{ name: "rating-native-adapter", setup(builder) {
       builder.onResolve({ filter: /.*/ }, args => {
         if (modules[args.path]) return { path: args.path, namespace: "fixture" };
-        for (const [suffix, name] of [["services/content", "content"], ["OnboardingProvider", "content"], ["ThemeProvider", "theme"], ["LanguageProvider", "language"], ["LocalizedText", "text"], ["constants/assets", "assets"]])
+        for (const [suffix, name] of [["services/content", "content"], ["OnboardingProvider", "content"], ["ThemeProvider", "theme"], ["LanguageProvider", "language"], ["LocalizedText", "text"], ["constants/assets", "assets"], ["companion/activity", "companion"]])
           if (args.path.endsWith(suffix)) return { path: name, namespace: "fixture" };
       });
       builder.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: modules[args.path] ?? {
         content, theme: `import{lightTheme,darkTheme}from'${root}/apps/mobile/src/theme/theme';export const useAppTheme=()=>({theme:window.dark?darkTheme:lightTheme})`,
         language: "export const useAppLanguage=()=>({translate:x=>x})", text: "export{Text,Image}from'react-native';export const Alert={alert:(...args)=>window.errors.push(args)}",
-        assets: "export const brandAssets={appMark:{}}"
+        assets: "export const brandAssets={appMark:{}}",
+        companion: "export const getCompanionActive=()=>window.fixture.companionActive===true;export const subscribeCompanionActive=()=>()=>{}"
       }[args.path], loader: "tsx", resolveDir: root }));
     } }] });
   return result.outputFiles[0].text;
@@ -140,6 +141,21 @@ test("old iOS binaries without the new bridge safely suppress automatic promptin
     assert.equal(await page.evaluate(() => (window as any).nativeRequests), 0);
     assert.equal(await page.evaluate(() => (window as any).disk), null);
     assert.equal(await page.getByRole("dialog").count(), 0);
+  } finally { await browser.close(); }
+});
+test("an open Bilal Companion defers rating without consuming the one-time campaign", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const platform of ["ios", "android"]) {
+      const page = await browser.newPage(); await setup(page, platform);
+      await patch(page, "companionActive", true); await advance(page, 60_000);
+      assert.equal(await page.evaluate(() => (window as any).disk), null);
+      assert.equal(await page.evaluate(() => (window as any).nativeRequests), 0);
+      assert.equal(await page.getByRole("dialog").count(), 0);
+      await patch(page, "companionActive", false); await advance(page);
+      assert.equal(await page.evaluate(() => JSON.parse((window as any).disk).attempted.length), 1);
+      await page.close();
+    }
   } finally { await browser.close(); }
 });
 test("cached or failed remote fetches cannot activate a campaign, and native decline does not consume it", async () => {

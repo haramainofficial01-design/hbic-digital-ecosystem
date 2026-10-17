@@ -5,6 +5,7 @@ import { SiteNavigation } from "./SiteNavigation";
 import { getPublicationState } from "../lib/publicationStore";
 import { isQuranPublicEnabled } from "../lib/quranRelease";
 import { PrayerRail } from "./PrayerRail";
+import { BilalCompanion } from "./BilalCompanion";
 
 export async function SiteChrome({
   children,
@@ -19,7 +20,7 @@ export async function SiteChrome({
   const quranEnabled = isQuranPublicEnabled();
   const academyEnabled = process.env.ACADEMY_PREVIEW_ENABLED === "true";
   return (
-    <div
+    <><div
       className="site"
       data-hbic-content-version={contentVersion}
       data-hbic-publication-revision={publication.revision}
@@ -44,6 +45,6 @@ export async function SiteChrome({
           <small className="footer-bottom">© {new Date().getFullYear()} Hazrat Bilal Islamic Centre · Made for our community.</small>
         </div>
       </footer>
-    </div>
+    </div><BilalCompanion /></>
   );
 }

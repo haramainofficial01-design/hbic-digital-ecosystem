@@ -168,6 +168,7 @@ export interface TvDisplaySettings {
 }
 
 export interface FeatureFlags {
+  bilalCompanionEnabled: boolean;
   communityHubEnabled: boolean;
   hijriDateEnabled: boolean;
   whiteDaysEnabled: boolean;

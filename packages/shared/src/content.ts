@@ -88,6 +88,7 @@ export const publicRevalidationPaths = [
 ] as const;
 
 export const defaultFeatureFlags: FeatureFlags = {
+  bilalCompanionEnabled: true,
   communityHubEnabled: true,
   hijriDateEnabled: true,
   whiteDaysEnabled: true,

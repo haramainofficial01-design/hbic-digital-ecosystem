@@ -2,6 +2,7 @@ import type { LanguageCode } from "../types";
 import { uiMore } from "./uiMore";
 import { uiDetails } from "./uiDetails";
 import { academyPolicyTranslations } from "./academyPolicy";
+import { companionTranslations } from "./companion";
 
 // Human-readable interface copy only. Quran text, names, addresses, URLs and
 // centre-authored content remain exactly as supplied by their sources.
@@ -10,6 +11,7 @@ export const uiTranslations: Record<string, readonly [string, string, string]> =
   ...uiMore,
   ...uiDetails,
   ...academyPolicyTranslations,
+  ...companionTranslations,
   "Home": ["ہوم", "خانه", "الرئيسية"],
   "Prayer": ["نماز", "نماز", "الصلاة"],
   "Iqamah": ["اقامت", "اقامه", "الإقامة"],
