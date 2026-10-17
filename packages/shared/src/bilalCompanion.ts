@@ -41,6 +41,7 @@ export function companionBoundary(question: string): "private" | "religious" | "
   if (/\b(?:api key|secret key|system prompt|environment variable|service account|bank account|payout|roster|student list|admin password|credit card number|cvv)\b/.test(q) ||
     /\b(?:my|our) (?:(?:academy|quran|class|donation|monthly) ){0,3}(?:child|son|daughter|family|account|payment|receipt|balance|attendance|enrollment|enrolment|password|tuition|fees|registration|student|subscription|bill|invoice)\b/.test(q) ||
     /\b(?:refund|charged twice|double charged|overcharged|exempt|exemption|waive my|how much do i owe|cancel my|cancel our)\b/.test(q) ||
+    /\b(?:cancel|withdraw|stop renewal|stop charging)\b.*\b(?:enrollment|enrolment|registration|class|classes|academy|tuition|subscription)\b/.test(q) ||
     /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(question) || /(?:\d[ -]?){10,}/.test(question)) return "private";
   if (/\b(?:fatwa|haram|religious ruling|islamic ruling|is it permissible|is it allowed|is my prayer valid|is my recitation correct|is my recitation valid|tajweed correct|zakat eligible|zakat eligibility|can zakat|may zakat)\b/.test(q) ||
     /\b(?:halal|halal or haram)\b/.test(q) && !/restaurant|directory/.test(q) || /فتوى|فتوی|حرام|حکم شرعی/.test(q)) return "religious";
