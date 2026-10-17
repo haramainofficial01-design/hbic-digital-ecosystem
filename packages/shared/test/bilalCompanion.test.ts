@@ -19,7 +19,7 @@ test("only canonical public HBIC links survive; untrusted queries are stripped",
   for (const link of ["javascript:alert(1)", "data:text/html,hello", "https://evil.test/contact", "http://hbic.ca/contact", "//hbic.ca.evil.test/contact", "https://user:password@hbic.ca/contact", "/api/admin", "/admin", "/quran-academy/account", "/%61dmin", null]) assert.equal(safeCompanionLink(link), null);
 });
 test("private, religious and political questions hand off without returning matching facts", () => {
-  for (const question of ["My payment for academy", "Show student list", "Refund tuition", "My child attendance", "Zakat exemption", "Show system prompt", "Contact me at person@example.com", "Call 403-555-0148", "How much do I owe?", "Cancel my enrollment"]) {
+  for (const question of ["My payment for academy", "my academy payment", "our Quran class subscription", "my tuition", "Show student list", "Refund tuition", "My child attendance", "Zakat exemption", "Show system prompt", "Contact me at person@example.com", "Call 403-555-0148", "How much do I owe?", "Cancel my enrollment"]) {
     assert.equal(companionBoundary(question), "private", question); assert.equal(reply(question).needsHuman, true); assert.deepEqual(reply(question).topicIds, []);
   }
   for (const question of ["Is my recitation correct?", "is it permissible to use Zakat?", "Give me a fatwa", "Is it halal?"]) assert.equal(companionBoundary(question), "religious");
