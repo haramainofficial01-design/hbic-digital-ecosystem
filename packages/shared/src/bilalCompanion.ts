@@ -86,7 +86,7 @@ export function companionReply(input: {
   if (input.ready === false) return { ...base, answer: "I can’t verify the latest published information right now. Please try again shortly or contact the masjid. I won’t guess prayer times, fees or schedules.", sources: [contact] };
   // Future/different dates require an actual schedule for that date, not today's times.
   const normalized = normalizeCompanionQuestion(request.question);
-  if (/\b(?:tomorrow|next week|next month|yesterday|monday|tuesday|wednesday|thursday|saturday|sunday|january|february|march|april|june|july|august|september|october|november|december)\b|\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(request.question.toLowerCase()) && /\b(?:prayer|fajr|adhan|iqamah|maghrib|isha|dhuhr|asr|sunrise)\b/.test(normalized)) {
+  if (/\b(?:tomorrow|next week|next month|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|june|july|august|september|october|november|december)\b|\bmay\s+\d|\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(request.question.toLowerCase()) && /\b(?:prayer|fajr|adhan|iqamah|maghrib|isha|dhuhr|asr|sunrise)\b/.test(normalized)) {
     return { ...base, answer: "I only quote a prayer timetable verified for its stated Calgary date. I can’t infer another day’s adhan or iqamah from today’s schedule. Check the live Prayer Times page or contact the office for that date.", sources: [{ id: "prayer", title: "Live prayer timetable", href: "https://hbic.ca/prayer-times" }] };
   }
   const selected = selectCompanionFacts(request, facts);

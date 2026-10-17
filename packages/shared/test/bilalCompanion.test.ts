@@ -37,7 +37,7 @@ test("answers are exact published facts, citations deduplicate, contextual fees 
 test("unavailable published data and other-day prayer requests never guess", () => {
   const unavailable = companionReply({ request: { question: "academy", previousQuestions: [] }, facts, now, contentVersion: 22, ready: false });
   assert.equal(unavailable.needsHuman, true); assert.match(unavailable.answer, /can’t verify/);
-  for (const question of ["tomorrow fajr", "Maghrib next week", "Prayer on 2026-10-25", "isha on Sunday", "Fajr October 25"]) { assert.match(reply(question).answer, /another day/); assert.equal(reply(question).topicIds.length, 0); }
+  for (const question of ["tomorrow fajr", "Maghrib next week", "Prayer on 2026-10-25", "isha on Sunday", "Fajr October 25", "Fajr next Friday", "May 5 Maghrib"]) { assert.match(reply(question).answer, /another day/); assert.equal(reply(question).topicIds.length, 0); }
 });
 test("assistant stays off private, immersive and TV routes on both platforms", () => {
   for (const route of ["/admin", "/admin/academy", "/display", "/display/fire-tv", "/quran", "/quran/reader", "/academy/calendar", "/quran-academy", "/donate", "/checkout", "/payment/status"]) { assert.equal(companionVisibleOnRoute(route), false, route); assert.equal(companionVisibleOnRoute(route, true), false, route); }
