@@ -2615,6 +2615,15 @@ body:not(.tv-display-active) {
 .footer-download { grid-column: 1 / -1; }
 .footer-download .smart-app-download { max-width: 420px; }
 .footer-download .app-smart-url { color: #FFF5D9; }
+@media (max-width: 480px) {
+  .smart-app-download { grid-template-columns: minmax(0, 1fr) 100px; gap: 12px; }
+  .app-smart-button { padding-inline: 8px; }
+  .app-smart-button svg { display: none; }
+  .app-smart-button strong { font-size: 16px; white-space: nowrap; }
+  .app-smart-button small { font-size: 9px; white-space: nowrap; }
+  .app-smart-url { font-size: 11px; }
+  .app-smart-qr { width: 100px; height: 100px; }
+}
 
 .app-home-promotion {
   position: relative;
