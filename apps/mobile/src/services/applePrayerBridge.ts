@@ -6,11 +6,16 @@ interface MasjidAppleBridgeModule {
   updatePrayerSnapshot(json: string): boolean;
   readPrayerSnapshot(): string | null;
   isWatchSupported(): boolean;
+  updateCompanionLanguage?(language: string): boolean;
 }
 
 const nativeBridge = Platform.OS === "ios"
   ? requireOptionalNativeModule<MasjidAppleBridgeModule>("MasjidAppleBridge")
   : null;
+
+export function publishAppleCompanionLanguage(language: string) {
+  try { return nativeBridge?.updateCompanionLanguage?.(language) ?? false; } catch { return false; }
+}
 
 export function publishApplePrayerSnapshot(
   content: HbicContent,

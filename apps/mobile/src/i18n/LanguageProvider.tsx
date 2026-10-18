@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import type { PropsWithChildren } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { setDialogLanguage } from "./dialogLanguage";
+import { publishAppleCompanionLanguage } from "../services/applePrayerBridge";
 
 interface LanguageContextValue {
   language: LanguageCode;
@@ -21,7 +22,9 @@ function isLanguage(value: string | null | undefined): value is LanguageCode {
 
 export function LanguageProvider({ children }: PropsWithChildren) {
   const [language, setStoredLanguage] = useState<LanguageCode>("en");
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => { setDialogLanguage(language); }, [language]);
+  useEffect(() => { if (hydrated) publishAppleCompanionLanguage(language); }, [hydrated, language]);
 
   useEffect(() => {
     let mounted = true;
@@ -38,7 +41,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
       }
     }
 
-    void loadLanguage();
+    void loadLanguage().finally(() => { if (mounted) setHydrated(true); });
     return () => {
       mounted = false;
     };

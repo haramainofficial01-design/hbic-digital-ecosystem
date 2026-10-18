@@ -3,6 +3,9 @@
 require("node:child_process").execFileSync(process.execPath, [
   require("node:path").resolve(__dirname, "../../scripts/sync-watch-quran.mjs")
 ]);
+require("node:child_process").execFileSync(process.execPath, [
+  require("node:path").resolve(__dirname, "../../scripts/sync-watch-bilal.mjs")
+]);
 module.exports = (config) => ({
   type: "watch",
   name: "MasjidBilalWatch",

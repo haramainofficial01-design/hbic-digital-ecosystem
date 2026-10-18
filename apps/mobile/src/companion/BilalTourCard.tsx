@@ -1,16 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { bilalTourSteps } from "@hbic/shared";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../i18n/LocalizedText";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { NativeGlassSurface } from "../components/NativeGlassSurface";
+import { BilalMotion } from "./BilalMotion";
+import { brandAssets } from "../constants/assets";
 
-export function BilalTourCard({ step, onNext, onSkip }: { step: number; onNext(): void; onSkip(): void }) {
+export function BilalTourCard({ step, onNext, onSkip, reducedMotion = true }: { step: number; onNext(): void; onSkip(): void; reducedMotion?: boolean }) {
   const { theme } = useAppTheme(), { isRtl, translate: t } = useAppLanguage(), item = bilalTourSteps[step];
   const c = theme.colors;
-  return <View style={styles.host}>
-    <NativeGlassSurface style={[styles.badge, { borderColor: c.borderStrong }]}><Ionicons name={step === 0 ? "chatbubble-ellipses-outline" : step === 1 ? "link-outline" : "shield-checkmark-outline"} size={34} color={c.tint} /></NativeGlassSurface>
+  return <BilalMotion style={styles.host} phase={step} reduced={reducedMotion}>
+    {step === 0 ? <Image source={brandAssets.bilalMark} style={styles.badge} accessible={false} /> : <NativeGlassSurface style={[styles.badge, { borderColor: c.borderStrong }]}><Ionicons name={step === 1 ? "link-outline" : "shield-checkmark-outline"} size={34} color={c.tint} /></NativeGlassSurface>}
     <View style={[styles.dots, { flexDirection: isRtl ? "row-reverse" : "row" }]} accessibilityLabel={`${step + 1} / ${bilalTourSteps.length}`}>
       {bilalTourSteps.map((_, index) => <View key={index} style={[styles.dot, { width: index === step ? 26 : 7, backgroundColor: index === step ? c.tint : c.borderStrong }]} />)}
     </View>
@@ -19,7 +21,7 @@ export function BilalTourCard({ step, onNext, onSkip }: { step: number; onNext()
     <View style={[styles.preview, { backgroundColor: c.tintSoft, borderColor: c.border }]}><Text style={[styles.detail, { color: c.muted }]}>{item.detail}</Text></View>
     <Pressable accessibilityRole="button" accessibilityLabel={t(step === 2 ? "Let’s begin" : "Next")} onPress={onNext} style={[styles.primary, { backgroundColor: c.tint, flexDirection: isRtl ? "row-reverse" : "row" }]}><Text style={{ color: c.onTint, fontSize: 15, fontWeight: "700" }}>{step === 2 ? "Let’s begin" : "Next"}</Text><Ionicons name={isRtl ? "arrow-back" : "arrow-forward"} size={18} color={c.onTint} /></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel={t("Skip tour")} onPress={onSkip} style={styles.skip}><Text style={{ color: c.muted, fontSize: 13 }}>Skip tour</Text></Pressable>
-  </View>;
+  </BilalMotion>;
 }
 const styles = StyleSheet.create({
   host: { padding: 25, gap: 16, width: "100%" }, badge: { alignSelf: "center", height: 76, width: 76, alignItems: "center", justifyContent: "center", borderRadius: 25, borderWidth: 1 },

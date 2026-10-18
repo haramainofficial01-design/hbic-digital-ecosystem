@@ -58,8 +58,8 @@ export const lightTheme: AppTheme = {
   colors: {
     background: "#F2FBFC",
     backgroundAlt: "#E8F6F8",
-    card: "rgba(255,255,255,0.82)",
-    cardStrong: "rgba(255,255,255,0.94)",
+    card: "#FFFFFF",
+    cardStrong: "#FFFFFF",
     surface: "#FFFFFF",
     surfaceStrong: "#F4FAFB",
     text: "#10202A",
@@ -95,8 +95,8 @@ export const darkTheme: AppTheme = {
   colors: {
     background: "#031827",
     backgroundAlt: "#062238",
-    card: "rgba(14,38,55,0.74)",
-    cardStrong: "rgba(15,45,64,0.9)",
+    card: "#0B2535",
+    cardStrong: "#0F2D40",
     surface: "#0A273D",
     surfaceStrong: "#10344A",
     text: "#F6FAFB",

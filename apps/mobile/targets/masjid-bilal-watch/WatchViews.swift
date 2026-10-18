@@ -91,6 +91,7 @@ struct WatchHomeView: View {
     @AppStorage("watch.showCountdown") private var showCountdown = true
     @AppStorage("watch.showHijri") private var showHijri = true
     @AppStorage("watch.showWhiteDays") private var showWhiteDays = true
+    @AppStorage("watch.bilal.language") private var bilalLanguage = WatchBilalLanguage.system.rawValue
 
     var body: some View {
         NavigationStack {
@@ -345,6 +346,10 @@ struct WatchHomeView: View {
 
     private var navigationContent: some View {
         VStack(spacing: 6) {
+            NavigationLink { WatchBilalView() } label: {
+                Label((WatchBilalLanguage(rawValue: bilalLanguage) ?? .english).text("Ask Bilal"), systemImage: "bubble.left.and.text.bubble.right").frame(maxWidth: .infinity)
+            }
+            .masjidGlassButtonStyle()
             NavigationLink { WatchQuranHome() } label: {
                 Label("Quran & Recite", systemImage: "book.closed.fill").frame(maxWidth: .infinity)
             }

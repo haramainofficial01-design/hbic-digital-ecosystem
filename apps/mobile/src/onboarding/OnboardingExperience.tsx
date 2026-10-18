@@ -254,9 +254,7 @@ export function OnboardingExperience() {
           </OnboardingPage>
 
           {content.featureFlags.bilalCompanionEnabled ? <OnboardingPage width={width} centered>
-            <NativeGlassSurface style={[styles.doneIcon, { borderColor: theme.colors.borderStrong }]}>
-              <Ionicons name="chatbubble-ellipses-outline" size={42} color={theme.colors.teal} />
-            </NativeGlassSurface>
+            <Image source={brandAssets.bilalMark} style={{ width: 104, height: 104, alignSelf: "center" }} accessible={false} />
             <PageTitle>Meet Bilal</PageTitle>
             <PageBody>Your Masjid Bilal guide, right here when you need a hand.</PageBody>
             <GlassCard style={styles.featureCard}>

@@ -6,7 +6,13 @@ const ledger = new BilalTourLedger({ read: async () => localStorage.getItem("hbi
 const validLanguage = (value: string | null): value is LanguageCode => supportedLanguages.some(item => item.code === value);
 export function useBilalPreferences({ eligible, open, onOpen }: { eligible: boolean; open: boolean; onOpen(): void }) {
   const [language, setLanguageState] = useState<LanguageCode>("en"), [seen, setSeen] = useState<boolean | null>(null), [tourStep, setTourStep] = useState<number | null>(null);
+  const [visible, setVisible] = useState(true);
   const lastInteraction = useRef(Date.now()), callback = useRef(onOpen); callback.current = onOpen;
+  useEffect(() => {
+    const update = () => { setVisible(document.visibilityState === "visible"); lastInteraction.current = Date.now(); };
+    update(); document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
   useEffect(() => {
     let mounted = true;
     void ledger.seen().then(value => { if (mounted) setSeen(value); });
@@ -27,7 +33,7 @@ export function useBilalPreferences({ eligible, open, onOpen }: { eligible: bool
     return () => { document.removeEventListener("pointerdown", note); document.removeEventListener("keydown", note); };
   }, []);
   useEffect(() => {
-    if (!eligible || open || seen !== false) return;
+    if (!eligible || !visible || open || seen !== false) return;
     let cancelled = false; const controller = new AbortController();
     async function check() {
       if (document.visibilityState !== "visible" || document.querySelector('[aria-modal="true"]') || /^(?:INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) return;
@@ -41,7 +47,7 @@ export function useBilalPreferences({ eligible, open, onOpen }: { eligible: bool
     }
     const initial = setTimeout(() => void check(), 6500), timer = setInterval(() => void check(), 30_000);
     return () => { cancelled = true; controller.abort(); clearTimeout(initial); clearInterval(timer); };
-  }, [eligible, open, seen]);
+  }, [eligible, visible, open, seen]);
   useEffect(() => { if (!open) setTourStep(null); }, [open]);
   const setLanguage = useCallback((value: LanguageCode) => { setLanguageState(value); try { localStorage.setItem("hbic-bilal-language", value); } catch { /* Session selection still works. */ } }, []);
   function showTour() { setSeen(true); setTourStep(0); void ledger.markSeen(); callback.current(); }

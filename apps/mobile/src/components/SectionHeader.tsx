@@ -15,11 +15,12 @@ export function SectionHeader({ title, subtitle }: { title: string; subtitle?: s
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 4
+    gap: 5
   },
   title: {
     fontSize: 22,
-    fontWeight: "900"
+    fontWeight: "700",
+    letterSpacing: -0.35
   },
   subtitle: {
     fontSize: 14,

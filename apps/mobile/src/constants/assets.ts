@@ -1,5 +1,6 @@
 export const brandAssets = {
   appMark: require("../../assets/brand/hbic-app-mark.png"),
+  bilalMark: require("../../assets/brand/bilal-mark.png"),
   youthLogo: require("../../assets/brand/hbic-youth-logo.png")
 };
 

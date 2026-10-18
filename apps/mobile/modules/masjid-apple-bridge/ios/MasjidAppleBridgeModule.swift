@@ -9,6 +9,7 @@ private enum MasjidAppleConstants {
   static let appGroup = "group.ca.hbic.calgary.app"
   static let snapshotKey = "masjid_prayer_snapshot_v1"
   static let widgetKind = "MasjidPrayerWidgets"
+  static let companionLanguageKey = "bilal_language"
 }
 
 private struct BridgePrayerEntry: Decodable {
@@ -143,6 +144,19 @@ public final class MasjidAppleBridgeModule: Module {
     Function("isWatchSupported") { () -> Bool in
       WCSession.isSupported()
     }
+
+    Function("updateCompanionLanguage") { (language: String) -> Bool in
+      guard ["en", "ur", "fa-AF", "ar"].contains(language) else { return false }
+      let defaults = UserDefaults(suiteName: MasjidAppleConstants.appGroup)
+      guard defaults?.string(forKey: MasjidAppleConstants.companionLanguageKey) != language else { return true }
+      defaults?.set(language, forKey: MasjidAppleConstants.companionLanguageKey)
+      if let data = defaults?.data(forKey: MasjidAppleConstants.snapshotKey),
+         let snapshot = try? JSONDecoder().decode(BridgePrayerSnapshot.self, from: data),
+         let json = String(data: data, encoding: .utf8) {
+        MasjidWatchSession.shared.update(with: json, schemaVersion: snapshot.schemaVersion)
+      }
+      return true
+    }
   }
 }
 
@@ -154,16 +168,22 @@ private final class MasjidWatchSession: NSObject, WCSessionDelegate {
 
   func update(with json: String, schemaVersion: Int) {
     guard WCSession.isSupported() else { return }
-    let context: [String: Any] = [
+    var context: [String: Any] = [
       "schemaVersion": schemaVersion,
       "prayerSnapshot": json,
       "sentAt": ISO8601DateFormatter().string(from: Date())
     ]
+    if let language = UserDefaults(suiteName: MasjidAppleConstants.appGroup)?.string(forKey: MasjidAppleConstants.companionLanguageKey) {
+      context["bilalLanguage"] = language
+    }
+    let latestContext = context
 
     queue.async {
       let session = WCSession.default
       session.delegate = self
-      self.pendingContext = context
+      if session.applicationContext["prayerSnapshot"] as? String == json,
+         session.applicationContext["bilalLanguage"] as? String == latestContext["bilalLanguage"] as? String { return }
+      self.pendingContext = latestContext
       if session.activationState == .activated {
         self.flushPendingContext(using: session)
       } else {

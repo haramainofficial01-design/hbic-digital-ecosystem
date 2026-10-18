@@ -11,6 +11,8 @@ async function bundle() {
   const result = await build({ bundle: true, write: false, outdir: "qa", format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion}from'./apps/public-web/components/BilalCompanion';function Harness(){const[tick,set]=useState(0);window.route=value=>flushSync(()=>{window.pathname=value;set(x=>x+1)});return <><div className="site"><button id="background">Background action</button></div><BilalCompanion/></>}createRoot(document.getElementById('root')).render(<Harness/>);` }, plugins: [{ name: "next-router-fixture", setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "navigation", namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export const usePathname=()=>window.pathname" }));
+    b.onResolve({ filter: /^next\/image$/ }, () => ({ path: "image", namespace: "image" }));
+    b.onLoad({ filter: /.*/, namespace: "image" }, () => ({ contents: "import React from'react';export default function Image(props){return <img {...props}/>}", loader: "tsx", resolveDir: root }));
   } }] });
   return { js: result.outputFiles.find(f => f.path.endsWith(".js"))!.text, css: result.outputFiles.find(f => f.path.endsWith(".css"))!.text };
 }
@@ -46,7 +48,7 @@ test("real website widget stays inside small/large light/dark viewports, traps f
       assert.equal(await page.locator(".site").evaluate(el => (el as HTMLElement).inert), true);
       await page.getByLabel("Your question", { exact: true }).fill("contact"); await page.getByRole("button", { name: "Send question" }).click();
       await page.getByText("Published information. <img src=x onerror=alert(1)>", { exact: true }).waitFor();
-      assert.equal(await dialog.locator("img").count(), 0); assert.equal(await page.getByRole("link", { name: "Unsafe link" }).count(), 0);
+      assert.equal(await dialog.locator('img[src="x"]').count(), 0); assert.equal(await dialog.locator('img[src="/brand/bilal-mark.svg"]').count(), 1); assert.equal(await page.getByRole("link", { name: "Unsafe link" }).count(), 0);
       assert.equal(await page.getByRole("link", { name: "Contact the masjid", exact: true }).getAttribute("href"), "https://hbic.ca/contact");
       await dialog.getByRole("combobox").focus(); await page.keyboard.press("Tab");
       assert.equal(await dialog.getByRole("button", { name: "Quick tour", exact: true }).evaluate(el => document.activeElement === el), true);
@@ -59,6 +61,28 @@ test("real website widget stays inside small/large light/dark viewports, traps f
     console.log(`Website companion screenshots: ${qa}`);
   } finally { await browser.close(); }
 });
+test("hidden website stops tour checks, closes chat and cancels an active question", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage(); await page.clock.install(); await setup(page, "/", false);
+    await page.addScriptTag({ content: "window.__name = (fn) => fn;" });
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (window as any).hiddenPage ? "hidden" : "visible" });
+      (window as any).hiddenPage = true; document.dispatchEvent(new Event("visibilitychange"));
+      const old = window.fetch; (window as any).snapshotChecks = 0;
+      window.fetch = async (url, init) => { if (String(url).includes("prayer-snapshot")) (window as any).snapshotChecks++; return old(url, init); };
+    });
+    await page.clock.runFor(120_000); assert.equal(await page.evaluate(() => (window as any).snapshotChecks), 0);
+    await page.evaluate(() => { (window as any).hiddenPage = false; document.dispatchEvent(new Event("visibilitychange")); });
+    await page.getByRole("button", { name: "Open Bilal" }).click(); await page.getByRole("button", { name: "Skip tour" }).click();
+    await page.clock.runFor(300); await page.getByRole("button", { name: "Open Bilal" }).click();
+    await page.evaluate(() => { (window as any).pending = true; }); await page.getByRole("textbox").fill("contact"); await page.getByRole("button", { name: "Send question" }).click();
+    await page.evaluate(() => { (window as any).hiddenPage = true; document.dispatchEvent(new Event("visibilitychange")); });
+    await page.locator('[data-active="false"]').waitFor({ state: "attached" }); await page.clock.runFor(300);
+    await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await page.locator('[data-active="false"]').count(), 1);
+  } finally { await browser.close(); }
+});
+
 test("existing visitor auto-tour waits for idle and a verified prayer quiet window, then persists across visits", async () => {
   const browser = await chromium.launch({ headless: true });
   try {

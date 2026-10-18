@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { MessageCircle, X, Send, ArrowUpRight, RotateCcw, BookOpen, CircleHelp } from "lucide-react";
+import { X, Send, ArrowUpRight, RotateCcw, BookOpen, CircleHelp } from "lucide-react";
+import Image from "next/image";
 import { bilalCompanionDisclaimer, bilalCompanionName, bilalCompanionSuggestions, bilalCompanionWelcome, companionVisibleOnRoute, safeCompanionLink, supportedLanguages, translateUi, type LanguageCode, type CompanionReply } from "@hbic/shared";
 import { BilalTour } from "./BilalTour";
 import { useBilalPreferences, useBilalViewport } from "./useBilalPreferences";
@@ -20,6 +21,12 @@ export function BilalCompanion() {
   const preferences = useBilalPreferences({ eligible: eligible && pathname === "/" && caps?.enabled === true, open, onOpen: () => setOpen(true) });
   const { language, tourStep } = preferences, t = (text: string) => translateUi(language, text), viewport = useBilalViewport(open);
   const [present, setPresent] = useState(false);
+  const [active, setActive] = useState(true);
+  useEffect(() => {
+    const update = () => { const visible = document.visibilityState === "visible"; setActive(visible); if (!visible) { setOpen(false); setPresent(false); } };
+    update(); document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
   useEffect(() => {
     if (open) { setPresent(true); return; }
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setPresent(false); return; }
@@ -74,15 +81,15 @@ export function BilalCompanion() {
   }
 
   if (!eligible || !caps?.enabled) return null;
-  return <div className={styles.host} dir={language === "en" ? "ltr" : "rtl"} lang={language}>
+  return <div className={styles.host} data-active={active} dir={language === "en" ? "ltr" : "rtl"} lang={language}>
     <button ref={launcher} className={styles.launcher} aria-label={t("Open Bilal")} aria-expanded={open} aria-controls="bilal-companion-panel" onClick={() => { if (!open && preferences.seen === false) preferences.showTour(); else setOpen(value => !value); }}>
-      <MessageCircle size={23} aria-hidden="true" /><span>{t("Ask Bilal")}</span>
+      <Image src="/brand/bilal-mark.svg" alt="" width={30} height={30} aria-hidden="true" /><span>{t("Ask Bilal")}</span>
     </button>
     {open || present ? <div className={`${styles.overlay} ${!open ? styles.leaving : ""}`} style={viewport} aria-hidden={!open || undefined} inert={!open}>
       <button className={styles.scrim} aria-label={t("Close chat")} tabIndex={-1} onClick={() => setOpen(false)} />
       <section ref={panel} id="bilal-companion-panel" className={styles.panel} role="dialog" aria-modal="true" aria-labelledby="bilal-companion-title">
         <header className={styles.header}>
-          <span className={styles.mark} aria-hidden="true"><MessageCircle size={23} /></span>
+          <Image src="/brand/bilal-mark.svg" alt="" width={42} height={42} className={styles.mark} aria-hidden="true" />
           <div className={styles.heading}><h2 id="bilal-companion-title">{t(bilalCompanionName)}</h2><p>{t("Your Masjid Bilal companion")}</p></div>
           <button className={styles.iconButton} aria-label={t("Quick tour")} disabled={tourStep !== null} onClick={preferences.showTour}><CircleHelp size={19} aria-hidden="true" /></button>
           <button className={styles.iconButton} aria-label={t("Clear chat")} disabled={busy || !messages.length || tourStep !== null} onClick={() => { setMessages([]); setError(""); setDraft(""); input.current?.focus(); }}><RotateCcw size={18} aria-hidden="true" /></button>

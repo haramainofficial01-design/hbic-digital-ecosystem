@@ -3,7 +3,7 @@ import { bilalCompanionDisclaimer, bilalCompanionName, bilalCompanionSuggestions
 import { usePathname } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from "react";
-import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { AccessibilityInfo, AppState, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLanguage } from "../i18n/LanguageProvider";
 import { useOnboarding } from "../onboarding/OnboardingProvider";
@@ -15,8 +15,10 @@ import { askBilalCompanion } from "./client";
 import { setCompanionActive } from "./activity";
 import { BilalTourCard } from "./BilalTourCard";
 import { useBilalTour } from "./useBilalTour";
-import { NativeGlassSurface } from "../components/NativeGlassSurface";
 import { useIsFocused } from "@react-navigation/native";
+import { BilalMotion } from "./BilalMotion";
+import { LinearGradient } from "expo-linear-gradient";
+import { brandAssets } from "../constants/assets";
 
 type Message = { id: number; role: "user" | "assistant"; text: string; question?: string; reply?: CompanionReply };
 const LauncherContext = createContext<{ bottom: number; right: number; open(): void } | null>(null);
@@ -28,7 +30,7 @@ export function BilalLauncher() {
   return <View pointerEvents="box-none" collapsable={false} style={styles.launcherHost}>
     <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher" onPress={launcher.open}
       style={({ pressed }) => [styles.launcher, { right: launcher.right, bottom: launcher.bottom, opacity: pressed ? .85 : 1 }]}>
-      <Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
+      <Image source={brandAssets.bilalMark} style={{ width: 30, height: 30 }} accessible={false} /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
     </Pressable>
   </View>;
 }
@@ -94,28 +96,29 @@ export function BilalCompanion({ children }: PropsWithChildren) {
     <Modal visible={open && eligible} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
       <KeyboardAvoidingView style={[styles.overlay, { paddingTop: Math.max(12, insets.top + 12) }]} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
         <Pressable accessibilityLabel={t("Close chat")} accessibilityRole="button" onPress={close} style={styles.scrim} />
-        <View accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), marginRight: Math.max(12, insets.right), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+        <BilalMotion reduced={reduceMotion} phase={open ? "open" : "closed"} accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), marginRight: Math.max(12, insets.right), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
           <View style={[styles.header, row]}>
-            <NativeGlassSurface style={styles.mark}><Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /></NativeGlassSurface>
+            <LinearGradient colors={["#1A5563", "#082C3C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+            <Image source={brandAssets.bilalMark} style={styles.mark} accessible={false} />
             <View style={styles.heading}><Text accessibilityRole="header" style={[styles.title, direction]}>{t(bilalCompanionName)}</Text><Text style={[styles.subtitle, direction]}>{t("Your Masjid Bilal companion")}</Text></View>
             <Pressable accessibilityRole="button" accessibilityLabel={t("Quick tour")} disabled={tour.step !== null || busy} onPress={tour.start} style={styles.iconButton}><Ionicons name="help-circle-outline" size={21} color="white" /></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={t("Clear chat")} disabled={busy || !messages.length || tour.step !== null} onPress={() => { setMessages([]); setDraft(""); setError(""); input.current?.focus(); }} style={[styles.iconButton, { opacity: busy || !messages.length || tour.step !== null ? .4 : 1 }]}><Ionicons name="refresh-outline" size={20} color="white" /></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={t("Close chat")} onPress={close} style={styles.iconButton}><Ionicons name="close" size={24} color="white" /></Pressable>
           </View>
-          {tour.step !== null ? <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled"><BilalTourCard step={tour.step} onNext={tour.next} onSkip={() => { tour.finish(); close(); }} /></ScrollView> : <>
+          {tour.step !== null ? <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled"><BilalTourCard reducedMotion={reduceMotion} step={tour.step} onNext={tour.next} onSkip={() => { tour.finish(); close(); }} /></ScrollView> : <>
           <View style={[styles.notice, { backgroundColor: c.tintSoft, borderColor: c.border }]}>
             <Text style={[styles.noticeText, direction, { color: c.muted }]}>{t(bilalCompanionDisclaimer)}</Text>
           </View>
           <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.messages} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
             <View style={[styles.bubble, styles.assistant, { backgroundColor: c.tintSoft, borderColor: c.border }]}><Text style={[styles.message, direction, { color: c.text }]}>{t(bilalCompanionWelcome)}</Text></View>
             {!messages.length ? <View style={styles.suggestions}>{bilalCompanionSuggestions.map(question => <Pressable key={question} accessibilityRole="button" onPress={() => void send(question, t(question))} disabled={busy} style={[styles.suggestion, row, { backgroundColor: c.surfaceStrong, borderColor: c.border }]}><Text style={[styles.suggestionText, direction, { color: c.text }]}>{t(question)}</Text><Ionicons name={isRtl ? "arrow-back" : "arrow-forward"} size={16} color={c.tint} /></Pressable>)}</View> : null}
-            {messages.map(message => <View key={message.id} style={[styles.bubble, message.role === "user" ? styles.user : styles.assistant, { backgroundColor: message.role === "user" ? c.tint : c.tintSoft, borderColor: c.border }]}>
+            {messages.map(message => <BilalMotion key={message.id} reduced={reduceMotion} style={[styles.bubble, message.role === "user" ? styles.user : styles.assistant, { backgroundColor: message.role === "user" ? c.tint : c.tintSoft, borderColor: c.border }]}>
               <Text selectable style={[styles.message, direction, { color: message.role === "user" ? c.onTint : c.text }]}>{message.text}</Text>
               {message.reply ? <>
                 <View style={[styles.sources, row]}>{message.reply.sources.filter(source => safeCompanionLink(source.href)).map(source => <Pressable accessibilityRole="link" accessibilityLabel={t(source.title)} key={source.id} onPress={() => void openSource(source.href)} style={[styles.source, row, { backgroundColor: c.surface, borderColor: c.border }]}><Text style={[styles.sourceText, direction, { color: c.text }]}>{t(source.title)}</Text><Ionicons name="arrow-up-right-box" size={13} color={c.tint} /></Pressable>)}</View>
                 <Text style={[styles.meta, direction, { color: c.muted }]}>{t("Published information")} · {new Date(message.reply.asOf).toLocaleTimeString(language === "en" ? "en-CA" : language, { timeZone: "America/Edmonton", hour: "numeric", minute: "2-digit" })} · {t("Calgary")}</Text>
               </> : null}
-            </View>)}
+            </BilalMotion>)}
             {busy ? <Text accessibilityLiveRegion="polite" style={[styles.status, { color: c.muted }]}>{t("Checking published information…")}</Text> : null}
             {error ? <Text accessibilityRole="alert" style={[styles.status, { color: c.danger }]}>{error}</Text> : null}
           </ScrollView>
@@ -127,7 +130,7 @@ export function BilalCompanion({ children }: PropsWithChildren) {
             <View style={styles.footerLinks}><Text style={[styles.meta, { color: c.muted }]}>{t("This session only")}</Text><Pressable accessibilityRole="link" onPress={() => void openSource("/privacy#bilal-companion")} style={styles.footerLink}><Text style={[styles.linkText, { color: c.tint }]}>{t("Privacy")}</Text></Pressable><Pressable accessibilityRole="link" onPress={() => void openSource("/contact")} style={styles.footerLink}><Text style={[styles.linkText, { color: c.tint }]}>{t("Contact the office")}</Text></Pressable></View>
           </View>
           </>}
-        </View>
+        </BilalMotion>
       </KeyboardAvoidingView>
     </Modal>
   </LauncherContext.Provider>;

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Bilal — Masjid Bilal guide</title>
+  <rect x="2" y="2" width="124" height="124" rx="37" fill="#082C3C"/>
+  <rect x="2.75" y="2.75" width="122.5" height="122.5" rx="36.25" stroke="#FFFFFF" stroke-opacity=".18" stroke-width="1.5"/>
+  <path d="M78 22C53 23 31 40 29 63C27 81 36 95 51 103" stroke="#E7C66B" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M85 30C103 42 109 66 98 84C93 93 85 98 74 100L57 110L60 96" stroke="#1DB6BB" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M47 69C47 57 56 51 64 45C72 51 81 57 81 69V84H47V69Z" fill="#F5FBFA"/>
+  <path d="M63 45V36" stroke="#F5FBFA" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M40 83V60M88 83V58" stroke="#F5FBFA" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="55" cy="74" r="3.2" fill="#087B83"/>
+  <circle cx="64" cy="74" r="3.2" fill="#087B83"/>
+  <circle cx="73" cy="74" r="3.2" fill="#087B83"/>
+  <circle cx="95" cy="101" r="3.5" fill="#E7C66B"/>
+</svg>

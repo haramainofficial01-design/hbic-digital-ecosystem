@@ -141,6 +141,9 @@ private final class WatchSnapshotReceiver: NSObject, WCSessionDelegate {
     ) {}
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        if let language = applicationContext["bilalLanguage"] as? String, ["en", "ur", "fa-AF", "ar"].contains(language) {
+            UserDefaults.standard.set(language, forKey: "watch.bilal.language")
+        }
         guard
             (applicationContext["schemaVersion"] as? Int).map(MasjidSharedData.supportedSchemaVersions.contains) == true,
             let json = applicationContext["prayerSnapshot"] as? String,

@@ -14,30 +14,33 @@ const flat=s=>Array.isArray(s)?Object.assign({},...s.map(flat)):s||{};
 const css=s=>{const x={...flat(s)};for(const key of ['padding','margin']){if(x[key+'Horizontal']!==undefined){x[key+'Left']=x[key+'Right']=x[key+'Horizontal'];delete x[key+'Horizontal']}if(x[key+'Vertical']!==undefined){x[key+'Top']=x[key+'Bottom']=x[key+'Vertical'];delete x[key+'Vertical']}}if(x.fontSize)x.fontSize*=window.textScale||1;if(x.lineHeight)x.lineHeight=(x.lineHeight*(window.textScale||1))+'px';return x};
 export const Platform={OS:window.platform};export const useWindowDimensions=()=>({width:window.innerWidth,height:window.innerHeight});export const StyleSheet={create:x=>x,absoluteFillObject:{position:'absolute',inset:0}};
 export const View=({children,style:s})=><div style={{display:'flex',position:'relative',flexDirection:'column',minWidth:0,...css(s)}}>{children}</div>;
+export const Animated={View,Value:class{setValue(){}interpolate(){return 0}},timing:(_,config)=>({start(){window.motionStarts=(window.motionStarts||0)+1;window.motionConfig=config},stop(){window.motionStops=(window.motionStops||0)+1}})};export const Easing={out:x=>x,cubic:x=>x};
 export const Text=({children,style:s,accessibilityRole})=><div role={accessibilityRole==='header'?'heading':accessibilityRole==='alert'?'alert':undefined} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',...css(s)}}>{children}</div>;
 export const TextInput=forwardRef(({value,onChangeText,onSubmitEditing,accessibilityLabel,placeholder,editable,style:s},ref)=><input ref={ref} aria-label={accessibilityLabel} placeholder={placeholder} value={value} disabled={editable===false} onChange={e=>onChangeText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSubmitEditing()}} style={{border:0,background:'transparent',...css(s)}}/>);
 export const Pressable=({children,onPress,accessibilityLabel,accessibilityRole,disabled,style:s,testID})=><button data-testid={testID} role={accessibilityRole==='link'?'link':undefined} aria-label={accessibilityLabel} disabled={disabled} onClick={onPress} style={{display:'flex',position:'relative',backgroundColor:'transparent',cursor:'pointer',font:'inherit',...css(typeof s==='function'?s({pressed:false}):s)}}>{children}</button>;
 export const ScrollView=forwardRef(({children,style:s,contentContainerStyle,onContentSizeChange},ref)=>{const el=useRef();useImperativeHandle(ref,()=>({scrollToEnd(){el.current?.scrollTo(0,el.current.scrollHeight)}}));useEffect(()=>{onContentSizeChange?.()},[children]);return <div ref={el} style={{overflowY:'auto',...css(s)}}><div style={{display:'flex',flexDirection:'column',...css(contentContainerStyle)}}>{children}</div></div>});
 export const KeyboardAvoidingView=({children,style:s})=><div style={{display:'flex',flexDirection:'column',height:'calc(100dvh - '+(window.keyboardHeight||0)+'px)',...css(s)}}>{children}</div>;
 export const Modal=({visible,children,onRequestClose,onShow})=>{useEffect(()=>{window.back=onRequestClose;if(visible)onShow?.()},[visible]);return visible?<div role='dialog' style={{position:'fixed',inset:0,zIndex:100}}>{children}</div>:null};
-export const AccessibilityInfo={isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})};
+export const AccessibilityInfo={isReduceMotionEnabled:async()=>window.reducedMotion!==false,addEventListener:()=>({remove(){}})};
 export const Image=forwardRef((_,ref)=><img ref={ref}/>);export const Alert={alert(){}};
 const listeners=new Set();export const AppState={currentState:'active',addEventListener(_,fn){listeners.add(fn);return{remove(){listeners.delete(fn)}}}};window.appState=s=>listeners.forEach(fn=>fn(s));
 export const Linking={openURL:async url=>{window.opened.push(url);if(window.linkError)throw Error('offline')}};`;
 
 async function bundle() {
   const result = await build({ bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env.EXPO_PUBLIC_API_URL": '"https://hbic.ca"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion,BilalLauncher}from'./apps/mobile/src/companion/BilalCompanion';import{getCompanionActive}from'./apps/mobile/src/companion/activity';window.companionActive=getCompanionActive;function Harness(){const[tick,set]=useState(0);window.patch=(key,value)=>flushSync(()=>{window.fixture[key]=value;set(x=>x+1)});return <BilalCompanion><BilalLauncher/><button id="screen-content">Screen content remains mounted</button></BilalCompanion>}let root;window.mount=()=>{root=createRoot(document.getElementById('root'));flushSync(()=>root.render(<Harness/>))};window.unmount=()=>flushSync(()=>root.unmount());window.mount();` }, plugins: [{ name: "native-companion-adapters", setup(b) {
-    b.onResolve({ filter: /^react-native$|^@react-navigation\/native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
-    for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime", "components/NativeGlassSurface"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
+    b.onResolve({ filter: /^react-native$|^@react-navigation\/native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$|^expo-linear-gradient$/ }, args => ({ path: args.path, namespace: "fixture" }));
+    for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime", "components/NativeGlassSurface", "constants/assets"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "tsx", resolveDir: root, contents: {
       "react-native": native,
       "@react-navigation/native": "export const useIsFocused=()=>window.fixture.focused!==false",
       "react-native-safe-area-context": "export const useSafeAreaInsets=()=>({top:20,bottom:20,left:0,right:0})",
       "@expo/vector-icons": "import React from'react';export const Ionicons=()=> <span aria-hidden='true' style={{width:20,height:20}}>◌</span>",
+      "expo-linear-gradient": "import React from'react';import{View}from'react-native';export const LinearGradient=({children,style})=><View style={style}>{children}</View>",
       "expo-router": "export const usePathname=()=>window.fixture.pathname",
       "expo-notifications": "const received=new Set(),tapped=new Set();export const getLastNotificationResponseAsync=async()=>null;export const addNotificationReceivedListener=fn=>{received.add(fn);return{remove(){received.delete(fn)}}};export const addNotificationResponseReceivedListener=fn=>{tapped.add(fn);return{remove(){tapped.delete(fn)}}};window.notification=()=>received.forEach(fn=>fn());window.notificationListeners=()=>received.size+tapped.size",
       "expo-file-system/legacy": "export const documentDirectory='test://';export const getInfoAsync=async()=>({exists:window.tourDisk!==null});export const readAsStringAsync=async()=>window.tourDisk;export const writeAsStringAsync=async(_,v)=>{window.tourDisk=v};export const deleteAsync=async()=>{window.tourDisk=null}",
       "components/NativeGlassSurface": `import React from'react';import{View}from'react-native';export const NativeGlassSurface=({children,style})=><View style={style}>{children}</View>`,
+      "constants/assets": "export const brandAssets={bilalMark:{}}",
       ThemeProvider: `import{lightTheme,darkTheme}from'${root}/apps/mobile/src/theme/theme';export const useAppTheme=()=>({theme:window.dark?darkTheme:lightTheme})`,
       LanguageProvider: `import{translateUi}from'@hbic/shared';export const useAppLanguage=()=>({language:window.fixture.language,isRtl:window.fixture.language!=='en',translate:x=>translateUi(window.fixture.language,x)})`,
       OnboardingProvider: "export const useOnboarding=()=>({active:window.fixture.onboarding})",
@@ -59,6 +62,22 @@ async function setup(page: Page, platform = "android", dark = false, mac = false
   await page.addScriptTag({ content: await bundled });
 }
 async function patch(page: Page, key: string, value: unknown) { await page.evaluate(([key, value]) => (window as any).patch(key, value), [key, value]); }
+
+test("native motion is finite and native-driven, does not repeat on typing, and stops when hidden", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage(); await page.setContent("<div></div>");
+    await page.evaluate(() => { (window as any).reducedMotion = false; }); await setup(page);
+    await page.getByRole("button", { name: "Open Bilal" }).click();
+    const initial = await page.evaluate(() => ({ starts: (window as any).motionStarts, config: (window as any).motionConfig }));
+    assert.ok(initial.starts > 0); assert.equal(initial.config.useNativeDriver, true); assert.equal(initial.config.isInteraction, false); assert.ok(initial.config.duration <= 300);
+    await page.getByRole("textbox", { name: "Your question" }).fill("contact");
+    assert.equal(await page.evaluate(() => (window as any).motionStarts), initial.starts, "Typing must not replay an animation");
+    await page.evaluate(() => (window as any).appState("background")); await page.getByRole("dialog").waitFor({ state: "hidden" });
+    assert.ok(await page.evaluate(() => (window as any).motionStops) > 0);
+    await page.close();
+  } finally { await browser.close(); }
+});
 
 test("iOS/Android/Mac native component actions, bounded layout, sources, clearing and session-only lifecycle", async () => {
   const browser = await chromium.launch({ headless: true });

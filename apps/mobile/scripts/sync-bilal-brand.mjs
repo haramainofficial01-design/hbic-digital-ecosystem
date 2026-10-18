@@ -1,0 +1,12 @@
+import sharp from "sharp";
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+const mobile = path.resolve(import.meta.dirname, "..");
+const source = readFileSync(path.join(mobile, "../public-web/public/brand/bilal-mark.svg"));
+if (!source.includes("Masjid Bilal guide") || /<image|<script|https?:\/\//.test(source.toString().replace('xmlns="http://www.w3.org/2000/svg"', ""))) throw Error("Self-contained vector mark required");
+await sharp(source).resize(256, 256).png().toFile(path.join(mobile, "assets/brand/bilal-mark.png"));
+const directory = path.join(mobile, "targets/masjid-bilal-watch/Assets.xcassets/BilalMark.imageset");
+mkdirSync(directory, { recursive: true });
+await sharp(source).resize(160, 160).png().toFile(path.join(directory, "bilal-mark.png"));
+writeFileSync(path.join(directory, "Contents.json"), JSON.stringify({ images: [{ filename: "bilal-mark.png", idiom: "universal" }], info: { author: "HBIC", version: 1 } }, null, 2) + "\n");
+console.log("Bilal: canonical custom vector, optimized phone/Watch raster assets generated.");

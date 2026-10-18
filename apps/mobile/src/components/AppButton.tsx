@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     opacity: 0.5
   },
   label: {
-    fontWeight: "800",
+    fontWeight: "700",
     fontSize: 15,
     lineHeight: 20,
     textAlign: "center",
