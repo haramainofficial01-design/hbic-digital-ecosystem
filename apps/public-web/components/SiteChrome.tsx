@@ -6,6 +6,7 @@ import { getPublicationState } from "../lib/publicationStore";
 import { isQuranPublicEnabled } from "../lib/quranRelease";
 import { PrayerRail } from "./PrayerRail";
 import { BilalCompanion } from "./BilalCompanion";
+import { AppDownloadLink } from "./AppStoreLinks";
 
 export async function SiteChrome({
   children,
@@ -42,6 +43,7 @@ export async function SiteChrome({
             <Link href="/privacy">Privacy Policy</Link>
             <Link href="/contact">Contact</Link>
           </div>
+          <div className="footer-download"><AppDownloadLink /></div>
           <small className="footer-bottom">© {new Date().getFullYear()} Hazrat Bilal Islamic Centre · Made for our community.</small>
         </div>
       </footer>

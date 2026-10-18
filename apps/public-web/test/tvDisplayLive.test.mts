@@ -50,6 +50,13 @@ test("deployed TV display advances seconds, fits TV sizes and recovers its publi
         }));
         assert.ok(layout.scrollWidth <= width + 1 && layout.scrollHeight <= height + 1, `TV overflow at ${width}×${height}`);
         assert.ok(layout.tiles.every(r => r.width > 0 && r.height > 0 && r.x >= -1 && r.y >= -1 && r.right <= width + 1 && r.bottom <= height + 1));
+        const qr = page.locator('footer img[src="/app/download-qr.png"]');
+        assert.equal(await qr.count(), 1, "one shared iPhone/Android download QR");
+        assert.equal(await page.locator('footer img[src*="app-store-qr"], footer img[src*="google-play-qr"]').count(), 0);
+        assert.equal(await qr.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0), true);
+        assert.equal(await qr.locator("..").getAttribute("href"), "https://hbic.ca/download");
+        const qrBox = await qr.boundingBox();
+        assert.ok(qrBox && qrBox.width >= 70 && qrBox.x >= 0 && qrBox.y >= 0 && qrBox.x + qrBox.width <= width + 1 && qrBox.y + qrBox.height <= height + 1, "QR remains fully visible");
 
         if (process.env.HBIC_TV_VERIFY_SCREENSHOTS === "1") {
           const directory = path.resolve(import.meta.dirname, "../../../output/tv-display-live");

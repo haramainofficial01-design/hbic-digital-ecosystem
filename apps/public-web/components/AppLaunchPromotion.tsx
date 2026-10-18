@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { isAppLaunchCampaignActive } from "../lib/appLaunch";
-import { StoreDownloadButtons } from "./AppStoreLinks";
+import { AppDownloadLink } from "./AppStoreLinks";
 
 function useCampaignActive() {
   // Keep the prerendered page and first client render identical; the effect
@@ -36,7 +36,7 @@ export function AppLaunchPromotion() {
         <span className="eyebrow">THE MASJID BILAL APP</span>
         <h2 id="app-home-promotion-title">Your Masjid, wherever you are.</h2>
         <p>Prayer and iqamah times, community events, announcements and more—together in one place.</p>
-        <StoreDownloadButtons />
+        <AppDownloadLink />
         <a className="app-learn-link" href="/app">Explore the app <span aria-hidden="true">→</span></a>
       </div>
       <div className="app-home-device" aria-label="Masjid Bilal app preview">

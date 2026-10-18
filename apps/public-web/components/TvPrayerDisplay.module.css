@@ -1491,6 +1491,25 @@
   font: 9px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* One static QR replaces two store images; no extra timer or animation. */
+.smartDownloads { display: flex; align-items: center; gap: clamp(10px, 1vw, 20px); }
+.smartDownloadCopy { display: grid; justify-items: end; gap: 5px; white-space: nowrap; }
+.smartDownloadCopy strong { color: var(--gold); font-size: clamp(13px, 1.2vw, 23px); font-weight: 750; }
+.smartDownloadCopy > span { display: flex; align-items: center; gap: 6px; color: var(--cream); font-size: clamp(10px, .85vw, 16px); }
+.smartDownloadCopy svg { width: 17px; height: 17px; fill: currentColor; }
+.smartDownloadCopy a { color: var(--muted); font-size: clamp(10px, .8vw, 15px); text-decoration: none; }
+.smartDownloadQr { display: block; flex: 0 0 auto; border-radius: 9px; }
+.smartDownloadQr img { display: block; width: clamp(76px, 6.2vw, 126px); height: auto; border: 4px solid white; border-radius: 9px; background: white; }
+.smartDownloadQr:focus-visible, .smartDownloadCopy a:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+@media (max-height: 760px) { .smartDownloadQr img { width: 78px; } }
+@media (orientation: landscape) and (max-height: 600px) {
+  .smartDownloadQr img { width: 56px; border-width: 3px; }
+  .smartDownloadCopy { gap: 3px; }
+  .smartDownloadCopy strong { font-size: 12px; }
+  .smartDownloadCopy > span, .smartDownloadCopy a { font-size: 9px; }
+  .smartDownloadCopy svg { width: 12px; height: 12px; }
+}
+
 .debugPanel strong { color: var(--gold); margin-bottom: 3px; }
 
 /* Some 4K televisions expose the full hardware resolution as the CSS

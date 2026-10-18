@@ -1,3 +1,6 @@
+export const appDownloadUrl = "https://hbic.ca/download";
+export const appDownloadQr = "/app/download-qr.png";
+
 export const appLaunchCampaign = {
   launchAt: "2026-09-18T04:11:14.000Z",
   timeZone: "America/Edmonton",

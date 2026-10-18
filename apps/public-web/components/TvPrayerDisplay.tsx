@@ -22,6 +22,7 @@ import {
 } from "../lib/tvDisplay";
 import styles from "./TvPrayerDisplay.module.css";
 import { publicDisplayUrl } from "../lib/displayClient";
+import { appDownloadQr, appDownloadUrl } from "../lib/appLaunch";
 
 const cacheKey = "hbic-tv-display-v1";
 const weatherCacheKey = "hbic-tv-weather-v1";
@@ -764,20 +765,15 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
               </div>
             </div>
           ) : (
-            <div className={styles.launchDownloads} aria-label="Download the Masjid Bilal app today">
-              <strong>Download the Masjid Bilal app today!</strong>
-              <div className={styles.storeQrs}>
-                <div className={styles.storeQr}>
-                  <span><AppStoreMark /> App Store</span>
-                  <svg className={styles.storeArrow} viewBox="0 0 42 18" aria-hidden="true"><path d="M2 9h34" /><path d="m29 3 7 6-7 6" /></svg>
-                  <Image src="/app/app-store-qr.png" alt="Scan to download Masjid Bilal from the Apple App Store" width={720} height={720} sizes="(min-width: 3000px) 192px, 96px" />
-                </div>
-                <div className={styles.storeQr}>
-                  <span><GooglePlayMark /> Google Play</span>
-                  <svg className={styles.storeArrow} viewBox="0 0 42 18" aria-hidden="true"><path d="M2 9h34" /><path d="m29 3 7 6-7 6" /></svg>
-                  <Image src="/app/google-play-qr.png" alt="Scan to download Masjid Bilal from Google Play" width={720} height={720} sizes="(min-width: 3000px) 192px, 96px" />
-                </div>
+            <div className={`${styles.launchDownloads} ${styles.smartDownloads}`} aria-label="Download the Masjid Bilal app today">
+              <div className={styles.smartDownloadCopy}>
+                <strong>Get the Masjid Bilal app</strong>
+                <span><AppStoreMark /> iPhone <GooglePlayMark /> Android</span>
+                <a href={appDownloadUrl}>hbic.ca/download</a>
               </div>
+              <a className={styles.smartDownloadQr} href={appDownloadUrl}>
+                <Image src={appDownloadQr} alt="Scan to download Masjid Bilal for iPhone or Android" width={592} height={592} unoptimized loading="eager" />
+              </a>
             </div>
           )
         ) : null}
