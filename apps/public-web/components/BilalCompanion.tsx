@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { X, Send, ArrowUpRight, RotateCcw, BookOpen, CircleHelp } from "lucide-react";
+import { X, ArrowUp, ArrowUpRight, RotateCcw, BookOpen, CircleHelp, Clock3, GraduationCap, Heart, Phone } from "lucide-react";
 import Image from "next/image";
 import { bilalCompanionDisclaimer, bilalCompanionName, bilalCompanionSuggestions, bilalCompanionWelcome, companionVisibleOnRoute, safeCompanionLink, supportedLanguages, translateUi, type LanguageCode, type CompanionReply } from "@hbic/shared";
 import { BilalTour } from "./BilalTour";
@@ -11,6 +11,7 @@ import styles from "./BilalCompanion.module.css";
 
 type Message = { id: number; role: "user" | "assistant"; text: string; question?: string; reply?: CompanionReply };
 type Capabilities = { enabled: boolean };
+const suggestionIcons = [Clock3, GraduationCap, Heart, Phone];
 
 export function BilalCompanion() {
   const pathname = usePathname(), [open, setOpen] = useState(false), [caps, setCaps] = useState<Capabilities | null>(null);
@@ -56,8 +57,9 @@ export function BilalCompanion() {
     document.addEventListener("keydown", keydown);
     return () => { cancelAnimationFrame(frame); document.removeEventListener("keydown", keydown); if (site) site.inert = previousInert; document.body.style.overflow = previousOverflow; previousLauncher?.focus(); };
   }, [open, eligible]);
-  useEffect(() => { if (open) end.current?.scrollIntoView({ block: "end", behavior: "instant" }); }, [messages, busy, open]);
+  useEffect(() => { if (open && (messages.length || busy)) end.current?.scrollIntoView({ block: "end", behavior: "instant" }); }, [messages, busy, open]);
   useEffect(() => { if (!open) { controller.current?.abort(); controller.current = null; locked.current = false; setBusy(false); } }, [open]);
+  useEffect(() => { controller.current?.abort(); controller.current = null; locked.current = false; setBusy(false); setMessages([]); setDraft(""); setError(""); }, [language]);
   useEffect(() => { if (open && tourStep === null) { const frame = requestAnimationFrame(() => input.current?.focus()); return () => cancelAnimationFrame(frame); } }, [open, tourStep]);
 
   async function send(question = draft, displayedQuestion = question) {
@@ -98,8 +100,12 @@ export function BilalCompanion() {
         {tourStep !== null ? <BilalTour step={tourStep} language={language} onNext={preferences.nextTourStep} onSkip={() => { preferences.finishTour(); setOpen(false); }} /> : <>
         <div className={styles.notice}><BookOpen size={15} aria-hidden="true" /><p>{t(bilalCompanionDisclaimer)}</p></div>
         <div className={styles.messages} role="log" aria-label={t("Conversation")} aria-relevant="additions" aria-live="polite">
-          <div className={styles.assistant}><p>{t(bilalCompanionWelcome)}</p><small>{t("Published information")} · {t("This session only")}</small></div>
-          {!messages.length ? <div className={styles.suggestions}>{bilalCompanionSuggestions.map(question => <button key={question} onClick={() => void send(question, t(question))} disabled={busy}>{t(question)}<ArrowUpRight size={15} aria-hidden="true" /></button>)}</div> : null}
+          {!messages.length ? <>
+            <div className={styles.welcome}><h3>{t("Assalamu alaikum!")}</h3><p>{t(bilalCompanionWelcome)}</p></div>
+            <div className={styles.suggestions}>{bilalCompanionSuggestions.map((question, index) => { const Icon = suggestionIcons[index]; return <button key={question} onClick={() => void send(question, t(question))} disabled={busy}>
+              <Icon size={20} className={styles.suggestionIcon} aria-hidden="true" /><span>{t(question)}</span><ArrowUpRight size={15} className={styles.suggestionArrow} aria-hidden="true" />
+            </button>; })}</div>
+          </> : null}
           {messages.map(message => <div key={message.id} className={message.role === "user" ? styles.user : styles.assistant}>
             <p>{message.text}</p>
             {message.reply ? <>
@@ -118,7 +124,7 @@ export function BilalCompanion() {
           <form onSubmit={event => { event.preventDefault(); void send(); }} className={styles.form}>
             <label className="sr-only" htmlFor="bilal-companion-question">{t("Your question")}</label>
             <input ref={input} id="bilal-companion-question" value={draft} maxLength={800} onChange={event => setDraft(event.target.value)} placeholder={t("Ask about Masjid Bilal…")} autoComplete="off" disabled={busy} />
-            <button aria-label={t("Send question")} type="submit" disabled={busy || !draft.trim()}><Send size={19} aria-hidden="true" /></button>
+            <button aria-label={t("Send question")} type="submit" disabled={busy || !draft.trim()}><ArrowUp size={21} aria-hidden="true" /></button>
           </form>
           <p className={styles.finePrint}>{t("No chat history is saved by HBIC.")} <a href="/privacy#bilal-companion" onClick={() => setOpen(false)}>{t("Privacy")}</a> · <a href="/contact" onClick={() => setOpen(false)}>{t("Contact the office")}</a></p>
         </footer>

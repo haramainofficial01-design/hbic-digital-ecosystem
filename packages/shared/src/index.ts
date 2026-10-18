@@ -1,6 +1,7 @@
 export * from "./constants";
 export * from "./ratingCampaign";
 export * from "./bilalCompanion";
+export { companionQuestionTerms } from "./bilalMessages";
 export * from "./bilalTour";
 export * from "./donations";
 export * from "./content";

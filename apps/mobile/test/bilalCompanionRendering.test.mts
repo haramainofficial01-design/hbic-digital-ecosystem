@@ -14,10 +14,10 @@ const flat=s=>Array.isArray(s)?Object.assign({},...s.map(flat)):s||{};
 const css=s=>{const x={...flat(s)};for(const key of ['padding','margin']){if(x[key+'Horizontal']!==undefined){x[key+'Left']=x[key+'Right']=x[key+'Horizontal'];delete x[key+'Horizontal']}if(x[key+'Vertical']!==undefined){x[key+'Top']=x[key+'Bottom']=x[key+'Vertical'];delete x[key+'Vertical']}}if(x.fontSize)x.fontSize*=window.textScale||1;if(x.lineHeight)x.lineHeight=(x.lineHeight*(window.textScale||1))+'px';return x};
 export const Platform={OS:window.platform};export const useWindowDimensions=()=>({width:window.innerWidth,height:window.innerHeight});export const StyleSheet={create:x=>x,absoluteFillObject:{position:'absolute',inset:0}};
 export const View=({children,style:s})=><div style={{display:'flex',position:'relative',flexDirection:'column',minWidth:0,...css(s)}}>{children}</div>;
-export const Animated={View,Value:class{setValue(){}interpolate(){return 0}},timing:(_,config)=>({start(){window.motionStarts=(window.motionStarts||0)+1;window.motionConfig=config},stop(){window.motionStops=(window.motionStops||0)+1}})};export const Easing={out:x=>x,cubic:x=>x};
+export const Animated={View,createAnimatedComponent:component=>component,Value:class{setValue(){}interpolate(){return 0}},timing:(_,config)=>({start(){window.motionStarts=(window.motionStarts||0)+1;window.motionConfig=config},stop(){window.motionStops=(window.motionStops||0)+1}})};export const Easing={out:x=>x,cubic:x=>x};
 export const Text=({children,style:s,accessibilityRole})=><div role={accessibilityRole==='header'?'heading':accessibilityRole==='alert'?'alert':undefined} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',...css(s)}}>{children}</div>;
 export const TextInput=forwardRef(({value,onChangeText,onSubmitEditing,accessibilityLabel,placeholder,editable,style:s},ref)=><input ref={ref} aria-label={accessibilityLabel} placeholder={placeholder} value={value} disabled={editable===false} onChange={e=>onChangeText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSubmitEditing()}} style={{border:0,background:'transparent',...css(s)}}/>);
-export const Pressable=({children,onPress,accessibilityLabel,accessibilityRole,disabled,style:s,testID})=><button data-testid={testID} role={accessibilityRole==='link'?'link':undefined} aria-label={accessibilityLabel} disabled={disabled} onClick={onPress} style={{display:'flex',position:'relative',backgroundColor:'transparent',cursor:'pointer',font:'inherit',...css(typeof s==='function'?s({pressed:false}):s)}}>{children}</button>;
+export const Pressable=({children,onPress,onPressIn,onPressOut,accessibilityLabel,accessibilityRole,disabled,style:s,testID})=><button data-testid={testID} role={accessibilityRole==='link'?'link':undefined} aria-label={accessibilityLabel} disabled={disabled} onPointerDown={onPressIn} onPointerUp={onPressOut} onClick={onPress} style={{display:'flex',position:'relative',backgroundColor:'transparent',cursor:'pointer',font:'inherit',...css(typeof s==='function'?s({pressed:false}):s)}}>{children}</button>;
 export const ScrollView=forwardRef(({children,style:s,contentContainerStyle,onContentSizeChange},ref)=>{const el=useRef();useImperativeHandle(ref,()=>({scrollToEnd(){el.current?.scrollTo(0,el.current.scrollHeight)}}));useEffect(()=>{onContentSizeChange?.()},[children]);return <div ref={el} style={{overflowY:'auto',...css(s)}}><div style={{display:'flex',flexDirection:'column',...css(contentContainerStyle)}}>{children}</div></div>});
 export const KeyboardAvoidingView=({children,style:s})=><div style={{display:'flex',flexDirection:'column',height:'calc(100dvh - '+(window.keyboardHeight||0)+'px)',...css(s)}}>{children}</div>;
 export const Modal=({visible,children,onRequestClose,onShow})=>{useEffect(()=>{window.back=onRequestClose;if(visible)onShow?.()},[visible]);return visible?<div role='dialog' style={{position:'fixed',inset:0,zIndex:100}}>{children}</div>:null};
@@ -117,6 +117,23 @@ test("native chat keeps its header below the safe area and input above a reduced
       assert.ok(heading && heading.y >= 32, "Header must clear the top safe area, including with a keyboard");
       assert.ok(input && input.y + input.height <= 514, "Input must clear the reduced keyboard viewport");
       await page.close();
+    }
+  } finally { await browser.close(); }
+});
+
+test("native press feedback is finite, non-blocking and disabled by Reduced Motion", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const reduced of [false, true]) {
+      const page = await browser.newPage(); await page.setContent("<div></div>");
+      await page.evaluate(reduced => { (window as any).reducedMotion = reduced; }, reduced); await setup(page);
+      const launcher = page.getByRole("button", { name: "Open Bilal" }); await launcher.waitFor();
+      const before = await page.evaluate(() => (window as any).motionStarts ?? 0);
+      await launcher.dispatchEvent("pointerdown"); await launcher.dispatchEvent("pointerup");
+      const motion = await page.evaluate(() => ({ count: (window as any).motionStarts ?? 0, config: (window as any).motionConfig }));
+      assert.equal(motion.count - before, reduced ? 0 : 2);
+      if (!reduced) { assert.equal(motion.config.duration, 170); assert.equal(motion.config.useNativeDriver, true); assert.equal(motion.config.isInteraction, false); assert.equal(motion.config.toValue, 1); }
+      await page.evaluate(() => (window as any).unmount()); await page.close();
     }
   } finally { await browser.close(); }
 });

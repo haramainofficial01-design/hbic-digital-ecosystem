@@ -1,5 +1,5 @@
 import { randomBytes, createHmac } from "node:crypto";
-import { bilalCompanionName, companionBoundary, companionReply, validateCompanionRequest } from "@hbic/shared";
+import { bilalCompanionName, companionBoundary, companionQuestionTerms, companionReply, normalizeCompanionQuestion, validateCompanionRequest } from "@hbic/shared";
 import { getPublishedContent } from "../../../lib/contentStore";
 import { isQuranPublicEnabled } from "../../../lib/quranRelease";
 import { createQuranRateLimit } from "../../../lib/quranRateLimit";
@@ -22,7 +22,7 @@ async function readBody(request: Request) {
 
 let billingCache: { until: number; monthlyCents: number; tuitionMode: string } | null = null;
 async function currentPublicTuition(question: string) {
-  if (!/academy|tuition|fee|cash|billing|class|فیس|شهریه|الرسوم/i.test(question)) return {};
+  if (!/academy|tuition|fee|cash|billing|class/.test(companionQuestionTerms(normalizeCompanionQuestion(question)))) return {};
   if (billingCache && billingCache.until > Date.now()) return billingCache;
   try {
     // Existing public read only. Never call a parent, Stripe-customer or admin endpoint.

@@ -54,3 +54,24 @@ test("assistant stays off private, immersive and TV routes on both platforms", (
   for (const route of ["/", "/prayer", "/events", "/more", "/settings"]) assert.equal(companionVisibleOnRoute(route, true), true);
   assert.equal(companionVisibleOnRoute("/unknown-private-screen", true), false);
 });
+
+test("warm greeting/thanks phrases work in all four languages without overriding real questions or safety", () => {
+  for (const [language, greeting, thanks] of [["en", "Hello!", "Thanks!"], ["ur", "السلام علیکم!", "شکریہ"], ["fa-AF", "سلام", "تشکر"], ["ar", "مرحبًا!", "شكرًا لك"]] as const) {
+    const get = (question: string, ready = true) => companionReply({ request: { question, previousQuestions: [], language }, facts, now, contentVersion: 22, ready });
+    assert.deepEqual(get(greeting).topicIds, ["companion.greeting"]);
+    assert.deepEqual(get(thanks).topicIds, ["companion.thanks"]);
+    assert.equal(get(greeting).needsHuman, false); assert.equal(get(thanks).sources.length, 0);
+    assert.equal(get(greeting, false).needsHuman, true);
+  }
+  assert.equal(reply("Hello, my child payment").needsHuman, true);
+  assert.equal(reply("thanks, what are the academy fees?").topicIds.includes("companion.thanks"), false);
+  for (const q of ["میری فیس کتنی ہے؟", "میری حاضری دکھائیں", "طفلم ثبت نام شده؟", "أريد استرداد الرسوم", "دفعة ابني"]) assert.equal(companionBoundary(q), "private", q);
+  assert.equal(companionBoundary("میری ریکارڈنگ کہاں محفوظ ہے؟"), null, "public recording-storage help is not an account lookup");
+});
+
+test("other-day prayers remain unverified with diacritics and local weekday names", () => {
+  for (const [language, question] of [["ar", "مواقيت الصلاة غدًا"], ["ar", "مواقيت الصلاة الخميس"], ["ur", "کل نماز کب ہے؟"], ["fa-AF", "نماز فردا چه وقت است؟"], ["fa-AF", "اذان دوشنبه چه وقت است؟"]] as const) {
+    const result = companionReply({ request: { question, previousQuestions: [], language }, facts, now, contentVersion: 22 });
+    assert.equal(result.needsHuman, true); assert.deepEqual(result.topicIds, []); assert.equal(result.sources[0].href, "https://hbic.ca/prayer-times");
+  }
+});

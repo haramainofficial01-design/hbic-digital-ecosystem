@@ -148,3 +148,29 @@ test("one-time tour, replay, all languages/RTL, reduced motion and keyboard view
     }
   } finally { await browser.close(); }
 });
+
+test("refined chat motion settles, does not repeat on typing, and offers 44px primary/source targets", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const reducedMotion of ["no-preference", "reduce"] as const) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion }); await setup(page);
+      await page.getByRole("button", { name: "Open Bilal" }).click();
+      const dialog = page.getByRole("dialog"); await page.getByRole("heading", { name: "Assalamu alaikum!" }).waitFor();
+      await page.waitForTimeout(350);
+      assert.equal(await dialog.evaluate(el => el.getAnimations({ subtree: true }).filter(a => a.playState === "running").length), 0);
+      for (const name of ["Quick tour", "Close chat", "Today’s prayer times", "Quran Academy", "Donation options", "Contact the masjid"]) {
+        const box = await dialog.getByRole("button", { name, exact: true }).boundingBox(); assert.ok(box && box.height >= 44 && box.width >= 44, name);
+      }
+      await dialog.getByRole("textbox").fill("contact");
+      assert.equal(await dialog.evaluate(el => el.getAnimations({ subtree: true }).filter(a => a.playState === "running").length), 0, "typing never restarts entry motion");
+      await dialog.getByRole("button", { name: "Send question" }).click();
+      const source = dialog.getByRole("link", { name: "Contact the masjid", exact: true }); await source.waitFor();
+      const box = await source.boundingBox(); assert.ok(box && box.height >= 44);
+      await page.waitForTimeout(350); assert.equal(await dialog.evaluate(el => el.getAnimations({ subtree: true }).filter(a => a.playState === "running").length), 0);
+      await dialog.getByRole("combobox").selectOption("ar"); await dialog.getByRole("heading", { name: "السلام عليكم!" }).waitFor();
+      assert.equal(await dialog.getByRole("textbox").inputValue(), "");
+      assert.equal(await dialog.getByText("Published information. <img src=x onerror=alert(1)>", { exact: true }).count(), 0, "language changes clear session-only old-language answers");
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});

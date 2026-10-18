@@ -62,3 +62,57 @@ test("unqualified speech preview, expired term and unknown details are described
   assert.equal(answer("Can I hire a trampoline?").needsHuman, true);
   assert.match(answer("who are you").answer, /No external AI service/);
 });
+
+test("every core topic has authored Urdu, Dari and Arabic answers and localized source labels", () => {
+  const core = facts.filter(f => !f.id.startsWith("program.") && !f.id.startsWith("notice."));
+  assert.ok(core.length >= 18);
+  for (const language of ["ur", "fa-AF", "ar"] as const) for (const fact of core) {
+    const text = fact.translations?.[language];
+    assert.ok(text && text.length > 40, `${fact.id}/${language}`);
+    assert.doesNotMatch(text, /Published upcoming events|The public Academy|Recite Assist can|The Masjid Bilal app brings/);
+    assert.ok(text.length <= 2400);
+  }
+  for (const language of ["ur", "fa-AF", "ar"] as const) {
+    const get = (question: string) => companionReply({ request: { question, previousQuestions: [], language }, facts, now, contentVersion: 1 });
+    for (const q of ["academy tuition", "recite assist accuracy", "next prayer", "download app", "volunteer", "events", "about hbic"]) {
+      const result = get(q); assert.equal(result.needsHuman, false, `${language}/${q}`);
+      // A matched CMS program may legitimately accompany the core answer as
+      // labelled original prose. Isolate core facts to check authored coverage.
+      for (const fact of core.filter(f => result.topicIds.includes(f.id))) {
+        const isolated = companionReply({ request: { question: fact.terms[0], previousQuestions: [], language }, facts: [fact], now, contentVersion: 1 });
+        assert.equal(isolated.answer, fact.translations![language]);
+        for (const source of isolated.sources) assert.match(source.title, /[\u0600-\u06ff]/, source.title);
+      }
+    }
+    assert.doesNotMatch(get("donations").answer, /General Donation|Building \/ Maintenance|Youth Programs/);
+  }
+});
+
+test("natural supported-language questions select the intended core topics, not similar-sounding registration", () => {
+  for (const [language, q, expected] of [
+    ["ur", "اگلی نماز کب ہے؟", "prayer.next"], ["fa-AF", "نماز بعدی چه وقت است؟", "prayer.next"], ["ar", "متى الصلاة القادمة؟", "prayer.next"],
+    ["ur", "قرآن اکیڈمی کی فیس کتنی ہے؟", "academy.fees"], ["fa-AF", "فیس ماهانه صنف قرآن چقدر است؟", "academy.fees"], ["ar", "كم رسوم أكاديمية القرآن؟", "academy.fees"],
+    ["ur", "قرآن کیسے پڑھوں؟", "quran.features"], ["fa-AF", "چگونه قرآن بخوانم؟", "quran.features"], ["ar", "كيف أقرأ القرآن؟", "quran.features"],
+    ["ur", "میری ریکارڈنگ کہاں محفوظ ہے؟", "quran.privacy"], ["fa-AF", "ضبط صدا کجا ذخیره می‌شود؟", "quran.privacy"], ["ar", "أين يتم تخزين التسجيلات؟", "quran.privacy"],
+    ["ur", "کیا تلاوت کی غلطیاں درست کرتا ہے؟", "quran.preview"], ["fa-AF", "دقت تشخیص اشتباه چقدر است؟", "quran.preview"], ["ar", "هل يكشف أخطاء التلاوة؟", "quran.preview"],
+    ["ur", "مسجد کا پتہ کیا ہے؟", "contact.location"], ["fa-AF", "آدرس مسجد کجاست؟", "contact.location"], ["ar", "ما عنوان المسجد؟", "contact.location"],
+    ["ur", "عطیہ کیسے دوں؟", "donations"], ["fa-AF", "کمک مالی چگونه است؟", "donations"], ["ar", "كيف أتبرّع؟", "donations"]
+  ] as const) {
+    const result = companionReply({ request: { question: q, previousQuestions: [], language }, facts, now, contentVersion: 1 });
+    assert.ok(result.topicIds.includes(expected), `${language}: ${q}: ${result.topicIds}`);
+    if (expected === "quran.privacy") assert.equal(result.topicIds.some(t => t.startsWith("academy.")), false, q);
+  }
+});
+
+test("localized tuition preserves live amount/mode and refuses missing price; expired terms stay explicit", () => {
+  for (const language of ["ur", "fa-AF", "ar"] as const) {
+    const family = buildCompanionKnowledge(content, now, { ...options, monthlyCents: 7250, tuitionMode: "per_family" }).find(f => f.id === "academy.fees")!.translations![language]!;
+    assert.match(family, /\$72.50 CAD/); assert.ok(family.includes(language === "ur" ? "فی خاندان" : language === "fa-AF" ? "هر خانواده" : "لكل عائلة"));
+    const missing = buildCompanionKnowledge(content, now, { academy: true, quran: true }).find(f => f.id === "academy.fees")!.translations![language]!;
+    assert.doesNotMatch(missing, /50.00|72.50/);
+    const expired = buildCompanionKnowledge(content, new Date("2027-03-01T16:00:00Z"), options).find(f => f.id === "academy.overview")!.translations![language]!;
+    assert.ok(expired.includes(language === "ur" ? "مدت گزر چکی" : language === "fa-AF" ? "دوره پایان یافته" : "انتهت هذه الفترة"));
+    const next = facts.find(f => f.id === "prayer.next")!.translations![language]!;
+    assert.match(next, /2:00 PM/); assert.match(next, /اقامت|الإقامة/);
+  }
+});

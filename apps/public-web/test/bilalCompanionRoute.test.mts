@@ -37,5 +37,11 @@ test("read-only route handles current public information, private handoff, fee e
     state.ready = true; state.billing = false; const offlineRoute = await isolatedRoute();
     const offline = await offlineRoute.POST(new Request("https://hbic.ca/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: "academy tuition" }) }));
     assert.match((await offline.json()).answer, /can’t verify a current fee/);
+    state.billing = true;
+    for (const [language, question] of [["ur", "قرآن اکیڈمی کی فیس کتنی ہے؟"], ["fa-AF", "فیس ماهانه صنف قرآن چقدر است؟"], ["ar", "كم رسوم أكاديمية القرآن؟"]]) {
+      const freshRoute = await isolatedRoute();
+      const response = await freshRoute.POST(new Request("https://hbic.ca/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, language }) }));
+      const body = await response.json(); assert.match(body.answer, /61.00 CAD/); assert.equal(body.topicIds[0], "academy.fees"); assert.equal(body.needsHuman, false);
+    }
   } finally { globalThis.fetch = previousFetch; if (previousAcademy === undefined) delete process.env.ACADEMY_PREVIEW_ENABLED; else process.env.ACADEMY_PREVIEW_ENABLED = previousAcademy; delete (globalThis as any).__companion; }
 });
