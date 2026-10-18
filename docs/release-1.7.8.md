@@ -26,6 +26,24 @@ an explicit full-size root and native overlay host (including the existing iOS
 FullWindowOverlay), with another exact native test required before submission.
 Build creation/upload is not review submission or public approval.
 
+The first native-layer correction (`056d0e6`) produced Android 45. Its actual
+tour displayed and completed, but the restart check still found the launcher
+outside the visible native screen hierarchy. That bundle is also held and was
+not sent to Google. The next correction hosts only the focused-screen launcher
+inside `AppScreen`; one root provider retains the chat, persistence, privacy
+and notification/route guards. All 25 companion/tour checks pass, including
+inactive-screen suppression and preserving important screen children.
+
+Expo's free iOS cloud allowance is exhausted until November 1. No plan upgrade
+or extra charge was authorized. A local build alternative uses existing Xcode
+27.1, existing production profiles and existing distribution identity. A local
+same-name certificate conflict was isolated: the profiles include fingerprint
+`EE937C9DDDAB3186A5A766585884CB1920ACE2A7`, while the login keychain also has an
+older certificate with the same common name. Archive selection and IPA export
+must both pin the matching existing identity. No certificate/profile was
+regenerated or revoked; temporary local signing keychains were cleaned by EAS.
+No failed local package is release-qualified.
+
 The assistant is named **Bilal**, with a persistent one-time Home tour for
 existing installations and an integrated new-user introduction. English,
 Urdu, Dari and Arabic interface/tour copy, RTL layout, authored core replies,

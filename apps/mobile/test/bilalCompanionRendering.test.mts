@@ -26,12 +26,12 @@ const listeners=new Set();export const AppState={currentState:'active',addEventL
 export const Linking={openURL:async url=>{window.opened.push(url);if(window.linkError)throw Error('offline')}};`;
 
 async function bundle() {
-  const result = await build({ bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env.EXPO_PUBLIC_API_URL": '"https://hbic.ca"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion}from'./apps/mobile/src/companion/BilalCompanion';import{getCompanionActive}from'./apps/mobile/src/companion/activity';window.companionActive=getCompanionActive;function Harness(){const[tick,set]=useState(0);window.patch=(key,value)=>flushSync(()=>{window.fixture[key]=value;set(x=>x+1)});return <BilalCompanion/>}let root;window.mount=()=>{root=createRoot(document.getElementById('root'));flushSync(()=>root.render(<Harness/>))};window.unmount=()=>flushSync(()=>root.unmount());window.mount();` }, plugins: [{ name: "native-companion-adapters", setup(b) {
-    b.onResolve({ filter: /^react-native$|^react-native-screens$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
+  const result = await build({ bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env.EXPO_PUBLIC_API_URL": '"https://hbic.ca"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion,BilalLauncher}from'./apps/mobile/src/companion/BilalCompanion';import{getCompanionActive}from'./apps/mobile/src/companion/activity';window.companionActive=getCompanionActive;function Harness(){const[tick,set]=useState(0);window.patch=(key,value)=>flushSync(()=>{window.fixture[key]=value;set(x=>x+1)});return <BilalCompanion><BilalLauncher/><button id="screen-content">Screen content remains mounted</button></BilalCompanion>}let root;window.mount=()=>{root=createRoot(document.getElementById('root'));flushSync(()=>root.render(<Harness/>))};window.unmount=()=>flushSync(()=>root.unmount());window.mount();` }, plugins: [{ name: "native-companion-adapters", setup(b) {
+    b.onResolve({ filter: /^react-native$|^@react-navigation\/native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
     for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime", "components/NativeGlassSurface"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "tsx", resolveDir: root, contents: {
       "react-native": native,
-      "react-native-screens": "export const FullWindowOverlay=({children})=>children",
+      "@react-navigation/native": "export const useIsFocused=()=>window.fixture.focused!==false",
       "react-native-safe-area-context": "export const useSafeAreaInsets=()=>({top:20,bottom:20,left:0,right:0})",
       "@expo/vector-icons": "import React from'react';export const Ionicons=()=> <span aria-hidden='true' style={{width:20,height:20}}>◌</span>",
       "expo-router": "export const usePathname=()=>window.fixture.pathname",
@@ -129,11 +129,12 @@ test("native chat closes on notification/background, respects onboarding/remote 
   try {
     const page = await browser.newPage(); await setup(page);
     const launcher = page.getByRole("button", { name: "Open Bilal" }); await launcher.click(); await page.evaluate(() => (window as any).notification()); await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
-    await launcher.click(); await page.evaluate(() => (window as any).appState("background")); await launcher.waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
+    await launcher.click(); await page.evaluate(() => (window as any).appState("background")); await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await launcher.count(), 0); assert.equal(await page.getByRole("dialog").count(), 0);
     await page.evaluate(() => (window as any).appState("active"));
+    await patch(page, "focused", false); assert.equal(await launcher.count(), 0); assert.equal(await page.locator("#screen-content").count(), 1); await patch(page, "focused", true);
     for (const key of ["onboarding", "loading"]) { await patch(page, key, true); assert.equal(await launcher.count(), 0); await patch(page, key, false); }
     await launcher.click(); await patch(page, "enabled", false); assert.equal(await page.getByRole("dialog").count(), 0); await patch(page, "enabled", true);
-    for (const route of ["/quran", "/quran/reader", "/quran-academy", "/donate", "/academy/check-in"]) { await patch(page, "pathname", route); assert.equal(await launcher.count(), 0, route); }
+    for (const route of ["/quran", "/quran/reader", "/quran-academy", "/donate", "/academy/check-in"]) { await patch(page, "pathname", route); assert.equal(await launcher.count(), 0, route); assert.equal(await page.locator("#screen-content").count(), 1, "Important screens remain mounted"); }
     await patch(page, "pathname", "/"); await launcher.click(); await page.evaluate(() => (window as any).unmount()); assert.equal(await page.evaluate(() => (window as any).companionActive()), false); assert.equal(await page.evaluate(() => (window as any).notificationListeners()), 0);
   } finally { await browser.close(); }
 });

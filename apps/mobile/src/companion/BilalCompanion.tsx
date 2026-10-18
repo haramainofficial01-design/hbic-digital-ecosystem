@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { bilalCompanionDisclaimer, bilalCompanionName, bilalCompanionSuggestions, bilalCompanionWelcome, companionVisibleOnRoute, safeCompanionLink, type CompanionReply } from "@hbic/shared";
 import { usePathname } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLanguage } from "../i18n/LanguageProvider";
@@ -16,12 +16,25 @@ import { setCompanionActive } from "./activity";
 import { BilalTourCard } from "./BilalTourCard";
 import { useBilalTour } from "./useBilalTour";
 import { NativeGlassSurface } from "../components/NativeGlassSurface";
-import { FullWindowOverlay } from "react-native-screens";
+import { useIsFocused } from "@react-navigation/native";
 
 type Message = { id: number; role: "user" | "assistant"; text: string; question?: string; reply?: CompanionReply };
+const LauncherContext = createContext<{ bottom: number; right: number; open(): void } | null>(null);
+
+/** Belongs inside the focused native screen, not behind the native navigator. */
+export function BilalLauncher() {
+  const launcher = useContext(LauncherContext), focused = useIsFocused(), { translate: t } = useAppLanguage();
+  if (!launcher || !focused) return null;
+  return <View pointerEvents="box-none" collapsable={false} style={styles.launcherHost}>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher" onPress={launcher.open}
+      style={({ pressed }) => [styles.launcher, { right: launcher.right, bottom: launcher.bottom, opacity: pressed ? .85 : 1 }]}>
+      <Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
+    </Pressable>
+  </View>;
+}
 
 /** Deliberately opened, memory-only companion. No background inference or animation loop. */
-export function BilalCompanion() {
+export function BilalCompanion({ children }: PropsWithChildren) {
   const pathname = usePathname(), { content, loading } = usePublishedContent(), { active: onboarding } = useOnboarding();
   const { theme } = useAppTheme(), { language, isRtl, translate: t } = useAppLanguage(), insets = useSafeAreaInsets(), { height } = useWindowDimensions();
   const [open, setOpen] = useState(false), [foreground, setForeground] = useState(AppState.currentState === "active"), [reduceMotion, setReduceMotion] = useState(true), [notificationReady, setNotificationReady] = useState(false);
@@ -72,17 +85,13 @@ export function BilalCompanion() {
   const c = theme.colors;
   const direction = { textAlign: isRtl ? "right" as const : "left" as const, writingDirection: isRtl ? "rtl" as const : "ltr" as const };
   const row = { flexDirection: isRtl ? "row-reverse" as const : "row" as const };
-  if (!eligible) return null;
-  const launcher = <View pointerEvents="box-none" collapsable={false} style={styles.launcherHost}>
-    <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher"
-      onPress={() => { noteRatingHomeInteraction(); tour.noteInteraction(); if (tour.seen === false) tour.start(); else { tour.finish(); setOpen(true); } }}
-      style={({ pressed }) => [styles.launcher, { right: Math.max(16, insets.right + 12), bottom: isMacQuranHost ? 24 : Math.max(12, insets.bottom) + 86, opacity: pressed ? .85 : 1 }]}>
-      <Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
-    </Pressable>
-  </View>;
-  return <>
-    {!open ? Platform.OS === "ios" ? <FullWindowOverlay>{launcher}</FullWindowOverlay> : launcher : null}
-    <Modal visible={open} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
+  const launcher = eligible && !open ? {
+    right: Math.max(16, insets.right + 12), bottom: isMacQuranHost ? 24 : Math.max(12, insets.bottom) + 86,
+    open: () => { noteRatingHomeInteraction(); tour.noteInteraction(); if (tour.seen === false) tour.start(); else { tour.finish(); setOpen(true); } }
+  } : null;
+  return <LauncherContext.Provider value={launcher}>
+    {children}
+    <Modal visible={open && eligible} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
         <Pressable accessibilityLabel={t("Close chat")} accessibilityRole="button" onPress={close} style={styles.scrim} />
         <View accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), marginRight: Math.max(12, insets.right), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
@@ -121,7 +130,7 @@ export function BilalCompanion() {
         </View>
       </KeyboardAvoidingView>
     </Modal>
-  </>;
+  </LauncherContext.Provider>;
 }
 
 const styles = StyleSheet.create({

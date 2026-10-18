@@ -51,7 +51,7 @@ function AppShell() {
     <View style={{ flex: 1 }} collapsable={false}>
       <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} />
       {!onboardingActive ? <NotificationRouter /> : null}
-      <MacAppFrame><Stack
+      <BilalCompanion><MacAppFrame><Stack
         initialRouteName="(tabs)"
         screenOptions={{
           headerShown: false,
@@ -59,8 +59,8 @@ function AppShell() {
           contentStyle: { backgroundColor: theme.colors.background }
         }}
       /></MacAppFrame>
-      <BilalCompanion />
       <OnboardingExperience />
+      </BilalCompanion>
     </View>
   );
 }

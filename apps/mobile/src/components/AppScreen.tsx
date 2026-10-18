@@ -10,6 +10,7 @@ import { useAppTheme } from "../theme/ThemeProvider";
 import { isMacQuranHost } from "../quran/macRuntime";
 import { desktopAppLayout } from "./desktopLayout";
 import { useAppViewport } from "./AppViewport";
+import { BilalLauncher } from "../companion/BilalCompanion";
 
 export function AppScreen({ children, style, onReady, onInteraction }: PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
@@ -74,6 +75,7 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
           </View>
         </ScrollView>
       </SafeAreaView>
+      <BilalLauncher />
     </View>
   );
 }
