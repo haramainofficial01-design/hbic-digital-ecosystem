@@ -18,7 +18,7 @@ export const Text=({children,style:s,accessibilityRole})=><div role={accessibili
 export const TextInput=forwardRef(({value,onChangeText,onSubmitEditing,accessibilityLabel,placeholder,editable,style:s},ref)=><input ref={ref} aria-label={accessibilityLabel} placeholder={placeholder} value={value} disabled={editable===false} onChange={e=>onChangeText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSubmitEditing()}} style={{border:0,background:'transparent',...css(s)}}/>);
 export const Pressable=({children,onPress,accessibilityLabel,accessibilityRole,disabled,style:s,testID})=><button data-testid={testID} role={accessibilityRole==='link'?'link':undefined} aria-label={accessibilityLabel} disabled={disabled} onClick={onPress} style={{display:'flex',position:'relative',backgroundColor:'transparent',cursor:'pointer',font:'inherit',...css(typeof s==='function'?s({pressed:false}):s)}}>{children}</button>;
 export const ScrollView=forwardRef(({children,style:s,contentContainerStyle,onContentSizeChange},ref)=>{const el=useRef();useImperativeHandle(ref,()=>({scrollToEnd(){el.current?.scrollTo(0,el.current.scrollHeight)}}));useEffect(()=>{onContentSizeChange?.()},[children]);return <div ref={el} style={{overflowY:'auto',...css(s)}}><div style={{display:'flex',flexDirection:'column',...css(contentContainerStyle)}}>{children}</div></div>});
-export const KeyboardAvoidingView=({children,style:s})=><div style={{display:'flex',flexDirection:'column',height:'100dvh',...css(s)}}>{children}</div>;
+export const KeyboardAvoidingView=({children,style:s})=><div style={{display:'flex',flexDirection:'column',height:'calc(100dvh - '+(window.keyboardHeight||0)+'px)',...css(s)}}>{children}</div>;
 export const Modal=({visible,children,onRequestClose,onShow})=>{useEffect(()=>{window.back=onRequestClose;if(visible)onShow?.()},[visible]);return visible?<div role='dialog' style={{position:'fixed',inset:0,zIndex:100}}>{children}</div>:null};
 export const AccessibilityInfo={isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})};
 export const Image=forwardRef((_,ref)=><img ref={ref}/>);export const Alert={alert(){}};
@@ -85,6 +85,23 @@ test("iOS/Android/Mac native component actions, bounded layout, sources, clearin
     console.log(`Native adapter screenshots (not real-device proof): ${qa}`);
   } finally { await browser.close(); }
 });
+test("native chat keeps its header below the safe area and input above a reduced keyboard viewport", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const platform of ["android", "ios"]) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); await setup(page, platform);
+      await page.getByRole("button", { name: "Open Bilal" }).click();
+      await page.evaluate(() => { (window as any).keyboardHeight = 330; });
+      await patch(page, "language", "en");
+      const heading = await page.getByRole("heading", { name: "Bilal", exact: true }).boundingBox();
+      const input = await page.getByRole("textbox", { name: "Your question" }).boundingBox();
+      assert.ok(heading && heading.y >= 32, "Header must clear the top safe area, including with a keyboard");
+      assert.ok(input && input.y + input.height <= 514, "Input must clear the reduced keyboard viewport");
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
+
 test("existing native installation automatically receives one tour only after fresh, idle Home content", async () => {
   const browser = await chromium.launch({ headless: true });
   try {
