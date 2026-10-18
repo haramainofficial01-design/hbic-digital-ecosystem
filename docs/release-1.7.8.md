@@ -2,6 +2,26 @@
 
 ## Latest revision: localized introduction and tour
 
+Source `529b4383041a3643458fe3c408de2ed2e00286fe` is committed and pushed.
+Public deployment `dpl_2aRs8PSo96ToBZmgwRbZJPmfEvRa` and admin deployment
+`dpl_6VE3jyDdB55LzCB5LneBzpTyHRxL` were verified READY, then promoted.
+Alias API checks independently confirm `hbic.ca`, `www.hbic.ca` and the existing
+admin domain point to those exact deployments. Public automatic Git metadata
+matches the source; admin was built from that commit's archive with only its
+staging hosting configuration changed. Both correct workspace build targets
+were confirmed. Final-domain checks passed at `2026-10-18T01:51:57.410Z`, including
+actual tour/once-only persistence, four-language interface, canonical live
+prayer/tuition evidence, secure handoffs and the published admin control bundle.
+
+Replacement builds, source-identical to the above feature commit:
+
+- Android **1.7.8 (44)**: `1a324849-047c-49ad-bb29-aa896ba7aaf8`.
+- iOS/Watch **1.7.8 (39)**: `b72391a9-1e8e-4bc1-af42-081cc45d4536`.
+
+These were in progress when this preparation record was written. Build creation
+is not artifact verification, store upload, review submission or public approval.
+No store submission of these replacement artifacts has yet been claimed here.
+
 The assistant is named **Bilal**, with a persistent one-time Home tour for
 existing installations and an integrated new-user introduction. English,
 Urdu, Dari and Arabic interface/tour copy, RTL layout, authored core replies,
