@@ -2,13 +2,17 @@
 
 ## Current requested expansion
 
-The user subsequently requested richer finite motion, a unique Bilal mark,
-Apple Watch availability and broader shared-surface/battery refinement. This
-new work supersedes the iOS 45 / Android 47 release candidates described below;
-they were not submitted for review. See
+The richer finite motion, unique Bilal mark, Apple Watch guide, shared surfaces
+and initial-loading race fix are implemented in pushed source `810e05c`.
+Replacement iOS 46 and Android 49 packages passed signing/assets checks, and
+Android passed 12 native flows plus two untouched automatic first launches.
+The refined website is live. iOS 46 is **WAITING_FOR_REVIEW**; Android 49's
+production edit was validated and committed for Google review. Neither is
+claimed publicly approved. These supersede the iOS 45 / Android 47 candidates described below;
+those were not submitted for review. See
 [current refinement and qualification](bilal-motion-watch-2026-10-18.md).
 
-## Latest revision: localized introduction and tour
+## Earlier revision: localized introduction and tour
 
 Website source `529b4383041a3643458fe3c408de2ed2e00286fe` and final native source
 `209d2277a9246f60897976f12775383fd5bbcb8b` are committed and pushed. The later

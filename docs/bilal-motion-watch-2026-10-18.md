@@ -113,3 +113,68 @@ it is not evidence of a JavaScript crash. Play Store updates were disabled only
 inside the disposable read-only QA emulator for repeatable tests. Previously
 failed reports remain failed. Final untouched-artifact startup/lifecycle checks
 and replacement signed packages are still required before store submission.
+
+## Replacement packages
+
+Both replacements use committed/pushed source
+`810e05c039391946a1974deeb103e018125f6553`. They were built locally with the
+existing credentials after the free cloud-build quota refused another Android
+job. No paid build plan, account permission, certificate or profile was created.
+The unsuccessful cloud attempt reserved Android version code 48; it did not
+produce a release package.
+
+- iOS/Watch **1.7.8 (46)**: SHA-256
+  `3c357dea4806dc8fa7a374e29aa4513125dfaa00112413a3b0982401a46fa713`.
+  Deep strict signatures and all four target identifiers/versions pass. The
+  native Watch Bilal implementation, four-language resource, phone language
+  bridge, existing Watch Quran implementation, own-app keychain group and Mac
+  true-size declaration are present. EAS upload
+  `bcb57f72-0e31-48e0-9e3a-cf9c4eaaed0b` finished; Apple processing and App
+  Review are separate states.
+- Android **1.7.8 (49)**: SHA-256
+  `6bac1842ec72447f7da3d85717aa93fbbaeaeb6b5f84d483ecbd894883703950`.
+  Signature, package/version, all 42 native libraries' 16-KB alignment and R8
+  checks pass (88.4% renamed classes). This is not a battery-use percentage.
+
+The exact Bilal PNG pixels in both packages match the canonical mobile source.
+Runtime checks find no diagnostic logging, private credential, external AI
+endpoint or gated research-model promotion. Existing features' release markers
+and permission checks pass. These are artifact checks, not runtime UI proof.
+
+The opt-in `scripts/test-watch-bilal-live.swift`, compiled with the actual Watch
+networking model and run on the Mac, validated live activation, public contact
+answers and canonical links in English/Urdu/Dari/Arabic, then cleared its session.
+It uses only authored public questions. It does not exercise a Watch radio,
+Watch UI, microphone, HBIC user data or physical energy measurement.
+
+The final Android 49 AAB-derived QA package (not a patched diagnostic) passed
+all **12** native flows at `2026-10-18T19:49:13.497Z`: Home entry, tour,
+restart/no repeat, actual keyboard, header safe area, live current prayers,
+clearing, private handoff, dark mode, Quran exclusion, Arabic/RTL and the
+new-install introduction. SHA-256 of that emulator-only debug-signed QA APK:
+`0d2280fe4c3320053b117f2757ecc7ee1631b5ba6e6e44e9ddc02e82b377e632`.
+The installed APK hash was checked against the one derived from the signed AAB.
+Header y=135 remains below the 63-pixel status bar; input ends at y=1297 above
+the actual keyboard boundary y=1517. Light/dark, Arabic and onboarding captures
+were visually inspected, including the new logo.
+
+Two additional clean-task/data fresh launches left Home untouched for 15 seconds
+each and both automatically displayed the tour, passing at
+`2026-10-18T19:50:02.715Z`. The older failed reports are retained separately;
+they were not re-labelled. Host microphone was disabled and no audio was recorded.
+Apple processed the matching iOS 46 package as `VALID`, build ID
+`9b3a239e-55b0-42f8-bc26-54a4515fe90c`. This resolves the scoped startup gate;
+it does not establish universal device reliability, physical iOS/Mac/Watch UI
+coverage, battery-life gains or recitation accuracy.
+
+Apple accepted review submission `08688b4c-fbf0-4273-a39d-fdca267bed0c` for
+1.7.8 (46); both submission and version returned `WAITING_FOR_REVIEW`. This is
+not public approval or availability. Existing genuine store placements remain.
+
+Google accepted the exact Android 49 checksum above, validated the production
+edit and committed it with `changesNotSentForReview=false`. The intended rollout
+is `completed` after Google's processing/approval, not a claim of public
+availability. Six existing genuine phone screenshots were retained. An earlier
+uncommitted edit rejected 575-character notes and was discarded; the retry uses
+455-character notes with a preflight 500-character bound. No extra version,
+payment, mass notification or account permission was required.
