@@ -31,3 +31,36 @@ weather, social and contact features remain unchanged. The published QR-enabled
 display setting was already on and was not modified. An already-open TV browser
 must reload `/display` once to receive a new application layout; this deployment
 does not remotely control or forcibly refresh the masjid's physical Fire TV.
+
+## Deployment verification — October 18, 2026
+
+Source `49ff57e45ef7e5ead468e64effd5528b9a5b5484` is live at `hbic.ca`, verified
+READY deployment `dpl_93MpvdsxNHhVJazc9ebyxkBkDjV3`. The existing production
+project, domains, cron settings and backend content were retained. The download
+redirect was deployed first, then the shared QR placements; a final narrow-phone
+CSS adjustment prevents the action and short URL wrapping into cramped stacks.
+
+At `2026-10-18T20:49:31Z`, final-domain checks passed for iPhone, Android, iPad,
+Android tablet, desktop, unknown devices, preview clients and unsupported phones,
+including alternating phone types, HEAD/query safety and both fallback store
+links. The redirects were not CDN cache hits. Both official public store pages
+also returned 200 with the correct Masjid Bilal titles.
+
+At `2026-10-18T20:49:40Z`, all 15 public routes had the shared footer link/QR.
+Actual Home, app and contact rendering passed at 320/390/1440 pixels, with light
+and dark coverage, loaded QR assets, bounded layouts and readable action/URL
+heights. The deployed PNG exactly matched the committed asset, SHA-256
+`5e541b4f9777f64d7a0d5b5cfded04425495e2d28fab45c4e7c9d6de9f89ffff`.
+
+The opt-in live TV test passed on the final domain at 1280×720 (clear),
+1920×1080 (rain) and 3840×2160 (snow), with six prayer cards, an advancing clock,
+one fully visible QR, no page overflow and no browser errors. A simulated
+503 kept the confirmed timetable and recovered afterward. Native barcode
+recognition independently decoded the exact download URL from the generated
+asset, each TV screenshot and each small/large website card screenshot.
+This is browser/screenshot validation, not a physical Fire TV or scan-distance
+test. Seven download tests, 12 display unit checks, 28 companion regression
+checks, web typecheck and lint pass (existing unrelated lint warnings remain).
+
+The static QR is available at `https://hbic.ca/app/download-qr.png`; no native
+release or new app-store review is needed for this website/display-only change.
