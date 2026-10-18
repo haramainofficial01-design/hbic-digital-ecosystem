@@ -97,9 +97,9 @@ export function BilalCompanion({ children }: PropsWithChildren) {
   return <LauncherContext.Provider value={launcher}>
     {children}
     <Modal visible={open && eligible} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
-      <KeyboardAvoidingView style={[styles.overlay, { paddingTop: Math.max(12, insets.top + 12) }]} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
+      <KeyboardAvoidingView style={[styles.overlay, { paddingTop: Math.max(12, insets.top + 12), paddingLeft: Math.max(12, insets.left), paddingRight: Math.max(12, insets.right) }]} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
         <Pressable accessibilityLabel={t("Close chat")} accessibilityRole="button" onPress={close} style={styles.scrim} />
-        <BilalMotion reduced={reduceMotion} phase={open ? "open" : "closed"} accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), marginRight: Math.max(12, insets.right), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+        <BilalMotion testID="bilal-companion-panel" reduced={reduceMotion} phase={open ? "open" : "closed"} accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
           <View style={[styles.header, row]}>
             <LinearGradient colors={["#1A5563", "#082C3C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
             <Image source={brandAssets.bilalMark} style={styles.mark} accessible={false} />
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   launcherHost: { ...StyleSheet.absoluteFillObject, zIndex: 80, elevation: 80 },
   launcher: { position: "absolute", zIndex: 80, flexDirection: "row", alignItems: "center", gap: 9, minHeight: 52, borderRadius: 20, borderWidth: 1, borderColor: "#648B91", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#082C3C", boxShadow: "0px 6px 18px #001C3828" },
   launcherLabel: { color: "#FFF9E8", fontSize: 14, fontWeight: "700" },
-  overlay: { flex: 1, justifyContent: "flex-end", alignItems: "flex-end", paddingLeft: 12 },
+  overlay: { flex: 1, justifyContent: "flex-end", alignItems: "flex-end" },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(3,24,39,0.4)" },
   panel: { width: "100%", maxWidth: 460, height: 720, flexShrink: 1, borderRadius: 28, borderWidth: 1, overflow: "hidden" },
   header: { flexDirection: "row", alignItems: "center", gap: 8, padding: 14, backgroundColor: "#082C3C" },

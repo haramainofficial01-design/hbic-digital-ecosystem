@@ -13,7 +13,7 @@ const native = `import React,{forwardRef,useEffect,useImperativeHandle,useRef}fr
 const flat=s=>Array.isArray(s)?Object.assign({},...s.map(flat)):s||{};
 const css=s=>{const x={...flat(s)};for(const key of ['padding','margin']){if(x[key+'Horizontal']!==undefined){x[key+'Left']=x[key+'Right']=x[key+'Horizontal'];delete x[key+'Horizontal']}if(x[key+'Vertical']!==undefined){x[key+'Top']=x[key+'Bottom']=x[key+'Vertical'];delete x[key+'Vertical']}}if(x.fontSize)x.fontSize*=window.textScale||1;if(x.lineHeight)x.lineHeight=(x.lineHeight*(window.textScale||1))+'px';return x};
 export const Platform={OS:window.platform};export const useWindowDimensions=()=>({width:window.innerWidth,height:window.innerHeight});export const StyleSheet={create:x=>x,absoluteFillObject:{position:'absolute',inset:0}};
-export const View=({children,style:s})=><div style={{display:'flex',position:'relative',flexDirection:'column',minWidth:0,...css(s)}}>{children}</div>;
+export const View=({children,style:s,testID})=><div data-testid={testID} style={{display:'flex',position:'relative',flexDirection:'column',minWidth:0,...css(s)}}>{children}</div>;
 export const Animated={View,createAnimatedComponent:component=>component,Value:class{setValue(){}interpolate(){return 0}},timing:(_,config)=>({start(){window.motionStarts=(window.motionStarts||0)+1;window.motionConfig=config},stop(){window.motionStops=(window.motionStops||0)+1}})};export const Easing={out:x=>x,cubic:x=>x};
 export const Text=({children,style:s,accessibilityRole})=><div role={accessibilityRole==='header'?'heading':accessibilityRole==='alert'?'alert':undefined} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',...css(s)}}>{children}</div>;
 export const TextInput=forwardRef(({value,onChangeText,onSubmitEditing,accessibilityLabel,placeholder,editable,style:s},ref)=><input ref={ref} aria-label={accessibilityLabel} placeholder={placeholder} value={value} disabled={editable===false} onChange={e=>onChangeText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')onSubmitEditing()}} style={{border:0,background:'transparent',...css(s)}}/>);
@@ -86,6 +86,7 @@ test("iOS/Android/Mac native component actions, bounded layout, sources, clearin
       const page = await browser.newPage({ viewport: { width, height } }); await setup(page, platform, dark, mac);
       const launcher = page.getByRole("button", { name: "Open Bilal" }); assert.equal(await page.getByRole("dialog").count(), 0);
       await launcher.click(); await page.getByRole("dialog").waitFor(); assert.equal(await page.evaluate(() => (window as any).companionActive()), true);
+      const panel = await page.getByTestId("bilal-companion-panel").boundingBox(); assert.ok(panel && panel.x >= 12 && panel.x + panel.width <= width - 12 + 1, `Panel must keep both margins: ${JSON.stringify(panel)}`);
       const input = page.getByRole("textbox", { name: "Your question" }); await input.fill("contact"); await page.getByRole("button", { name: "Send question" }).click();
       await page.getByText("Verified public answer.", { exact: true }).waitFor();
       assert.equal(await page.getByRole("link", { name: "Unsafe link" }).count(), 0);

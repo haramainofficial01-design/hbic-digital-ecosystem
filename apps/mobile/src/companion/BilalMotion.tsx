@@ -17,8 +17,8 @@ export function BilalPressable({ reduced = true, style, children, ...props }: Pr
 }
 
 /** Finite, compositor-driven motion. No loop, frame callback or idle timer. */
-export function BilalMotion({ children, style, reduced = true, phase = "enter", accessibilityViewIsModal }: PropsWithChildren<{
-  style?: StyleProp<ViewStyle>; reduced?: boolean; phase?: string | number; accessibilityViewIsModal?: boolean;
+export function BilalMotion({ children, style, reduced = true, phase = "enter", accessibilityViewIsModal, testID }: PropsWithChildren<{
+  style?: StyleProp<ViewStyle>; reduced?: boolean; phase?: string | number; accessibilityViewIsModal?: boolean; testID?: string;
 }>) {
   const progress = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -28,7 +28,7 @@ export function BilalMotion({ children, style, reduced = true, phase = "enter", 
     animation.start();
     return () => { animation.stop(); progress.setValue(1); };
   }, [phase, reduced, progress]);
-  return <Animated.View accessibilityViewIsModal={accessibilityViewIsModal} style={[style, !reduced && {
+  return <Animated.View testID={testID} accessibilityViewIsModal={accessibilityViewIsModal} style={[style, !reduced && {
     opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }]
   }]}>{children}</Animated.View>;
 }

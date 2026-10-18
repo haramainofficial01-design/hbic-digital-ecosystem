@@ -57,3 +57,15 @@ submission and public approval are separate gates. The previous live web
 deployment is `dpl_93MpvdsxNHhVJazc9ebyxkBkDjV3`; previous packages are iOS 46 and
 Android 49. Those packages do not include this new native chat presentation.
 Replacement artifact and deployment evidence is recorded after verification.
+
+## Final native spacing correction
+
+Visual inspection of the installed Android 50 package exposed asymmetric panel
+margins: `width: 100%` plus a right margin made the left edge reach the screen.
+Both horizontal insets now belong to the keyboard-aware overlay, not to the
+full-width panel. A new panel identifier supports direct boundary checks, and
+the iOS/Android/Mac rendering checks require both margins to remain inside the
+viewport. All **35/35** companion checks and mobile typechecking pass again.
+iOS 47 was uploaded but was not attached to App Review; it and Android 50 are
+superseded by the corrected native packages. Their evidence is retained rather
+than treated as verification of the corrected packages.
