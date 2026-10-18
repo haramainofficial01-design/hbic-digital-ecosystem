@@ -75,3 +75,41 @@ store evidence. Final exact artifacts must pass independently before submission.
 No physical-device energy/thermal baseline, all-platform battery certification,
 99% recognition qualification or general-purpose AI capability is claimed.
 Website deployment and native store submission/public approval remain separate.
+
+## Live website and first-launch diagnosis
+
+The website refinement from `598c5ab9179245b1e8d017a71ce1bd3e89e01aa2`
+is live at `https://hbic.ca`, production deployment
+`dpl_BP7FTgwj1SjQ3GymHaAMdVsnT5vi`. It was staged, checked, then promoted;
+the existing admin deployment and hosting configuration were retained. Live
+checks passed again at 2026-10-18T19:38:28Z for canonical current prayer answers,
+public tuition, private handoffs, three translated reply languages, no guessed
+future times, honest preview limitations, real mobile/desktop tour controls and
+the existing admin switch. The deployed SVG matches the canonical source:
+SHA-256 `82734b7e18d1e13364dfeb8cafc3f2e9c4eece2e5b90a99296b56e2a1bd9393f`.
+Actual deployed logos loaded in 390-px light/Reduced-Motion and 1440-px dark
+viewports, with panels inside both viewports. This is not native-app validation.
+
+A diagnostic-only Android run captured `source: api`, `loading: true`,
+`onboarding: false`, `foreground: true`, with no refresh error and a disabled
+launcher. The shared content provider has a startup race: foreground activation
+can own a **silent** refresh before the initial cache read completes; the
+ordinary startup request joins it, but the silent owner's old `finally` never
+cleared the initially true loading state. This also leaves the refresh indicator
+running and suppresses features that correctly wait for Home to finish loading.
+The owner now always clears loading on settlement, without changing prayer
+resolution, data, caches, scheduling, overrides or notification registration.
+
+`npm run test:content` drives the real provider with controlled native lifecycle,
+cache and transport adapters. Before the fix, the foreground-first success and
+failure regressions failed (2 of 3); after the one-line fix, all 3 pass, covering
+single-flight joining, normal startup/manual refresh, same-object retention,
+cached/offline outcomes and listener cleanup. The 28 companion checks and mobile
+typecheck also pass. Diagnostic logging is not part of the committed source.
+
+A separate failed diagnostic run was terminated by Android's WebView package
+auto-update, as recorded by `ApplicationExitInfo` reason `PACKAGE UPDATED`;
+it is not evidence of a JavaScript crash. Play Store updates were disabled only
+inside the disposable read-only QA emulator for repeatable tests. Previously
+failed reports remain failed. Final untouched-artifact startup/lifecycle checks
+and replacement signed packages are still required before store submission.

@@ -90,7 +90,10 @@ export function PublishedContentProvider({ children }: { children: ReactNode }) 
           setLastUpdatedAt(undefined);
         }
       } finally {
-        if (!silent) setLoading(false);
+        // Foreground activation can start a silent request before startup has
+        // finished reading its cache. The startup caller then joins that same
+        // request, so its owner must always settle the initial loading state.
+        setLoading(false);
       }
     })();
     refreshInFlight.current = task;
