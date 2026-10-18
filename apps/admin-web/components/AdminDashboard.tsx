@@ -1824,7 +1824,7 @@ function SettingsPanel({ content, updateContent }: EditorPanelProps) {
 
 function FeatureFlagsPanel({ content, updateContent }: EditorPanelProps) {
   const labels: Array<[keyof HbicContent["featureFlags"], string, string]> = [
-    ["bilalCompanionEnabled", "Bilal Companion", "Public-information assistant. No paid AI service or private account access."],
+    ["bilalCompanionEnabled", "Bilal", "Public-information assistant. No paid AI service or private account access."],
     ["communityHubEnabled", "Community hub", "Ready public Community navigation and spotlight."],
     ["hijriDateEnabled", "Hijri date", "Shared Hijri date across public clients."],
     ["whiteDaysEnabled", "White Days display", "Shows 13th, 14th, and 15th as voluntary fasting days."],

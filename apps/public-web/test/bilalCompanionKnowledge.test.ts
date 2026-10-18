@@ -20,6 +20,18 @@ test("canonical current-day timetable keeps adhan and iqamah separate, including
   assert.match(stale.find(f => f.id === "prayer.today")!.text, /can’t verify/);
   assert.equal(stale.some(f => f.id === "prayer.next"), false);
 });
+test("authored public translations preserve canonical times, contact details and privacy handoffs", () => {
+  for (const language of ["ur", "fa-AF", "ar"] as const) {
+    const get = (question: string) => companionReply({ request: { question, previousQuestions: [], language }, facts, now, contentVersion: content.version });
+    const prayers = get("Today’s prayer times");
+    assert.match(prayers.answer, /6:30 PM/); assert.match(prayers.answer, /6:40 PM/); assert.match(prayers.answer, /2026-10-17/);
+    assert.doesNotMatch(prayers.answer, /Masjid Bilal timetable/);
+    assert.ok(get("contact the office").answer.includes(content.settings.phone));
+    assert.ok(get("contact the office").answer.includes(content.settings.email));
+    assert.equal(get("my Academy payment").needsHuman, true);
+    assert.equal(get("my Academy payment").topicIds.length, 0);
+  }
+});
 test("live public billing controls price, missing evidence refuses an old amount", () => {
   assert.match(answer("academy tuition").answer, /50.00 CAD per child per month/);
   assert.match(buildCompanionKnowledge(content, now, { ...options, monthlyCents: 7250, tuitionMode: "per_family" }).find(f => f.id === "academy.fees")!.text, /72.50 CAD per family/);

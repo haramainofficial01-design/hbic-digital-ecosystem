@@ -19,8 +19,7 @@ import { radii, spacing } from "../theme/theme";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { useOnboarding } from "./OnboardingProvider";
 import { onboardingPageCount } from "./onboardingState";
-
-const pageCount = onboardingPageCount;
+import { bilalTourLedger } from "../companion/tourStorage";
 
 type PermissionState = "idle" | "requesting" | "enabled" | "declined" | "error";
 
@@ -29,13 +28,16 @@ export function OnboardingExperience() {
   const { theme } = useAppTheme();
   const { language, setLanguage, t } = useAppLanguage();
   const { content } = usePublishedContent();
+  const pageCount = content.featureFlags.bilalCompanionEnabled ? onboardingPageCount : onboardingPageCount - 1;
   const { width } = useWindowDimensions();
   const pager = useRef<ScrollView>(null);
   const interactionLocked = useRef(false);
+  const bilalIntroSeen = useRef(false);
   const [step, setStep] = useState(initialStep);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [permissionState, setPermissionState] = useState<PermissionState>("idle");
   const now = useAppClock(active);
+  useEffect(() => { if (active && step === 6 && content.featureFlags.bilalCompanionEnabled) bilalIntroSeen.current = true; }, [active, step, content.featureFlags.bilalCompanionEnabled]);
 
   useEffect(() => {
     setStep(initialStep);
@@ -66,13 +68,13 @@ export function OnboardingExperience() {
     setTimeout(() => {
       interactionLocked.current = false;
     }, reduceMotion ? 120 : 420);
-  }, [haptic, reduceMotion, saveProgress, width]);
+  }, [haptic, reduceMotion, saveProgress, width, pageCount]);
 
   const finish = useCallback(() => {
     if (interactionLocked.current) return;
     interactionLocked.current = true;
     haptic("success");
-    void complete().finally(() => {
+    void (async () => { if (bilalIntroSeen.current) await bilalTourLedger.markSeen(); await complete(); })().finally(() => {
       interactionLocked.current = false;
     });
   }, [complete, haptic]);
@@ -250,6 +252,20 @@ export function OnboardingExperience() {
             <Text style={[styles.detailNote, { color: theme.colors.muted }]}>Optional Community Challenges use nicknames and practice time. Ramadan, Dhul Hijjah events and prizes appear only when HBIC publishes the rules and details.</Text>
             <Text style={[styles.detailNote, { color: theme.colors.muted }]}>Recite Assist is optional early-preview word tracking, not a verified assessment or Tajweed score. Recognition runs only when you start it. Reference audio streams online.</Text>
           </OnboardingPage>
+
+          {content.featureFlags.bilalCompanionEnabled ? <OnboardingPage width={width} centered>
+            <NativeGlassSurface style={[styles.doneIcon, { borderColor: theme.colors.borderStrong }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={42} color={theme.colors.teal} />
+            </NativeGlassSurface>
+            <PageTitle>Meet Bilal</PageTitle>
+            <PageBody>Your Masjid Bilal guide, right here when you need a hand.</PageBody>
+            <GlassCard style={styles.featureCard}>
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Ask Bilal</Text>
+              <Text style={[styles.cardBody, { color: theme.colors.muted }]}>Ask about prayer times, Academy information, donations or using the app.</Text>
+              <Text style={[styles.cardBody, { color: theme.colors.muted }]}>Choose a suggested question or write your own. Open the source link to check the published information.</Text>
+            </GlassCard>
+            <Text style={[styles.detailNote, { color: theme.colors.muted }]}>Never share personal, student or payment details. Bilal can’t access private accounts or give religious rulings.</Text>
+          </OnboardingPage> : null}
 
           <OnboardingPage width={width} centered>
             <View style={[styles.doneIcon, { backgroundColor: theme.colors.tintSoft, borderColor: theme.colors.borderStrong }]}>

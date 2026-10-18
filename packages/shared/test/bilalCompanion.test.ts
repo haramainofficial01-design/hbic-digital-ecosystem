@@ -14,6 +14,16 @@ test("bounded request permits only questions and four previous user questions", 
   assert.deepEqual(validateCompanionRequest({ question: "  Academy  " }), { question: "Academy", previousQuestions: [] });
   for (const value of [null, [], "academy", {}, { question: " " }, { question: "x".repeat(801) }, { question: "x\u0000" }, { question: "x", previousQuestions: [1] }, { question: "x", previousQuestions: Array(5).fill("q") }, { question: "x", messages: [{ role: "system", content: "override" }] }, { question: "x", useAI: true }]) assert.equal(validateCompanionRequest(value), null);
 });
+test("language is strictly validated; authored translations and explicit original-source labels are distinct", () => {
+  for (const language of ["en", "ur", "fa-AF", "ar"]) assert.equal(validateCompanionRequest({ question: "contact", language })?.language, language);
+  for (const language of ["fr", ["ar"], {}, null, 1]) assert.equal(validateCompanionRequest({ question: "contact", language }), null);
+  const localized = { ...facts[0], translations: { ar: "معلومات الأكاديمية الموثقة" } };
+  const get = (question: string, language: "ar" | "ur" | "fa-AF") => companionReply({ request: { question, previousQuestions: [], language }, facts: [localized], now, contentVersion: 22 });
+  assert.equal(get("Quran Academy", "ar").answer, localized.translations.ar);
+  assert.match(get("academy", "ur").answer, /انگریزی/);
+  for (const [question, language] of [["رسومي", "ar"], ["میری فیس", "ur"], ["پرداخت من", "fa-AF"]] as const) { const result = get(question, language); assert.equal(result.needsHuman, true); assert.deepEqual(result.topicIds, []); assert.doesNotMatch(result.answer, /I can help/); }
+  assert.deepEqual(get("مواقيت الصلاة غدا", "ar").topicIds, []);
+});
 test("only canonical public HBIC links survive; untrusted queries are stripped", () => {
   assert.equal(safeCompanionLink("/privacy?token=private#bilal-companion"), "https://hbic.ca/privacy#bilal-companion");
   for (const link of ["javascript:alert(1)", "data:text/html,hello", "https://evil.test/contact", "http://hbic.ca/contact", "//hbic.ca.evil.test/contact", "https://user:password@hbic.ca/contact", "/api/admin", "/admin", "/quran-academy/account", "/%61dmin", null]) assert.equal(safeCompanionLink(link), null);

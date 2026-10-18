@@ -3,6 +3,38 @@
 Historical baseline: August 8, 2026. See the October 11, 2026 addendum below;
 the historical account and direct-collection statements do not describe 1.7.5.
 
+## October 17, 2026 — Bilal addendum
+
+The optional native/public-web companion sends a bounded question and at most
+four previous user questions to HBIC's HTTPS server for a public-information
+lookup. It uses no external AI provider, account identifier or microphone.
+Questions/answers remain in app/browser memory and are not written to an HBIC
+database or application logs. Clear chat/reload/restart removes local history.
+Hosting connection/security records remain governed by the existing policy;
+the application limiter retains a bounded, short-lived salted address hash.
+The canonical policy now explains this at `https://hbic.ca/privacy#bilal-companion`.
+The introductory-tour campaign and interface-language preference are device-local
+settings, not chat history. The existing privacy anchor remains backward compatible.
+
+Google's [Data safety guidance](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en)
+requires ephemeral off-device processing to be considered in the form even
+when it does not appear as collected data on the public listing. HBIC's existing
+declaration already includes optional **Other user-generated content**, app
+functionality, non-shared; some existing private form content is retained, so
+the category as a whole is not exclusively ephemeral. The new companion's
+question processing does not justify changing that entire category to ephemeral
+or claiming HBIC collects no user content. The public Play Data safety page was
+rechecked on October 17 and lists App interactions and Other user-generated
+content, alongside the existing account, Academy/payment and device-ID types.
+No declaration was silently weakened or replaced with a no-data claim.
+
+Apple's [privacy definition](https://developer.apple.com/app-store/app-privacy-details/)
+distinguishes real-time processing from retention beyond the request. No new
+persistent chat collection, tracking, advertising or external AI processor is
+introduced; existing retained forms/account/payment declarations remain.
+These are scoped implementation/declaration checks, not independent legal
+certification or a guarantee about future provider behavior.
+
 ## October 11, 2026 release addendum
 
 - Canonical public policy: `https://hbic.ca/privacy`.

@@ -1,6 +1,6 @@
 export const onboardingSchemaVersion = 1;
 export const currentOnboardingVersion = 1;
-export const onboardingPageCount = 7;
+export const onboardingPageCount = 8;
 
 export type OnboardingCompletionSource = "first-install" | "legacy-migration" | "settings-replay";
 

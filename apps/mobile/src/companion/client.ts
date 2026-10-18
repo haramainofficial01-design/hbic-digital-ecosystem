@@ -5,7 +5,7 @@ const apiBase = (process.env.EXPO_PUBLIC_API_URL || "https://hbic.ca").replace(/
 /** Public, read-only HBIC endpoint. No model provider, account token or disk storage. */
 export async function askBilalCompanion(input: CompanionRequest, signal: AbortSignal): Promise<CompanionReply> {
   const response = await fetch(`${apiBase}/api/assistant`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", signal,
+    method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", credentials: "omit", signal,
     body: JSON.stringify(input)
   });
   const data = await response.json();

@@ -1,4 +1,4 @@
-# Bilal Companion
+# Bilal
 
 HBIC-owned, no-model public-information assistant for the existing website
 and compatible iOS/Android app. The user explicitly declined any AI provider
@@ -11,13 +11,21 @@ infrastructure.
 
 - Deliberately opened **Ask Bilal** launcher in HBIC navy, teal and gold.
   Bounded conversation panel, source chips, clear/dismiss controls and restrained
-  motion respecting Reduced Motion. Never opens automatically.
-- This is an English-topic published-information lookup, not an independently
+  motion respecting Reduced Motion. A one-time three-step introduction can open
+  on verified, idle Home after launch/onboarding; it waits around prayer alerts
+  and notifications. A campaign preference is persisted before display. Skip,
+  dismissal and restart do not repeat it. Quick tour replays it voluntarily.
+  New installs that actually view Bilal in onboarding consume this same tour;
+  existing installs are not forced through full onboarding again.
+- This is a supported-topic published-information lookup, not an independently
   trained conversational model. It can answer supported questions about the
   masjid, prayer times, Academy, donations, Quran tools, app settings, events,
   programs and contact routes. Unknown questions receive an explicit handoff.
-  Urdu, Dari and Arabic interface labels are supplied; answers quote published
-  English information and the app explicitly says so. No universal natural-
+  The introduction and interface follow English/Urdu/Dari/Arabic app settings;
+  the website provides the same four-language selector with a local preference.
+  Authored contact, current prayer, donation and secure-account/calendar replies
+  are translated. Other CMS prose is explicitly labelled as original English
+  when no authored translation exists. No universal natural-
   language understanding, translation certification or "all questions" claim.
 - Current public CMS fields are explicitly allowlisted. Expired, hidden,
   future and non-All announcements and past events are not exposed. Private
@@ -34,11 +42,11 @@ infrastructure.
   preview; the assistant does not claim 99% accuracy.
 - Chat stays out of Quran, Academy, payment/check-in and TV displays. Native
   notifications/backgrounding/route changes close it and abort pending work;
-  an active chat defers the existing voluntary rating invitation.
+  an active/pending first tour defers the existing voluntary rating invitation.
 
 ## Privacy and controls
 
-The public POST accepts a bounded question and at most four previous user
+The public POST accepts a bounded question, supported language and at most four previous user
 questions, not arbitrary system messages or tools. It returns only server-
 authored published facts and canonical public hbic.ca source links. Text is
 rendered as plain text; untrusted HTML and external/private links cannot execute.
@@ -47,8 +55,10 @@ per-instance limiter uses a salted address hash, without a persistent profile.
 No chat database, analytics event or application-log text is written. In-memory
 history clears on Clear chat, reload or app restart. The public privacy policy
 documents server processing and ordinary hosting/security connection handling.
+Only the tour campaign and interface-language preferences are persisted locally;
+they contain no chat text, account identifier or payment information.
 
-**Admin → Public feature controls → Bilal Companion** controls
+**Admin → Public feature controls → Bilal** controls
 `featureFlags.bilalCompanionEnabled` after the normal content publication.
 The server checks this switch on every question; no provider key is required.
 

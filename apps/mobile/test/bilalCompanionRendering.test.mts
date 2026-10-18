@@ -5,6 +5,7 @@ import { chromium, type Page } from "playwright";
 import path from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { defaultContent, normalizeContent } from "@hbic/shared";
 
 const root = path.resolve(import.meta.dirname, "../../.."), qa = mkdtempSync(path.join(tmpdir(), "hbic-companion-native-adapters-"));
 // Real component/effects/client with explicit native UI adapters. Not physical-device proof.
@@ -20,37 +21,40 @@ export const ScrollView=forwardRef(({children,style:s,contentContainerStyle,onCo
 export const KeyboardAvoidingView=({children,style:s})=><div style={{display:'flex',flexDirection:'column',height:'100dvh',...css(s)}}>{children}</div>;
 export const Modal=({visible,children,onRequestClose,onShow})=>{useEffect(()=>{window.back=onRequestClose;if(visible)onShow?.()},[visible]);return visible?<div role='dialog' style={{position:'fixed',inset:0,zIndex:100}}>{children}</div>:null};
 export const AccessibilityInfo={isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})};
+export const Image=forwardRef((_,ref)=><img ref={ref}/>);export const Alert={alert(){}};
 const listeners=new Set();export const AppState={currentState:'active',addEventListener(_,fn){listeners.add(fn);return{remove(){listeners.delete(fn)}}}};window.appState=s=>listeners.forEach(fn=>fn(s));
 export const Linking={openURL:async url=>{window.opened.push(url);if(window.linkError)throw Error('offline')}};`;
 
 async function bundle() {
   const result = await build({ bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env.EXPO_PUBLIC_API_URL": '"https://hbic.ca"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion}from'./apps/mobile/src/companion/BilalCompanion';import{getCompanionActive}from'./apps/mobile/src/companion/activity';window.companionActive=getCompanionActive;function Harness(){const[tick,set]=useState(0);window.patch=(key,value)=>flushSync(()=>{window.fixture[key]=value;set(x=>x+1)});return <BilalCompanion/>}let root;window.mount=()=>{root=createRoot(document.getElementById('root'));flushSync(()=>root.render(<Harness/>))};window.unmount=()=>flushSync(()=>root.unmount());window.mount();` }, plugins: [{ name: "native-companion-adapters", setup(b) {
-    b.onResolve({ filter: /^react-native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$/ }, args => ({ path: args.path, namespace: "fixture" }));
-    for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
+    b.onResolve({ filter: /^react-native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
+    for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime", "components/NativeGlassSurface"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "tsx", resolveDir: root, contents: {
       "react-native": native,
       "react-native-safe-area-context": "export const useSafeAreaInsets=()=>({top:20,bottom:20,left:0,right:0})",
       "@expo/vector-icons": "import React from'react';export const Ionicons=()=> <span aria-hidden='true' style={{width:20,height:20}}>◌</span>",
       "expo-router": "export const usePathname=()=>window.fixture.pathname",
-      "expo-notifications": "const received=new Set(),tapped=new Set();export const addNotificationReceivedListener=fn=>{received.add(fn);return{remove(){received.delete(fn)}}};export const addNotificationResponseReceivedListener=fn=>{tapped.add(fn);return{remove(){tapped.delete(fn)}}};window.notification=()=>received.forEach(fn=>fn());window.notificationListeners=()=>received.size+tapped.size",
+      "expo-notifications": "const received=new Set(),tapped=new Set();export const getLastNotificationResponseAsync=async()=>null;export const addNotificationReceivedListener=fn=>{received.add(fn);return{remove(){received.delete(fn)}}};export const addNotificationResponseReceivedListener=fn=>{tapped.add(fn);return{remove(){tapped.delete(fn)}}};window.notification=()=>received.forEach(fn=>fn());window.notificationListeners=()=>received.size+tapped.size",
+      "expo-file-system/legacy": "export const documentDirectory='test://';export const getInfoAsync=async()=>({exists:window.tourDisk!==null});export const readAsStringAsync=async()=>window.tourDisk;export const writeAsStringAsync=async(_,v)=>{window.tourDisk=v};export const deleteAsync=async()=>{window.tourDisk=null}",
+      "components/NativeGlassSurface": `import React from'react';import{View}from'react-native';export const NativeGlassSurface=({children,style})=><View style={style}>{children}</View>`,
       ThemeProvider: `import{lightTheme,darkTheme}from'${root}/apps/mobile/src/theme/theme';export const useAppTheme=()=>({theme:window.dark?darkTheme:lightTheme})`,
-      LanguageProvider: "export const useAppLanguage=()=>({language:window.fixture.language,translate:x=>x})",
+      LanguageProvider: `import{translateUi}from'@hbic/shared';export const useAppLanguage=()=>({language:window.fixture.language,isRtl:window.fixture.language!=='en',translate:x=>translateUi(window.fixture.language,x)})`,
       OnboardingProvider: "export const useOnboarding=()=>({active:window.fixture.onboarding})",
-      "services/content": "export const usePublishedContent=()=>({loading:window.fixture.loading,content:{featureFlags:{bilalCompanionEnabled:window.fixture.enabled}}})",
+      "services/content": "export const usePublishedContent=()=>({loading:window.fixture.loading,content:window.fixture.content?{...window.fixture.content,featureFlags:{...window.fixture.content.featureFlags,bilalCompanionEnabled:window.fixture.enabled}}:{featureFlags:{bilalCompanionEnabled:window.fixture.enabled}},source:window.fixture.source})",
       "quran/macRuntime": "export const isMacQuranHost=window.mac"
     }[args.path] ?? "" }));
   } }] });
   return result.outputFiles[0].text;
 }
 const bundled = bundle();
-async function setup(page: Page, platform = "android", dark = false, mac = false) {
+async function setup(page: Page, platform = "android", dark = false, mac = false, seen = true) {
   page.setDefaultTimeout(5000);
   page.on("pageerror", error => console.error("Native-adapter error:", error.message));
   await page.setContent("<style>html,body{margin:0;font-family:system-ui}*{box-sizing:border-box}button{border:0}</style><div id='root'></div>");
-  await page.evaluate(({ platform, dark, mac }) => {
-    Object.assign(window, { platform, dark, mac, opened: [], requests: [], fixture: { pathname: "/", loading: false, onboarding: false, enabled: true, language: "en" }, fail: false });
+  await page.evaluate(({ platform, dark, mac, seen }) => {
+    Object.assign(window, { platform, dark, mac, tourDisk: seen ? "hbic-bilal-welcome-2026-10-v1" : null, opened: [], requests: [], fixture: { pathname: "/", loading: false, onboarding: false, enabled: true, language: "en" }, fail: false });
     window.fetch = async (_, init) => { const w = window as any; w.requests.push({ url: String(_), body: JSON.parse(String(init?.body)) }); return Response.json(w.fail ? { ok: false } : { ok: true, answer: "Verified public answer.", sources: [{ id: "contact", title: "Source page", href: "https://hbic.ca/contact" }, { id: "bad", title: "Unsafe link", href: "https://untrusted.test" }], asOf: "2026-10-17T16:00:00Z", mode: "published-info" }, { status: w.fail ? 503 : 200 }); };
-  }, { platform, dark, mac });
+  }, { platform, dark, mac, seen });
   await page.addScriptTag({ content: await bundled });
 }
 async function patch(page: Page, key: string, value: unknown) { await page.evaluate(([key, value]) => (window as any).patch(key, value), [key, value]); }
@@ -60,7 +64,7 @@ test("iOS/Android/Mac native component actions, bounded layout, sources, clearin
   try {
     for (const [platform, width, height, dark, mac] of [["ios",390,844,false,false],["android",320,568,true,false],["ios",1440,900,true,true]] as const) {
       const page = await browser.newPage({ viewport: { width, height } }); await setup(page, platform, dark, mac);
-      const launcher = page.getByRole("button", { name: "Open Bilal Companion" }); assert.equal(await page.getByRole("dialog").count(), 0);
+      const launcher = page.getByRole("button", { name: "Open Bilal" }); assert.equal(await page.getByRole("dialog").count(), 0);
       await launcher.click(); await page.getByRole("dialog").waitFor(); assert.equal(await page.evaluate(() => (window as any).companionActive()), true);
       const input = page.getByRole("textbox", { name: "Your question" }); await input.fill("contact"); await page.getByRole("button", { name: "Send question" }).click();
       await page.getByText("Verified public answer.", { exact: true }).waitFor();
@@ -74,17 +78,56 @@ test("iOS/Android/Mac native component actions, bounded layout, sources, clearin
       assert.equal(await input.inputValue(), "question", "failed question is available for retry");
       await page.evaluate(() => (window as any).back()); await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
       await page.evaluate(() => { (window as any).unmount(); (window as any).mount(); }); await launcher.click(); assert.equal(await page.getByText("question", { exact: true }).count(), 0);
-      const requests = await page.evaluate(() => (window as any).requests); assert.equal(requests[0].url, "https://hbic.ca/api/assistant"); assert.deepEqual(requests[0].body, { question: "contact", previousQuestions: [] });
+      const requests = await page.evaluate(() => (window as any).requests); assert.equal(requests[0].url, "https://hbic.ca/api/assistant"); assert.deepEqual(requests[0].body, { question: "contact", previousQuestions: [], language: "en" });
       await page.close();
     }
     console.log(`Native adapter screenshots (not real-device proof): ${qa}`);
+  } finally { await browser.close(); }
+});
+test("existing native installation automatically receives one tour only after fresh, idle Home content", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage(); await page.clock.install({ time: new Date("2026-10-17T18:00:00Z") }); await setup(page, "ios", false, false, false);
+    const content = normalizeContent({ ...structuredClone(defaultContent), updatedAt: "2026-10-17T18:00:00Z", announcements: [], prayerTime: { ...defaultContent.prayerTime, date: "2026-10-17", fajr: "6:00 AM", sunrise: "8:00 AM", dhuhr: "1:30 PM", asr: "4:00 PM", maghrib: "6:30 PM", isha: "8:30 PM", source: "iqamah.ca" } });
+    await patch(page, "content", content); await patch(page, "source", "cache"); await page.clock.runFor(10_000);
+    assert.equal(await page.getByRole("dialog").count(), 0); assert.equal(await page.evaluate(() => (window as any).tourDisk), null);
+    await patch(page, "source", "api"); await page.clock.runFor(6600); await page.getByRole("heading", { name: "Meet Bilal" }).waitFor();
+    assert.equal(await page.evaluate(() => (window as any).companionActive()), true);
+    await page.getByRole("button", { name: "Skip tour" }).click(); await page.getByRole("dialog").waitFor({ state: "hidden" });
+    await page.clock.runFor(90_000); assert.equal(await page.getByRole("dialog").count(), 0);
+    await page.evaluate(() => { (window as any).unmount(); (window as any).mount(); }); await page.clock.runFor(40_000);
+    assert.equal(await page.getByRole("dialog").count(), 0);
+  } finally { await browser.close(); }
+});
+test("native tour is translated, scrollable at large text, consumed once, replayable and interrupted by a notification", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const language of ["en", "ur", "fa-AF", "ar"]) {
+      const page = await browser.newPage({ viewport: { width: 320, height: 568 } }); await setup(page, "android", true, false, false);
+      await page.evaluate(() => { (window as any).textScale = 1.6; }); await patch(page, "language", language); await page.waitForTimeout(60);
+      await page.getByTestId("bilal-companion-launcher").click();
+      const dialog = page.getByRole("dialog"), next = dialog.getByRole("button").filter({ has: page.locator('span[aria-hidden="true"]') });
+      // The primary step button is the only non-header button containing an arrow.
+      for (let step = 0; step < 3; step++) {
+        const primary = next.last(); await primary.scrollIntoViewIfNeeded(); await primary.click();
+      }
+      const input = dialog.getByRole("textbox"); await input.waitFor();
+      await dialog.getByRole("button").nth(1).click();
+      await dialog.getByRole("textbox").waitFor({ state: "hidden" });
+      await page.evaluate(() => (window as any).notification()); await dialog.waitFor({ state: "hidden" });
+      await page.getByTestId("bilal-companion-launcher").click(); await input.waitFor();
+      await page.evaluate(() => { (window as any).unmount(); (window as any).mount(); }); await page.waitForTimeout(60);
+      await page.getByTestId("bilal-companion-launcher").click(); await input.waitFor();
+      assert.equal(await page.evaluate(() => (window as any).tourDisk), "hbic-bilal-welcome-2026-10-v1");
+      await page.screenshot({ path: path.join(qa, `tour-${language}.png`) }); await page.close();
+    }
   } finally { await browser.close(); }
 });
 test("native chat closes on notification/background, respects onboarding/remote switch and private routes, cleans listeners", async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage(); await setup(page);
-    const launcher = page.getByRole("button", { name: "Open Bilal Companion" }); await launcher.click(); await page.evaluate(() => (window as any).notification()); await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
+    const launcher = page.getByRole("button", { name: "Open Bilal" }); await launcher.click(); await page.evaluate(() => (window as any).notification()); await page.getByRole("dialog").waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
     await launcher.click(); await page.evaluate(() => (window as any).appState("background")); await launcher.waitFor({ state: "hidden" }); assert.equal(await page.getByRole("dialog").count(), 0);
     await page.evaluate(() => (window as any).appState("active"));
     for (const key of ["onboarding", "loading"]) { await patch(page, key, true); assert.equal(await launcher.count(), 0); await patch(page, key, false); }

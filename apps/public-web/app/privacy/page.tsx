@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
             <strong>On this page</strong>
             <a href="#scope">Scope</a>
             <a href="#information">Information we handle</a>
-            <a href="#bilal-companion">Bilal Companion</a>
+            <a href="#bilal-companion">Bilal</a>
             <a href="#use">How information is used</a>
             <a href="#sharing">Service providers and sharing</a>
             <a href="#retention">Retention and deletion</a>
@@ -101,9 +101,9 @@ export default async function PrivacyPage() {
             </section>
 
             <section id="bilal-companion">
-              <h2>Bilal Companion</h2>
+              <h2 id="bilal">Bilal</h2>
               <p>
-                Bilal Companion is HBIC&apos;s public-information assistant, not a live staff member, imam or general-purpose AI model. When you send a question, our server matches it with published HBIC information and returns source links. No external AI service receives your question. It cannot access private student, attendance, payment or account records, take payments, enroll anyone, or provide religious rulings.
+                Bilal is HBIC&apos;s public-information assistant, not a live staff member, imam or general-purpose AI model. When you send a question, our server matches it with published HBIC information and returns source links. No external AI service receives your question. It cannot access private student, attendance, payment or account records, take payments, enroll anyone, or provide religious rulings. Your device remembers only the introductory tour preference and selected interface language; chat text is not saved with those preferences.
               </p>
               <p>
                 The current question and up to four earlier questions from this chat are processed by HBIC&apos;s server to understand short follow-ups. We do not save the chat to a database or include its text in application logs. Conversation history stays in this open app or browser session; Clear chat removes it, and reloading or restarting clears it. Do not enter personal, child, account, card or other sensitive details. General hosting connection and security information is handled as described above. A short-lived, server-instance-specific hash of the connecting address limits excessive requests; it is not a saved chat profile.

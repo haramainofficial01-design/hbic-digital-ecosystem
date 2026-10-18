@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { bilalCompanionDisclaimer, bilalCompanionName, bilalCompanionSuggestions, bilalCompanionWelcome, companionVisibleOnRoute, safeCompanionLink, type CompanionReply } from "@hbic/shared";
 import { usePathname } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLanguage } from "../i18n/LanguageProvider";
@@ -13,18 +13,24 @@ import { usePublishedContent } from "../services/content";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { askBilalCompanion } from "./client";
 import { setCompanionActive } from "./activity";
+import { BilalTourCard } from "./BilalTourCard";
+import { useBilalTour } from "./useBilalTour";
+import { NativeGlassSurface } from "../components/NativeGlassSurface";
 
-type Message = { id: number; role: "user" | "assistant"; text: string; reply?: CompanionReply };
+type Message = { id: number; role: "user" | "assistant"; text: string; question?: string; reply?: CompanionReply };
 
 /** Deliberately opened, memory-only companion. No background inference or animation loop. */
 export function BilalCompanion() {
   const pathname = usePathname(), { content, loading } = usePublishedContent(), { active: onboarding } = useOnboarding();
-  const { theme } = useAppTheme(), { language, translate: t } = useAppLanguage(), insets = useSafeAreaInsets(), { height } = useWindowDimensions();
-  const [open, setOpen] = useState(false), [foreground, setForeground] = useState(AppState.currentState === "active"), [reduceMotion, setReduceMotion] = useState(true);
+  const { theme } = useAppTheme(), { language, isRtl, translate: t } = useAppLanguage(), insets = useSafeAreaInsets(), { height } = useWindowDimensions();
+  const [open, setOpen] = useState(false), [foreground, setForeground] = useState(AppState.currentState === "active"), [reduceMotion, setReduceMotion] = useState(true), [notificationReady, setNotificationReady] = useState(false);
   const [draft, setDraft] = useState(""), [messages, setMessages] = useState<Message[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const input = useRef<TextInput>(null), scroll = useRef<ScrollView>(null), sequence = useRef(0), locked = useRef(false), controller = useRef<AbortController | null>(null);
   const eligible = !onboarding && !loading && foreground && content.featureFlags.bilalCompanionEnabled && companionVisibleOnRoute(pathname, true);
-  function close() { controller.current?.abort(); controller.current = null; locked.current = false; setBusy(false); setOpen(false); }
+  const tour = useBilalTour({ eligible: eligible && notificationReady && pathname === "/", open, onboarding, onOpen: () => setOpen(true) });
+  const deferTour = useRef(tour.defer); deferTour.current = tour.defer;
+  const close = useCallback(() => { controller.current?.abort(); controller.current = null; locked.current = false; setBusy(false); setOpen(false); }, []);
+  const interrupt = useCallback(() => { deferTour.current(); close(); }, [close]);
 
   useEffect(() => {
     let mounted = true;
@@ -32,24 +38,27 @@ export function BilalCompanion() {
     const motion = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
     const state = AppState.addEventListener("change", value => setForeground(value === "active"));
     // A notification must not leave a chat covering a more important action.
-    const received = Notifications.addNotificationReceivedListener(close);
-    const tapped = Notifications.addNotificationResponseReceivedListener(close);
+    const received = Notifications.addNotificationReceivedListener(interrupt);
+    const tapped = Notifications.addNotificationResponseReceivedListener(interrupt);
+    void Notifications.getLastNotificationResponseAsync().then(value => { if (mounted) { if (value) deferTour.current(); setNotificationReady(true); } }).catch(() => {});
     return () => { mounted = false; motion.remove(); state.remove(); received.remove(); tapped.remove(); controller.current?.abort(); };
-  }, []);
-  useEffect(() => { close(); }, [pathname, eligible]);
-  useEffect(() => { setCompanionActive(open && eligible); return () => { setCompanionActive(false); }; }, [open, eligible]);
+  }, [interrupt]);
+  useEffect(() => { close(); }, [pathname, eligible, close]);
+  useEffect(() => { if (!foreground) deferTour.current(); }, [foreground]);
+  useEffect(() => { setCompanionActive(eligible && (open || pathname === "/" && tour.seen === false)); return () => { setCompanionActive(false); }; }, [open, eligible, pathname, tour.seen]);
+  useEffect(() => { if (open && tour.step === null) { const timer = setTimeout(() => input.current?.focus(), 200); return () => clearTimeout(timer); } }, [open, tour.step]);
 
-  async function send(question = draft) {
+  async function send(question = draft, displayedQuestion = question) {
     const text = question.trim();
     if (!text || text.length > 800 || locked.current) return;
     if (messages.filter(message => message.role === "user").length >= 20) { setError(t("Please clear this chat to start a new conversation.")); return; }
-    noteRatingHomeInteraction(); locked.current = true; setBusy(true); setDraft(""); setError("");
-    const previousQuestions = messages.filter(message => message.role === "user").slice(-4).map(message => message.text);
-    setMessages(current => [...current, { id: ++sequence.current, role: "user", text }]);
+    noteRatingHomeInteraction(); tour.noteInteraction(); locked.current = true; setBusy(true); setDraft(""); setError("");
+    const previousQuestions = messages.filter(message => message.role === "user").slice(-4).map(message => message.question ?? message.text);
+    setMessages(current => [...current, { id: ++sequence.current, role: "user", text: displayedQuestion.trim(), question: text }]);
     const abort = new AbortController(); controller.current = abort;
     const timeout = setTimeout(() => abort.abort(), 20_000);
     try {
-      const reply = await askBilalCompanion({ question: text, previousQuestions }, abort.signal);
+      const reply = await askBilalCompanion({ question: text, previousQuestions, language }, abort.signal);
       if (!abort.signal.aborted && controller.current === abort) setMessages(current => [...current, { id: ++sequence.current, role: "assistant", text: reply.answer, reply }]);
     } catch (reason) {
       if (controller.current === abort) { setDraft(text); setError(t(abort.signal.aborted ? "That request was interrupted. Please try again." : reason instanceof Error ? reason.message : "Please try again shortly.")); }
@@ -60,47 +69,51 @@ export function BilalCompanion() {
     try { await Linking.openURL(url); close(); } catch { setError(t("Couldn’t open that page. Please try again.")); }
   }
   const c = theme.colors;
+  const direction = { textAlign: isRtl ? "right" as const : "left" as const, writingDirection: isRtl ? "rtl" as const : "ltr" as const };
+  const row = { flexDirection: isRtl ? "row-reverse" as const : "row" as const };
   if (!eligible) return null;
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal Companion")} testID="bilal-companion-launcher"
-      onPress={() => { noteRatingHomeInteraction(); setOpen(true); }}
+    <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher"
+      onPress={() => { noteRatingHomeInteraction(); tour.noteInteraction(); if (tour.seen === false) tour.start(); else { tour.finish(); setOpen(true); } }}
       style={({ pressed }) => [styles.launcher, { right: Math.max(16, insets.right + 12), bottom: isMacQuranHost ? 24 : Math.max(12, insets.bottom) + 86, opacity: pressed ? .85 : 1 }]}>
       <Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
     </Pressable>
-    <Modal visible={open} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => input.current?.focus()} statusBarTranslucent>
-      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <Modal visible={open} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
         <Pressable accessibilityLabel={t("Close chat")} accessibilityRole="button" onPress={close} style={styles.scrim} />
         <View accessibilityViewIsModal style={[styles.panel, { maxHeight: Math.max(220, height - insets.top - insets.bottom - 28), marginBottom: Math.max(12, insets.bottom), marginRight: Math.max(12, insets.right), backgroundColor: c.surface, borderColor: c.borderStrong }]}>
-          <View style={styles.header}>
-            <View style={styles.mark}><Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /></View>
-            <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>{bilalCompanionName}</Text><Text style={styles.subtitle}>{t("Your Masjid Bilal companion")}</Text></View>
-            <Pressable accessibilityRole="button" accessibilityLabel={t("Clear chat")} disabled={busy || !messages.length} onPress={() => { setMessages([]); setDraft(""); setError(""); input.current?.focus(); }} style={[styles.iconButton, { opacity: busy || !messages.length ? .4 : 1 }]}><Ionicons name="refresh-outline" size={20} color="white" /></Pressable>
+          <View style={[styles.header, row]}>
+            <NativeGlassSurface style={styles.mark}><Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /></NativeGlassSurface>
+            <View style={styles.heading}><Text accessibilityRole="header" style={[styles.title, direction]}>{t(bilalCompanionName)}</Text><Text style={[styles.subtitle, direction]}>{t("Your Masjid Bilal companion")}</Text></View>
+            <Pressable accessibilityRole="button" accessibilityLabel={t("Quick tour")} disabled={tour.step !== null || busy} onPress={tour.start} style={styles.iconButton}><Ionicons name="help-circle-outline" size={21} color="white" /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t("Clear chat")} disabled={busy || !messages.length || tour.step !== null} onPress={() => { setMessages([]); setDraft(""); setError(""); input.current?.focus(); }} style={[styles.iconButton, { opacity: busy || !messages.length || tour.step !== null ? .4 : 1 }]}><Ionicons name="refresh-outline" size={20} color="white" /></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={t("Close chat")} onPress={close} style={styles.iconButton}><Ionicons name="close" size={24} color="white" /></Pressable>
           </View>
+          {tour.step !== null ? <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled"><BilalTourCard step={tour.step} onNext={tour.next} onSkip={() => { tour.finish(); close(); }} /></ScrollView> : <>
           <View style={[styles.notice, { backgroundColor: c.tintSoft, borderColor: c.border }]}>
-            <Text style={[styles.noticeText, { color: c.muted }]}>{t(bilalCompanionDisclaimer)}</Text>
-            {language !== "en" ? <Text style={[styles.noticeText, { color: c.muted }]}>{t("Answers quote published English information.")}</Text> : null}
+            <Text style={[styles.noticeText, direction, { color: c.muted }]}>{t(bilalCompanionDisclaimer)}</Text>
           </View>
           <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.messages} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
-            <View style={[styles.bubble, styles.assistant, { backgroundColor: c.tintSoft, borderColor: c.border }]}><Text style={[styles.message, { color: c.text }]}>{t(bilalCompanionWelcome)}</Text></View>
-            {!messages.length ? <View style={styles.suggestions}>{bilalCompanionSuggestions.map(question => <Pressable key={question} accessibilityRole="button" onPress={() => void send(question)} disabled={busy} style={[styles.suggestion, { backgroundColor: c.surfaceStrong, borderColor: c.border }]}><Text style={[styles.suggestionText, { color: c.text }]}>{t(question)}</Text><Ionicons name="arrow-forward" size={16} color={c.tint} /></Pressable>)}</View> : null}
+            <View style={[styles.bubble, styles.assistant, { backgroundColor: c.tintSoft, borderColor: c.border }]}><Text style={[styles.message, direction, { color: c.text }]}>{t(bilalCompanionWelcome)}</Text></View>
+            {!messages.length ? <View style={styles.suggestions}>{bilalCompanionSuggestions.map(question => <Pressable key={question} accessibilityRole="button" onPress={() => void send(question, t(question))} disabled={busy} style={[styles.suggestion, row, { backgroundColor: c.surfaceStrong, borderColor: c.border }]}><Text style={[styles.suggestionText, direction, { color: c.text }]}>{t(question)}</Text><Ionicons name={isRtl ? "arrow-back" : "arrow-forward"} size={16} color={c.tint} /></Pressable>)}</View> : null}
             {messages.map(message => <View key={message.id} style={[styles.bubble, message.role === "user" ? styles.user : styles.assistant, { backgroundColor: message.role === "user" ? c.tint : c.tintSoft, borderColor: c.border }]}>
-              <Text selectable style={[styles.message, { color: message.role === "user" ? c.onTint : c.text }]}>{message.text}</Text>
+              <Text selectable style={[styles.message, direction, { color: message.role === "user" ? c.onTint : c.text }]}>{message.text}</Text>
               {message.reply ? <>
-                <View style={styles.sources}>{message.reply.sources.map(source => <Pressable accessibilityRole="link" accessibilityLabel={source.title} key={source.id} onPress={() => void openSource(source.href)} style={[styles.source, { backgroundColor: c.surface, borderColor: c.border }]}><Text style={[styles.sourceText, { color: c.text }]}>{source.title}</Text><Ionicons name="arrow-up-right-box" size={13} color={c.tint} /></Pressable>)}</View>
-                <Text style={[styles.meta, { color: c.muted }]}>{t("Published information")} · {new Date(message.reply.asOf).toLocaleTimeString("en-CA", { timeZone: "America/Edmonton", hour: "numeric", minute: "2-digit" })} Calgary</Text>
+                <View style={[styles.sources, row]}>{message.reply.sources.filter(source => safeCompanionLink(source.href)).map(source => <Pressable accessibilityRole="link" accessibilityLabel={t(source.title)} key={source.id} onPress={() => void openSource(source.href)} style={[styles.source, row, { backgroundColor: c.surface, borderColor: c.border }]}><Text style={[styles.sourceText, direction, { color: c.text }]}>{t(source.title)}</Text><Ionicons name="arrow-up-right-box" size={13} color={c.tint} /></Pressable>)}</View>
+                <Text style={[styles.meta, direction, { color: c.muted }]}>{t("Published information")} · {new Date(message.reply.asOf).toLocaleTimeString(language === "en" ? "en-CA" : language, { timeZone: "America/Edmonton", hour: "numeric", minute: "2-digit" })} · {t("Calgary")}</Text>
               </> : null}
             </View>)}
             {busy ? <Text accessibilityLiveRegion="polite" style={[styles.status, { color: c.muted }]}>{t("Checking published information…")}</Text> : null}
             {error ? <Text accessibilityRole="alert" style={[styles.status, { color: c.danger }]}>{error}</Text> : null}
           </ScrollView>
           <View style={[styles.footer, { borderColor: c.border }]}>
-            <View style={[styles.form, { backgroundColor: c.surfaceStrong, borderColor: c.border }]}>
-              <TextInput ref={input} style={[styles.input, { color: c.text }]} placeholder={t("Ask about Masjid Bilal…")} placeholderTextColor={c.muted} accessibilityLabel={t("Your question")} value={draft} maxLength={800} autoComplete="off" editable={!busy} onChangeText={value => { noteRatingHomeInteraction(); setDraft(value); }} onSubmitEditing={() => void send()} returnKeyType="send" />
+            <View style={[styles.form, row, { backgroundColor: c.surfaceStrong, borderColor: c.border }]}>
+              <TextInput ref={input} style={[styles.input, direction, { color: c.text }]} placeholder={t("Ask about Masjid Bilal…")} placeholderTextColor={c.muted} accessibilityLabel={t("Your question")} value={draft} maxLength={800} autoComplete="off" editable={!busy} onChangeText={value => { noteRatingHomeInteraction(); tour.noteInteraction(); setDraft(value); }} onSubmitEditing={() => void send()} returnKeyType="send" />
               <Pressable accessibilityRole="button" accessibilityLabel={t("Send question")} disabled={busy || !draft.trim()} onPress={() => void send()} style={[styles.send, { backgroundColor: c.tint, opacity: busy || !draft.trim() ? .4 : 1 }]}><Ionicons name="arrow-up" size={22} color={c.onTint} /></Pressable>
             </View>
             <View style={styles.footerLinks}><Text style={[styles.meta, { color: c.muted }]}>{t("This session only")}</Text><Pressable accessibilityRole="link" onPress={() => void openSource("/privacy#bilal-companion")} style={styles.footerLink}><Text style={[styles.linkText, { color: c.tint }]}>{t("Privacy")}</Text></Pressable><Pressable accessibilityRole="link" onPress={() => void openSource("/contact")} style={styles.footerLink}><Text style={[styles.linkText, { color: c.tint }]}>{t("Contact the office")}</Text></Pressable></View>
           </View>
+          </>}
         </View>
       </KeyboardAvoidingView>
     </Modal>

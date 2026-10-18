@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   if (!input) return json({ ok: false, error: "Please enter a question of up to 800 characters." }, 400);
   try {
     const { content, status } = await getPublishedContent();
-    if (!content.featureFlags.bilalCompanionEnabled) return json({ ok: false, error: "Bilal Companion is currently switched off. Please contact the office." }, 503);
+    if (!content.featureFlags.bilalCompanionEnabled) return json({ ok: false, error: "Bilal is currently switched off. Please contact the office." }, 503);
     const now = new Date();
     if (companionBoundary(input.question)) return json(companionReply({ request: input, facts: [], now, contentVersion: content.version, ready: status.configured }));
     const tuition = process.env.ACADEMY_PREVIEW_ENABLED === "true" ? await currentPublicTuition([input.question, ...input.previousQuestions].join(" ")) : {};
