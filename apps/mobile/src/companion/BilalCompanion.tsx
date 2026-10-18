@@ -16,6 +16,7 @@ import { setCompanionActive } from "./activity";
 import { BilalTourCard } from "./BilalTourCard";
 import { useBilalTour } from "./useBilalTour";
 import { NativeGlassSurface } from "../components/NativeGlassSurface";
+import { FullWindowOverlay } from "react-native-screens";
 
 type Message = { id: number; role: "user" | "assistant"; text: string; question?: string; reply?: CompanionReply };
 
@@ -72,12 +73,15 @@ export function BilalCompanion() {
   const direction = { textAlign: isRtl ? "right" as const : "left" as const, writingDirection: isRtl ? "rtl" as const : "ltr" as const };
   const row = { flexDirection: isRtl ? "row-reverse" as const : "row" as const };
   if (!eligible) return null;
-  return <>
+  const launcher = <View pointerEvents="box-none" collapsable={false} style={styles.launcherHost}>
     <Pressable accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher"
       onPress={() => { noteRatingHomeInteraction(); tour.noteInteraction(); if (tour.seen === false) tour.start(); else { tour.finish(); setOpen(true); } }}
       style={({ pressed }) => [styles.launcher, { right: Math.max(16, insets.right + 12), bottom: isMacQuranHost ? 24 : Math.max(12, insets.bottom) + 86, opacity: pressed ? .85 : 1 }]}>
       <Ionicons name="chatbubble-ellipses-outline" size={23} color="#F1D98D" /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
     </Pressable>
+  </View>;
+  return <>
+    {!open ? Platform.OS === "ios" ? <FullWindowOverlay>{launcher}</FullWindowOverlay> : launcher : null}
     <Modal visible={open} transparent animationType={reduceMotion ? "none" : "fade"} onRequestClose={close} onShow={() => { if (tour.step === null) input.current?.focus(); }} statusBarTranslucent>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={tour.noteInteraction}>
         <Pressable accessibilityLabel={t("Close chat")} accessibilityRole="button" onPress={close} style={styles.scrim} />
@@ -121,6 +125,7 @@ export function BilalCompanion() {
 }
 
 const styles = StyleSheet.create({
+  launcherHost: { ...StyleSheet.absoluteFillObject, zIndex: 80, elevation: 80 },
   launcher: { position: "absolute", zIndex: 80, flexDirection: "row", alignItems: "center", gap: 9, minHeight: 52, borderRadius: 20, borderWidth: 1, borderColor: "#648B91", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#082C3C", boxShadow: "0px 6px 18px #001C3828" },
   launcherLabel: { color: "#FFF9E8", fontSize: 14, fontWeight: "700" },
   overlay: { flex: 1, justifyContent: "flex-end", alignItems: "flex-end", paddingLeft: 12 },

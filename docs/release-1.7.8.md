@@ -18,9 +18,13 @@ Replacement builds, source-identical to the above feature commit:
 - Android **1.7.8 (44)**: `1a324849-047c-49ad-bb29-aa896ba7aaf8`.
 - iOS/Watch **1.7.8 (39)**: `b72391a9-1e8e-4bc1-af42-081cc45d4536`.
 
-These were in progress when this preparation record was written. Build creation
-is not artifact verification, store upload, review submission or public approval.
-No store submission of these replacement artifacts has yet been claimed here.
+Both packages passed signature/identity/content checks. The exact-AAB Android
+test then found the root launcher absent above native navigation. These builds
+are held, not release-qualified. iOS 39 was uploaded for processing but was not
+submitted to App Review; Android 44 was not uploaded. The correction supplies
+an explicit full-size root and native overlay host (including the existing iOS
+FullWindowOverlay), with another exact native test required before submission.
+Build creation/upload is not review submission or public approval.
 
 The assistant is named **Bilal**, with a persistent one-time Home tour for
 existing installations and an integrated new-user introduction. English,

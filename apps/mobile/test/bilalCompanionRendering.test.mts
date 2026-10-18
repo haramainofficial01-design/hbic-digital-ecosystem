@@ -27,10 +27,11 @@ export const Linking={openURL:async url=>{window.opened.push(url);if(window.link
 
 async function bundle() {
   const result = await build({ bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env.EXPO_PUBLIC_API_URL": '"https://hbic.ca"' }, stdin: { resolveDir: root, loader: "tsx", contents: `import React,{useState}from'react';import{createRoot}from'react-dom/client';import{flushSync}from'react-dom';import{BilalCompanion}from'./apps/mobile/src/companion/BilalCompanion';import{getCompanionActive}from'./apps/mobile/src/companion/activity';window.companionActive=getCompanionActive;function Harness(){const[tick,set]=useState(0);window.patch=(key,value)=>flushSync(()=>{window.fixture[key]=value;set(x=>x+1)});return <BilalCompanion/>}let root;window.mount=()=>{root=createRoot(document.getElementById('root'));flushSync(()=>root.render(<Harness/>))};window.unmount=()=>flushSync(()=>root.unmount());window.mount();` }, plugins: [{ name: "native-companion-adapters", setup(b) {
-    b.onResolve({ filter: /^react-native$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
+    b.onResolve({ filter: /^react-native$|^react-native-screens$|^react-native-safe-area-context$|^@expo\/vector-icons$|^expo-router$|^expo-notifications$|^expo-file-system\/legacy$/ }, args => ({ path: args.path, namespace: "fixture" }));
     for (const name of ["ThemeProvider", "LanguageProvider", "OnboardingProvider", "services/content", "quran/macRuntime", "components/NativeGlassSurface"]) b.onResolve({ filter: new RegExp(`${name}$`) }, () => ({ path: name, namespace: "fixture" }));
     b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ loader: "tsx", resolveDir: root, contents: {
       "react-native": native,
+      "react-native-screens": "export const FullWindowOverlay=({children})=>children",
       "react-native-safe-area-context": "export const useSafeAreaInsets=()=>({top:20,bottom:20,left:0,right:0})",
       "@expo/vector-icons": "import React from'react';export const Ionicons=()=> <span aria-hidden='true' style={{width:20,height:20}}>◌</span>",
       "expo-router": "export const usePathname=()=>window.fixture.pathname",

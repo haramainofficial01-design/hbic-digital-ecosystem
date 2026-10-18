@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo } from "react-native";
+import { AccessibilityInfo, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "../src/i18n/LanguageProvider";
 import { OnboardingExperience } from "../src/onboarding/OnboardingExperience";
@@ -48,7 +48,7 @@ function AppShell() {
   }, []);
 
   return (
-    <>
+    <View style={{ flex: 1 }} collapsable={false}>
       <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} />
       {!onboardingActive ? <NotificationRouter /> : null}
       <MacAppFrame><Stack
@@ -61,7 +61,7 @@ function AppShell() {
       /></MacAppFrame>
       <BilalCompanion />
       <OnboardingExperience />
-    </>
+    </View>
   );
 }
 
