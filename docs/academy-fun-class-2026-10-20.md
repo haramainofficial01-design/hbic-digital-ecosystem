@@ -41,6 +41,31 @@ deployment delivers the calendar change to those installed apps when Academy is
 reloaded; no new native dependency, OTA, binary or store approval is needed for
 this web-backed change. This does not claim a physical-device test.
 
-Production deployment and alias verification are recorded separately after the
-verified source is committed. Existing authenticated calendar endpoints remain
-private; anonymous requests must not expose parent data.
+## Live release
+
+Source `ffe67a2b8f862199fb86ff793c16746a798c9935` is committed and pushed to
+`feature/quran-reader-practice` in the canonical private repository. Both uploads
+were made from isolated exports of that exact commit, without local secrets or
+output caches. Only the admin export's root hosting configuration was replaced
+with the existing `vercel.admin.json`, as required by the established workflow.
+
+- Public deployment: `dpl_EWGi8BsydqxAVrQ6TVhVNrfhXhQR`.
+- Admin deployment: `dpl_AR6oi4jg8rm75RnPc4QGj8LUfqBN`.
+- Both are READY. Vercel API checks confirmed the exact source metadata and the
+  correct workspace build commands/output directories.
+- Staged public/admin checks passed before promotion. Final alias checks confirm
+  `hbic.ca` and `www.hbic.ca` point to the public deployment, and
+  `hbic-calgary-admin.vercel.app` points to the admin deployment.
+- At `2026-10-20T23:32:15.253Z`, the live Academy page returned HTTP 200 and all
+  14 referenced client scripts loaded; the published code contains the new
+  monthly rule and Fun Class badge. The live admin's eight client scripts
+  include the renamed special-class option.
+- Both unauthenticated Academy-content endpoints still return HTTP 401 without
+  calendar/private parent content. The www Academy URL redirects to the
+  canonical URL with HTTP 308.
+- No real-family signed-in session was inspected. Local rendered interaction
+  tests use synthetic records; they are not claimed as production-family or
+  physical-device tests. No notification was sent or existing record rewritten.
+
+Previous public deployment `dpl_46YRgpU9X68B2uymxHjz4cztYqN5` and admin deployment
+`dpl_6VE3jyDdB55LzCB5LneBzpTyHRxL` remain available as rollback references.
