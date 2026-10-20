@@ -35,13 +35,13 @@ export function academyCalendarMonths(from: string, through: string) {
 
 export function academyCalendarKind(item: ParentCalendarItem) {
   if (item.type === "no_class" || item.type === "holiday") return "closure";
-  if (item.type === "special_class" || item.type === "class" && /fun thursday|special activity/i.test(`${item.title} ${item.note ?? ""}`)) return "special";
+  if (item.type === "special_class" || item.type === "class" && /\bfun (?:class|thursday)\b|special activity/i.test(`${item.title} ${item.note ?? ""}`)) return "special";
   if (item.type === "time_changed") return "changed";
   return item.type === "class" ? "class" : "event";
 }
 
 export function academyCalendarBadge(item: ParentCalendarItem) {
-  return { closure: "No class", special: "Special Thursday", changed: "Time changed", class: "Class", event: "Update" }[academyCalendarKind(item)];
+  return { closure: "No class", special: "Fun Class", changed: "Time changed", class: "Class", event: "Update" }[academyCalendarKind(item)];
 }
 
 export function academyParentCalendar(items: readonly ParentCalendarItem[], today: string, enrollmentStartPeriod?: string | null) {

@@ -14,7 +14,7 @@ async function fixture() {
     stdin: { resolveDir: root, loader: "tsx", contents: `import React from'react';import{createRoot}from'react-dom/client';import{AcademyParent}from'./apps/public-web/components/AcademyParent';
 const items=[{id:'past',date:'2026-10-01',type:'no_class',title:'Preparation day'},
 {id:'thanksgiving',date:'2026-10-12',type:'class',title:'Quran Academy class',note:'5:30–7:00 p.m.'},
-{id:'special',date:'2026-10-15',type:'special_class',title:'Monthly activity',note:'Games and an Islamic presentation.'},
+{id:'special',date:'2026-10-29',type:'class',title:'Fun Class',note:'Games and an Islamic presentation.'},
 {id:'closure',date:'2026-10-19',type:'no_class',title:'Staff closure',note:'No class on this date.'},
 {id:'changed',date:'2026-10-22',type:'time_changed',title:'Updated class time',note:'Class starts at 6:00 PM.'},
 {id:'nov',date:'2026-11-02',type:'class',title:'Quran Academy class'},
@@ -58,8 +58,9 @@ test("actual signed-in parent UI has a prominent calendar, readable full schedul
           return calendar.compareDocumentPosition([...document.querySelectorAll("small")].find(node => node.textContent?.startsWith("TUITION"))!) & Node.DOCUMENT_POSITION_FOLLOWING;
         }), "calendar appears before tuition/payment controls");
         assert.equal(await calendar.getByText("Preparation day").count(), 0);
-        await calendar.getByRole("button", { name: "Thursday, October 15, 2026: Special Thursday", exact: true }).click();
-        await calendar.getByText("Special Thursday", { exact: true }).waitFor();
+        await calendar.getByText("Fun Class: last Thursday of each month.", { exact: true }).waitFor();
+        await calendar.getByRole("button", { name: "Thursday, October 29, 2026: Fun Class", exact: true }).click();
+        await calendar.getByText("Fun Class", { exact: true }).first().waitFor();
         await calendar.getByRole("button", { name: "Monday, October 19, 2026: No class", exact: true }).click();
         await calendar.getByText("Staff closure", { exact: true }).waitFor();
         await calendar.getByRole("button", { name: "Thursday, October 22, 2026: Time changed", exact: true }).click();

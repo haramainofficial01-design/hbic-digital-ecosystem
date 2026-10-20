@@ -72,6 +72,9 @@ try {
   assert.equal(await page.getByRole('checkbox').isChecked(), true);
   assert.equal(await page.evaluate(() => window.academyTestRequests.filter(r => /\/cash$|\/tuition-exemption$/.test(r.path)).length), 0);
   const sections = ['Overview','Families','Students','Attendance','Registrations','Tuition exemptions','Classes','Calendar','Announcements','Payments','Scan Pass','Programs','Settings'];
+  await nav.getByRole('button', { name: 'Calendar', exact: true }).click();
+  assert.equal(await page.getByRole('option', { name: 'Fun Class', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('option', { name: 'Monthly special Thursday', exact: true }).count(), 0);
   for (const width of [320,430,768,1440]) for (const colorScheme of ['light','dark']) {
     await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     for (const section of sections) {

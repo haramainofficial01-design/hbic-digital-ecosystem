@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { academyCardEnrollmentConfirmed } from "../src/academy";
-import { ACADEMY_TUITION_POLICY_VERSION, academyCheckoutLineItemPlan, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
+import { ACADEMY_FIRST_FUN_CLASS_DATE, ACADEMY_TUITION_POLICY_VERSION, academyCheckoutLineItemPlan, academyCheckoutTiming, academyCheckoutTuitionAmounts, academyEnrollmentStartPeriod, academyNextMonthEnrollmentOpen, academyCashReminderStage, academyRecurringClasses, academyRegistrationOpen, academyTuitionPeriod, academyTuitionTotalCents, calgaryBillingPeriod, isCalgaryFirstOfMonth, nextCalgaryFirstBillingAnchor, parseAcademyRegistration } from "../src/academy";
 
 const valid = {
   guardianName: "Sahl Shafiq",
@@ -160,11 +160,13 @@ test("cash reminders appear three Calgary days before the first and on unpaid du
   assert.equal(academyCashReminderStage(new Date("2026-02-25T16:00:00Z"), true, "cash_due"), null);
 });
 
-test("Academy classes start October 5 and the special activity is monthly", () => {
+test("Academy classes start October 5 and Fun Class falls on the last Thursday", () => {
   const classes = academyRecurringClasses("2026-10-01", 32);
   assert.equal(classes[0]?.date, "2026-10-05");
   assert.equal(classes[1]?.date, "2026-10-08");
-  assert.equal(classes.find((entry) => entry.fun)?.date, "2026-10-15");
+  assert.equal(classes.find((entry) => entry.fun)?.date, "2026-10-29");
+  assert.equal(classes.find((entry) => entry.fun)?.date, ACADEMY_FIRST_FUN_CLASS_DATE);
+  assert.equal(classes.find((entry) => entry.fun)?.title, "Fun Class");
   assert.equal(classes.filter((entry) => entry.fun).length, 1);
   assert.equal(academyRecurringClasses("2026-10-01", 32, ["2026-10-22"]).find((entry) => entry.fun)?.date, "2026-10-22");
   assert.equal(classes.some((entry) => entry.date === "2026-10-12"), true);
@@ -172,4 +174,26 @@ test("Academy classes start October 5 and the special activity is monthly", () =
   const term = academyRecurringClasses("2027-01-30", 20);
   assert.equal(term.at(-1)?.date, "2027-02-01");
   assert.equal(term.some((entry) => entry.date === "2027-02-04"), false);
+});
+
+test("Fun Class handles four/five Thursdays, year rollover and the term boundary", () => {
+  const term = academyRecurringClasses("2026-10-01", 180);
+  assert.deepEqual(term.filter(entry => entry.fun).map(entry => entry.date), [
+    "2026-10-29", "2026-11-26", "2026-12-31", "2027-01-28"
+  ]);
+  assert.equal(term.at(-1)?.date, "2027-02-01");
+  assert.ok(term.every(entry => entry.date <= "2027-02-01"));
+  assert.ok(term.filter(entry => entry.fun).every(entry => entry.title === "Fun Class"));
+  assert.equal(academyRecurringClasses("2026-10-20", 15).find(entry => entry.fun)?.date, "2026-10-29");
+  assert.deepEqual(academyRecurringClasses("2027-02-02"), []);
+});
+
+test("staff Fun Class overrides replace the monthly default without duplicating it", () => {
+  const classes = academyRecurringClasses("2026-10-01", 180, ["2026-10-22", "2026-11-12"]);
+  assert.deepEqual(classes.filter(entry => entry.fun).map(entry => entry.date), [
+    "2026-10-22", "2026-11-12", "2026-12-31", "2027-01-28"
+  ]);
+  assert.equal(classes.find(entry => entry.date === "2026-10-29")?.fun, false);
+  assert.equal(classes.find(entry => entry.date === "2026-11-26")?.fun, false);
+  assert.equal(academyRecurringClasses("2026-10-23", 9, ["2026-10-22"]).some(entry => entry.fun), false);
 });

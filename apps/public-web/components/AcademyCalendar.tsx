@@ -32,8 +32,8 @@ export function AcademyCalendar({ items, today, enrollmentStartPeriod, error, on
 
   return <section id="academy-calendar" className={styles.calendar} aria-labelledby="academy-calendar-title" tabIndex={-1}>
     <div className={styles.heading}><h3 id="academy-calendar-title">Academy Calendar</h3><button type="button" className={styles.refresh} disabled={refreshing} onClick={() => void refresh()} aria-label="Refresh Academy calendar">{refreshing ? "Refreshing…" : "Refresh"}</button></div>
-    <p className={styles.rhythm}>Monday &amp; Thursday<span className={styles.classTime}>{academyClassTimeLabel}</span><span>Calgary time</span></p>
-    {nextClass ? <div className={styles.next}><span className={styles.eyebrow}>NEXT CLASS</span><strong>{academyCalendarDateLabel(nextClass.date)}</strong><span>{academyCalendarKind(nextClass) === "changed" ? nextClass.note || "Check the updated time below." : academyClassTimeLabel}{academyCalendarKind(nextClass) === "special" ? " · Special Thursday" : ""}</span></div> : items ? <p className={styles.empty}>{enrollmentStartPeriod && `${enrollmentStartPeriod}-01` > today ? "No class dates are published yet for your selected start month." : "No upcoming classes are published."}</p> : null}
+    <p className={styles.rhythm}>Monday &amp; Thursday<span className={styles.classTime}>{academyClassTimeLabel}</span><span>Calgary time</span><span>Fun Class: last Thursday of each month.</span></p>
+    {nextClass ? <div className={styles.next}><span className={styles.eyebrow}>NEXT CLASS</span><strong>{academyCalendarDateLabel(nextClass.date)}</strong><span>{academyCalendarKind(nextClass) === "changed" ? nextClass.note || "Check the updated time below." : academyClassTimeLabel}{academyCalendarKind(nextClass) === "special" ? " · Fun Class" : ""}</span></div> : items ? <p className={styles.empty}>{enrollmentStartPeriod && `${enrollmentStartPeriod}-01` > today ? "No class dates are published yet for your selected start month." : "No upcoming classes are published."}</p> : null}
     {error ? <p className={styles.warning} role="status">{items ? "Schedule could not refresh. Showing the last loaded dates." : "Calendar could not load. Please try Refresh."}</p> : items === null ? <p className={styles.empty} role="status">Loading your schedule…</p> : null}
     <div className={styles.monthNavigation}><button type="button" aria-label="Previous calendar month" disabled={monthIndex <= 0} onClick={() => changeMonth(monthIndex - 1)}>‹</button><h4 aria-live="polite">{academyCalendarMonthLabel(month)}</h4><button type="button" aria-label="Next calendar month" disabled={monthIndex >= availableMonths.length - 1} onClick={() => changeMonth(monthIndex + 1)}>›</button></div>
     <div className={styles.grid} role="group" aria-label={`${academyCalendarMonthLabel(month)} calendar`}>
@@ -49,7 +49,7 @@ export function AcademyCalendar({ items, today, enrollmentStartPeriod, error, on
           : <span key={date} className={`${styles.day} ${styles.quietDay}`} aria-label={academyCalendarDateLabel(date)}>{content}</span>;
       })}
     </div>
-    <div className={styles.legend}><span>● Class</span><span>★ Special Thursday</span><span>× No class</span><span>! Time changed</span><span>• Update</span></div>
+    <div className={styles.legend}><span>● Class</span><span>★ Fun Class</span><span>× No class</span><span>! Time changed</span><span>• Update</span></div>
     <div id="academy-calendar-dates">
       {months.map(month => <div key={month} className={styles.month}><h4>{expanded ? academyCalendarMonthLabel(month) : "Selected date"}</h4><ul className={styles.dates}>
         {visible.filter(item => item.date.startsWith(month)).map(item => <li key={item.id} className={styles.dateRow}>

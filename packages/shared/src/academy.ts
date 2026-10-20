@@ -36,8 +36,8 @@ export function academyCheckoutLineItemPlan(monthlyCents: number, childCount: nu
 }
 export const ACADEMY_REGISTRATION_OPEN_DATE = "2026-09-27";
 export const ACADEMY_FIRST_CLASS_DATE = "2026-10-05";
-/** The initial special activity is October 15. One Thursday is special each month; staff can override it in the Academy calendar. */
-export const ACADEMY_FIRST_FUN_CLASS_DATE = "2026-10-15";
+/** Fun Class falls on the last Thursday each month; staff can override it in the Academy calendar. */
+export const ACADEMY_FIRST_FUN_CLASS_DATE = "2026-10-29";
 export const ACADEMY_FIRST_BILLING_MONTH = "2026-10";
 export const ACADEMY_LAST_BILLING_MONTH = "2027-01";
 export const ACADEMY_TERM_END_DATE = "2027-02-01";
@@ -91,7 +91,7 @@ export function academyRegistrationOpen(now = new Date()): boolean {
   return date >= ACADEMY_REGISTRATION_OPEN_DATE && date <= "2027-01-31";
 }
 
-/** Default monthly special Thursday: third Thursday. An explicit `special_class` calendar entry replaces it. */
+/** Default monthly Fun Class: last Thursday. An explicit `special_class` calendar entry replaces it. */
 export function academyRecurringClasses(fromDate: string, days = 150, specialDates: readonly string[] = []) {
   const start = Math.max(Date.parse(`${fromDate}T12:00:00Z`), Date.parse(`${ACADEMY_FIRST_CLASS_DATE}T12:00:00Z`));
   if (!Number.isFinite(start)) return [];
@@ -104,9 +104,9 @@ export function academyRecurringClasses(fromDate: string, days = 150, specialDat
     const weekday = day.getUTCDay();
     if (weekday !== 1 && weekday !== 4) continue;
     const date = day.toISOString().slice(0, 10);
-    const thursdayInMonth = Math.floor((day.getUTCDate() - 1) / 7) + 1;
-    const fun = weekday === 4 && (configuredSpecialDates.has(date) || (thursdayInMonth === 3 && !configuredSpecialMonths.has(date.slice(0, 7))));
-    result.push({ date: day.toISOString().slice(0, 10), type: "class", title: fun ? "Fun Thursday class" : "Quran Academy class",
+    const lastThursday = weekday === 4 && new Date(day.getTime() + 7 * 86_400_000).getUTCMonth() !== day.getUTCMonth();
+    const fun = weekday === 4 && (configuredSpecialDates.has(date) || (lastThursday && !configuredSpecialMonths.has(date.slice(0, 7))));
+    result.push({ date: day.toISOString().slice(0, 10), type: "class", title: fun ? "Fun Class" : "Quran Academy class",
       note: fun ? "5:30–7:00 p.m. · monthly special activity with games and an Islamic presentation; food or prizes may be offered occasionally" : "5:30–7:00 p.m.", fun });
   }
   return result;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarMonthCells, academyCalendarMonths, academyCalendarMonthLabel, academyParentCalendar } from "../lib/academyCalendarView";
+import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarKind, academyCalendarMonthCells, academyCalendarMonths, academyCalendarMonthLabel, academyParentCalendar } from "../lib/academyCalendarView";
+import { translateUi } from "../../../packages/shared/src/i18n/ui";
 import { academyRecurringClasses } from "../../../packages/shared/src/academy";
 
 const item = (date: string, type = "class", title = "Quran Academy class") => ({ id: `${date}-${type}`, date, type, title });
@@ -50,8 +51,20 @@ test("calendar presentation keeps existing Thanksgiving, special Thursday, final
   const recurring = academyRecurringClasses("2026-10-05").map(row => ({ ...row, id: `recurring-${row.date}` }));
   const view = academyParentCalendar([...recurring, item("2027-02-02", "no_class", "Ramadan/Eid break")], "2026-10-12");
   assert.equal(view.nextClass?.date, "2026-10-12");
-  assert.equal(academyCalendarBadge(view.upcoming.find(row => row.date === "2026-10-15")!), "Special Thursday");
+  assert.equal(academyCalendarBadge(view.upcoming.find(row => row.date === "2026-10-15")!), "Class");
+  assert.equal(academyCalendarBadge(view.upcoming.find(row => row.date === "2026-10-29")!), "Fun Class");
   assert.ok(view.upcoming.some(row => row.date === "2027-02-01" && row.type === "class"));
   assert.ok(!view.upcoming.some(row => row.date > "2027-02-01" && row.type === "class"));
   assert.equal(academyCalendarBadge(view.upcoming.at(-1)!), "No class");
+});
+
+test("Fun Class labels recognize both new and legacy schedule records and retain closures", () => {
+  for (const row of [item("2026-10-29", "class", "Fun Class"), item("2026-10-15", "class", "Fun Thursday class"), item("2026-10-22", "special_class", "Monthly activity")]) {
+    assert.equal(academyCalendarKind(row), "special");
+    assert.equal(academyCalendarBadge(row), "Fun Class");
+  }
+  assert.equal(academyCalendarBadge(item("2026-10-29", "no_class", "Fun Class cancelled")), "No class");
+  for (const language of ["ur", "fa-AF", "ar"] as const) {
+    for (const text of ["Fun Class", "Fun Class: last Thursday of each month."]) assert.notEqual(translateUi(language, text), text);
+  }
 });
