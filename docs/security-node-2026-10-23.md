@@ -157,3 +157,23 @@ Previous public `dpl_EWGi8BsydqxAVrQ6TVhVNrfhXhQR` and admin
 the earlier affected framework packages; reverting to them is not a security
 remediation. Credentials, financial records and private audit results are not
 part of either release commit.
+
+## Authorized provider escalation
+
+On October 23, the owner approved sending the measured runtime versions,
+region and deployment identifiers to Vercel Security. The escalation was sent
+to `security@vercel.com` at `2026-10-23T23:47:43Z` and its Sent status and recipient
+were independently verified through Gmail metadata. Its subject is
+“Urgent: HBIC managed Node function runtime below CVE-2026-111497 security floor”.
+
+The email requests confirmation of the managed function-runtime rollout and
+the exact safe remediation, distinguishes build/runtime evidence, and does not
+claim a known compromise. No API key, customer/payment record, raw log
+attachment or secret was included. Provider confirmation and credential
+rollover remain pending; email submission does not resolve the runtime gap.
+
+A read-only check at `2026-10-23T23:48:24Z` confirmed the live diagnostics route
+still rejects anonymous access with HTTP 401, but returned no new cold-start
+runtime evidence in the retained log window. It therefore does not establish
+that Vercel has upgraded the function runtime since the earlier measurement.
+The owner's selected browser tab was not navigated, focused or changed.
