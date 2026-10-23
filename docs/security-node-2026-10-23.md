@@ -177,3 +177,28 @@ still rejects anonymous access with HTTP 401, but returned no new cold-start
 runtime evidence in the retained log window. It therefore does not establish
 that Vercel has upgraded the function runtime since the earlier measurement.
 The owner's selected browser tab was not navigated, focused or changed.
+
+## Provider routing correction and owner handoff
+
+Vercel's authenticated automated reply to the escalation says
+`security@vercel.com` does not monitor support requests and directs account and
+product security support to `https://vercel.com/help`. The email was sent, but
+**no monitored support case or human acknowledgement has been established**.
+This supersedes any implication that sending the email opened a support case.
+
+The owner-approved runtime/deployment evidence was also submitted through the
+official authenticated `vercel feedback` command, with product `functions` and
+type `bug`. The command confirmed “Feedback sent”. No secret, customer record,
+payment information, raw log attachment or new permission was included. This
+is a confirmed feedback submission, not a support ticket or a runtime fix.
+
+The Help page was inspected in a hidden, separate in-app browser without
+changing the owner's Chrome tab. It is signed out and offers Log In. The owner
+needs to sign in to Vercel Help to reach the account-specific support options;
+no login popup, paid plan or public community post was initiated.
+
+The owner opened Stripe's API Keys page in the correct account. Read-only UI
+inspection confirmed the existing restricted key name, “HBIC Quran Academy
+Production”, with a masked token. No Reveal, Roll, Create, Edit, Expire or
+permission-change action was performed. The runtime patch remains unconfirmed,
+and the credential rollover remains owner-controlled and incomplete.
