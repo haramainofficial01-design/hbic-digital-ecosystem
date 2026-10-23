@@ -10,6 +10,9 @@ No successful compromise has been established. Patching, limited log review and
 credential rotation are separate tasks; this document must not be read as a
 forensic clearance or confirmation that all credentials were rotated.
 
+**Current status: application security hotfix deployed; managed Node runtime
+patching and credential rollover remain unresolved.**
+
 ## Implemented safeguards
 
 - Updated this Mac's Homebrew Node from 26.8.1 to 26.12.1 and its shared Brotli
@@ -93,3 +96,64 @@ because the application has been deployed.
 
 The owner must perform the credential-entry/confirmation actions. No key
 rotation, previous-key expiration or webhook-secret rollover is claimed yet.
+
+## Deployment and actual runtime evidence
+
+Verified source `487faf7dc18fc12b56b01aa33454a413702ceda7` is committed and pushed.
+Both deployments used isolated exports of that source, with the established
+admin root-configuration packaging. Hosting logs confirm the old build cache
+was skipped, `npm ci` ran, Next.js 15.5.28 was selected, and the builder passed
+the Node 24.22.1 security check.
+
+- Public hotfix: `dpl_7a2XHs2rmS8x5ZK2wFU3EuDoWkY9`.
+- Admin hotfix: `dpl_BYVoQY23zYQYP7QnARaYaFzm9QyY`.
+- Both were staged and verified before promotion. The public site, Academy,
+  Donate, TV display, content version and public billing configuration returned
+  HTTP 200. Card availability remains true. Diagnostics and parent calendar
+  endpoints still return HTTP 401 anonymously without private data. A trusted
+  local PNG passed actual server-side image optimization with HTTP 200.
+- Post-promotion checks at `2026-10-23T22:25:29.727Z` confirm the public routes and
+  existing admin domain remain available. No live payment object was created to
+  test the hotfix.
+- The post-commit text/configuration scan checked 1,724 reachable Git blobs and
+  found no matching Stripe credential strings.
+- Config/public/admin type checks, five runtime-policy tests, 28 payment/auth/
+  schedule regressions, three parent-calendar interaction/adapter tests and the
+  admin's 104 responsive light/dark checks pass after patching.
+
+### Important: the builder is not the serverless runtime
+
+The actual deployed function cold-start log at `2026-10-23T22:20:38.384Z`, region
+`pdx1`, reported **Node 24.21.0**, `patched: false`, and
+`brotliDecoderFixPresent: false`. This is below the published 24.22.1 floor even
+though the builder is patched. Do not describe the managed Node issue as fixed.
+
+A minimal authenticated preview probe of the supported Node 22 alternative
+reported **22.23.2** with the decoder-fix constant absent, below 22.23.4. It had
+no payment code or customer data, never received a production domain, and was
+removed after its result was preserved privately. No release/rollback
+deployment was deleted. No unsupported custom runtime or unverified payment
+host migration was attempted.
+
+The application/image-processing fixes were promoted to reduce the existing
+exposure while preserving functionality; they do not resolve this provider
+runtime gap. The next required external action is Vercel confirmation and
+deployment of the patched **function runtime**, followed by a new cold-start
+verification. No replacement key should be considered safe merely because the
+build logs show the patched version. No support email or private log was sent
+to a third party without owner authorization.
+
+### Access containment and rollback
+
+Enabled Vercel's no-cost Standard Protection for the public project
+(`prod_deployment_urls_and_all_previews`). All four existing public website/API
+domains still returned HTTP 200 with JSON content. A prior deployment URL now
+redirects anonymous callers to authentication with HTTP 302. Existing admin
+protection remains unchanged. This protects archived/preview URLs without
+changing production domain access, purchasing a plan or deleting history.
+
+Previous public `dpl_EWGi8BsydqxAVrQ6TVhVNrfhXhQR` and admin
+`dpl_AR6oi4jg8rm75RnPc4QGj8LUfqBN` remain recoverable for reference. They contain
+the earlier affected framework packages; reverting to them is not a security
+remediation. Credentials, financial records and private audit results are not
+part of either release commit.
