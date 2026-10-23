@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3101",
-    "build": "next build",
-    "start": "next start --port 3101",
+    "dev": "node ../../scripts/check-node-runtime.mjs && next dev --port 3101",
+    "build": "node ../../scripts/check-node-runtime.mjs && next build",
+    "start": "node ../../scripts/check-node-runtime.mjs && next start --port 3101",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
   },
@@ -14,7 +14,7 @@
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "firebase": "^10.13.0",
-    "next": "15.5.24",
+    "next": "15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
@@ -23,7 +23,7 @@
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.7",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.19",
+    "eslint-config-next": "15.5.28",
     "typescript": "^5.5.4"
   }
 }

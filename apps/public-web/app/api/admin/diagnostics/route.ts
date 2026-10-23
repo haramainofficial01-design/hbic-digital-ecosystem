@@ -2,6 +2,11 @@ import { getPublishedContent, getDatabase } from "../../../../lib/contentStore";
 import { getPrayerSyncStatus } from "../../../../lib/prayerSync";
 import { jsonResponse, optionsResponse, requireAdminSecret } from "../../../../lib/api";
 import { getPublicationState } from "../../../../lib/publicationStore";
+import { runtimeSecurity } from "../../../../lib/runtimeSecurity";
+
+// Cold-start evidence is available in protected hosting logs even when an
+// unauthenticated request correctly receives 401. No secret is logged.
+console.info("HBIC_SERVER_RUNTIME_SECURITY", JSON.stringify(runtimeSecurity()));
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +32,7 @@ export async function GET(request: Request) {
       ok: true,
       backend: status,
       diagnostics: {
+        runtimeSecurity: runtimeSecurity(),
         databaseConfigured: status.configured,
         databaseMode: status.mode,
         schemaVersion: "hbic-content-v1",
