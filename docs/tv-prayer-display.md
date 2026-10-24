@@ -28,6 +28,12 @@ The kiosk updates its digital seconds every second. There is no analog clock. Th
 
 The live clock has its own wall-second-aligned timer. The sky recomputes every 30 seconds; the prayer schedule wakes only when its visible content can change. When the page is hidden, live timers, weather drawing, CSS motion and network refreshes pause and recalculate immediately when it becomes visible again. Weather uses two bounded surfaces: clouds are rasterized only when their reading or size changes, then drift as one composite layer; rain/snow uses a canvas capped at 960×540 pixels, 24 particles and at most 20 drawing frames per second (16 for snow). Clear, cloudy and fog conditions have no repeating JavaScript drawing loop. Reduced motion draws a static scene. No WebGL, weather video, live blur or individual particle layers are used. The sun follows the existing canonical daylight calculation. Wind direction affects precipitation, strong wind gently sways the central lettering, and measured letter positions anchor snow caps and highlighted droplets. The six prayer tiles retain static translucent layers. Identical display polls do not replace the rendered tree or rewrite its local cache, and stalled requests time out so later reconnects can retry. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
 
+The weather readout sits in a rounded glass capsule with static tint, inset
+highlights and a soft top reflection. The temperature and icon are approximately
+10% larger than the initial Fire TV revision. This material uses no backdrop
+filter, new animation, image asset or JavaScript work. Long condition labels
+wrap within the capsule while the digital clock stays on one line.
+
 Each changed, confirmed prayer payload is stored as the last-known-good browser snapshot. A newer cached snapshot is never overwritten by an older server response during startup, and a snapshot for yesterday is never selected for today. During a network interruption the display keeps showing the last confirmed schedule and labels it as cached while retrying. A recovered connection updates the screen without navigation or a full-page reload.
 
 ## Fire TV installation
@@ -167,6 +173,23 @@ staff must still confirm long-running stability on the masjid's device.
   separate managed Node runtime issue is still open. See
   [the security record](security-node-2026-10-23.md); a successful TV release
   does not establish that Vercel has patched its function runtime.
+
+### Glass weather readout release
+
+Source `d3ffc072645a70c34cb79ec7911e3f742f8b4fb8` was pushed and deployed as
+`dpl_5AgbifSEhSEFMP19SiA6M4xbJBPz`, then promoted after staged schedule,
+weather and stylesheet checks. Deployment metadata and all four public alias
+records match that source. The preceding
+`dpl_A9wH1uA5kLa9cHtiPCfs6Yctak72` remains recoverable.
+
+The production build and the seven public viewport/weather checks passed with
+advancing clock seconds, offline recovery, six prayer cards and no backdrop
+filters, overflow or browser exceptions. A separate layout check used −33°C,
+“Heavy snow showers” and wind at 38 km/h across 960×540, 1280×720, 1366×768,
+1920×1080 and 3840×2160: no header overlap and no wrapped digital clock.
+The live capsule was visually inspected, with the temperature rendered at
+57.6px on a 1920px viewport versus the preceding 51.84px. Canonical prayer
+entries and display settings matched before and after promotion.
 
 ## Staff publishing
 
