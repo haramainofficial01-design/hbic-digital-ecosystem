@@ -311,7 +311,7 @@ export function deriveDisplayFocus(snapshot: WidgetPrayerSnapshot, now: Date): D
 
 /** The TV countdown shows minutes, not seconds. Wake its prayer subtree only
  * when the label can change or the exact next adhan/iqamah arrives. The clock
- * hands and digital seconds continue on their separate one-second timer. */
+ * digital seconds continue on their separate one-second timer. */
 export function nextDisplayScheduleUpdateMs(snapshot: WidgetPrayerSnapshot, now: Date) {
   const target = deriveDisplayFocus(snapshot, now)?.date.getTime();
   if (target === undefined || !Number.isFinite(target)) return 60_000;

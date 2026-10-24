@@ -101,7 +101,6 @@
   border-radius: 999px;
   background: rgba(20, 47, 91, .62);
   box-shadow: 0 20px 52px rgba(0, 0, 0, .24), 0 0 40px rgba(244,205,112,.08), inset 0 1px rgba(255, 255, 255, .19);
-  backdrop-filter: blur(18px) saturate(140%);
 }
 
 .jumuahOccasion span {
@@ -152,7 +151,7 @@
   pointer-events: none;
 }
 
-.display > :not(.celestialField):not(.daylightWash):not(.jumuahOccasion):not(.debugPanel):not(.sunDiscOverlay) {
+.display > :not(.celestialField):not(.daylightWash):not(.jumuahOccasion):not(.debugPanel):not(.weatherCanvas):not(.cloudCanvas) {
   position: relative;
   z-index: 1;
 }
@@ -165,25 +164,20 @@
   border-radius: 50%;
   opacity: var(--sun-render-opacity);
   transform: translate3d(-50%, -50%, 0);
-  transition:
-    left 30s linear,
-    top 30s linear,
-    opacity 2s ease,
-    background-color 3s ease,
-    box-shadow 3s ease;
+  transition: opacity 2s ease;
 }
 
 .sunAura {
   width: clamp(170px, 18vw, 360px);
   aspect-ratio: 1;
   background: radial-gradient(circle, rgba(255, 226, 154, .2), rgba(255, 194, 95, .065) 42%, transparent 72%);
-  filter: blur(12px);
 }
 
 .sunDisc {
   width: clamp(42px, 4.4vw, 84px);
   aspect-ratio: 1;
   border: 1px solid rgba(255, 249, 215, .74);
+  background-color: #ffdf89;
   background-color: color-mix(in srgb, #fff7c8 58%, #ffc95f);
   box-shadow:
     0 0 clamp(24px, 3vw, 58px) rgba(255, 204, 105, .38),
@@ -199,242 +193,36 @@
   transform: rotate(-18deg);
 }
 
-.sunDiscOverlay {
+.weatherCanvas {
   position: absolute !important;
-  z-index: 2;
-  left: var(--sun-x);
-  top: var(--sun-y);
-  width: clamp(34px, 4.4vw, 84px);
-  aspect-ratio: 1;
-  border: 1px solid rgba(255, 249, 215, .8);
-  border-radius: 50%;
-  background: #ffdc7a;
-  box-shadow:
-    0 0 clamp(22px, 2.8vw, 54px) rgba(255, 204, 105, .32),
-    inset -9px -10px 18px rgba(204, 126, 36, .16),
-    inset 7px 7px 14px rgba(255, 255, 255, .46);
-  opacity: var(--sun-overlay-opacity);
-  pointer-events: none;
-  transform: translate3d(-50%, -50%, 0);
-  mix-blend-mode: screen;
-  transition: left 30s linear, top 30s linear, opacity 2s ease;
-}
-
-.sunDiscOverlay::before {
-  content: "";
-  position: absolute;
-  inset: -26%;
-  z-index: -1;
-  border-radius: 50%;
-  background: rgba(255, 213, 124, .12);
-  filter: blur(10px);
-}
-
-.sunDiscOverlay span {
-  position: absolute;
-  inset: 11%;
-  border-top: 1px solid rgba(255, 255, 255, .7);
-  border-radius: 50%;
-  transform: rotate(-18deg);
-}
-
-.weatherScene,
-.cloudField,
-.rainField,
-.snowField,
-.fogField,
-.stormFlash {
-  position: absolute;
+  z-index: 2 !important;
   inset: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  contain: strict;
   pointer-events: none;
 }
 
-.cloudField {
-  inset: -7vw -14vw auto;
-  height: 56vh;
-  opacity: 0;
-  transition: opacity 3s ease;
-}
-
-.cloudField i {
-  position: absolute;
-  display: block;
-  width: clamp(280px, 30vw, 590px);
-  height: clamp(74px, 8vw, 158px);
-  border-radius: 50%;
-  background: rgba(204, 222, 233, .21);
-  box-shadow:
-    8vw 1.5vw 0 -1vw rgba(197, 217, 230, .15),
-    -7vw 2vw 0 -1.7vw rgba(190, 215, 229, .13),
-    2vw -2vw 0 -1.3vw rgba(225, 236, 241, .14);
-  filter: blur(clamp(13px, 1.4vw, 27px));
-  animation: weatherCloudDrift var(--weather-motion-duration) linear infinite;
-  animation-play-state: paused;
-}
-
-.cloudOne {
-  top: 6vh;
-  left: -8vw;
-}
-
-.cloudTwo {
-  top: 20vh;
-  left: 42vw;
-  opacity: .72;
-  animation-delay: -24s !important;
-}
-
-.cloudThree {
-  top: 2vh;
-  left: 72vw;
-  opacity: .54;
-  animation-delay: -49s !important;
-}
-
-.display[data-weather="clouds"] .cloudField,
-.display[data-weather="fog"] .cloudField,
-.display[data-weather="rain"] .cloudField,
-.display[data-weather="snow"] .cloudField,
-.display[data-weather="storm"] .cloudField {
-  opacity: var(--weather-cloud-opacity);
-}
-
-.display[data-weather="clouds"] .cloudField i,
-.display[data-weather="fog"] .cloudField i,
-.display[data-weather="rain"] .cloudField i,
-.display[data-weather="snow"] .cloudField i,
-.display[data-weather="storm"] .cloudField i {
-  animation-play-state: running;
-}
-
-.display[data-weather="rain"] .cloudField i,
-.display[data-weather="storm"] .cloudField i {
-  background: rgba(129, 158, 181, .22);
-  box-shadow:
-    8vw 1.5vw 0 -1vw rgba(116, 149, 175, .17),
-    -7vw 2vw 0 -1.7vw rgba(104, 140, 168, .15),
-    2vw -2vw 0 -1.3vw rgba(174, 194, 207, .13);
-}
-
-.rainField,
-.snowField {
-  opacity: 0;
-  transition: opacity 2.5s ease;
-}
-
-.rainField i {
-  position: absolute;
-  top: -14vh;
-  left: var(--particle-x);
-  width: clamp(1px, .11vw, 2px);
-  height: clamp(16px, 2.25vh, 29px);
-  border-radius: 999px;
-  background: rgba(192, 227, 246, .72);
-  box-shadow: 0 0 5px rgba(190, 225, 248, .18);
-  opacity: var(--weather-particle-opacity);
-  animation: weatherRainFall var(--particle-duration) linear infinite;
-  animation-delay: var(--particle-delay);
-  transform-origin: center;
-  animation-play-state: paused;
-}
-
-.display[data-weather="rain"] .rainField,
-.display[data-weather="storm"] .rainField {
-  opacity: 1;
-}
-
-.display[data-weather="rain"] .rainField i,
-.display[data-weather="storm"] .rainField i {
-  animation-play-state: running;
-}
-
-.snowField i {
-  position: absolute;
-  top: -7vh;
-  left: var(--particle-x);
-  width: clamp(4px, .42vw, 8px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: rgba(244, 250, 255, .9);
-  box-shadow: 0 0 8px rgba(222, 241, 255, .34);
-  opacity: var(--weather-particle-opacity);
-  animation: weatherSnowFall var(--particle-duration) ease-in-out infinite;
-  animation-delay: var(--particle-delay);
-  animation-play-state: paused;
-}
-
-.display[data-weather="snow"] .snowField {
-  opacity: 1;
-}
-
-.display[data-weather="snow"] .snowField i {
-  animation-play-state: running;
-}
-
-.fogField {
-  opacity: 0;
-  transition: opacity 3s ease;
-}
-
-.fogField i {
-  position: absolute;
-  left: -15vw;
-  width: 125vw;
-  height: 11vh;
-  border-radius: 50%;
-  background: rgba(200, 218, 230, .13);
-  filter: blur(24px);
-  animation: weatherFogDrift var(--weather-motion-duration) ease-in-out infinite alternate;
-  animation-play-state: paused;
-}
-
-.fogField i:first-child { top: 28vh; }
-.fogField i:last-child { top: 52vh; animation-delay: -11s; }
-
-.display[data-weather="fog"] .fogField {
-  opacity: var(--weather-cloud-opacity);
-}
-
-.display[data-weather="fog"] .fogField i {
-  animation-play-state: running;
-}
-
-.stormFlash {
-  background: rgba(211, 231, 255, .2);
-  opacity: 0;
-}
-
-.display[data-weather="storm"] .stormFlash {
-  animation: weatherStormFlash 15s ease-in-out infinite;
-  animation-play-state: running;
+.cloudCanvas {
+  position: absolute !important;
+  z-index: 0 !important;
+  top: 0;
+  left: -3%;
+  width: 106%;
+  height: 55%;
+  contain: strict;
+  pointer-events: none;
+  animation: weatherCloudDrift var(--weather-motion-duration) ease-in-out infinite alternate;
 }
 
 @keyframes weatherCloudDrift {
-  from { transform: translate3d(-12vw, 0, 0); }
-  to { transform: translate3d(calc(12vw + var(--weather-drift-x)), 0, 0); }
+  from { transform: translateX(-1%); }
+  to { transform: translateX(2%); }
 }
 
-@keyframes weatherRainFall {
-  from { transform: translate3d(0, -12vh, 0) rotate(var(--weather-wind-lean)) scale(var(--particle-scale)); }
-  to { transform: translate3d(var(--weather-drift-x), 122vh, 0) rotate(var(--weather-wind-lean)) scale(var(--particle-scale)); }
-}
-
-@keyframes weatherSnowFall {
-  0% { transform: translate3d(0, -8vh, 0) rotate(0) scale(var(--particle-scale)); }
-  48% { transform: translate3d(var(--weather-half-drift-x), 55vh, 0) rotate(145deg) scale(var(--particle-scale)); }
-  100% { transform: translate3d(var(--weather-drift-x), 112vh, 0) rotate(320deg) scale(var(--particle-scale)); }
-}
-
-@keyframes weatherFogDrift {
-  from { transform: translate3d(-4vw, 0, 0); }
-  to { transform: translate3d(calc(4vw + var(--weather-drift-x)), 1.5vh, 0); }
-}
-
-@keyframes weatherStormFlash {
-  0%, 88%, 91%, 94%, 100% { opacity: 0; }
-  89% { opacity: .16; }
-  92% { opacity: .06; }
+.display[data-motion="paused"] * {
+  animation-play-state: paused !important;
+  transition: none !important;
 }
 
 .header,
@@ -533,105 +321,31 @@
   font-size: clamp(16px, 1.2vw, 23px);
 }
 
-.analogClock {
-  --hour-angle: 0deg;
-  --minute-angle: 0deg;
-  --second-angle: 0deg;
-  position: relative;
-  flex: 0 0 auto;
-  width: clamp(68px, 5vw, 96px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1px solid rgba(190, 222, 236, .13);
-  background: rgba(7, 27, 52, .58);
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, .2),
-    inset 0 1px rgba(255, 255, 255, .16),
-    inset 0 -10px 24px rgba(0, 0, 0, .13);
-  opacity: .94;
-}
-
-.analogClock::before {
-  content: "";
-  position: absolute;
-  inset: 8%;
-  border-radius: 50%;
-  background: repeating-conic-gradient(from -1deg, rgba(248, 241, 223, .7) 0 1deg, transparent 1deg 30deg);
-  mask: radial-gradient(circle, transparent 0 78%, black 79% 100%);
-}
-
-.clockHand {
-  position: absolute;
-  z-index: 1;
-  bottom: 50%;
-  left: 50%;
-  display: block;
-  border-radius: 999px;
-  background: var(--cream);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, .28);
-  transform-origin: 50% 100%;
-}
-
-.hourHand {
-  width: 4.2%;
-  height: 24%;
-  transform: translateX(-50%) rotate(var(--hour-angle));
-}
-
-.minuteHand {
-  width: 3.1%;
-  height: 34%;
-  transform: translateX(-50%) rotate(var(--minute-angle));
-}
-
-.secondHand {
-  width: 1.35%;
-  height: 37%;
-  background: var(--gold);
-  transform: translateX(-50%) rotate(var(--second-angle));
-}
-
-.clockPin {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  width: 9%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 2px rgba(4, 20, 43, .62), 0 2px 5px rgba(0, 0, 0, .35);
-  transform: translate(-50%, -50%);
-}
-
 .weather {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 13px;
-  border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 999px;
-  color: #d8e0db;
-  background: rgba(255, 255, 255, .045);
-  box-shadow: inset 0 1px rgba(255, 255, 255, .06);
-  font-size: clamp(16px, 1.15vw, 22px);
+  gap: clamp(8px, .75vw, 16px);
+  color: var(--cream);
   white-space: nowrap;
+  text-align: left;
 }
 
-.weather > span {
+.weather > svg {
+  width: clamp(38px, 3.5vw, 66px);
+  height: clamp(38px, 3.5vw, 66px);
+  flex: 0 0 auto;
   color: var(--gold);
-  font-size: 1.2em;
 }
 
 .weather b {
-  color: var(--cream);
+  font-size: clamp(30px, 2.7vw, 52px);
+  font-weight: 600;
+  letter-spacing: -.03em;
 }
 
-.weather i,
-.weather em {
-  color: var(--muted);
-  font-style: normal;
-}
+.weather > span { display: grid; gap: 3px; }
+.weather em { font-size: clamp(13px, .95vw, 18px); font-style: normal; color: var(--cream); }
+.weather small { font-size: clamp(11px, .8vw, 15px); color: var(--muted); }
 
 .hero {
   position: relative;
@@ -644,130 +358,28 @@
   text-align: center;
 }
 
-.hero > :not(.heroWeatherFilm) {
-  position: relative;
-  z-index: 1;
-}
-
-.heroWeatherFilm {
-  position: absolute !important;
-  z-index: 2 !important;
-  inset: 4% 10%;
-  overflow: hidden;
-  border-radius: 44%;
-  opacity: var(--weather-film-opacity);
-  pointer-events: none;
-  transition: opacity 2.5s ease;
-}
-
-.heroWeatherFilm::before,
-.heroWeatherFilm::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-}
-
-.heroWeatherFilm::before {
-  top: -18%;
-  bottom: -18%;
-  left: -30%;
-  width: 34%;
-  border-radius: 50%;
-  background: rgba(225, 240, 248, .12);
-  filter: blur(24px);
-  opacity: 0;
-}
-
-.display[data-weather="clouds"] .heroWeatherFilm::before,
-.display[data-weather="fog"] .heroWeatherFilm::before,
-.display[data-weather="rain"] .heroWeatherFilm::before,
-.display[data-weather="snow"] .heroWeatherFilm::before,
-.display[data-weather="storm"] .heroWeatherFilm::before {
-  opacity: .7;
-  animation: heroWeatherSheen var(--weather-motion-duration) ease-in-out infinite alternate;
-}
-
-.heroWeatherFilm i {
-  position: absolute;
-  left: var(--mark-x);
-  top: var(--mark-y);
-  display: block;
-  opacity: 0;
-}
-
-.display[data-weather="rain"] .heroWeatherFilm i,
-.display[data-weather="storm"] .heroWeatherFilm i {
-  width: clamp(4px, .34vw, 7px);
-  height: clamp(8px, .75vw, 15px);
-  border: 1px solid rgba(221, 242, 255, .54);
-  border-radius: 48% 52% 58% 42%;
-  background: rgba(185, 223, 244, .15);
-  box-shadow: inset 1px 1px rgba(255, 255, 255, .28), 0 2px 8px rgba(5, 28, 55, .18);
-  animation: heroRainMark 3.8s ease-in infinite;
-  animation-delay: var(--mark-delay);
-}
-
-.display[data-weather="snow"] .heroWeatherFilm i {
-  width: clamp(5px, .46vw, 9px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: rgba(242, 250, 255, .82);
-  box-shadow: 0 0 8px rgba(221, 240, 255, .36);
-  animation: heroSnowMelt 7.5s ease-in-out infinite;
-  animation-delay: var(--mark-delay);
-}
-
-.display[data-weather="snow"] .heroWeatherFilm::after {
-  right: 8%;
-  bottom: 9%;
-  left: 8%;
-  height: 2px;
-  border-radius: 50%;
-  background: rgba(236, 248, 255, .42);
-  box-shadow: 0 -4px 15px rgba(213, 238, 255, .15);
-  opacity: var(--weather-film-opacity);
-}
+.hero > * { position: relative; z-index: 1; }
 
 .display[data-weather="rain"] .heroPrayer h2,
 .display[data-weather="rain"] .heroPrayer strong,
 .display[data-weather="storm"] .heroPrayer h2,
 .display[data-weather="storm"] .heroPrayer strong {
-  text-shadow:
-    1px 1px 0 rgba(210, 239, 255, .16),
-    0 16px 40px rgba(0, 0, 0, .38);
+  text-shadow: 1px 1px rgba(210, 239, 255, .3), 0 10px 24px rgba(0, 0, 0, .4);
 }
 
 .display[data-weather="snow"] .heroPrayer h2,
 .display[data-weather="snow"] .heroPrayer strong {
-  text-shadow:
-    0 -1px 0 rgba(241, 250, 255, .48),
-    0 16px 40px rgba(0, 0, 0, .34);
+  text-shadow: 0 -2px 0 rgba(241, 250, 255, .68), 0 10px 24px rgba(0, 0, 0, .35);
 }
 
-.display[data-windy="true"] .heroLabel {
-  animation: heroWindWhisper 5.5s ease-in-out infinite;
-}
-
-@keyframes heroWeatherSheen {
-  from { transform: translate3d(0, 0, 0) rotate(-7deg); }
-  to { transform: translate3d(calc(112% + var(--weather-drift-x)), 0, 0) rotate(-7deg); }
-}
-
-@keyframes heroRainMark {
-  0% { opacity: 0; transform: translate3d(0, -8px, 0) rotate(var(--weather-wind-lean)) scale(var(--mark-scale)); }
-  18%, 64% { opacity: .72; }
-  100% { opacity: 0; transform: translate3d(var(--weather-half-drift-x), 22px, 0) rotate(var(--weather-wind-lean)) scale(.72); }
-}
-
-@keyframes heroSnowMelt {
-  0%, 12% { opacity: 0; transform: translate3d(0, -8px, 0) scale(var(--mark-scale)); }
-  34%, 66% { opacity: .74; transform: translate3d(var(--weather-half-drift-x), 5px, 0) scale(var(--mark-scale)); }
-  100% { opacity: 0; transform: translate3d(var(--weather-half-drift-x), 13px, 0) scale(.18); }
+.display[data-windy="true"] .heroPrayer {
+  transform-origin: center 85%;
+  animation: heroWindWhisper 7s ease-in-out infinite;
 }
 
 @keyframes heroWindWhisper {
-  0%, 100% { transform: translate3d(-1px, 0, 0); }
-  50% { transform: translate3d(2px, 0, 0); }
+  0%, 100% { transform: translateX(-1px) rotate(-.1deg); }
+  50% { transform: translateX(2px) rotate(.12deg); }
 }
 
 .heroLabel {
@@ -1325,8 +937,7 @@
 }
 
 @media (max-width: 1100px) {
-  .analogClock { width: clamp(54px, 6.2vw, 70px); }
-  .weather { gap: 4px; padding: 5px 8px; }
+  .weather { gap: 6px; }
   .weather em { max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
   .footer { column-gap: 8px; }
   .webIdentity { gap: 6px; }
@@ -1425,10 +1036,12 @@
   .brand p { font-size: 8px; margin-bottom: 1px; }
   .brand h1 { font-size: clamp(23px, 3vw, 31px); }
   .brand span { font-size: 9px; margin-top: 2px; }
-  .analogClock { width: 48px; }
   .clock { font-size: clamp(56px, 7.4vw, 86px); }
   .date, .hijri { font-size: 10px; margin-top: 1px; }
-  .weather { font-size: 10px; }
+  .weather b { font-size: 26px; }
+  .weather > svg { width: 30px; height: 30px; }
+  .weather em { font-size: 11px; }
+  .weather small { font-size: 9px; }
   .heroLabel { font-size: 9px; }
   .heroPrayer h2 { font-size: clamp(46px, 7.2vw, 74px); }
   .heroPrayer strong { font-size: clamp(42px, 6.6vw, 68px); }
@@ -1523,25 +1136,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .display * {
-    scroll-behavior: auto !important;
-  }
-
-  .cloudField i,
-  .rainField i,
-  .snowField i,
-  .fogField i,
-  .stormFlash,
-  .heroWeatherFilm::before,
-  .heroWeatherFilm i,
-  .display[data-windy="true"] .heroLabel {
+  .display *, .display *::before, .display *::after {
     animation: none !important;
-  }
-
-  .rainField,
-  .snowField,
-  .stormFlash,
-  .heroWeatherFilm i {
-    opacity: 0 !important;
+    transition: none !important;
   }
 }

@@ -43,7 +43,7 @@ export async function GET() {
       "temperature_2m,weather_code,cloud_cover,precipitation,rain,showers,snowfall,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
     );
     endpoint.searchParams.set("timezone", "America/Edmonton");
-    const response = await fetch(endpoint, { next: { revalidate: 300 } });
+    const response = await fetch(endpoint, { next: { revalidate: 300 }, signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error("Weather service unavailable.");
     const data = await response.json() as {
       current?: {

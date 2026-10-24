@@ -24,6 +24,7 @@ export function SiteExperience() {
   const requestedVersion = useRef(0);
 
   useEffect(() => {
+    if (pathname.startsWith("/display")) return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion || window.sessionStorage.getItem("masjid-bilal-intro-seen")) return;
 
@@ -31,9 +32,10 @@ export function SiteExperience() {
     setIntroVisible(true);
     const timer = window.setTimeout(() => setIntroVisible(false), 760);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
+    if (pathname.startsWith("/display")) return;
     const showLoader = () => {
       setRouteLoading(true);
       if (loaderFallback.current) window.clearTimeout(loaderFallback.current);
@@ -54,9 +56,10 @@ export function SiteExperience() {
       if (loaderFallback.current) window.clearTimeout(loaderFallback.current);
       if (blessingTimer.current) window.clearTimeout(blessingTimer.current);
     };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
+    if (pathname.startsWith("/display")) return;
     const timer = window.setTimeout(() => setRouteLoading(false), 320);
     return () => window.clearTimeout(timer);
   }, [pathname]);

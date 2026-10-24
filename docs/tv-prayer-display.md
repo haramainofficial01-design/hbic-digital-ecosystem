@@ -1,6 +1,6 @@
 # Masjid Bilal TV prayer display
 
-The prayer-hall display is a public, read-only kiosk page designed for Amazon Fire TV Silk and fixed screens. It intentionally shows only Masjid Bilal branding, Calgary date/time, compact current Calgary weather, next prayer/countdown, today’s prayer and iqamah times, Jumu’ah, one optional notice, hbic.ca, verified social accounts, and the website/app QR.
+The prayer-hall display is a public, read-only kiosk page designed for Amazon Fire TV Silk and fixed screens. It shows Masjid Bilal branding, Calgary date/time, current Calgary weather, next prayer/countdown, today’s prayer and iqamah times, Jumu’ah, one optional notice, hbic.ca, verified social accounts, and the website/app QR.
 
 ## URLs
 
@@ -24,9 +24,9 @@ There is one prayer schedule. `/display` reads the same published content and ge
 
 ## Refresh and offline behaviour
 
-The kiosk updates its digital seconds and analog hands every second. The minute-resolution countdown and prayer cards update at their next visible minute change or exact adhan/iqamah boundary, without unnecessary second-by-second rerenders. It checks the display endpoint every minute, refreshes immediately after reconnection and at Calgary date rollover. Current weather refreshes every 15 minutes and is omitted silently if unavailable, so weather can never obscure or interrupt prayer times.
+The kiosk updates its digital seconds every second. There is no analog clock. The minute-resolution countdown and prayer cards update at their next visible minute change or exact adhan/iqamah boundary, without unnecessary second-by-second rerenders. It checks the display endpoint every minute, refreshes immediately after reconnection and at Calgary date rollover. Current weather refreshes every 15 minutes and is omitted silently if unavailable, so weather can never obscure or interrupt prayer times.
 
-The live clock has its own wall-second-aligned timer. The sky recomputes every 30 seconds; the prayer schedule wakes only when its visible content can change. When the page is hidden, live timers and network refreshes pause and recalculate immediately when it becomes visible again. Only the active weather scene is mounted. The six prayer tiles use static translucent layers instead of continuously repainting GPU backdrop blurs; the visible glass styling and weather effects remain. Identical display polls do not replace the rendered tree or rewrite its local cache, and stalled requests time out so later reconnects can retry. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
+The live clock has its own wall-second-aligned timer. The sky recomputes every 30 seconds; the prayer schedule wakes only when its visible content can change. When the page is hidden, live timers, weather drawing, CSS motion and network refreshes pause and recalculate immediately when it becomes visible again. Weather uses two bounded surfaces: clouds are rasterized only when their reading or size changes, then drift as one composite layer; rain/snow uses a canvas capped at 960×540 pixels, 24 particles and at most 20 drawing frames per second (16 for snow). Clear, cloudy and fog conditions have no repeating JavaScript drawing loop. Reduced motion draws a static scene. No WebGL, weather video, live blur or individual particle layers are used. The sun follows the existing canonical daylight calculation. Wind direction affects precipitation, strong wind gently sways the central lettering, and measured letter positions anchor snow caps and highlighted droplets. The six prayer tiles retain static translucent layers. Identical display polls do not replace the rendered tree or rewrite its local cache, and stalled requests time out so later reconnects can retry. Browser storage is best-effort, so disabled or full local storage does not prevent the display from loading or refreshing.
 
 Each changed, confirmed prayer payload is stored as the last-known-good browser snapshot. A newer cached snapshot is never overwritten by an older server response during startup, and a snapshot for yesterday is never selected for today. During a network interruption the display keeps showing the last confirmed schedule and labels it as cached while retrying. A recovered connection updates the screen without navigation or a full-page reload.
 
@@ -91,6 +91,51 @@ HBIC_TV_VERIFY_URL=https://hbic.ca npx tsx --test apps/public-web/test/tvDisplay
 The test is skipped unless the URL is explicitly provided. Its optional
 `HBIC_TV_VERIFY_SCREENSHOTS=1` captures are written under ignored `output/`.
 Reload the existing Fire Stick bookmark once to load the updated code.
+
+## 23 October 2026 Fire TV rendering revision
+
+- Removed the analog clock. Enlarged temperature/condition and added wind speed,
+  with consistent vector weather icons. Prayer times, source selection, overrides,
+  Jumu'ah, notices, QR destinations and publishing settings are unchanged.
+- Replaced separate CSS particle layers, cloud/fog blurs and the central weather
+  film with the bounded renderer described above. The Friday badge no longer
+  applies a backdrop filter. Kiosk pages skip general-site intro and toast work.
+- Production-build browser checks passed for 960×540 rain, 1280×720 clear,
+  1366×768 clouds, 1920×1080 rain/fog/storm and 3840×2160 snow: six visible
+  prayer cards, advancing seconds, no page overflow or browser exceptions,
+  bounded weather surfaces and no backdrop filters. Offline recovery passed.
+- Fifteen focused tests cover canonical prayer transitions, weather modes and
+  allocation bounds, background/reduced-motion pause, resume, and thirty
+  renderer mount/dispose cycles. The public-web typecheck, production build and
+  five existing runtime-security tests passed. Existing unrelated build warnings
+  remain; no new warning is attributed to the display changes.
+- A three-minute Chromium run at 1280×720 with sixfold CPU throttling and six
+  weather replacements had zero browser errors, zero DOM-node growth, zero
+  event-listener growth and 462,736 bytes of post-GC heap growth. Clock samples
+  stayed aligned with wall time. This is bounded browser evidence, **not a
+  physical Fire Stick certification or a full-day stability claim**.
+- Twelve-second measurements on the same desktop/viewport, before and after:
+
+  | Scene | Browser layers | CSS animations | Main-thread task seconds |
+  | --- | --- | --- | --- |
+  | Rain | 65 → 13 | 48 → 2 | 0.600604 → 0.088624 |
+  | Snow | 56 → 10 | 39 → 1 | 0.122095 → 0.067192 |
+  | Clouds | 18 → 10 | 4 → 1 | 0.018453 → 0.012476 |
+
+  These are short desktop samples, not estimates of Fire TV frame rate or
+  memory savings. The capped precipitation surface is 960×540; cached clouds
+  are 960×297 at a 16:9 viewport, independent of hardware pixel density.
+
+Repeat the bounded soak explicitly with public GETs only:
+
+```sh
+HBIC_TV_VERIFY_URL=https://hbic.ca HBIC_TV_SOAK_SECONDS=180 npx tsx --test apps/public-web/test/tvDisplaySoak.test.mts
+```
+
+The soak is skipped unless both variables are provided. Its aggregate output
+is written to ignored `output/tv-display-fire-tv/soak.json`. No private staff or
+payment endpoints are called. No Fire Stick is attached to this workstation;
+staff must still confirm long-running stability on the masjid's device.
 
 ## Staff publishing
 

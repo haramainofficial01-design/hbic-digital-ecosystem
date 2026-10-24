@@ -18,11 +18,13 @@ import {
   socialHandle,
   type TvDisplayPayload,
   type TvWeatherMode,
-  type TvWeatherReading
+  type TvWeatherReading,
+  type TvWeatherVisualState
 } from "../lib/tvDisplay";
 import styles from "./TvPrayerDisplay.module.css";
 import { publicDisplayUrl } from "../lib/displayClient";
 import { appDownloadQr, appDownloadUrl } from "../lib/appLaunch";
+import { startTvWeatherScene } from "../lib/tvWeatherCanvas";
 
 const cacheKey = "hbic-tv-display-v1";
 const weatherCacheKey = "hbic-tv-weather-v1";
@@ -34,35 +36,6 @@ const arabicPrayerNames: Record<PrayerName, string> = {
   maghrib: "المغرب",
   isha: "العشاء"
 };
-
-const rainParticles = Array.from({ length: 34 }, (_, index) => ({
-  x: (index * 37 + 9) % 100,
-  delay: -((index * 17) % 38) / 10,
-  duration: .72 + (index % 6) * .08,
-  scale: .72 + (index % 4) * .13
-}));
-
-const snowParticles = Array.from({ length: 26 }, (_, index) => ({
-  x: (index * 43 + 4) % 100,
-  delay: -((index * 29) % 90) / 10,
-  duration: 6.8 + (index % 7) * .75,
-  scale: .68 + (index % 5) * .14
-}));
-
-const heroWeatherMarks = Array.from({ length: 9 }, (_, index) => ({
-  x: 8 + ((index * 31) % 84),
-  y: 12 + ((index * 23) % 68),
-  delay: -((index * 13) % 36) / 10,
-  scale: .7 + (index % 4) * .16
-}));
-
-const calgaryClockPartsFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: masjidTimeZone,
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23"
-});
 
 const calgaryDigitalClockFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: masjidTimeZone,
@@ -221,36 +194,16 @@ function timeLabel(date: Date) {
   return calgaryTimeLabelFormatter.format(date);
 }
 
-function weatherIcon(condition: string) {
-  const value = condition.toLowerCase();
-  if (value.includes("snow")) return "❄";
-  if (value.includes("rain") || value.includes("drizzle") || value.includes("shower")) return "☂";
-  if (value.includes("thunder")) return "ϟ";
-  if (value.includes("fog")) return "≋";
-  if (value.includes("cloud")) return "☁";
-  return "☀";
-}
-
-function AnalogClock({ now }: { now: Date }) {
-  const parts = calgaryClockPartsFormatter.formatToParts(now);
-  const value = (type: "hour" | "minute" | "second") => Number(parts.find((part) => part.type === type)?.value ?? 0);
-  const hour = value("hour");
-  const minute = value("minute");
-  const second = value("second");
-  const handStyle = {
-    "--hour-angle": `${(hour % 12) * 30 + minute * .5 + second / 120}deg`,
-    "--minute-angle": `${minute * 6 + second * .1}deg`,
-    "--second-angle": `${second * 6}deg`
-  } as CSSProperties;
-
-  return (
-    <div className={styles.analogClock} style={handStyle} aria-hidden="true">
-      <span className={`${styles.clockHand} ${styles.hourHand}`} />
-      <span className={`${styles.clockHand} ${styles.minuteHand}`} />
-      <span className={`${styles.clockHand} ${styles.secondHand}`} />
-      <i className={styles.clockPin} />
-    </div>
-  );
+function WeatherIcon({ mode }: { mode: TvWeatherMode }) {
+  return <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {mode === "clear" ? <><circle cx="24" cy="24" r="9" /><path d="M24 4v5m0 30v5M4 24h5m30 0h5M10 10l4 4m20 20 4 4M10 38l4-4m20-20 4-4" /></> : <>
+      <path d="M12 31a8 8 0 1 1 1-16 12 12 0 0 1 23 3 6.5 6.5 0 0 1 0 13H12Z" />
+      {mode === "rain" ? <path d="m16 36-2 6m11-6-2 6m11-6-2 6" /> : null}
+      {mode === "storm" ? <path d="m26 29-8 9h8l-4 8" /> : null}
+      {mode === "snow" ? <path d="M17 36v8m-3-6 6 4m-6 0 6-4m13-2v8m-3-6 6 4m-6 0 6-4" /> : null}
+      {mode === "fog" ? <path d="M8 37h32M12 43h24" /> : null}
+    </>}
+  </svg>;
 }
 
 function ClockArea({
@@ -273,13 +226,11 @@ function ClockArea({
       <div className={styles.clockRow}>
         {displayWeather ? (
           <div className={styles.weather} aria-label={`Calgary weather: ${displayWeather.temperature} degrees, ${displayWeather.condition}`}>
-            <span aria-hidden="true">{weatherIcon(displayWeather.condition)}</span>
+            <WeatherIcon mode={deriveWeatherVisualState(displayWeather).mode} />
             <b>{displayWeather.temperature < 0 ? "−" : ""}{Math.abs(displayWeather.temperature)}°C</b>
-            <i>·</i>
-            <em>{displayWeather.condition}</em>
+            <span><em>{displayWeather.condition}</em>{typeof displayWeather.windSpeed === "number" ? <small>Wind {Math.round(displayWeather.windSpeed)} km/h</small> : null}</span>
           </div>
         ) : null}
-        <AnalogClock now={now} />
         <strong className={styles.clock}>{calgaryDigitalClockFormatter.format(now)}</strong>
       </div>
       {showGregorianDate ? <span className={styles.date}>{calgaryDateFormatter.format(now)}</span> : null}
@@ -288,45 +239,18 @@ function ClockArea({
   );
 }
 
-const WeatherScene = memo(function WeatherScene({ mode }: { mode: TvWeatherMode }) {
-  if (mode === "clear") return null;
-  return (
-    <div className={styles.weatherScene}>
-      <div className={styles.cloudField}>
-        <i className={styles.cloudOne} />
-        <i className={styles.cloudTwo} />
-        <i className={styles.cloudThree} />
-      </div>
-      {mode === "fog" ? <div className={styles.fogField}><i /><i /></div> : null}
-      {mode === "rain" || mode === "storm" ? <div className={styles.rainField}>
-        {rainParticles.map((particle, index) => (
-          <i
-            key={index}
-            style={{
-              "--particle-x": `${particle.x}%`,
-              "--particle-delay": `${particle.delay}s`,
-              "--particle-duration": `${particle.duration}s`,
-              "--particle-scale": particle.scale
-            } as CSSProperties}
-          />
-        ))}
-      </div> : null}
-      {mode === "snow" ? <div className={styles.snowField}>
-        {snowParticles.map((particle, index) => (
-          <i
-            key={index}
-            style={{
-              "--particle-x": `${particle.x}%`,
-              "--particle-delay": `${particle.delay}s`,
-              "--particle-duration": `${particle.duration}s`,
-              "--particle-scale": particle.scale
-            } as CSSProperties}
-          />
-        ))}
-      </div> : null}
-      {mode === "storm" ? <div className={styles.stormFlash} /> : null}
-    </div>
-  );
+const WeatherScene = memo(function WeatherScene({ weather }: { weather: TvWeatherVisualState }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const clouds = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const surface = canvas.current;
+    const root = surface?.parentElement;
+    if (surface && root && clouds.current) return startTvWeatherScene(surface, root, weather, clouds.current);
+  }, [weather]);
+  return <>
+    <canvas ref={clouds} className={styles.cloudCanvas} aria-hidden="true" data-weather-clouds="cached" />
+    <canvas ref={canvas} className={styles.weatherCanvas} aria-hidden="true" data-weather-surface="bounded" />
+  </>;
 });
 
 const PrayerTile = memo(function PrayerTile({
@@ -362,12 +286,10 @@ const PrayerTile = memo(function PrayerTile({
 function LivePrayerSchedule({
   snapshot,
   previewJumuah,
-  weatherMode,
   onJumuahThemeChange
 }: {
   snapshot: TvDisplayPayload["snapshot"];
   previewJumuah: boolean;
-  weatherMode: TvWeatherMode;
   onJumuahThemeChange: (active: boolean) => void;
 }) {
   const now = usePrayerScheduleClock(snapshot.generatedAt, snapshot);
@@ -390,26 +312,12 @@ function LivePrayerSchedule({
         ) : (
           <div className={styles.heroLabel}>{focus?.primaryKind === "iqamah" ? "Iqamah next" : "Next prayer"}</div>
         )}
-        {weatherMode !== "clear" ? <div className={styles.heroWeatherFilm} aria-hidden="true">
-          {weatherMode === "rain" || weatherMode === "snow" || weatherMode === "storm" ?
-            heroWeatherMarks.map((mark, index) => (
-            <i
-              key={index}
-              style={{
-                "--mark-x": `${mark.x}%`,
-                "--mark-y": `${mark.y}%`,
-                "--mark-delay": `${mark.delay}s`,
-                "--mark-scale": mark.scale
-              } as CSSProperties}
-            />
-            )) : null}
-        </div> : null}
         <div className={styles.heroPrayer}>
           <div className={styles.heroPrayerName}>
-            <h2>{focus?.entry.name ?? "Prayer times"}</h2>
+            <h2 data-weather-text>{focus?.entry.name ?? "Prayer times"}</h2>
             {focus ? <span lang="ar" dir="rtl">{arabicPrayerNames[focus.entry.key]}</span> : null}
           </div>
-          <strong>{focus ? timeLabel(focus.date) : "Unavailable"}</strong>
+          <strong data-weather-text>{focus ? timeLabel(focus.date) : "Unavailable"}</strong>
         </div>
         <div className={styles.heroMeta}>
           <span className={styles.countdown}>{countdown}</span>
@@ -441,7 +349,7 @@ function LivePrayerSchedule({
 
 export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayPayload }) {
   const [payload, setPayload] = useState(initialPayload);
-  // Keep the atmospheric canvas on a relaxed cadence. Digital/analog seconds
+  // Keep the atmospheric state on a relaxed cadence. Digital seconds
   // and the minute-resolution prayer schedule have separate timers below.
   const [now, setNow] = useState(() => new Date(initialPayload.snapshot.generatedAt));
   const [weather, setWeather] = useState<TvWeatherReading | null>(null);
@@ -667,7 +575,6 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       <div className={styles.celestialField} aria-hidden="true">
         <div className={styles.sunAura} />
         <div className={styles.sunDisc}><span /></div>
-        <WeatherScene mode={weatherVisual.mode} />
       </div>
       {debugMetrics ? (
         <aside className={styles.debugPanel}>
@@ -699,7 +606,6 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       <LivePrayerSchedule
         snapshot={payload.snapshot}
         previewJumuah={previewJumuah}
-        weatherMode={weatherVisual.mode}
         onJumuahThemeChange={onJumuahThemeChange}
       />
 
@@ -778,7 +684,7 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
           )
         ) : null}
       </footer>
-      <div className={styles.sunDiscOverlay} aria-hidden="true"><span /></div>
+      <WeatherScene weather={weatherVisual} />
     </main>
   );
 }

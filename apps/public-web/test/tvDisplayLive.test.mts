@@ -22,18 +22,33 @@ test("deployed TV display advances seconds, fits TV sizes and recovers its publi
 
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const [width, height, weather] of [[1280, 720, "clear"], [1920, 1080, "rain"], [3840, 2160, "snow"]] as const) {
+    for (const [width, height, weather] of [[960, 540, "rain"], [1280, 720, "clear"], [1366, 768, "clouds"], [1920, 1080, "rain"], [1920, 1080, "fog"], [1920, 1080, "storm"], [3840, 2160, "snow"]] as const) {
       const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
       const errors: string[] = [];
       page.on("pageerror", error => errors.push(error.message));
       try {
+        if (width === 960) await page.addInitScript(() => {
+          // Kiosk privacy/storage restrictions must not stop the live display.
+          Storage.prototype.getItem = () => { throw new DOMException("Blocked", "SecurityError"); };
+          Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); };
+        });
         const url = new URL("/display", origin);
         url.searchParams.set("previewWeather", weather);
         await page.goto(url.href, { waitUntil: "networkidle" });
         await page.waitForFunction(expected => document.querySelector("main")?.getAttribute("data-weather") === expected, weather);
+        const surface = page.locator('canvas[data-weather-surface="bounded"]');
+        assert.equal(await surface.count(), 1);
+        const size = await surface.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+        assert.ok(size.width > 0 && size.width <= 960 && size.height > 0 && size.height <= 540);
+        assert.equal(await page.locator('[class*="analogClock"], [class*="clockHand"]').count(), 0, "analog clock is removed");
+        const filters = await page.locator("main *").evaluateAll(elements => elements.filter(element => getComputedStyle(element).backdropFilter !== "none").length);
+        assert.equal(filters, 0, "no continuous backdrop filtering over the weather");
         const schedule = page.getByRole("region", { name: "Today's prayer and iqamah times", exact: true });
         assert.equal(await schedule.locator(":scope > div").count(), 6);
         const clock = page.locator("header strong").first();
+        const weatherBox = await page.getByLabel(/^Calgary weather:/).boundingBox();
+        const clockBox = await clock.boundingBox();
+        assert.ok(weatherBox && clockBox && weatherBox.x + weatherBox.width <= clockBox.x + 1, "weather does not overlap the digital clock");
         const firstTime = await clock.textContent();
         assert.match(firstTime ?? "", /\d{1,2}:\d{2}:\d{2}/);
         await page.waitForFunction(previous => document.querySelector("header strong")?.textContent !== previous, firstTime, { timeout: 3500 });
@@ -56,7 +71,7 @@ test("deployed TV display advances seconds, fits TV sizes and recovers its publi
         assert.equal(await qr.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0), true);
         assert.equal(await qr.locator("..").getAttribute("href"), "https://hbic.ca/download");
         const qrBox = await qr.boundingBox();
-        assert.ok(qrBox && qrBox.width >= 70 && qrBox.x >= 0 && qrBox.y >= 0 && qrBox.x + qrBox.width <= width + 1 && qrBox.y + qrBox.height <= height + 1, "QR remains fully visible");
+        assert.ok(qrBox && qrBox.width >= (height <= 600 ? 50 : 70) && qrBox.x >= 0 && qrBox.y >= 0 && qrBox.x + qrBox.width <= width + 1 && qrBox.y + qrBox.height <= height + 1, "QR remains fully visible");
 
         if (process.env.HBIC_TV_VERIFY_SCREENSHOTS === "1") {
           const directory = path.resolve(import.meta.dirname, "../../../output/tv-display-live");

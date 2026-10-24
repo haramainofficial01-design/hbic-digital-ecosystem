@@ -202,3 +202,14 @@ inspection confirmed the existing restricted key name, “HBIC Quran Academy
 Production”, with a masked token. No Reveal, Roll, Create, Edit, Expire or
 permission-change action was performed. The runtime patch remains unconfirmed,
 and the credential rollover remains owner-controlled and incomplete.
+
+## Runtime recheck during the Fire TV revision
+
+The existing public deployment emitted another cold-start diagnostic at
+`2026-10-24T03:06:11.777Z` in `pdx1`: Node `24.21.0`,
+`brotliDecoderFixPresent: false`, `patched: false`. The official Vercel advisory
+still describes managed-runtime patching as rolling out. This is direct evidence
+that the application/dependency updates and patched build machine have **not**
+yet established a patched production function runtime. No credential rollover
+or full security clearance is claimed. An owner-authenticated Vercel Help case
+and subsequent runtime verification remain necessary.
