@@ -137,6 +137,37 @@ is written to ignored `output/tv-display-fire-tv/soak.json`. No private staff or
 payment endpoints are called. No Fire Stick is attached to this workstation;
 staff must still confirm long-running stability on the masjid's device.
 
+### Production release verification
+
+- Source `100411258877e4ba83052df4777f8a201c1cab1d` is committed and pushed to
+  the canonical `feature/quran-reader-practice` branch. The public deployment
+  `dpl_A9wH1uA5kLa9cHtiPCfs6Yctak72` completed an uncached production build
+  and was promoted after staged GET verification. Its metadata matches that
+  exact commit. Vercel alias records confirm `hbic.ca`, `www.hbic.ca`,
+  `hbic-calgary.vercel.app` and `hbic-calgary-app.vercel.app` all point to it.
+- The seven browser viewport/weather checks above also passed against the
+  public `https://hbic.ca/display`, including restricted browser storage,
+  offline schedule retention/recovery, bounded canvases and no analog clock.
+  The weather readout does not overlap the digital clock. Rendered 540p and
+  4K views were visually inspected.
+- A second three-minute run against the public production URL, again with
+  sixfold CPU throttling and six weather replacements, passed with zero browser
+  errors, zero DOM-node growth, zero listener growth and 462,544 bytes of
+  post-GC heap growth. Clock samples stayed current. This remains browser
+  validation rather than an attached Fire Stick soak test.
+- Before and after promotion, publication version 20, all six prayer entries
+  and display settings matched. Home, Quran, Academy, donations, display and
+  the staff editor returned 200; billing reported card availability; anonymous
+  diagnostics returned 401. No payment, private record or content publication
+  was changed by these read-only checks.
+- The previous public deployment `dpl_7a2XHs2rmS8x5ZK2wFU3EuDoWkY9` remains
+  recoverable. This change concerns the web TV display and does not require a
+  mobile OTA or app-store build.
+- The application/dependency security patches remain in this release, but the
+  separate managed Node runtime issue is still open. See
+  [the security record](security-node-2026-10-23.md); a successful TV release
+  does not establish that Vercel has patched its function runtime.
+
 ## Staff publishing
 
 1. Open `/display-admin` from a trusted staff computer, or choose **Prayer Display** in the existing web admin dashboard.

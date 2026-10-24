@@ -213,3 +213,16 @@ that the application/dependency updates and patched build machine have **not**
 yet established a patched production function runtime. No credential rollover
 or full security clearance is claimed. An owner-authenticated Vercel Help case
 and subsequent runtime verification remain necessary.
+
+The fresh Fire TV deployment `dpl_A9wH1uA5kLa9cHtiPCfs6Yctak72`
+(source `100411258877e4ba83052df4777f8a201c1cab1d`) completed an uncached
+build on patched Node `24.22.1`, but its protected diagnostics cold start at
+`2026-10-24T03:33:13.133Z` in `pdx1` again reported Node `24.21.0`,
+`brotliDecoderFixPresent: false`, `patched: false`. Redeployment alone has
+therefore not resolved the managed-runtime gap. The diagnostics GET remained
+401 for an unauthenticated caller; no secrets were returned.
+
+The owner subsequently confirmed signing in to Vercel Help. Browser control
+was unavailable because local browser access is disabled in Work settings,
+so no authenticated Help form or support case could be submitted. No alternate
+credential extraction, login bypass or public support post was attempted.
