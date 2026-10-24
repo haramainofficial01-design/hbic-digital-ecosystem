@@ -13,6 +13,12 @@ forensic clearance or confirmation that all credentials were rotated.
 **Current status: application security hotfix deployed; managed Node runtime
 patching and credential rollover remain unresolved.**
 
+**Latest provider response:** the authenticated Vercel Help conversation is
+complete. Its automated assistant declined a deployment-specific support case,
+tracking or ETA for this centrally managed rollout. No further owner login is
+needed. The serving-runtime patch remains unverified; the provider conversation
+does not establish that the patch has reached HBIC.
+
 ## Implemented safeguards
 
 - Updated this Mac's Homebrew Node from 26.8.1 to 26.12.1 and its shared Brotli
@@ -226,3 +232,45 @@ The owner subsequently confirmed signing in to Vercel Help. Browser control
 was unavailable because local browser access is disabled in Work settings,
 so no authenticated Help form or support case could be submitted. No alternate
 credential extraction, login bypass or public support post was attempted.
+
+## Authenticated Help response — October 23, 2026
+
+The owner re-enabled the browser connection. The existing signed-in Help tab
+was accessed in the background, selecting the existing HBIC Hobby account.
+The authorized report included only the runtime/build versions, project and
+deployment identifiers, region, exact observation timestamp and public
+advisory link. No credentials, customer records, payment data or raw log files
+were sent. No plan upgrade, account permission or new resource was requested.
+
+[Authenticated Help conversation](https://vercel.com/help?product=vercel&teamSlug=hbic&c=true&thread=2fe23d49-08e7-477c-97cf-32f904c8b99a)
+
+Vercel's automated support assistant responded that:
+
+- It cannot open or track an individual support case, verify a deployment's
+  patch coverage, accelerate this rollout or provide a project-specific ETA.
+- Build machines and serving Functions are separate environments; a patched
+  build does not prove a patched serving runtime. Versions can differ between
+  warm instances, executions and regions during rollout.
+- Managed 24.x runtime patches arrive automatically. Changing patch-version
+  settings or making repeated deployments is not required to receive them.
+- There is no customer-controlled Vercel platform setting that substitutes for
+  the runtime fix on fetched responses. The inbound WAF does not cover them.
+- Rollout-completion information is published in the official
+  [Vercel advisory](https://vercel.com/kb/bulletin/node-js-security-advisory).
+
+The published advisory was rechecked and still described the managed-runtime
+rollout as ongoing. The latest retained production cold-start evidence remained
+Node `24.21.0` at `2026-10-24T03:34:01.388Z` in `pdx1`, below the upstream
+`24.22.1` floor, with the decoder-fix marker absent. An anonymous diagnostics
+GET at `2026-10-24T03:43:09.260Z` remained 401. A warm invocation or a missing
+new log must not be presented as fresh patch evidence.
+
+This supersedes the earlier plan to obtain an individually tracked support
+case: the provider assistant declined that route. A screenshot and the local
+verification journal are retained outside Git. This was an automated support
+exchange, not a human engineering acknowledgement or confirmation of a fix.
+
+Next required evidence is the provider's completed rollout and a confirmed
+patched serving runtime. Then complete the documented owner-controlled Stripe
+credential rollover and verify both public/admin payment consumers. The
+rollover and historical Workbench request-log review are still incomplete.
