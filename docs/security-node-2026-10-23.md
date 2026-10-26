@@ -10,8 +10,80 @@ No successful compromise has been established. Patching, limited log review and
 credential rotation are separate tasks; this document must not be read as a
 forensic clearance or confirmation that all credentials were rotated.
 
-**Current status: application security hotfix deployed; managed Node runtime
-patching and credential rollover remain unresolved.**
+**Current status: application security hotfix and emergency application-level
+Brotli containment are live. The managed runtime patch, credential rollover
+and full historical request-log review remain unresolved. Containment is not
+a patched runtime or a complete security clearance.**
+
+### Emergency containment release — October 26, 2026
+
+Source `8371b031eda4a936209319662722088a773834b1` was committed, pushed,
+exported into clean staging directories and built without the previous cache.
+
+- Public deployment: `dpl_5jzKBWSUsZGLNcR7yx5G6TExeuxC`.
+- Admin deployment: `dpl_EyJwpPZWe3RRSECzErxk1v6ikRT6`.
+- All four existing public domains resolve to the public release; the existing
+  `hbic-calgary-admin-hbic.vercel.app` alias resolves to the admin release.
+- Previous public `dpl_5AgbifSEhSEFMP19SiA6M4xbJBPz` and admin
+  `dpl_BYVoQY23zYQYP7QnARaYaFzm9QyY` remain recoverable. Rolling back removes
+  the additional containment and is not a security remediation.
+
+Both apps use Next's documented startup instrumentation. On an unpatched Node
+instance, the safeguard replaces the four public Node Brotli decompression
+entry points with a local rejection before native decoding. Streaming errors
+are asynchronous so HTTP clients can attach their error handlers. Existing ESM
+named exports are synchronized using Node's documented builtin-export API.
+Server fetches negotiate gzip/deflate instead. No TLS validation, authentication,
+webhook validation or account permission is weakened. Patched instances retain
+their original decoder and fetch implementation.
+
+This is **application-level containment**, not a Node patch. It does not claim
+to cover native addons, references captured outside startup control or other
+vulnerabilities in the unpatched runtime. Legitimate Brotli-only upstream
+responses are deliberately rejected until the runtime is patched. The native
+image-processing dependency was separately updated in the earlier hotfix.
+
+Eight runtime/containment tests pass. A separate process with simulated
+unpatched evidence verifies six decoder entry-point cases, 12 ordinary/gzip/
+deflate response cases across four clients (including an already-loaded native
+fetch), eight Brotli/redirect rejections carrying the containment error, and
+preservation of POST bodies, request credentials and cancellation. Test input
+is ordinary valid compressed fixture text, never an exploit payload. The 28
+payment/webhook/authentication/donation/prayer regressions also pass with the
+containment active. Both hosted builds and all relevant type checks passed.
+
+The staged deployment successfully read the existing Stripe monthly price and
+reported `cardAvailable: true`; no live charge, subscription, refund or payout
+was created. Public content, display settings and billing configuration matched
+the pre-release baseline, apart from routine prayer-import timestamps. Content
+version remained 21. The scoped staged runtime error query returned no records.
+After promotion, the home, Academy, donation, display, billing, display API and
+weather routes returned 200; anonymous diagnostics remained 401.
+
+Live evidence at `2026-10-26T14:51:37.279Z`, domain `hbic.ca`, region `pdx1`,
+reported `HBIC_BROTLI_CONTAINMENT` with `nodeVersion: 24.21.0`, `active: true`,
+`mode: decoder-blocked`. Separate diagnostics still report the upstream fix
+marker absent. Do not label the runtime patched because containment is active.
+
+An isolated, SSO-protected alternate-runtime preview reported Bun 1.3.14 and
+no decoder-fix marker. Bun's official advisory requires 1.4.4. It was rejected
+as an alternative and never received a production domain. Its result is retained
+privately; the disposable probe is removed separately from release history.
+
+A fresh fully paginated seven-day Stripe inventory contains 38 events. This is
+an event inventory, not a complete request-log investigation or proof that every
+event was authorized. Raw financial records remain private outside Git.
+Metadata-only inspection confirms the application's production restricted-key
+environment variable was last updated September 27; no replacement value was
+read. The browser tool still reported disabled after the owner confirmed enabling
+it. The owner has been given the exact Stripe account/key name and existing
+Vercel production field for the required credential-entry handoff. No completed
+key rotation or old-key expiration is claimed.
+
+Primary implementation references:
+[Next.js startup instrumentation](https://nextjs.org/docs/app/guides/instrumentation),
+[Node builtin export synchronization](https://nodejs.org/api/module.html#modulesyncbuiltinesmexports),
+[Bun's security advisory](https://github.com/oven-sh/bun/security/advisories/GHSA-663w-cv8g-jj2p).
 
 ### Fresh production recheck — October 26, 2026
 
