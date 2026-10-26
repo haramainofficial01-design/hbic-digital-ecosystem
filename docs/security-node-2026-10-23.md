@@ -12,10 +12,10 @@ forensic clearance or confirmation that all credentials were rotated.
 
 **Current status: application security hotfix and emergency application-level
 Brotli containment are live. The owner-saved production payment-key setting
-has been deployed and passed a real Stripe price read. Independent old-key
-expiry verification, separate webhook-secret replacement and the managed
-runtime patch remain unresolved. Containment is not a patched runtime or a
-complete security clearance.**
+has been deployed and passed a real Stripe price read. The separate
+webhook-secret replacement and the managed runtime patch remain
+unresolved. The old payment key's 24-hour expiry is now independently verified.
+Containment is not a patched runtime or a complete security clearance.**
 
 ### Emergency containment release — October 26, 2026
 
@@ -88,6 +88,34 @@ Primary implementation references:
 [Bun's security advisory](https://github.com/oven-sh/bun/security/advisories/GHSA-663w-cv8g-jj2p).
 
 ### Owner-saved payment-key release — October 26, 2026
+
+**Follow-up verification:** after browser access was restored, Stripe's key
+list showed the original restricted key masked `…modF` with **Expires in
+24 hours**, and a replacement of the same name masked `…6HBC`. A successful
+monthly-price GET in Workbench used the replacement masked `…3L6HBC`, confirming
+the live backend is using the replacement, rather than merely a saved value
+that might still be the original. The full key was never revealed. Read-only
+inspection of the old and replacement permission editors found the same 170
+selected resource settings; neither editor was submitted and no permission was
+expanded. This supersedes the pending independent key verification below.
+
+One inherited configuration limitation was observed: Payment Intents is Read,
+while the existing best-effort tuition-purpose labeling helper calls its update
+API. Checkout Sessions, Invoices, Subscriptions and Customer Portal retain
+their existing Write settings. Permission parity is not an assertion that every
+pre-existing helper can write successfully. No access expansion was made as part
+of this rotation; a separate authorized permission correction and verification
+would be required for that reporting helper. No charge or billing state was
+changed to investigate it.
+
+The separate active webhook's **Roll secret** dialog was opened without final
+submission, with **in 24 hours** selected. The existing Production
+`ACADEMY_STRIPE_WEBHOOK_SECRET` write-only Value editor was prepared, and the
+owner was asked to complete the credential change and save there. No signing
+secret was revealed, generated, entered or submitted by the agent. The
+24-hour overlap is supported by Stripe's documented multiple-secret signatures:
+[webhook signing-secret rotation](https://docs.stripe.com/webhooks#roll-endpoint-secrets).
+The secret handoff and the subsequent deployment remain pending.
 
 The owner reported completing and saving the payment-key replacement.
 Metadata-only inspection confirmed the existing Production restricted-key
