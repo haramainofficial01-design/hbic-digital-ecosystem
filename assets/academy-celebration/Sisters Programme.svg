@@ -1,39 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-labelledby="title description">
   <title id="title">Qur’an Class Celebration — SISTERS’ SIDE</title>
   <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. The programme space in the centre is intentionally blank.</desc>
+  <defs>
+    <pattern id="geometry" width="128" height="128" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="#C19479" stroke-width="1.1">
+        <polygon points="64.00,7.00 79.42,26.77 104.31,23.69 101.23,48.58 121.00,64.00 101.23,79.42 104.31,104.31 79.42,101.23 64.00,121.00 48.58,101.23 23.69,104.31 26.77,79.42 7.00,64.00 26.77,48.58 23.69,23.69 48.58,26.77"/>
+        <rect x="35.5" y="35.5" width="57" height="57"/>
+        <rect x="35.5" y="35.5" width="57" height="57" transform="rotate(45 64 64)"/>
+        <path d="M0 0L24 24M104 104L128 128M128 0L104 24M24 104L0 128M64 7V0M64 121V128M7 64H0M121 64H128"/>
+      </g>
+    </pattern>
+    <clipPath id="arch-clip"><path d="M76 1190V415Q76 255 340 201Q469 174 540 132Q611 174 740 201Q1004 255 1004 415V1190Q1004 1246 948 1246H132Q76 1246 76 1190Z"/></clipPath>
+  </defs>
   <style>
     text { fill: #542C47; text-rendering: geometricPrecision; }
     .sans { font-family: 'Avenir Next', Arial, sans-serif; }
     .serif { font-family: Georgia, 'Times New Roman', serif; }
   </style>
-  <rect width="1080" height="1350" fill="#FFF5F5"/>
-  <rect x="26" y="26" width="1028" height="1298" rx="2" fill="none" stroke="#D9ADB9" stroke-width="1"/>
-  <path d="M26 115H0 M1054 115h26 M26 1235H0 M1054 1235h26" stroke="#D9ADB9"/>
-  <text class="sans" x="80" y="88" font-size="25" font-weight="700" letter-spacing="2.5">HBIC QUR’AN ACADEMY</text>
-  <text class="sans" x="80" y="121" font-size="20" letter-spacing=".5">Masjid Bilal · Calgary</text>
-  <text class="sans" x="1000" y="92" text-anchor="end" font-size="22" font-weight="600" letter-spacing="2" style="fill:#9E486A">SISTERS’ SIDE</text>
-  <path d="M80 155H1000" stroke="#D9ADB9"/>
+  <rect width="1080" height="1350" fill="#542C47"/>
+  <rect width="1080" height="1350" fill="url(#geometry)" opacity=".21"/>
+  <rect x="25" y="25" width="1030" height="1300" fill="none" stroke="#C19479" stroke-width="1"/>
+  <rect x="35" y="35" width="1010" height="1280" fill="none" stroke="#C19479" stroke-width=".5" opacity=".55"/>
+  <rect x="169" y="44" width="742" height="83" fill="#542C47"/>
+  <text class="sans" x="540" y="75" text-anchor="middle" font-size="25" font-weight="600" letter-spacing="3.1" style="fill:#FFF5F5">HBIC QUR’AN ACADEMY</text>
+  <text class="sans" x="540" y="108" text-anchor="middle" font-size="18" letter-spacing="1" style="fill:#FFF5F5">Masjid Bilal · Calgary</text>
 
-  <text class="serif" x="540" y="273" text-anchor="middle" font-size="91" letter-spacing="-3">Qur’an Class</text>
-  <text class="serif" x="540" y="375" text-anchor="middle" font-size="103" font-style="italic" letter-spacing="-3" style="fill:#9E486A">Celebration</text>
-  <text class="sans" x="540" y="424" text-anchor="middle" font-size="23" letter-spacing="1">A special end-of-month class</text>
+  <path d="M76 1190V415Q76 255 340 201Q469 174 540 132Q611 174 740 201Q1004 255 1004 415V1190Q1004 1246 948 1246H132Q76 1246 76 1190Z" fill="#FFF5F5"/>
+  <g clip-path="url(#arch-clip)" opacity=".3" fill="none" stroke="#D9ADB9">
+    <circle cx="54" cy="426" r="135"/><circle cx="54" cy="426" r="151"/>
+    <circle cx="1026" cy="426" r="135"/><circle cx="1026" cy="426" r="151"/>
+  </g>
+  <path d="M76 1190V415Q76 255 340 201Q469 174 540 132Q611 174 740 201Q1004 255 1004 415V1190Q1004 1246 948 1246H132Q76 1246 76 1190Z" fill="none" stroke="#C19479" stroke-width="1.5"/>
+  <path d="M94 1188V416Q94 269 347 218Q475 191 540 153Q605 191 733 218Q986 269 986 416V1188Q986 1228 946 1228H134Q94 1228 94 1188Z" fill="none" stroke="#D9ADB9" stroke-width=".9"/>
 
-  <path d="M80 474H1000" stroke="#D9ADB9"/>
-  <text class="sans" x="80" y="524" font-size="25" font-weight="600" letter-spacing="1.4">THURSDAY, OCTOBER 29</text>
-  <text class="sans" x="80" y="559" font-size="21" letter-spacing="2" style="fill:#9E486A">2026</text>
-  <path d="M572 501V562" stroke="#D9ADB9"/>
-  <text class="sans" x="1000" y="543" text-anchor="end" font-size="43" font-weight="600" letter-spacing="-1">5:30–7:30 PM</text>
-  <path d="M80 589H1000" stroke="#D9ADB9"/>
+  <polygon points="540.00,197.00 544.86,203.27 552.73,202.27 551.73,210.14 558.00,215.00 551.73,219.86 552.73,227.73 544.86,226.73 540.00,233.00 535.14,226.73 527.27,227.73 528.27,219.86 522.00,215.00 528.27,210.14 527.27,202.27 535.14,203.27" fill="none" stroke="#C19479" stroke-width="1.4"/>
+  <polygon points="540.00,206.50 542.30,209.46 546.01,208.99 545.54,212.70 548.50,215.00 545.54,217.30 546.01,221.01 542.30,220.54 540.00,223.50 537.70,220.54 533.99,221.01 534.46,217.30 531.50,215.00 534.46,212.70 533.99,208.99 537.70,209.46" fill="#C19479"/>
+  <text class="sans" x="540" y="275" text-anchor="middle" font-size="21" font-weight="600" letter-spacing="4" style="fill:#9E486A">SISTERS’ SIDE</text>
+  <path d="M366 267H410M670 267H714" stroke="#C19479"/>
+  <text class="serif" x="540" y="365" text-anchor="middle" font-size="75" letter-spacing="-2.2">Qur’an Class</text>
+  <text class="serif" x="540" y="460" text-anchor="middle" font-size="99" font-style="italic" letter-spacing="-3" style="fill:#9E486A">Celebration</text>
+  <text class="sans" x="540" y="506" text-anchor="middle" font-size="21" letter-spacing=".6">A special end-of-month class</text>
 
-  <text class="serif" x="540" y="654" text-anchor="middle" font-size="31">Programme</text>
-  <path d="M80 644H385 M695 644H1000" stroke="#D9ADB9"/>
+  <path d="M130 548H950M130 671H950" stroke="#D9ADB9"/>
+  <text class="serif" x="138" y="639" font-size="83" letter-spacing="-4">29</text>
+  <path d="M270 574V644M618 574V644" stroke="#D9ADB9"/>
+  <text class="sans" x="299" y="600" font-size="23" font-weight="600" letter-spacing="1.6">THURSDAY</text>
+  <text class="sans" x="299" y="635" font-size="21" letter-spacing="1">OCTOBER 2026</text>
+  <text class="sans" x="945" y="614" text-anchor="end" font-size="35" font-weight="600" letter-spacing="-.7">5:30–7:30 PM</text>
+
+  <path d="M130 726H382M698 726H950" stroke="#D9ADB9"/>
+  <polygon points="377.00,721.00 379.47,723.53 382.00,726.00 379.47,728.47 377.00,731.00 374.53,728.47 372.00,726.00 374.53,723.53" fill="#C19479"/>
+  <polygon points="703.00,721.00 705.47,723.53 708.00,726.00 705.47,728.47 703.00,731.00 700.53,728.47 698.00,726.00 700.53,723.53" fill="#C19479"/>
+  <text class="serif" x="540" y="737" text-anchor="middle" font-size="33">Programme</text>
   <!-- Blank programme field: do not add placeholders or activity details. -->
-  <rect id="programme-space" x="80" y="686" width="920" height="414" rx="0" fill="#FFFFFF" fill-opacity=".72"/>
-  <path d="M80 706v-20h20 M980 686h20v20 M80 1080v20h20 M980 1100h20v-20" fill="none" stroke="#D9ADB9" stroke-width="1.5"/>
+  <rect id="programme-space" x="130" y="771" width="820" height="347" fill="#FFFFFF" fill-opacity=".35"/>
+  <path d="M130 807V771H166M914 771H950V807M130 1082V1118H166M914 1118H950V1082" fill="none" stroke="#C19479" stroke-width="1.2"/>
+  <path d="M141 794V782H153M927 782H939V794M141 1095V1107H153M927 1107H939V1095" fill="none" stroke="#D9ADB9" stroke-width="1"/>
 
-  <rect x="0" y="1160" width="1080" height="190" fill="#542C47"/>
-  <rect x="26" y="1160" width="1028" height="164" fill="none" stroke="#D9ADB9" stroke-opacity=".4"/>
-  <path d="M480 1197H600" stroke="#976C49" stroke-width="2"/>
-  <text class="serif" x="540" y="1241" text-anchor="middle" font-size="28" style="fill:#FFF5F5">Celebrating a month of learning,</text>
-  <text class="serif" x="540" y="1280" text-anchor="middle" font-size="28" style="fill:#FFF5F5">recitation &amp; growing together.</text>
+  <path d="M130 1153H447M633 1153H950" stroke="#D9ADB9"/>
+  <polygon points="540.00,1141.00 543.25,1145.15 548.49,1144.51 547.85,1149.75 552.00,1153.00 547.85,1156.25 548.49,1161.49 543.25,1160.85 540.00,1165.00 536.75,1160.85 531.51,1161.49 532.15,1156.25 528.00,1153.00 532.15,1149.75 531.51,1144.51 536.75,1145.15" fill="none" stroke="#C19479"/>
+  <path d="M474 1153H510M570 1153H606" stroke="#C19479"/>
+  <text class="serif" x="540" y="1192" text-anchor="middle" font-size="20">Celebrating a month of learning, recitation &amp; growing together.</text>
+  <rect x="322" y="1265" width="436" height="41" fill="#542C47"/>
+  <text class="sans" x="540" y="1292" text-anchor="middle" font-size="18" letter-spacing="2.8" style="fill:#FFF5F5">MASJID BILAL · CALGARY</text>
 </svg>

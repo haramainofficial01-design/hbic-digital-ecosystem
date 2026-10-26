@@ -9,6 +9,8 @@ The current artwork replaces the earlier teaser design. It has no generated imag
 - Sisters: plum, rose and warm blush.
 - Both: a completed event-poster layout with one intentionally empty centre programme field. No activities, menu or segment times have been invented. Teaser phrases and gift imagery have been removed.
 
+The refined editions use a pointed-arch central panel, a fine eight-point geometric border, double keylines, restrained gold accents and a prominent day-of-month layout. These are authored vector paths and typeset text, rather than generated pictures. The blank programme area remains clear of ornament, with corner details outside its usable space.
+
 ## Files
 
 Each edition includes a 2160 × 2700 PNG for sharing and a 1080 × 1350 editable SVG source. The SVG has live text; install the named fonts when editing to retain the same layout. The PNG preserves the rendered typography on any device.
