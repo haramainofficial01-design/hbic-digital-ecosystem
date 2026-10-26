@@ -11,9 +11,11 @@ credential rotation are separate tasks; this document must not be read as a
 forensic clearance or confirmation that all credentials were rotated.
 
 **Current status: application security hotfix and emergency application-level
-Brotli containment are live. The managed runtime patch, credential rollover
-and full historical request-log review remain unresolved. Containment is not
-a patched runtime or a complete security clearance.**
+Brotli containment are live. The owner-saved production payment-key setting
+has been deployed and passed a real Stripe price read. Independent old-key
+expiry verification, separate webhook-secret replacement and the managed
+runtime patch remain unresolved. Containment is not a patched runtime or a
+complete security clearance.**
 
 ### Emergency containment release — October 26, 2026
 
@@ -84,6 +86,55 @@ Primary implementation references:
 [Next.js startup instrumentation](https://nextjs.org/docs/app/guides/instrumentation),
 [Node builtin export synchronization](https://nodejs.org/api/module.html#modulesyncbuiltinesmexports),
 [Bun's security advisory](https://github.com/oven-sh/bun/security/advisories/GHSA-663w-cv8g-jj2p).
+
+### Owner-saved payment-key release — October 26, 2026
+
+The owner reported completing and saving the payment-key replacement.
+Metadata-only inspection confirmed the existing Production restricted-key
+variable was updated at `2026-10-26T20:51:27.483Z`. The value was never read,
+printed or written into a local environment file. The webhook-secret and
+Preview-variable metadata remain unchanged; those were not silently replaced.
+
+The exact previously verified containment source
+`8371b031eda4a936209319662722088a773834b1` was rebuilt without cache against
+the current Production environment in the existing public project. Deployment
+`dpl_HaHQ7rH3Z21vyecG3Wu5hvHhr1FY`,
+`https://hbic-calgary-9ryv9bzqu-hbic.vercel.app`, completed its hosted build on
+Node 24.22.1. Existing unrelated lint/CSS warnings remain. No new application
+feature, billing rule, Firebase setting, mobile build or account permission
+was changed for this release.
+
+Before promotion, the staged billing endpoint returned `cardAvailable: true`,
+which requires a successful server-side read and validation of the existing
+Stripe monthly price using that deployment's saved credential. Display and
+weather APIs returned 200 and anonymous diagnostics returned 401. This proves
+that the saved configuration works for that read; it does not establish all
+write permissions, a new charge or independent confirmation of which key
+Stripe generated.
+
+The verified deployment was promoted. Alias records confirmed all four existing
+public domains, including `hbic.ca` and `www.hbic.ca`, resolve to it. Live checks
+at `2026-10-26T20:55:28Z` returned 200 for home, Academy, donation, display,
+billing, display weather, published app content, prayer snapshot and the current
+admin alias. Billing still reports the existing per-child monthly configuration
+and `cardAvailable: true`; content version is still 21. Anonymous diagnostics
+remains 401. No real charge, subscription, refund, payout or webhook replay was
+created to test this change. The scoped release log query returned no error or
+fatal records.
+
+The new deployment's serving-runtime diagnostic at `20:54:33.168Z` in `pdx1`
+still reports Node 24.21.0, `patched: false` and the Brotli fix marker absent.
+Its startup containment markers confirm decoder blocking remains active.
+The patched build machine therefore must not be confused with a patched server.
+
+Browser control is disabled again. Independent inspection of Stripe's resulting
+key/expiration state is pending, as is the separate webhook signing-secret
+replacement. The owner was asked to re-enable browser access for those steps.
+No early expiration or revocation was performed by the agent. After any old-key
+expiry, previously built deployments and the unchanged Preview environment
+must not be assumed to retain working billing. For rollback, rebuild the desired
+verified source against current secrets instead of promoting an old deployment
+with an expired embedded credential. Release history remains recoverable.
 
 ### Owner handoff and request review — October 26, 2026
 
