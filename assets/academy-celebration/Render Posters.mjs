@@ -1,90 +1,105 @@
 import { chromium } from 'playwright';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 // Fixed vector geometry and real, locally installed typefaces; no image assets.
 const directory = path.dirname(fileURLToPath(import.meta.url));
+const logo = (await readFile(path.join(directory, '../../apps/public-web/public/brand/hbic-logo.png'))).toString('base64');
 const editions = [
   { name: 'Brothers', side: 'BROTHERS’ SIDE', ink: '#102F43', accent: '#146E75', paper: '#F2F7F7', pale: '#D9E9EC', line: '#A8C8CB', gold: '#BC9C60' },
   { name: 'Sisters', side: 'SISTERS’ SIDE', ink: '#542C47', accent: '#9E486A', paper: '#FFF5F5', pale: '#F0D9E1', line: '#D9ADB9', gold: '#C19479' },
 ];
 
-function star(cx, cy, outer, inner, points = 8) {
-  return Array.from({ length: points * 2 }, (_, i) => {
-    const angle = -Math.PI / 2 + i * Math.PI / points;
-    const radius = i % 2 ? inner : outer;
-    return `${(cx + Math.cos(angle) * radius).toFixed(2)},${(cy + Math.sin(angle) * radius).toFixed(2)}`;
-  }).join(' ');
+function rosette(t) {
+  const sister = t.name === 'Sisters';
+  const cx = 850, cy = 329, radius = 148, folds = sister ? 32 : 24;
+  let shapes = '';
+  for (let i = 0; i < folds; i++) {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / folds;
+    const b = a + Math.PI / folds;
+    const c = a + Math.PI * 2 / folds;
+    const point = (angle, r) => `${(cx + Math.cos(angle) * r).toFixed(2)},${(cy + Math.sin(angle) * r).toFixed(2)}`;
+    const inner = point(a, 70), outer = point(a, radius);
+    const mid = point(b, sister ? radius - 8 : radius - 24);
+    shapes += `<polygon points="${cx},${cy} ${outer} ${mid}" fill="url(#fold-light)"/>`;
+    shapes += `<polygon points="${cx},${cy} ${mid} ${point(c, radius)}" fill="url(#fold-dark)"/>`;
+    shapes += `<path d="M${inner}L${outer}" stroke="${t.gold}" stroke-opacity=".35" stroke-width=".6"/>`;
+  }
+  return `<g filter="url(#paper-shadow)">
++    <path d="M784 417L748 549L813 523L847 568L877 425Z" fill="url(#ribbon)"/>
++    <path d="M841 421L876 565L914 519L968 538L921 410Z" fill="${t.accent}"/>
++    <path d="M802 433L783 515M905 433L929 510" stroke="${t.gold}" stroke-opacity=".6"/>
++    ${shapes}
++    <circle cx="${cx}" cy="${cy}" r="81" fill="${t.paper}"/>
++    <circle cx="${cx}" cy="${cy}" r="74" fill="none" stroke="${t.gold}" stroke-width="1"/>
++    <text class="display" x="${cx}" y="348" text-anchor="middle" font-size="76" style="fill:${t.ink}">29</text>
++    <text class="sans" x="${cx}" y="376" text-anchor="middle" font-size="14" font-weight="600" letter-spacing="2.8" style="fill:${t.accent}">OCTOBER</text>
++  </g>`.replaceAll('\n+', '\n');
 }
 
 function poster(t) {
-  const arch = 'M76 1190V415Q76 255 340 201Q469 174 540 132Q611 174 740 201Q1004 255 1004 415V1190Q1004 1246 948 1246H132Q76 1246 76 1190Z';
+  const sister = t.name === 'Sisters';
+  const background = sister ? '#F9E8E8' : '#082D36';
+  const foreground = sister ? t.ink : t.paper;
+  const quiet = sister ? '#7D4860' : '#C2DAD8';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-labelledby="title description">
   <title id="title">Qur’an Class Celebration — ${t.side}</title>
-  <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. The programme space in the centre is intentionally blank.</desc>
+  <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. The centre programme field is intentionally empty.</desc>
   <defs>
-    <pattern id="geometry" width="128" height="128" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="${t.gold}" stroke-width="1.1">
-        <polygon points="${star(64, 64, 57, 40.3)}"/>
-        <rect x="35.5" y="35.5" width="57" height="57"/>
-        <rect x="35.5" y="35.5" width="57" height="57" transform="rotate(45 64 64)"/>
-        <path d="M0 0L24 24M104 104L128 128M128 0L104 24M24 104L0 128M64 7V0M64 121V128M7 64H0M121 64H128"/>
-      </g>
-    </pattern>
-    <clipPath id="arch-clip"><path d="${arch}"/></clipPath>
+    <linearGradient id="fold-light" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${sister ? '#F4C8CB' : '#4BABA4'}"/><stop offset=".65" stop-color="${sister ? '#CD8094' : '#257E80'}"/><stop offset="1" stop-color="${t.accent}"/></linearGradient>
+    <linearGradient id="fold-dark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${sister ? '#C58098' : '#207A7D'}"/><stop offset="1" stop-color="${sister ? '#8F3E63' : '#0C4F5D'}"/></linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${t.accent}"/><stop offset=".5" stop-color="${sister ? '#C7788A' : '#419894'}"/><stop offset="1" stop-color="${t.accent}"/></linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFCF5"/><stop offset="1" stop-color="${t.paper}"/></linearGradient>
+    <filter id="paper-shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="${t.ink}" flood-opacity=".22"/></filter>
   </defs>
   <style>
-    text { fill: ${t.ink}; text-rendering: geometricPrecision; }
+    text { fill: ${foreground}; text-rendering: geometricPrecision; }
     .sans { font-family: 'Avenir Next', Arial, sans-serif; }
+    .display { font-family: Didot, 'Bodoni 72', Georgia, serif; }
     .serif { font-family: Georgia, 'Times New Roman', serif; }
   </style>
-  <rect width="1080" height="1350" fill="${t.ink}"/>
-  <rect width="1080" height="1350" fill="url(#geometry)" opacity=".21"/>
-  <rect x="25" y="25" width="1030" height="1300" fill="none" stroke="${t.gold}" stroke-width="1"/>
-  <rect x="35" y="35" width="1010" height="1280" fill="none" stroke="${t.gold}" stroke-width=".5" opacity=".55"/>
-  <rect x="169" y="44" width="742" height="83" fill="${t.ink}"/>
-  <text class="sans" x="540" y="75" text-anchor="middle" font-size="25" font-weight="600" letter-spacing="3.1" style="fill:${t.paper}">HBIC QUR’AN ACADEMY</text>
-  <text class="sans" x="540" y="108" text-anchor="middle" font-size="18" letter-spacing="1" style="fill:${t.paper}">Masjid Bilal · Calgary</text>
+  <rect width="1080" height="1350" fill="${background}"/>
+  <path d="M1080 101C747 101 701 175 701 337S747 573 1080 573" fill="none" stroke="${sister ? '#E9C4D0' : '#13515A'}" stroke-width="105"/>
+  <path d="M1080 98C740 98 681 175 681 337S740 576 1080 576" fill="none" stroke="${t.gold}" stroke-width=".8" opacity=".55"/>
+  <path d="M23 0V1350M1057 0V1350" stroke="${t.gold}" opacity=".4"/>
+  <image x="62" y="53" width="68" height="68" href="data:image/png;base64,${logo}"/>
+  <text class="sans" x="148" y="81" font-size="23" font-weight="600" letter-spacing="2">HBIC QUR’AN ACADEMY</text>
+  <text class="sans" x="148" y="111" font-size="17" letter-spacing=".8" style="fill:${quiet}">Masjid Bilal · Calgary</text>
+  <text class="sans" x="1018" y="92" text-anchor="end" font-size="18" font-weight="600" letter-spacing="2.3">${t.side}</text>
+  <path d="M62 146H1018" stroke="${t.gold}" stroke-width=".8"/>
 
-  <path d="${arch}" fill="${t.paper}"/>
-  <g clip-path="url(#arch-clip)" opacity=".3" fill="none" stroke="${t.line}">
-    <circle cx="54" cy="426" r="135"/><circle cx="54" cy="426" r="151"/>
-    <circle cx="1026" cy="426" r="135"/><circle cx="1026" cy="426" r="151"/>
+  <text class="display" x="64" y="272" font-size="132" letter-spacing="-4">Qur’an</text>
+  <text class="display" x="67" y="398" font-size="130" letter-spacing="-4">Class</text>
+  <text class="display" x="62" y="491" font-size="96" font-style="italic" letter-spacing="-2.3" style="fill:${sister ? '#A94E73' : '#E3C785'}">Celebration</text>
+  <path d="M67 530H121" stroke="${t.gold}" stroke-width="2"/>
+  <text class="sans" x="139" y="538" font-size="20" letter-spacing=".2" style="fill:${quiet}">A special end-of-month class</text>
+  ${rosette(t)}
+
+  <path d="M92 619L1014 601L1024 1208L78 1225Z" fill="${sister ? '#EBC5CC' : '#367C80'}"/>
+  <path d="M55 608L998 626L1007 1200L64 1216Z" fill="${sister ? '#B76A83' : '#174F59'}" stroke="${t.gold}" stroke-width=".7"/>
+  <g filter="url(#paper-shadow)">
+    <path d="M62 586H1018V1196H62Z" fill="url(#paper)"/>
+    <path d="M62 586H1018V716H62Z" fill="${sister ? '#6B304E' : '#17636C'}"/>
+    <path d="M83 605H997M83 697H997" stroke="${t.gold}" stroke-opacity=".75" stroke-width=".7"/>
+    <text class="display" x="103" y="678" font-size="81" style="fill:#FFFAEF">29</text>
+    <path d="M237 618V686M647 618V686" stroke="${t.gold}" stroke-opacity=".65"/>
+    <text class="sans" x="266" y="646" font-size="24" font-weight="600" letter-spacing="2" style="fill:#FFFAEF">THURSDAY</text>
+    <text class="sans" x="266" y="679" font-size="22" letter-spacing=".7" style="fill:#FFFAEF">OCTOBER 2026</text>
+    <text class="sans" x="982" y="660" text-anchor="end" font-size="34" font-weight="600" letter-spacing="-.8" style="fill:#FFFAEF">5:30–7:30 PM</text>
+    <path d="M83 736H997" stroke="${t.line}" stroke-width=".8" stroke-dasharray="3 6"/>
+    <circle cx="62" cy="736" r="12" fill="${background}"/><circle cx="1018" cy="736" r="12" fill="${background}"/>
+    <text class="display" x="103" y="795" font-size="39" style="fill:${t.ink}">The programme</text>
+    <path d="M431 783H976" stroke="${t.line}"/>
+    <!-- This entire field remains empty until the final programme is supplied. -->
+    <rect id="programme-space" x="103" y="824" width="874" height="290" fill="none"/>
+    <path d="M104 834V823H115M965 823H976V834M104 1104V1115H115M965 1115H976V1104" fill="none" stroke="${t.gold}" stroke-width=".8"/>
+    <path d="M103 1146H977" stroke="${t.line}" stroke-width=".8"/>
+    <text class="sans" x="104" y="1176" font-size="15" letter-spacing="2" style="fill:${t.accent}">QUR’AN · COMMUNITY · CELEBRATION</text>
+    <text class="sans" x="977" y="1176" text-anchor="end" font-size="15" letter-spacing="2" style="fill:${t.accent}">${t.side}</text>
   </g>
-  <path d="${arch}" fill="none" stroke="${t.gold}" stroke-width="1.5"/>
-  <path d="M94 1188V416Q94 269 347 218Q475 191 540 153Q605 191 733 218Q986 269 986 416V1188Q986 1228 946 1228H134Q94 1228 94 1188Z" fill="none" stroke="${t.line}" stroke-width=".9"/>
-
-  <polygon points="${star(540, 215, 18, 12.7)}" fill="none" stroke="${t.gold}" stroke-width="1.4"/>
-  <polygon points="${star(540, 215, 8.5, 6)}" fill="${t.gold}"/>
-  <text class="sans" x="540" y="275" text-anchor="middle" font-size="21" font-weight="600" letter-spacing="4" style="fill:${t.accent}">${t.side}</text>
-  <path d="M366 267H410M670 267H714" stroke="${t.gold}"/>
-  <text class="serif" x="540" y="365" text-anchor="middle" font-size="75" letter-spacing="-2.2">Qur’an Class</text>
-  <text class="serif" x="540" y="460" text-anchor="middle" font-size="99" font-style="italic" letter-spacing="-3" style="fill:${t.accent}">Celebration</text>
-  <text class="sans" x="540" y="506" text-anchor="middle" font-size="21" letter-spacing=".6">A special end-of-month class</text>
-
-  <path d="M130 548H950M130 671H950" stroke="${t.line}"/>
-  <text class="serif" x="138" y="639" font-size="83" letter-spacing="-4">29</text>
-  <path d="M270 574V644M618 574V644" stroke="${t.line}"/>
-  <text class="sans" x="299" y="600" font-size="23" font-weight="600" letter-spacing="1.6">THURSDAY</text>
-  <text class="sans" x="299" y="635" font-size="21" letter-spacing="1">OCTOBER 2026</text>
-  <text class="sans" x="945" y="614" text-anchor="end" font-size="35" font-weight="600" letter-spacing="-.7">5:30–7:30 PM</text>
-
-  <path d="M130 726H382M698 726H950" stroke="${t.line}"/>
-  <polygon points="${star(377, 726, 5, 3.5, 4)}" fill="${t.gold}"/>
-  <polygon points="${star(703, 726, 5, 3.5, 4)}" fill="${t.gold}"/>
-  <text class="serif" x="540" y="737" text-anchor="middle" font-size="33">Programme</text>
-  <!-- Blank programme field: do not add placeholders or activity details. -->
-  <rect id="programme-space" x="130" y="771" width="820" height="347" fill="#FFFFFF" fill-opacity=".35"/>
-  <path d="M130 807V771H166M914 771H950V807M130 1082V1118H166M914 1118H950V1082" fill="none" stroke="${t.gold}" stroke-width="1.2"/>
-  <path d="M141 794V782H153M927 782H939V794M141 1095V1107H153M927 1107H939V1095" fill="none" stroke="${t.line}" stroke-width="1"/>
-
-  <path d="M130 1153H447M633 1153H950" stroke="${t.line}"/>
-  <polygon points="${star(540, 1153, 12, 8.5)}" fill="none" stroke="${t.gold}"/>
-  <path d="M474 1153H510M570 1153H606" stroke="${t.gold}"/>
-  <text class="serif" x="540" y="1192" text-anchor="middle" font-size="20">Celebrating a month of learning, recitation &amp; growing together.</text>
-  <rect x="322" y="1265" width="436" height="41" fill="${t.ink}"/>
-  <text class="sans" x="540" y="1292" text-anchor="middle" font-size="18" letter-spacing="2.8" style="fill:${t.paper}">MASJID BILAL · CALGARY</text>
+  <text class="serif" x="540" y="1284" text-anchor="middle" font-size="24" style="fill:${foreground}">Celebrating a month of learning,</text>
+  <text class="serif" x="540" y="1318" text-anchor="middle" font-size="24" style="fill:${foreground}">recitation &amp; growing together.</text>
 </svg>`;
 }
 

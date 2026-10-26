@@ -3,24 +3,24 @@
 Thursday, October 29, 2026 · 5:30–7:30 PM
 HBIC Qur’an Academy · Masjid Bilal · Calgary
 
-The current artwork replaces the earlier teaser design. It has no generated imagery, generated lettering, stock imagery or illustrations. All lettering is actual typeset text, using Georgia and Avenir Next with ordinary serif/sans-serif fallbacks. Font files are not included or redistributed.
+## Current artwork
 
-- Brothers: navy, teal and cool off-white.
-- Sisters: plum, rose and warm blush.
-- Both: a completed event-poster layout with one intentionally empty centre programme field. No activities, menu or segment times have been invented. Teaser phrases and gift imagery have been removed.
+The current editions use an editorial event-programme composition, replacing the earlier plain and arch-border designs. They contain real typeset Didot display lettering, Avenir Next supporting text and Georgia footer text. All font files remain on the local system and are not redistributed. There is no image-generated artwork or generated lettering.
 
-The refined editions use a pointed-arch central panel, a fine eight-point geometric border, double keylines, restrained gold accents and a prominent day-of-month layout. These are authored vector paths and typeset text, rather than generated pictures. The blank programme area remains clear of ornament, with corner details outside its usable space.
+The only raster source included in the SVG is the existing official masjid logo from `apps/public-web/public/brand/hbic-logo.png`. Folded-paper rosettes, ribbons, layered sheets, light/shadow and the framing are authored SVG geometry and gradients. The brothers’ edition uses a sharper 24-fold teal rosette on deep petrol, with ivory and gold type. The sisters’ edition uses a finer 32-fold rose rosette on warm blush, with plum type. Their base surfaces, contrast and rosette construction differ, rather than simply changing a label.
+
+Both retain an entirely empty programme field in the central sheet. No activities, menu, segment timings or other unconfirmed event details have been invented. The confirmed overall time remains 5:30–7:30 PM. No teaser copy is included.
 
 ## Files
 
-Each edition includes a 2160 × 2700 PNG for sharing and a 1080 × 1350 editable SVG source. The SVG has live text; install the named fonts when editing to retain the same layout. The PNG preserves the rendered typography on any device.
+Each edition has a 2160 × 2700 PNG for sharing and a 1080 × 1350 editable SVG. The PNG preserves the typography on any device. For editing live SVG text, install Didot and Avenir Next; standard fallbacks are specified but will alter the typography.
 
-The source is `Render Posters.mjs`. From the project root, run:
+The editable source is `Render Posters.mjs`. From the project root:
 
 ```sh
 node 'assets/academy-celebration/Render Posters.mjs'
 ```
 
-This renders the fixed SVG geometry and text using local headless Chromium. It makes no network requests and does not use an image-generation service. Exports were visually checked together for colour distinction, legibility, spacing, side labels, the date and time, and an empty programme area. Text bounds are checked against the artwork safe area during export.
+Exports use local headless Chromium with network requests blocked. Both editions were visually inspected for typography, spacing, colour contrast, logo, side labels, date/time and the empty programme area. The export checks text against the artwork safe bounds.
 
-These are prepared poster files only. Saving them does not send messages to families or publish content to the website or apps.
+These files are prepared artwork. Saving them does not send messages or publish them to HBIC’s website or apps.
