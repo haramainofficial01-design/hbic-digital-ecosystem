@@ -13,6 +13,30 @@ forensic clearance or confirmation that all credentials were rotated.
 **Current status: application security hotfix deployed; managed Node runtime
 patching and credential rollover remain unresolved.**
 
+### Fresh production recheck — October 26, 2026
+
+A read-only request to the existing protected diagnostics route returned HTTP
+401 and emitted fresh cold-start evidence at `2026-10-26T11:49:44.423Z`.
+The serving public deployment remains
+`dpl_5AgbifSEhSEFMP19SiA6M4xbJBPz`, region `pdx1`. Its log reported:
+
+- `nodeVersion: 24.21.0`
+- `minimumPatchedVersion: 24.22.1`
+- `patched: false`
+- `brotliDecoderFixPresent: false`
+
+This is a new production observation, not a reused build log. The managed
+runtime issue is therefore still unresolved on this observed instance. The
+official Vercel advisory, fetched again on October 26, still says managed
+runtime patching is rolling out and that inbound WAF protection does not
+cover fetched responses. No new deployment, account configuration change or
+financial write was performed for this check.
+
+The existing Stripe CLI account still matches the account in the notice.
+No new credential rollover has been performed or independently verified in
+this recheck. The earlier limited activity review is not a current forensic
+clearance, nor proof that exposed credentials were never used.
+
 **Latest provider response:** the authenticated Vercel Help conversation is
 complete. Its automated assistant declined a deployment-specific support case,
 tracking or ETA for this centrally managed rollout. No further owner login is
