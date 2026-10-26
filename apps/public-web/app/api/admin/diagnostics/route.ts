@@ -3,6 +3,7 @@ import { getPrayerSyncStatus } from "../../../../lib/prayerSync";
 import { jsonResponse, optionsResponse, requireAdminSecret } from "../../../../lib/api";
 import { getPublicationState } from "../../../../lib/publicationStore";
 import { runtimeSecurity } from "../../../../lib/runtimeSecurity";
+import { serverBrotliContainmentStatus } from "../../../../lib/serverBrotliContainment";
 
 // Cold-start evidence is available in protected hosting logs even when an
 // unauthenticated request correctly receives 401. No secret is logged.
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
       backend: status,
       diagnostics: {
         runtimeSecurity: runtimeSecurity(),
+        brotliContainment: serverBrotliContainmentStatus(),
         databaseConfigured: status.configured,
         databaseMode: status.mode,
         schemaVersion: "hbic-content-v1",
