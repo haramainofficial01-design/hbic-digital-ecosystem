@@ -1,27 +1,24 @@
-# Qur’an Academy celebration teaser posters
+# Qur’an Class Celebration posters
 
-Event: Thursday, October 29, 2026, 5:30–7:30 PM, Masjid Bilal, Calgary.
+Thursday, October 29, 2026 · 5:30–7:30 PM
+HBIC Qur’an Academy · Masjid Bilal · Calgary
 
-Two matching portrait posters, one for Brothers’ Side and one for Sisters’ Side. These are teaser programme templates: all three programme rows are intentionally empty. No activities, individual segment times, menu or final timetable have been assigned. The posters have been prepared for sharing; adding these files does not publish them to the website or send them to families.
+The current artwork replaces the earlier teaser design. It has no generated imagery, generated lettering, stock imagery or illustrations. All lettering is actual typeset text, using Georgia and Avenir Next with ordinary serif/sans-serif fallbacks. Font files are not included or redistributed.
 
-## Design prompt set
+- Brothers: navy, teal and cool off-white.
+- Sisters: plum, rose and warm blush.
+- Both: a completed event-poster layout with one intentionally empty centre programme field. No activities, menu or segment times have been invented. Teaser phrases and gift imagery have been removed.
 
-Production method: built-in image generation, followed by a matching text-only variant through the same image tool. The rendered files were visually reviewed for the correct side, date, time, spelling and three empty programme rows.
+## Files
 
-First poster: one full-bleed 4:5 portrait marketing poster with a warm ivory background, navy #0B2E3D, muted teal #147C80 and restrained champagne gold. Use meticulous editorial typography, generous margins and a single physically rendered closed teal gift box with an ivory ribbon, soft studio shadows and a restrained architectural arch/plinth. Avoid people, confetti, cartoon icons, invented logos, Arabic calligraphy, starfields, busy patterns, holographic gradients and watermarks. Use a large editorial serif headline and clear sans-serif supporting text. Place three completely blank outlined programme rows under THE PROGRAMME, with no words, numbers, times or icons inside them.
+Each edition includes a 2160 × 2700 PNG for sharing and a 1080 × 1350 editable SVG source. The SVG has live text; install the named fonts when editing to retain the same layout. The PNG preserves the rendered typography on any device.
 
-Exact copy:
+The source is `Render Posters.mjs`. From the project root, run:
 
-- HBIC QUR’AN ACADEMY
-- Masjid Bilal · Calgary
-- BROTHERS’ SIDE
-- A special class awaits.
-- End-of-month Qur’an class celebration
-- THURSDAY, OCTOBER 29, 2026
-- 5:30–7:30 PM
-- The details are under wraps.
-- THE PROGRAMME
-- Full plan coming soon, inshaAllah.
-- Food, activities & surprises to be revealed.
+```sh
+node 'assets/academy-celebration/Render Posters.mjs'
+```
 
-Second poster: edit the first poster by replacing only BROTHERS’ SIDE with SISTERS’ SIDE. Preserve the composition, palette, gift render, typography, all other wording and the three empty programme rows.
+This renders the fixed SVG geometry and text using local headless Chromium. It makes no network requests and does not use an image-generation service. Exports were visually checked together for colour distinction, legibility, spacing, side labels, the date and time, and an empty programme area. Text bounds are checked against the artwork safe area during export.
+
+These are prepared poster files only. Saving them does not send messages to families or publish content to the website or apps.

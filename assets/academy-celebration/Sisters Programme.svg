@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-labelledby="title description">
+  <title id="title">Qur’an Class Celebration — SISTERS’ SIDE</title>
+  <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. The programme space in the centre is intentionally blank.</desc>
+  <style>
+    text { fill: #542C47; text-rendering: geometricPrecision; }
+    .sans { font-family: 'Avenir Next', Arial, sans-serif; }
+    .serif { font-family: Georgia, 'Times New Roman', serif; }
+  </style>
+  <rect width="1080" height="1350" fill="#FFF5F5"/>
+  <rect x="26" y="26" width="1028" height="1298" rx="2" fill="none" stroke="#D9ADB9" stroke-width="1"/>
+  <path d="M26 115H0 M1054 115h26 M26 1235H0 M1054 1235h26" stroke="#D9ADB9"/>
+  <text class="sans" x="80" y="88" font-size="25" font-weight="700" letter-spacing="2.5">HBIC QUR’AN ACADEMY</text>
+  <text class="sans" x="80" y="121" font-size="20" letter-spacing=".5">Masjid Bilal · Calgary</text>
+  <text class="sans" x="1000" y="92" text-anchor="end" font-size="22" font-weight="600" letter-spacing="2" style="fill:#9E486A">SISTERS’ SIDE</text>
+  <path d="M80 155H1000" stroke="#D9ADB9"/>
+
+  <text class="serif" x="540" y="273" text-anchor="middle" font-size="91" letter-spacing="-3">Qur’an Class</text>
+  <text class="serif" x="540" y="375" text-anchor="middle" font-size="103" font-style="italic" letter-spacing="-3" style="fill:#9E486A">Celebration</text>
+  <text class="sans" x="540" y="424" text-anchor="middle" font-size="23" letter-spacing="1">A special end-of-month class</text>
+
+  <path d="M80 474H1000" stroke="#D9ADB9"/>
+  <text class="sans" x="80" y="524" font-size="25" font-weight="600" letter-spacing="1.4">THURSDAY, OCTOBER 29</text>
+  <text class="sans" x="80" y="559" font-size="21" letter-spacing="2" style="fill:#9E486A">2026</text>
+  <path d="M572 501V562" stroke="#D9ADB9"/>
+  <text class="sans" x="1000" y="543" text-anchor="end" font-size="43" font-weight="600" letter-spacing="-1">5:30–7:30 PM</text>
+  <path d="M80 589H1000" stroke="#D9ADB9"/>
+
+  <text class="serif" x="540" y="654" text-anchor="middle" font-size="31">Programme</text>
+  <path d="M80 644H385 M695 644H1000" stroke="#D9ADB9"/>
+  <!-- Blank programme field: do not add placeholders or activity details. -->
+  <rect id="programme-space" x="80" y="686" width="920" height="414" rx="0" fill="#FFFFFF" fill-opacity=".72"/>
+  <path d="M80 706v-20h20 M980 686h20v20 M80 1080v20h20 M980 1100h20v-20" fill="none" stroke="#D9ADB9" stroke-width="1.5"/>
+
+  <rect x="0" y="1160" width="1080" height="190" fill="#542C47"/>
+  <rect x="26" y="1160" width="1028" height="164" fill="none" stroke="#D9ADB9" stroke-opacity=".4"/>
+  <path d="M480 1197H600" stroke="#976C49" stroke-width="2"/>
+  <text class="serif" x="540" y="1241" text-anchor="middle" font-size="28" style="fill:#FFF5F5">Celebrating a month of learning,</text>
+  <text class="serif" x="540" y="1280" text-anchor="middle" font-size="28" style="fill:#FFF5F5">recitation &amp; growing together.</text>
+</svg>
