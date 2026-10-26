@@ -85,6 +85,48 @@ Primary implementation references:
 [Node builtin export synchronization](https://nodejs.org/api/module.html#modulesyncbuiltinesmexports),
 [Bun's security advisory](https://github.com/oven-sh/bun/security/advisories/GHSA-663w-cv8g-jj2p).
 
+### Owner handoff and request review — October 26, 2026
+
+Browser access is now working. The correct Stripe account's existing restricted
+key rotation dialog is prepared with a 24-hour expiration overlap. The existing
+Vercel Production variable's write-only edit form is also prepared. No rotation
+was submitted, no replacement credential was generated or entered, and no
+environment variable was saved. The browser's credential-change handoff rule
+requires the owner to complete those final steps. This supersedes the earlier
+browser-disabled observation; it does not establish a completed rollover.
+
+Stripe's Suspicious API Activity view reports **No suspicious activity found**,
+with automatic request blocking already On. No security setting was changed.
+The Workbench request listing was reviewed from `2026-10-19T19:26:40Z` through
+the inspection at approximately `2026-10-26T19:28Z`. Dashboard, API and MCP
+sources were confirmed selected, without an IP, user-agent, key, account,
+HTTP-method or status restriction. After loading older entries until no further
+load control remained, the listing contained 32 entries, all HTTP 200 GET:
+23 price reads, four directory searches, two event reads, and one each of
+account, charges and payouts reads. This is a bounded listing review, not
+independent attribution of every request, coverage of other accounts or a
+forensic clearance. Raw records and screenshots remain private outside Git.
+
+The existing active Academy webhook's **This week** overview reports four event
+deliveries and zero failed deliveries. Its delivery list shows successful
+checkout, paid-invoice and subscription-update acknowledgements. The old
+disabled endpoint remains disabled. No event was resent, endpoint changed,
+signing secret revealed or financial write performed.
+
+Read-only health checks at `2026-10-26T19:26:40Z` and `19:30:19Z` confirmed:
+home, Academy, donation, prayer display and current admin alias return 200;
+published app content, prayer snapshot and display weather APIs return JSON
+with 200; display content version remains 21; billing still reports
+`cardAvailable: true` and the existing per-child monthly tuition configuration.
+Anonymous diagnostics still returns 401. These are service checks, not a new
+physical-device test or end-to-end charge test.
+
+Retained production startup markers at `19:18:05.123Z` in `iad1` and
+`19:19:15.947Z` in `pdx1` still report Node 24.21.0 with the decoder containment
+active. These are recent retained startup observations, not new cold starts
+at the health-check timestamp. The official provider advisory still describes
+runtime patch rollout as ongoing. No unchanged deployment was repeated.
+
 ### Fresh production recheck — October 26, 2026
 
 A read-only request to the existing protected diagnostics route returned HTTP
