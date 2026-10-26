@@ -11,10 +11,10 @@ credential rotation are separate tasks; this document must not be read as a
 forensic clearance or confirmation that all credentials were rotated.
 
 **Current status: application security hotfix and emergency application-level
-Brotli containment are live. The owner-saved production payment-key setting
-has been deployed and passed a real Stripe price read. The separate
-webhook-secret replacement and the managed runtime patch remain
-unresolved. The old payment key's 24-hour expiry is now independently verified.
+Brotli containment are live. Both owner-saved production credentials are
+deployed. A real Stripe price read and one Stripe-signed webhook replay passed.
+The old payment key's 24-hour expiry is independently verified; expiry completion
+has not yet been observed. The managed serving-runtime patch remains unresolved.
 Containment is not a patched runtime or a complete security clearance.**
 
 ### Emergency containment release — October 26, 2026
@@ -86,6 +86,66 @@ Primary implementation references:
 [Next.js startup instrumentation](https://nextjs.org/docs/app/guides/instrumentation),
 [Node builtin export synchronization](https://nodejs.org/api/module.html#modulesyncbuiltinesmexports),
 [Bun's security advisory](https://github.com/oven-sh/bun/security/advisories/GHSA-663w-cv8g-jj2p).
+
+### Owner-saved webhook-secret release — October 26, 2026
+
+The owner reported completing the separate signing-secret handoff. Metadata-only
+inspection confirmed the existing Production `ACADEMY_STRIPE_WEBHOOK_SECRET`
+was saved at `2026-10-26T21:32:05.338Z`. The payment-key setting remains the
+previously confirmed replacement. No secret value was read or written into a
+local environment file, and the Preview settings were not changed.
+
+The same verified source `8371b031eda4a936209319662722088a773834b1` was rebuilt
+without cache against the current Production environment. Deployment
+`dpl_2P2WkDQupQGLXpH72M8WNEA4QWAQ`,
+`https://hbic-calgary-mvluizxop-hbic.vercel.app`, completed successfully and was
+promoted only after staged billing/Stripe connectivity and weather checks
+passed. An unsigned empty webhook POST returned 400, and anonymous diagnostics
+remained 401. The existing four canonical public domain assignments were
+confirmed against the new deployment.
+
+For actual signature/delivery verification, one previously delivered, paid
+donation Checkout confirmation was requested for replay through Stripe to the
+existing active production endpoint. It was independently checked as a donation
+event before replay. This was a webhook resend, not creation or confirmation of
+a new Checkout, charge, refund, subscription or payout. The donation handler's
+existing transaction uses the Checkout ID as its record key and returns without
+creating a second record when that record exists. No Academy payment/enrollment
+event was replayed. The normal endpoint after-response email-dispatch hook was
+not disabled or modified for this verification; this review does not claim an
+independent audit of any previously queued mail it may process.
+
+Stripe's delivery detail reports **200 OK**, **Delivered**, and
+`{"received":true}` for that replay. The application's production log confirms
+`academy_stripe_webhook` stage `processed` on the new deployment at
+`2026-10-26T21:36:29.141Z`. Provider acceptance was therefore followed by a
+verified endpoint acknowledgement. This validates the saved signing-secret
+configuration during the overlap; it does not establish that the previous
+signing secret has expired. Event identifiers, raw financial payloads and the
+delivery evidence remain private outside Git. No signing secret was revealed.
+
+Live checks at `21:36:41Z` passed for home, Academy, donations, prayer display,
+Stripe billing, display weather, published app content, prayer snapshot and the
+current admin alias. Billing retains `cardAvailable: true`; display content
+version remains 21. The scoped release error/fatal query returned no records.
+Existing unrelated lint/CSS warnings remain; no new mobile/store release or
+payment-rule change was made for a server credential replacement.
+
+Fresh production evidence at `21:36:42.191Z`, domain `hbic.ca`, region `pdx1`,
+still reports Node 24.21.0, `patched: false` and the decoder fix marker absent.
+The adjacent startup marker confirms the emergency decoder containment remains
+active. The provider runtime patch and full forensic clearance remain unresolved;
+successful credentials and webhook delivery must not be described as resolving
+that runtime gap. Rollbacks must be rebuilt against current credentials, as
+described below, rather than assuming old built deployments survive expiry.
+
+The existing project protection setting is
+`prod_deployment_urls_and_all_previews`. Anonymous unsigned POST probes to the
+two preceding deployment-specific webhook URLs returned 401 at the hosting
+protection layer. The older built credential copies were not treated as public
+fallbacks, and no protection setting or release artifact was removed to perform
+this check. The canonical public domain intentionally remains reachable for
+Stripe-signed deliveries.
 
 ### Owner-saved payment-key release — October 26, 2026
 
