@@ -14,8 +14,77 @@ forensic clearance or confirmation that all credentials were rotated.
 Brotli containment are live. Both owner-saved production credentials are
 deployed. A real Stripe price read and one Stripe-signed webhook replay passed.
 The old payment key's 24-hour expiry is independently verified; expiry completion
-has not yet been observed. The managed serving-runtime patch remains unresolved.
+has not yet been observed. Both web services were redeployed for Vercel's newly
+documented managed runtime protection after isolated validation. The managed
+serving-runtime patch remains unresolved.
 Containment is not a patched runtime or a complete security clearance.**
+
+### Additional managed runtime protection — October 26, 2026 (Calgary)
+
+The provider's advisory changed to describe a new temporary managed-runtime
+protection that requires redeployment. This is a new reason to redeploy, rather
+than a repeated attempt to force a patch by rebuilding unchanged source.
+[Vercel's managed runtime protection](https://vercel.com/kb/bulletin/node-js-security-advisory#vercel-managed-runtime-protection)
+states that new deployments stop requesting Brotli and reject Brotli responses
+on outbound fetch and Node HTTP/HTTPS paths while patched versions roll out.
+The provider still controls the patch version; only major lines are selectable.
+
+Two isolated, authentication-protected previews checked the available Node 22
+and 24 serving runtimes. The only test data was ordinary valid compressed
+fixture text from a loopback HTTP server. There was no malformed input, exploit
+payload, external upstream, application credential access or customer data.
+
+| Evidence | Node 22 preview | Node 24 preview |
+| --- | --- | --- |
+| Serving version | 22.23.2 | 24.21.0 |
+| Decoder fix marker present | No | No |
+| Ordinary fetch / HTTP response | Passed | Passed |
+| Brotli fetch response | Rejected with `ERR_VERCEL_UNEXPECTED_BROTLI_RESPONSE` | Same |
+| Brotli HTTP response | Rejected with `ERR_VERCEL_UNEXPECTED_BROTLI_RESPONSE` | Same |
+| Fetch Accept-Encoding | gzip, deflate | gzip, deflate |
+| Direct valid Brotli decoding still available | Yes | Yes |
+
+The previews therefore demonstrate the managed HTTP mitigation, not a patched
+native decoder. Switching the production app to Node 22 would not solve the
+patch gap and was rejected. The existing application decoder containment stays
+in place. Both disposable preview deployments were removed by their exact IDs;
+no release history or aliased deployment was removed. Probe source hashes and
+results remain in the private security journal.
+
+The exact verified source `8371b031eda4a936209319662722088a773834b1` was rebuilt
+without cache against the existing public/admin projects and current saved
+credentials:
+
+- Public: `dpl_CojRkkQiug5vsaZF32BHu7c7GoBx`,
+  `https://hbic-calgary-dayjuz01l-hbic.vercel.app`.
+- Admin: `dpl_Hgg99qUS5tY8D2oRaDVo9Bgr9z1T`,
+  `https://hbic-calgary-admin-9atzb3hq5-hbic.vercel.app`.
+
+Both hosted builds passed, retaining existing unrelated warnings. Public
+staged billing verified the saved payment key against the existing monthly
+price; prayer snapshot and weather returned 200, and anonymous diagnostics 401.
+The staged scoped error/fatal query returned no records. Both releases were
+promoted, and alias records confirmed the four canonical public domains and
+the existing admin aliases point to their respective new deployments. The
+platform also assigned its auto-project alias while using `--skip-domain`, so
+that flag must not be represented as keeping every alias unchanged.
+
+Live checks at `2026-10-27T01:05:33Z` (October 26 in Calgary) passed for home,
+Academy, donation, display, billing, published app content, prayer snapshot and
+weather. Billing retained `cardAvailable: true` and content version 21; private
+diagnostics still returned 401. The current admin alias returned 200 and its
+scoped error/fatal query returned no records. This did not create charges,
+subscriptions, refunds or payouts, or repeat the prior signed webhook replay.
+That successful replay is documented against the preceding credential release;
+the credential values and payment/webhook source were unchanged for this release.
+
+Fresh live diagnostics at `2026-10-27T01:05:34.827Z` in `pdx1` still report Node
+24.21.0, `patched: false`, and the native fix marker absent. Application
+containment remains active and the scoped public error/fatal query returned no
+records. The managed protection is enabled through the documented fresh
+deployment workflow, with isolated HTTP-path behavior verified above; no
+platform-internal attestation is claimed for every running instance. The
+provider patch remains the specific unresolved requirement for full remediation.
 
 ### Emergency containment release — October 26, 2026
 
