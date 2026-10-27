@@ -47,10 +47,53 @@ QA evidence under `output/usage-optimization/verified.json`.
 
 ## Deployment
 
-Pending production build, verification and promotion. Existing deployment
-`dpl_G5qRjq1C3P8FwbdTchi24mbxbL8j` is the rollback reference.
+Source commit `546d3af7665ee9a5c7ed56311619eb4a9a79d69f` was pushed, built
+and promoted through the existing public Vercel project:
+`dpl_AwegsTqcjsShhgDHziHFnZ1wkDdf` (https://hbic.ca). The hosted function
+bundle shown by Vercel is 3.36 MB, compared with 98.46 MB in the previous
+public build. This is the reported bundle-size comparison, not total
+deployment storage: public CDN assets still exist.
 
-Old-deployment cleanup requires the owner's separate choice. A candidate
-inventory excludes other projects, all aliased deployments and the three most
-recent ready deployments per HBIC web project. No old deployment has been
-deleted as part of this source work.
+The staged release passed 13 checks: public/home, Media, display and potluck
+pages; card-payment availability; canonical adhan/iqamah and instant equality
+with prior production; the app-content contract/version; Bilal; capacity
+limits; private-route authorization; and range serving of the community film.
+After promotion, live pages, app-facing APIs and billing availability remained
+healthy; the existing admin entry still rendered its sign-in and navigation.
+No payment was initiated, and private payment workflows were not exercised.
+
+Rollback references retained include the previous public deployment
+`dpl_G5qRjq1C3P8FwbdTchi24mbxbL8j`, its predecessor
+`dpl_ARFvcQKWgu5dB5kMye78BuzcHjZY`, and the unchanged admin deployment
+`dpl_6r2kGVLE3cqfC2uVp9D7bZt1qqG7` plus its previous two ready releases.
+
+## Owner-approved deployment cleanup and retention
+
+The owner approved removal of superseded, unaliased HBIC deployments while
+protecting current deployments, two recent rollback versions per project and
+every aliased deployment. The complete paginated inventory was checked.
+105 superseded HBIC deployments were deleted through Vercel (67 public and
+38 admin); no deletion failed. Seven public and four admin deployments remain,
+including current releases, protected recovery versions and aliased releases.
+Other projects were excluded. Every existing alias name was retained;
+only the verified public promotion changed its production targets. Detailed
+inventory and deletion results remain private outside the repository under
+`~/Library/Logs/HBIC Usage/2026-10-27/`.
+
+To prevent new accumulation, the public and admin projects now retain
+superseded production and pre-production deployments for seven days, and
+cancelled/errored builds for one day. The pre-existing `deploymentsToKeep: 10`
+setting remains unchanged. Vercel's production-alias/recent-release exceptions
+still apply. Both settings were saved in the dashboard and confirmed through
+the project API. No team-wide policy or unrelated project was changed.
+
+Build/install commands, framework, output/root directories, Node major,
+resource settings, cron settings, environment credentials and deployment
+protections were compared before/after and remained equal. No paid plan or
+add-on was enabled.
+
+Usage is not a real-time free-disk counter. Vercel records daily project
+storage maxima and aggregates them across the billing period; deletion and
+smaller future outputs do not erase historical consumption. See
+[Vercel Deployment Storage](https://vercel.com/docs/deployment-storage) and
+[retention exceptions](https://vercel.com/docs/deployment-retention).
