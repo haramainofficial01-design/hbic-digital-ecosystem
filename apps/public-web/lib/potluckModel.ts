@@ -5,16 +5,16 @@ export const potluckEvent = {
 } as const;
 
 export const potluckItems = [
-  { id: "napkins", title: "Napkins", category: "Table essentials", example: "e.g. 40 napkins" },
-  { id: "plates", title: "Plates", category: "Table essentials", example: "e.g. 40 plates" },
-  { id: "utensils", title: "Utensils", category: "Table essentials", example: "e.g. 40 sets" },
-  { id: "sandwiches", title: "Sandwiches", category: "Food", example: "e.g. 12 sandwiches" },
-  { id: "pizza", title: "Pizza", category: "Food", example: "e.g. 2 large pizzas" },
-  { id: "pasta", title: "Pasta", category: "Food", example: "e.g. 2 dishes, 10 servings" },
-  { id: "rice", title: "Any rice dish", category: "Food", example: "e.g. 2 dishes, 10 servings" },
-  { id: "snacks", title: "Fruit snacks / snack packs", category: "Food", example: "e.g. 20 packs" },
-  { id: "water", title: "Water bottles", category: "Drinks", example: "e.g. 24 bottles" },
-  { id: "juice", title: "Juice boxes", category: "Drinks", example: "e.g. 12 boxes" }
+  { id: "napkins", title: "Napkins", category: "Table essentials", example: "e.g. 40 napkins", maxSignups: 1 },
+  { id: "plates", title: "Plates", category: "Table essentials", example: "e.g. 40 plates", maxSignups: 1 },
+  { id: "utensils", title: "Utensils", category: "Table essentials", example: "e.g. 40 sets", maxSignups: 1 },
+  { id: "sandwiches", title: "Sandwiches", category: "Food", example: "e.g. 12 sandwiches", maxSignups: 2 },
+  { id: "pizza", title: "Pizza", category: "Food", example: "e.g. 2 large pizzas", maxSignups: 2 },
+  { id: "pasta", title: "Pasta", category: "Food", example: "e.g. 2 dishes, 10 servings", maxSignups: 2 },
+  { id: "rice", title: "Any rice dish", category: "Food", example: "e.g. 2 dishes, 10 servings", maxSignups: 2 },
+  { id: "snacks", title: "Fruit snacks / snack packs", category: "Food", example: "e.g. 20 packs", maxSignups: 2 },
+  { id: "water", title: "Water bottles", category: "Drinks", example: "e.g. 24 bottles", maxSignups: 2 },
+  { id: "juice", title: "Juice boxes", category: "Drinks", example: "e.g. 12 boxes", maxSignups: 2 }
 ] as const;
 
 export type PotluckEntry = { id: string; itemId: string; name: string; quantity: string; owner: string; cancelled: boolean; updatedAt: string };
@@ -38,7 +38,7 @@ function id(value: unknown) {
 }
 export function potluckOpen(now = Date.now()) { return now < Date.parse(potluckEvent.closesAt); }
 export function availableItems(state: PotluckState) {
-  return [...potluckItems, ...state.suggestions.filter(s => s.status === "approved").map(s => ({ id: `idea-${s.id}`, title: s.title, category: "Suggestions", example: "Quantity or servings" }))];
+  return [...potluckItems, ...state.suggestions.filter(s => s.status === "approved").map(s => ({ id: `idea-${s.id}`, title: s.title, category: "Suggestions", example: "Quantity or servings", maxSignups: 1 }))];
 }
 export function publicPotluck(state: PotluckState, owner: string, now = Date.now()) {
   const showNames = now < Date.parse(potluckEvent.publicNamesUntil);
@@ -79,13 +79,19 @@ export function changePotluck(input: PotluckState, body: PotluckAction, actor: {
     state.suggestions.push({ id: key, title, name, quantity, owner: actor.owner, status: "pending", updatedAt: stamp }); return state;
   }
   if (body.action !== "save") throw new PotluckError("Choose an item and try again.");
-  if (typeof body.itemId !== "string" || !availableItems(state).some(i => i.id === body.itemId)) throw new PotluckError("Choose an item from the list.");
+  const item = availableItems(state).find(i => i.id === body.itemId);
+  if (!item) throw new PotluckError("Choose an item from the list.");
   const entry = state.entries.find(e => e.id === key);
   if (entry && entry.owner !== actor.owner) throw new PotluckError("This entry belongs to another device.", 403);
   if (state.entries.some(e => e.id !== key && e.owner === actor.owner && e.itemId === body.itemId && !e.cancelled)) throw new PotluckError("You already signed up for this item. Use Edit to change it.", 409);
+  // The store applies this reducer inside the same Firestore transaction as the write.
+  // Keep existing signups editable, even if a new limit is below the existing count.
+  const keepingSpot = entry && !entry.cancelled && entry.itemId === item.id;
+  if (!keepingSpot && state.entries.filter(e => !e.cancelled && e.itemId === item.id).length >= item.maxSignups)
+    throw new PotluckError(`${item.title} is covered. Please choose another item.`, 409);
   if (!entry && state.entries.length >= 350) throw new PotluckError("Please contact Academy staff to add your item.", 409);
   if (!entry && state.entries.filter(e => e.owner === actor.owner && !e.cancelled).length >= 20) throw new PotluckError("Please edit an existing entry or contact Academy staff.", 409);
-  if (entry) Object.assign(entry, { itemId: body.itemId, name, quantity, cancelled: false, updatedAt: stamp });
-  else state.entries.push({ id: key, itemId: body.itemId, name, quantity, owner: actor.owner, cancelled: false, updatedAt: stamp });
+  if (entry) Object.assign(entry, { itemId: item.id, name, quantity, cancelled: false, updatedAt: stamp });
+  else state.entries.push({ id: key, itemId: item.id, name, quantity, owner: actor.owner, cancelled: false, updatedAt: stamp });
   return state;
 }

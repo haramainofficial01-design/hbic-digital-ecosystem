@@ -18,6 +18,16 @@ First names and quantities are publicly visible beside their items. Parents
 can edit or remove their own signups on the same browser/device that added them
 while the signup controls are available.
 
+Each supply item (napkins, plates and utensils) has one signup spot. Each food
+and drink item has two. Approved suggested items have one spot, initially
+occupied by the suggesting parent. The page shows remaining spots and marks
+full items **Covered**. Limits count active signups, not dishes or servings.
+They are enforced inside the existing Firestore write transaction, including
+when concurrent requests compete for the last spot. A stale form receives a
+409 response and refreshes availability. Existing owners may still edit or
+cancel at capacity; cancellation reopens the spot. Existing entries are
+preserved if a new limit is below their count.
+
 Ownership uses a random, HTTP-only `hbic-potluck-owner` cookie, scoped to
 `/api/potluck`, with SameSite=Lax, Secure in production and a 30-day lifetime.
 Only the SHA-256 hash of its token is stored with the record. Clearing cookies,
@@ -80,8 +90,8 @@ bucket. Rate records carry an `expiresAt` value two hourly boundaries after
 the bucket begins; this code does not configure or verify Firestore TTL
 deletion. Staff writes bypass this public rate limit. Additional limits are
 350 stored entries, 20 active entries per device, 80 suggestions in total and
-five suggestions per device. The list does not impose invented item targets
-or claim an item is fully covered from a signup count.
+five suggestions per device. The list uses the organizer-requested one/two signup limits; quantities
+remain visible so parents can coordinate actual servings.
 
 This is an extension of the existing infrastructure. It does not change
 Firebase configuration or rules, Stripe or Academy billing configuration, or

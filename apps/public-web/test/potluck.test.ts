@@ -40,6 +40,44 @@ test("unknown, unapproved, duplicate and invalid input is rejected", () => {
   const saved = changePotluck(emptyPotluck(), signup, parent, now);
   assert.throws(() => changePotluck(saved, { ...signup, id: second }, parent, now), /already signed up/);
 });
+test("supplies allow one signup; food and drinks allow two", () => {
+  for (const item of potluckItems) {
+    const limit = item.category === "Table essentials" ? 1 : 2;
+    assert.equal(item.maxSignups, limit);
+    let state = emptyPotluck();
+    for (let index = 0; index < limit; index++) state = changePotluck(state, { ...signup, id: index ? second : first, itemId: item.id }, { owner: `parent-${index}` }, now);
+    assert.throws(() => changePotluck(state, { ...signup, id: "d271e652-6460-4d1d-99e2-f1af8fdc582f", itemId: item.id }, other, now), error => error instanceof Error && "status" in error && error.status === 409 && /covered/.test(error.message));
+    assert.equal(state.entries.length, limit);
+  }
+});
+test("covered signups stay editable; removal frees a spot and cancelled entries cannot reclaim it", () => {
+  const saved = changePotluck(emptyPotluck(), { ...signup, itemId: "plates" }, parent, now);
+  const edited = changePotluck(saved, { ...signup, itemId: "plates", quantity: "40 plates" }, parent, now);
+  assert.equal(edited.entries[0].quantity, "40 plates");
+  const removed = changePotluck(edited, { action: "remove", id: first }, parent, now);
+  const replacement = changePotluck(removed, { ...signup, id: second, itemId: "plates" }, other, now);
+  assert.throws(() => changePotluck(replacement, { ...signup, itemId: "plates" }, parent, now), /covered/);
+});
+test("lower limits preserve existing signups and allow their owners to edit", () => {
+  const saved = changePotluck(emptyPotluck(), { ...signup, itemId: "plates" }, parent, now);
+  saved.entries.push({ ...saved.entries[0], id: second, owner: other.owner });
+  const edited = changePotluck(saved, { ...signup, itemId: "plates", quantity: "40 plates" }, parent, now);
+  assert.equal(edited.entries.filter(e => !e.cancelled).length, 2);
+  assert.equal(edited.entries[0].quantity, "40 plates");
+  assert.throws(() => changePotluck(edited, { ...signup, id: "d271e652-6460-4d1d-99e2-f1af8fdc582f", itemId: "plates" }, { owner: "third" }, now), /covered/);
+});
+test("moving an existing signup into a covered item is rejected without losing the original", () => {
+  const pasta = changePotluck(emptyPotluck(), signup, parent, now);
+  const covered = changePotluck(pasta, { ...signup, id: second, itemId: "plates" }, other, now);
+  assert.throws(() => changePotluck(covered, { ...signup, itemId: "plates" }, parent, now), /covered/);
+  assert.equal(covered.entries.find(e => e.id === first)?.itemId, "pasta");
+});
+test("approved suggestions have one spot occupied by the suggesting parent", () => {
+  const pending = changePotluck(emptyPotluck(), { ...signup, action: "suggest", title: "Dates" }, parent, now);
+  const approved = changePotluck(pending, { action: "approve", id: first }, staff, now);
+  assert.equal(availableItems(approved).find(i => i.id === `idea-${first}`)?.maxSignups, 1);
+  assert.throws(() => changePotluck(approved, { ...signup, id: second, itemId: `idea-${first}` }, other, now), /covered/);
+});
 test("closed events reject new submissions; names disappear from public output after retention", () => {
   const saved = changePotluck(emptyPotluck(), signup, parent, now), closed = Date.parse(potluckEvent.closesAt);
   assert.throws(() => changePotluck(saved, { ...signup, id: second }, other, closed), /closed/);

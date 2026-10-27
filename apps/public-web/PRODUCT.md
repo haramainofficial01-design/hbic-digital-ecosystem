@@ -8,7 +8,9 @@ web
 Masjid Bilal's community and Qur’an Academy parents use the existing website for
 prayer times, community information and Academy services. The October 29, 2026
 potluck page lets parents coordinate one shared list for approximately 35–40
-people. Parents add their first name and quantity beside an item. Staff approve
+people. Parents add their first name and quantity beside an item. Supplies allow one
+signup per item; food and drinks allow two. Covered items stop accepting
+new signups. Approved suggested items have one spot. Staff approve
 suggestions before they appear. Food should be halal, easy to serve, without
 sauces or messy crumbs, and, where possible, divided into separate dishes for
 the brothers’ and sisters’ sides.
