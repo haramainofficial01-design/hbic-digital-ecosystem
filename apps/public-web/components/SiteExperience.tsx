@@ -24,7 +24,7 @@ export function SiteExperience() {
   const requestedVersion = useRef(0);
 
   useEffect(() => {
-    if (pathname.startsWith("/display")) return;
+    if (pathname.startsWith("/display") || pathname === "/potluck") return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion || window.sessionStorage.getItem("masjid-bilal-intro-seen")) return;
 
@@ -35,7 +35,7 @@ export function SiteExperience() {
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/display")) return;
+    if (pathname.startsWith("/display") || pathname === "/potluck") return;
     const showLoader = () => {
       setRouteLoading(true);
       if (loaderFallback.current) window.clearTimeout(loaderFallback.current);
@@ -59,13 +59,13 @@ export function SiteExperience() {
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/display")) return;
+    if (pathname.startsWith("/display") || pathname === "/potluck") return;
     const timer = window.setTimeout(() => setRouteLoading(false), 320);
     return () => window.clearTimeout(timer);
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/display")) return;
+    if (pathname.startsWith("/display") || pathname === "/potluck") return;
     let disposed = false;
     let inFlight = false;
     const checkPublishedVersion = async () => {
@@ -101,7 +101,7 @@ export function SiteExperience() {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (pathname.startsWith("/display")) return;
+    if (pathname.startsWith("/display") || pathname === "/potluck") return;
     let disposed = false;
     const refresh = async () => {
       if (document.visibilityState === "hidden") return;
@@ -121,7 +121,7 @@ export function SiteExperience() {
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname.startsWith("/display") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if ((pathname.startsWith("/display") || pathname === "/potluck") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let observer: IntersectionObserver | null = null;
     let frame = 0;
@@ -168,7 +168,7 @@ export function SiteExperience() {
 
   const loaderVisible = introVisible || routeLoading;
 
-  if (pathname.startsWith("/display")) return null;
+  if (pathname.startsWith("/display") || pathname === "/potluck") return null;
 
   return (
     <>

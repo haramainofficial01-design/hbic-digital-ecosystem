@@ -38,6 +38,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { FirebaseAdminAuth } from "./FirebaseAdminAuth";
 import { AcademyPanel } from "./AcademyPanel";
 import { QuranChallengesPanel } from "./QuranChallengesPanel";
+import { PotluckPanel } from "./PotluckPanel";
 
 const pages = [
   "Dashboard",
@@ -49,6 +50,7 @@ const pages = [
   "Programs",
   "Quran Academy",
   "Quran Challenges",
+  "Potluck",
   "Donations",
   "Media",
   "Halal Directory",
@@ -65,12 +67,12 @@ type Page = (typeof pages)[number];
 type AdminResponse = Record<string, any>;
 
 const navigationGroups: { label: string; pages: Page[] }[] = [
-  { label: "Overview", pages: ["Dashboard", "Quran Academy", "Donations"] },
+  { label: "Overview", pages: ["Dashboard", "Quran Academy", "Potluck", "Donations"] },
   { label: "Prayer", pages: ["Prayer & Iqamah", "Jumu'ah", "Prayer Display"] },
   { label: "Community", pages: ["Quran Challenges", "Announcements", "Events", "Programs", "Media", "Halal Directory", "Community", "Volunteers"] },
   { label: "Administration", pages: ["Push Notifications", "Diagnostics", "Feature Flags", "Settings", "Users/Roles"] }
 ];
-const independentPages: Page[] = ["Quran Academy", "Quran Challenges", "Prayer Display", "Push Notifications", "Diagnostics", "Users/Roles"];
+const independentPages: Page[] = ["Potluck", "Quran Academy", "Quran Challenges", "Prayer Display", "Push Notifications", "Diagnostics", "Users/Roles"];
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || "https://hbic.ca").replace(/\/$/, "");
 const iqamahOverridePrayers: IqamahPrayerName[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -462,6 +464,7 @@ export function AdminDashboard() {
         {page === "Events" && <EventsPanel content={content} updateContent={updateContent} />}
         {page === "Programs" && <ProgramsPanel content={content} updateContent={updateContent} />}
         {page === "Quran Academy" && <AcademyPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
+        {page === "Potluck" && <PotluckPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
         {page === "Quran Challenges" && <QuranChallengesPanel adminRequest={adminRequest} personalSession={adminToken?.startsWith("Bearer ") === true} />}
         {page === "Donations" && <DonationsPanel content={content} updateContent={updateContent} />}
         {page === "Media" && <MediaPanel content={content} updateContent={updateContent} />}
