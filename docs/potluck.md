@@ -1,7 +1,6 @@
 # October 2026 Academy potluck
 
-The public signup page is `/potluck` (intended production URL:
-`https://hbic.ca/potluck`). It coordinates one shared list for the class party
+The public signup page is live at **https://hbic.ca/potluck**. It coordinates one shared list for the class party
 on **Thursday, October 29, 2026, 5:30–7:30 PM in Calgary**, for approximately
 **35–40 people**. This attendance estimate is event context, not a participation
 count or signup goal. No names, signups, participation counts or goals are
@@ -122,11 +121,39 @@ neither web app has a `DESIGN.md` in its application directory, and the older
 access as awaiting MFA setup, whereas `docs/admin-auth-security-audit.md`
 documents the current approved personal password-sign-in model.
 
-## Pending deployment
+## Production release — October 26, 2026
 
-**Production deployment is not yet verified.** Local checks and the SHIP
-design disposition do not establish production availability or a production
-staff session. Update this section with the actual deployment reference and
-post-deployment public page/API, privacy and staff-access verification before
-claiming the feature is deployed. No app-store upload, review submission or
-public approval is established by this document.
+Feature source commit: `b565944a613c749b130c9bf6076c48df39ee73a0`, pushed to
+`feature/quran-reader-practice` in the canonical private repository. Clean
+source archives from that commit were built through the existing Vercel
+production projects, without copying local environment files. Both hosted
+builds passed and both deployments were promoted to their existing aliases:
+
+| Application | Production deployment | Entry point |
+| --- | --- | --- |
+| Public web | `dpl_ARFvcQKWgu5dB5kMye78BuzcHjZY` | https://hbic.ca/potluck |
+| Admin web | `dpl_6r2kGVLE3cqfC2uVp9D7bZt1qqG7` | https://hbic-calgary-admin-hbic.vercel.app — Potluck |
+
+Real shared-storage checks against the new public production deployment passed:
+all ten items loaded; a synthetic signup was saved, reloaded, edited and
+removed; another device saw the shared entry but could not remove it (403);
+public approval attempts were rejected (403); cross-origin writes were
+rejected (403); anonymous moderation was rejected (401). The synthetic entry
+is cancelled and absent from the visible list. The private verification
+report remains outside the repository under `~/Library/Logs/HBIC Potluck/`.
+
+After promotion, the canonical public page and API returned 200. The API
+returned ten items, open signup controls, no visible test entries and no
+ownership hashes. Anonymous moderation remained 401. Existing Academy billing
+availability and the display endpoint still returned 200.
+
+Production desktop/mobile screenshots were captured from the live canonical
+page and visually inspected: `output/potluck/live-desktop.png`,
+`output/potluck/live-mobile.png` and `output/potluck/live-mobile-form.png`.
+They show the actual empty shared list and inline signup form, without
+synthetic parent names. These ignored QA artifacts are not source assets.
+
+No signed-in staff end-to-end moderation session is claimed. Staff authorization
+was checked at the route boundary; approval/rejection behavior was covered by
+local tests and mocked browser checks. This web release does not establish
+an app-store upload, review submission or public store approval.
