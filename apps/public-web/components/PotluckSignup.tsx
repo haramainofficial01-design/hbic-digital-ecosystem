@@ -67,7 +67,7 @@ export function PotluckSignup() {
       </header>
       <section className={styles.intro} aria-labelledby="potluck-title">
         <h1 id="potluck-title">Class party<br /><em>potluck.</em></h1>
-        <div className={styles.details}><p><strong>Thursday, October 29</strong><span>5:30–7:30 PM</span></p><p><strong>35–40 people</strong><span>One shared list</span></p></div>
+        <div className={styles.details}><p><strong>Thursday, October 29</strong><span>5:30–7:30 PM</span></p><p><strong>30–35 students</strong><span>One shared list</span></p></div>
       </section>
       <aside className={styles.note}><p>Halal food, easy to serve. Please avoid sauces and messy, crumbly foods.</p><p>If possible, bring food in <strong>two separate dishes</strong> for the brothers’ and sisters’ sides.</p></aside>
       <div className={styles.listHeading}><h2>{data.open ? "What are you bringing?" : "Signups are closed"}</h2><button className={styles.refresh} disabled={busy} onClick={() => void refresh()} aria-label="Refresh signup list"><RefreshCw size={17} aria-hidden="true" /></button></div>

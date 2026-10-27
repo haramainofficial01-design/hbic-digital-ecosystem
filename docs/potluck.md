@@ -2,7 +2,7 @@
 
 The public signup page is live at **https://hbic.ca/potluck**. It coordinates one shared list for the class party
 on **Thursday, October 29, 2026, 5:30–7:30 PM in Calgary**, for approximately
-**35–40 people**. This attendance estimate is event context, not a participation
+**30–35 students**. This attendance estimate is event context, not a participation
 count or signup goal. No names, signups, participation counts or goals are
 fabricated in the public list.
 
