@@ -7,8 +7,8 @@ const now = Date.parse("2026-10-27T00:00:00Z"), first = "4baf4472-bd88-4223-857f
 const parent = { owner: "private-owner-a" }, other = { owner: "private-owner-b" }, staff = { owner: "staff", admin: true };
 const signup = { action: "save", id: first, itemId: "pasta", name: "Parent", quantity: "2 dishes, 10 servings" };
 
-test("requested ten items include pasta and rice, with Calgary closing time", () => {
-  assert.equal(potluckItems.length, 10); assert.ok(potluckItems.some(i => i.id === "rice"));
+test("active items include pasta and rice, with Calgary closing time", () => {
+  assert.equal(potluckItems.length, 9); assert.ok(potluckItems.some(i => i.id === "rice"));
   assert.equal(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(potluckEvent.closesAt)), "19:30");
 });
 test("save retries do not duplicate; owners can edit and cancel without mutating the input", () => {
@@ -26,17 +26,17 @@ test("another device cannot change or remove a signup, and cannot approve sugges
 test("pending suggestions are private; staff approval publishes one item and one signup", () => {
   const suggestion = { ...signup, action: "suggest", title: "Dates" };
   const pending = changePotluck(emptyPotluck(), suggestion, parent, now);
-  assert.equal(availableItems(pending).length, 10); assert.equal(publicPotluck(pending, other.owner, now).mySuggestions.length, 0);
+  assert.equal(availableItems(pending).length, 9); assert.equal(publicPotluck(pending, other.owner, now).mySuggestions.length, 0);
   assert.equal(publicPotluck(pending, parent.owner, now).mySuggestions[0].status, "pending");
   const approved = changePotluck(pending, { action: "approve", id: first }, staff, now);
   const twice = changePotluck(approved, { action: "approve", id: first }, staff, now);
-  assert.equal(availableItems(twice).length, 11); assert.equal(publicPotluck(twice, other.owner, now).entries.length, 1);
+  assert.equal(availableItems(twice).length, 10); assert.equal(publicPotluck(twice, other.owner, now).entries.length, 1);
   assert.equal(changePotluck(twice, suggestion, parent, now).suggestions[0].status, "approved");
   const rejected = changePotluck(twice, { action: "reject", id: first }, staff, now);
-  assert.equal(publicPotluck(rejected, other.owner, now).entries.length, 0); assert.equal(availableItems(rejected).length, 10);
+  assert.equal(publicPotluck(rejected, other.owner, now).entries.length, 0); assert.equal(availableItems(rejected).length, 9);
 });
 test("unknown, unapproved, duplicate and invalid input is rejected", () => {
-  for (const replacement of [{ itemId: "idea-unapproved" }, { name: "" }, { name: "<script>" }, { name: "A".repeat(41) }, { quantity: "" }, { id: "../../other" }, { action: "approve" }]) assert.throws(() => changePotluck(emptyPotluck(), { ...signup, ...replacement }, parent, now));
+  for (const replacement of [{ itemId: "water" }, { itemId: "idea-unapproved" }, { name: "" }, { name: "<script>" }, { name: "A".repeat(41) }, { quantity: "" }, { id: "../../other" }, { action: "approve" }]) assert.throws(() => changePotluck(emptyPotluck(), { ...signup, ...replacement }, parent, now));
   const saved = changePotluck(emptyPotluck(), signup, parent, now);
   assert.throws(() => changePotluck(saved, { ...signup, id: second }, parent, now), /already signed up/);
 });

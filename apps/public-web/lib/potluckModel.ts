@@ -1,6 +1,6 @@
 export const potluckEvent = {
   id: "october-2026", title: "Class party potluck", date: "Thursday, October 29",
-  time: "5:30–7:30 PM", attendance: "35–40 people",
+  time: "5:30–7:30 PM", attendance: "30–35 students",
   closesAt: "2026-10-30T01:30:00.000Z", publicNamesUntil: "2026-11-06T01:30:00.000Z"
 } as const;
 
@@ -13,7 +13,6 @@ export const potluckItems = [
   { id: "pasta", title: "Pasta", category: "Food", example: "e.g. 2 dishes, 10 servings", maxSignups: 2 },
   { id: "rice", title: "Any rice dish", category: "Food", example: "e.g. 2 dishes, 10 servings", maxSignups: 2 },
   { id: "snacks", title: "Fruit snacks / snack packs", category: "Food", example: "e.g. 20 packs", maxSignups: 2 },
-  { id: "water", title: "Water bottles", category: "Drinks", example: "e.g. 24 bottles", maxSignups: 2 },
   { id: "juice", title: "Juice boxes", category: "Drinks", example: "e.g. 12 boxes", maxSignups: 2 }
 ] as const;
 

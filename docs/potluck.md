@@ -205,3 +205,11 @@ public-web workflow. A direct request to https://hbic.ca/potluck returned 200,
 contained the new estimate and no longer contained the previous estimate.
 Previous deployment `dpl_AwegsTqcjsShhgDHziHFnZ1wkDdf` remains a rollback
 reference. No admin deployment or mobile build was needed for this text change.
+
+## Water removed from public choices
+
+Water bottles were removed from the fixed signup list at the owner's request.
+Nine original choices remain. The public view omits any historical entries
+for unavailable items, and stale attempts to sign up for water are rejected.
+No stored parent entries are deleted by this change. The event API attendance
+text also uses the already-requested 30–35 students estimate.
