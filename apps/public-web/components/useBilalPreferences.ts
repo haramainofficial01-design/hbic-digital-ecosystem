@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BilalTourLedger, bilalTourQuiet, supportedLanguages, type LanguageCode } from "@hbic/shared";
+import { fetchPublicDisplay } from "../lib/displayClient";
 
 const ledger = new BilalTourLedger({ read: async () => localStorage.getItem("hbic-bilal-tour"), write: async value => { if (value === null) localStorage.removeItem("hbic-bilal-tour"); else localStorage.setItem("hbic-bilal-tour", value); } });
 const validLanguage = (value: string | null): value is LanguageCode => supportedLanguages.some(item => item.code === value);
@@ -34,19 +35,19 @@ export function useBilalPreferences({ eligible, open, onOpen }: { eligible: bool
   }, []);
   useEffect(() => {
     if (!eligible || !visible || open || seen !== false) return;
-    let cancelled = false; const controller = new AbortController();
+    let cancelled = false;
     async function check() {
       if (document.visibilityState !== "visible" || document.querySelector('[aria-modal="true"]') || /^(?:INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) return;
       try {
-        const response = await fetch("/api/content/prayer-snapshot", { cache: "no-store", credentials: "omit", signal: controller.signal }), value = await response.json(), snapshot = value.snapshot;
-        if (!response.ok || !value.ok || snapshot?.availability !== "available" || snapshot.stale) return;
-        const prayers = [...snapshot.prayers.filter((p: { key: string }) => p.key !== "sunrise").flatMap((p: { adhanDate?: string; iqamahDate?: string }) => [p.adhanDate, p.iqamahDate]), ...(snapshot.jumuah ?? []).flatMap((p: { khutbahDate?: string; iqamahDate?: string }) => [p.khutbahDate, p.iqamahDate])].filter(Boolean).map(Date.parse);
+        const value = await fetchPublicDisplay(), snapshot = value.snapshot;
+        if (cancelled || snapshot?.availability !== "available" || snapshot.stale) return;
+        const prayers = [...snapshot.prayers.filter((p: { key: string }) => p.key !== "sunrise").flatMap((p: { adhanDate?: string; iqamahDate?: string }) => [p.adhanDate, p.iqamahDate]), ...(snapshot.jumuah ?? []).flatMap((p: { khutbahDate?: string; iqamahDate?: string }) => [p.khutbahDate, p.iqamahDate])].filter((value): value is string => Boolean(value)).map(Date.parse);
         if (!bilalTourQuiet({ now: Date.now(), prayerTimes: prayers, lastInteractionAt: lastInteraction.current, deferredUntil: 0 })) return;
         if (!cancelled && await ledger.claim(() => !cancelled && document.visibilityState === "visible") && !cancelled) { setSeen(true); setTourStep(0); callback.current(); }
       } catch { /* No verified current-day schedule: defer, never interrupt. */ }
     }
     const initial = setTimeout(() => void check(), 6500), timer = setInterval(() => void check(), 30_000);
-    return () => { cancelled = true; controller.abort(); clearTimeout(initial); clearInterval(timer); };
+    return () => { cancelled = true; clearTimeout(initial); clearInterval(timer); };
   }, [eligible, visible, open, seen]);
   useEffect(() => { if (!open) setTourStep(null); }, [open]);
   const setLanguage = useCallback((value: LanguageCode) => { setLanguageState(value); try { localStorage.setItem("hbic-bilal-language", value); } catch { /* Session selection still works. */ } }, []);

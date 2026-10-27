@@ -70,7 +70,7 @@ test("hidden website stops tour checks, closes chat and cancels an active questi
       Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (window as any).hiddenPage ? "hidden" : "visible" });
       (window as any).hiddenPage = true; document.dispatchEvent(new Event("visibilitychange"));
       const old = window.fetch; (window as any).snapshotChecks = 0;
-      window.fetch = async (url, init) => { if (String(url).includes("prayer-snapshot")) (window as any).snapshotChecks++; return old(url, init); };
+      window.fetch = async (url, init) => { if (String(url).includes("/api/display")) (window as any).snapshotChecks++; return old(url, init); };
     });
     await page.clock.runFor(120_000); assert.equal(await page.evaluate(() => (window as any).snapshotChecks), 0);
     await page.evaluate(() => { (window as any).hiddenPage = false; document.dispatchEvent(new Event("visibilitychange")); });
@@ -90,7 +90,7 @@ test("existing visitor auto-tour waits for idle and a verified prayer quiet wind
     await page.evaluate(() => {
       const previous = window.fetch;
       (window as any).nearPrayer = true;
-      window.fetch = async (url, init) => String(url).includes("prayer-snapshot") ? Response.json({ ok: true, snapshot: { availability: "available", stale: false, prayers: [{ key: "dhuhr", adhanDate: new Date(Date.now() + ((window as any).nearPrayer ? 60_000 : 3_600_000)).toISOString() }], jumuah: [] } }) : previous(url, init);
+      window.fetch = async (url, init) => String(url).includes("/api/display") ? Response.json({ ok: true, snapshot: { availability: "available", stale: false, prayers: [{ key: "dhuhr", adhanDate: new Date(Date.now() + ((window as any).nearPrayer ? 60_000 : 3_600_000)).toISOString() }], jumuah: [] } }) : previous(url, init);
     });
     await page.clock.runFor(6600); assert.equal(await page.getByRole("dialog").count(), 0, "prayer time suppresses automatic tour");
     assert.equal(await page.evaluate(() => localStorage.getItem("hbic-bilal-tour")), null);

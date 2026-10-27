@@ -56,9 +56,23 @@ export function resolvedMasjidTimeZone(date: Date, timeZone = masjidTimeZone) {
     ? "Etc/GMT+6" : timeZone;
 }
 
+// Constructing ICU formatters is costly, especially when a widget snapshot
+// searches several weeks of Hijri dates. Cache formatters, never date results:
+// every call still resolves its own timezone, instant and staff adjustments.
+const datePartFormatters = new Map<string, Intl.DateTimeFormat>();
+const hijriFormatters = new Map<string, Intl.DateTimeFormat>();
+function cachedFormatter(cache: Map<string, Intl.DateTimeFormat>, timeZone: string, locale: string, options: Intl.DateTimeFormatOptions) {
+  let formatter = cache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { ...options, timeZone });
+    if (cache.size >= 16) cache.delete(cache.keys().next().value!);
+    cache.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 export function datePartsInTimeZone(date: Date, timeZone = masjidTimeZone) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: resolvedMasjidTimeZone(date, timeZone),
+  const parts = cachedFormatter(datePartFormatters, resolvedMasjidTimeZone(date, timeZone), "en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -272,15 +286,10 @@ export function getHijriDate(date = new Date(), adjustmentDays = 0, timeZone = m
   if (!Number.isInteger(adjustmentDays) || adjustmentDays < -2 || adjustmentDays > 2) return null;
   const adjustedDate = new Date(date.getTime() + adjustmentDays * 86_400_000);
   try {
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: resolvedMasjidTimeZone(adjustedDate, timeZone),
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    };
+    const zone = resolvedMasjidTimeZone(adjustedDate, timeZone);
     const parts = mobileHijriParts
-      ? mobileHijriParts(adjustedDate, resolvedMasjidTimeZone(adjustedDate, timeZone))
-      : new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", options).formatToParts(adjustedDate);
+      ? mobileHijriParts(adjustedDate, zone)
+      : cachedFormatter(hijriFormatters, zone, "en-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).formatToParts(adjustedDate);
     const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
     const day = Number(read("day"));
     const year = Number(read("year"));

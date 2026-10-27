@@ -7,7 +7,7 @@ import { GET as display } from "../app/api/display/route";
 import { GET as published } from "../app/api/content/published/route";
 import { GET as version } from "../app/api/content/version/route";
 import { GET as snapshot } from "../app/api/content/prayer-snapshot/route";
-import { publicDisplayUrl } from "../lib/displayClient";
+import { fetchPublicDisplay, publicDisplayUrl } from "../lib/displayClient";
 
 test("display CDN keys change at canonical Calgary midnight, including Alberta Time", () => {
   assert.equal(publicDisplayUrl(new Date("2026-10-04T05:59:59Z")), "/api/display?date=2026-10-03");
@@ -42,4 +42,22 @@ test("public caches preserve display/mobile contracts and invalidate after publi
     invalidatePublicReads(); await display(new Request("https://hbic.ca/api/display"));
     assert.equal(upstream, 2);
   } finally { globalThis.fetch = originalFetch; invalidatePublicReads(); }
+});
+
+
+test("rail, occasion styling and Bilal tour share one public snapshot request", async () => {
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async input => {
+    requests++;
+    assert.match(String(input), /^\/api\/display\?date=\d{4}-\d{2}-\d{2}$/);
+    return Response.json({ ok: true, contentVersion: 1, snapshot: { prayers: [], scheduleRevision: "fixture" } });
+  };
+  try {
+    const [rail, occasion, tour] = await Promise.all([fetchPublicDisplay(), fetchPublicDisplay(), fetchPublicDisplay()]);
+    assert.equal(requests, 1);
+    assert.deepEqual(rail, occasion); assert.deepEqual(occasion, tour);
+    rail.snapshot.scheduleRevision = "changed locally";
+    assert.equal((await fetchPublicDisplay()).snapshot.scheduleRevision, "fixture");
+  } finally { globalThis.fetch = originalFetch; }
 });
