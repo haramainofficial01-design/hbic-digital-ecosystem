@@ -213,3 +213,10 @@ Nine original choices remain. The public view omits any historical entries
 for unavailable items, and stale attempts to sign up for water are rejected.
 No stored parent entries are deleted by this change. The event API attendance
 text also uses the already-requested 30–35 students estimate.
+
+Source commit `9399f38` was pushed and deployed as
+`dpl_35SXTT2MwrtvuNHnnAnN6Je7BauU`. Fourteen potluck tests, the hosted
+production build and fifteen staged endpoint checks passed. After promotion,
+the live signup API omitted water, retained juice and returned the corrected
+attendance estimate. The public page remained available. Previous deployment
+`dpl_DS25EUWK3o4KQXwWGhCGojuRixyy` remains a rollback reference.
