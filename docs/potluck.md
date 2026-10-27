@@ -190,3 +190,18 @@ reopened. Private results remain outside the repository in
 `~/Library/Logs/HBIC Potluck/2026-10-26/Per-item concurrency verification.json`.
 The canonical live API exposes all ten correct limits. No existing parent
 signups were removed. The admin UI and unrelated services were not redeployed.
+
+## Attendance estimate update, 27 October 2026
+
+The public page and its description/link-preview metadata now say **30–35
+students**. Signup capacity and existing entries are unchanged. Source commit
+`16ac7ef` was pushed before deployment. The hosted production build, including
+type checks and the server-bundle size guard, passed. Fourteen staged checks
+passed, covering the new copy, existing public endpoints, prayer-snapshot
+consistency, card-payment availability, item limits and authentication barriers.
+
+Deployment `dpl_DS25EUWK3o4KQXwWGhCGojuRixyy` was promoted through the existing
+public-web workflow. A direct request to https://hbic.ca/potluck returned 200,
+contained the new estimate and no longer contained the previous estimate.
+Previous deployment `dpl_AwegsTqcjsShhgDHziHFnZ1wkDdf` remains a rollback
+reference. No admin deployment or mobile build was needed for this text change.
