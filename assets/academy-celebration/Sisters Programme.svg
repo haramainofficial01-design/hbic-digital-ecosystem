@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-labelledby="title description">
   <title id="title">Qur’an Class Celebration — SISTERS’ SIDE</title>
-  <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. The centre programme field is intentionally empty.</desc>
+  <desc id="description">HBIC Qur’an Academy, Masjid Bilal, Calgary. Thursday, October 29, 2026, 5:30–7:30 PM. Programme: Islamic talk for kids, games and challenges, food and treats, awards and prizes.</desc>
   <defs>
     <linearGradient id="fold-light" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F4C8CB"/><stop offset=".65" stop-color="#CD8094"/><stop offset="1" stop-color="#9E486A"/></linearGradient>
     <linearGradient id="fold-dark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#C58098"/><stop offset="1" stop-color="#8F3E63"/></linearGradient>
@@ -55,9 +55,23 @@
     <circle cx="62" cy="736" r="12" fill="#F9E8E8"/><circle cx="1018" cy="736" r="12" fill="#F9E8E8"/>
     <text class="display" x="103" y="795" font-size="39" style="fill:#542C47">The programme</text>
     <path d="M431 783H976" stroke="#D9ADB9"/>
-    <!-- This entire field remains empty until the final programme is supplied. -->
-    <rect id="programme-space" x="103" y="824" width="874" height="290" fill="none"/>
-    <path d="M104 834V823H115M965 823H976V834M104 1104V1115H115M965 1115H976V1104" fill="none" stroke="#C19479" stroke-width=".8"/>
+    <g id="programme-content" aria-label="Islamic talk for kids, games and challenges, food and treats, awards and prizes">
+      <g transform="translate(108 830)" fill="none" stroke="#9E486A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h6a3 3 0 0 1 3 3v13a4 4 0 0 0-4-3H4zM22 5h-6a3 3 0 0 0-3 3v13a4 4 0 0 1 4-3h5z"/></g>
+      <text class="sans" x="155" y="850" font-size="25" font-weight="600" style="fill:#542C47">Islamic talk for kids</text>
+      <text class="sans" x="155" y="877" font-size="18" style="fill:#542C47">A short reminder and time for questions.</text>
+      <path d="M155 891H977" stroke="#D9ADB9" stroke-width=".7"/>
+      <g transform="translate(108 898)" fill="none" stroke="#9E486A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="18" height="18" rx="3"/><path d="M8 9h4M10 7v4M16 16h.01M19 13h.01"/></g>
+      <text class="sans" x="155" y="918" font-size="25" font-weight="600" style="fill:#542C47">Games &amp; challenges</text>
+      <text class="sans" x="155" y="945" font-size="18" style="fill:#542C47">Friendly competitions, teamwork and fun.</text>
+      <path d="M155 959H977" stroke="#D9ADB9" stroke-width=".7"/>
+      <g transform="translate(108 966)" fill="none" stroke="#9E486A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a3 3 0 0 0 6 0V3M9 3v20M20 3c-3 3-4 6-4 10h4V3zM20 13v10"/></g>
+      <text class="sans" x="155" y="986" font-size="25" font-weight="600" style="fill:#542C47">Food &amp; treats</text>
+      <text class="sans" x="155" y="1013" font-size="18" style="fill:#542C47">A shared potluck with classmates.</text>
+      <path d="M155 1027H977" stroke="#D9ADB9" stroke-width=".7"/>
+      <g transform="translate(108 1034)" fill="none" stroke="#9E486A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h10v7a5 5 0 0 1-10 0V3zM8 5H4v4a4 4 0 0 0 4 4M18 5h4v4a4 4 0 0 1-4 4M13 15v7M8 23h10"/></g>
+      <text class="sans" x="155" y="1054" font-size="25" font-weight="600" style="fill:#542C47">Awards &amp; prizes</text>
+      <text class="sans" x="155" y="1081" font-size="18" style="fill:#542C47">Celebrating students’ effort and progress.</text>
+    </g>
     <path d="M103 1146H977" stroke="#D9ADB9" stroke-width=".8"/>
     <text class="sans" x="104" y="1176" font-size="15" letter-spacing="2" style="fill:#9E486A">QUR’AN · COMMUNITY · CELEBRATION</text>
     <text class="sans" x="977" y="1176" text-anchor="end" font-size="15" letter-spacing="2" style="fill:#9E486A">SISTERS’ SIDE</text>
