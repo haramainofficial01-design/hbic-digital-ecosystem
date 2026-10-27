@@ -167,3 +167,26 @@ No signed-in staff end-to-end moderation session is claimed. Staff authorization
 was checked at the route boundary; approval/rejection behavior was covered by
 local tests and mocked browser checks. This web release does not establish
 an app-store upload, review submission or public store approval.
+
+## Per-item limits release — October 26, 2026
+
+Source commit `98fd1326e781ab788cfed2c5aa178d30d90f7019` was pushed and built
+on the existing public project. Deployment
+`dpl_G5qRjq1C3P8FwbdTchi24mbxbL8j` passed its hosted build and was promoted
+to https://hbic.ca/potluck. Previous release
+`dpl_ARFvcQKWgu5dB5kMye78BuzcHjZY` remains a recoverable rollback reference.
+
+Sixteen combined potluck/auth tests, both web typechecks and scoped public
+lint passed. Browser checks covered covered-item controls, editing at
+capacity, cancellation reopening a spot, a stale last-spot form refreshing
+on 409, and no overflow at 1440, 390 and 320 pixels. Desktop and mobile
+fixtures were visually inspected; their test names were mocked locally.
+
+A real shared-storage check sent simultaneous requests against empty
+one-spot and two-spot items: exactly one and two succeeded respectively,
+with each excess request rejected as 409. Stored active counts respected
+both limits. All successful synthetic entries were cancelled and the items
+reopened. Private results remain outside the repository in
+`~/Library/Logs/HBIC Potluck/2026-10-26/Per-item concurrency verification.json`.
+The canonical live API exposes all ten correct limits. No existing parent
+signups were removed. The admin UI and unrelated services were not redeployed.
