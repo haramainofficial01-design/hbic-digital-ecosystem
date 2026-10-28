@@ -19,6 +19,7 @@ FONT_FILES = {
     "Display": ("Supplemental/Didot.ttc", 0),
     "Display Italic": ("Supplemental/Didot.ttc", 1),
     "Serif": ("Supplemental/Baskerville.ttc", 0),
+    "Serif Bold": ("Supplemental/Baskerville.ttc", 1),
     "Serif Italic": ("Supplemental/Baskerville.ttc", 2),
     "Script": ("Supplemental/SnellRoundhand.ttc", 1),
     "Sans": ("Avenir Next.ttc", 7),
@@ -69,6 +70,50 @@ def centred(c, text, y, face, size, fill):
     c.setFont(face, size)
     c.setFillColor(colour(fill))
     c.drawCentredString(WIDTH / 2, y, text)
+
+
+def arc_label(c, text, radius, size, centre_angle, reverse=False, tracking=0.5):
+    """Optically centred real type on a mathematical circular baseline."""
+    advances = [pdfmetrics.stringWidth(glyph, "Serif Bold", size) for glyph in text]
+    length = sum(advances) + tracking * (len(text) - 1)
+    span = length / radius
+    direction = 1 if reverse else -1
+    angle = math.radians(centre_angle) - direction * span / 2
+    for glyph, width in zip(text, advances):
+        middle = angle + direction * width / (2 * radius)
+        c.saveState()
+        c.translate(radius * math.cos(middle), radius * math.sin(middle))
+        c.rotate(math.degrees(middle) + (90 if reverse else -90))
+        c.setFont("Serif Bold", size)
+        c.drawCentredString(0, 0, glyph)
+        c.restoreState()
+        angle += direction * (width + tracking) / radius
+
+
+def academy_seal(c, x=396, y=527):
+    """Concentric vector rim and type, with the unchanged official emblem."""
+    c.saveState()
+    c.translate(x, y)
+    c.setFillColor(colour("#12303E"))
+    c.circle(0, 0, 40.6, fill=1, stroke=0)
+    c.setStrokeColor(colour("#C5A15A"))
+    c.setLineWidth(0.48)
+    c.circle(0, 0, 38.5, stroke=1, fill=0)
+    c.setLineWidth(0.22)
+    c.circle(0, 0, 39.7, stroke=1, fill=0)
+    c.setFillColor(colour("#E0C17D"))
+    arc_label(c, "HBIC QUR’AN ACADEMY", 30.5, 5.2, 90, tracking=0.48)
+    arc_label(c, "MASJID BILAL · CALGARY", 34.4, 4.65, 270, reverse=True, tracking=0.43)
+    c.setFillColor(colour("#FFFCF5"))
+    c.circle(0, 0, 19.2, fill=1, stroke=0)
+    c.saveState()
+    clip = c.beginPath()
+    clip.circle(0, 0, 18.1)
+    c.clipPath(clip, stroke=0, fill=0)
+    logo = ROOT / "apps/public-web/public/brand/hbic-logo.png"
+    c.drawImage(ImageReader(str(logo)), -18, -18, width=36, height=36, mask="auto")
+    c.restoreState()
+    c.restoreState()
 
 
 def star(c, x, y, r, fill=None, stroke=None, points=8, inner=0.47):
@@ -184,16 +229,7 @@ def render(edition, name, directory):
         c.line(x, 334, x, 427)
         star(c, x, 306, 8.5, theme["paper"], theme["gold"], points=8, inner=0.66)
         c.circle(x, 306, 2, stroke=1, fill=0)
-    # Official Academy seal, including its established central masjid mark.
-    # Page-level clipping excludes the rectangular source background without
-    # changing the supplied artwork or lettering.
-    logo = Path(__file__).resolve().parent / "Academy Logo.png"
-    c.saveState()
-    clip = c.beginPath()
-    clip.circle(396, 527, 40.6)
-    c.clipPath(clip, stroke=0, fill=0)
-    c.drawImage(ImageReader(str(logo)), 354, 485, width=84, height=84, mask="auto")
-    c.restoreState()
+    academy_seal(c)
     tracked(c, "HBIC QUR’AN ACADEMY", 396, 468, "Sans Demi", 10.5, theme["ink"], 1.5)
     # A restrained engraved divider beneath the identity.
     c.setStrokeColor(colour(theme["gold"]))

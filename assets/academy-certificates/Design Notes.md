@@ -23,9 +23,12 @@ classmates and teachers, for October 2026. The presentation date is
 
 Run `Render Certificates.py` using a Python runtime with ReportLab installed.
 The renderer uses locally installed macOS fonts and the repository's official
-Academy logo supplied beside the renderer. The original 360 × 360 seal is
-placed at 84 points (about 309 pixels per inch) and clipped to its circular
-edge on the page; its original lettering and colours are preserved. Pass
+central masjid emblem. The original Academy seal is retained beside the
+renderer as an identity reference. Its photographed outer rim was off-centre
+and contained a stray line, so the certificate uses concentric vector circles
+and real circular typesetting with the same Academy and masjid wording.
+Both rim strokes, the navy disc and the central emblem share one exact centre.
+The central emblem artwork itself is unchanged. Pass
 recipient names with `--brothers-name` or `--sisters-name` and an
 optional private output folder with `--output`. Omitting a name produces a
 blank recipient line. Default output is under ignored `output/pdf/`.
