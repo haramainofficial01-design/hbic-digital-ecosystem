@@ -244,7 +244,8 @@ def render(edition, name, directory):
         size = 49
         while pdfmetrics.stringWidth(name, "Script", size) > 490:
             size -= 1
-        centred(c, name, 302, "Script", size, theme["ink"])
+        # Leave clearance for descending calligraphic strokes above the rule.
+        centred(c, name, 308, "Script", size, theme["ink"])
     c.setStrokeColor(colour(theme["gold"]))
     c.setLineWidth(0.65)
     c.line(190, 288, 602, 288)
