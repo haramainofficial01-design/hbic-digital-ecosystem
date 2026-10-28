@@ -184,11 +184,17 @@ def render(edition, name, directory):
         c.line(x, 334, x, 427)
         star(c, x, 306, 8.5, theme["paper"], theme["gold"], points=8, inner=0.66)
         c.circle(x, 306, 2, stroke=1, fill=0)
-    # Established masjid mark with a typeset Academy lockup.
-    logo = ROOT / "apps/public-web/public/brand/hbic-logo.png"
-    c.drawImage(ImageReader(str(logo)), 374, 506, width=44, height=44, mask="auto")
-    tracked(c, "HBIC QUR’AN ACADEMY", 396, 483, "Sans Demi", 12, theme["ink"], 1.7)
-    tracked(c, "MASJID BILAL · CALGARY", 396, 467, "Sans", 7.3, theme["accent"], 1.6)
+    # Official Academy seal, including its established central masjid mark.
+    # Page-level clipping excludes the rectangular source background without
+    # changing the supplied artwork or lettering.
+    logo = Path(__file__).resolve().parent / "Academy Logo.png"
+    c.saveState()
+    clip = c.beginPath()
+    clip.circle(396, 527, 40.6)
+    c.clipPath(clip, stroke=0, fill=0)
+    c.drawImage(ImageReader(str(logo)), 354, 485, width=84, height=84, mask="auto")
+    c.restoreState()
+    tracked(c, "HBIC QUR’AN ACADEMY", 396, 468, "Sans Demi", 10.5, theme["ink"], 1.5)
     # A restrained engraved divider beneath the identity.
     c.setStrokeColor(colour(theme["gold"]))
     c.setLineWidth(0.45)
@@ -219,7 +225,7 @@ def render(edition, name, directory):
     centred(c, "May Allah increase you in knowledge and love for the Qur’an.", 190, "Serif Italic", 10.3, theme["accent"])
     rosette(c, theme, sister)
     # Blank, real signing areas rather than simulated signatures.
-    for left, right, label in [(105, 279, "ACADEMY TEACHER"), (513, 687, "ACADEMY COORDINATOR")]:
+    for left, right, label in [(105, 279, "ACADEMY TEACHER"), (513, 687, "MASJID DIRECTOR")]:
         c.setStrokeColor(colour(theme["gold"]))
         c.setLineWidth(0.55)
         c.line(left, 106, right, 106)
