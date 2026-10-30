@@ -20,33 +20,6 @@
   .site .mobile-app-link,.site .mobile-menu summary{font-size:11px;padding-inline:8px}
 }
 
-.jumuah-site-accent {
-  position: fixed;
-  z-index: 48;
-  top: 82px;
-  right: 22px;
-  display: grid;
-  gap: 1px;
-  padding: 9px 15px;
-  border: 1px solid rgba(207, 175, 93, .34);
-  border-radius: 999px;
-  background: rgba(17, 48, 91, .88);
-  color: #fff7db;
-  box-shadow: 0 14px 38px rgba(7, 24, 55, .18), inset 0 1px rgba(255,255,255,.18);
-  backdrop-filter: blur(18px) saturate(130%);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-8px);
-  transition: opacity .5s ease, transform .5s ease;
-}
-
-.jumuah-site-accent.visible { opacity: 1; transform: translateY(0); }
-.jumuah-site-accent span { font-family: Georgia, "Times New Roman", serif; font-size: 15px; line-height: 1.1; }
-.jumuah-site-accent small { color: rgba(255,255,255,.68); font-size: 8px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-
-@media (max-width: 700px) {
-  .jumuah-site-accent { top: 72px; right: 12px; padding: 7px 12px; }
-}
 
 * {
   box-sizing: border-box;
@@ -3119,3 +3092,9 @@ body:not(.tv-display-active) { background: #f8f8f4; }
   .prayer-mobile-panel>a{position:relative;font-size:14px}
 }
 @media(prefers-reduced-motion:reduce){.prayer-glass-bar,.prayer-glass-content,.prayer-mobile-panel,.prayer-mobile-toggle{transition:none!important;animation:none!important}}
+
+/* Friday label participates in the prayer bar layout instead of floating over links. */
+.prayer-friday-label{display:grid;flex-shrink:0;gap:3px;text-align:center;padding:6px 10px;color:#21474f;background:rgba(231,198,107,.16);border-radius:10px;line-height:1.3}
+.prayer-friday-label>span{font-family:Georgia,serif;font-size:17px;line-height:1.5}
+.prayer-friday-label>small{font-size:9px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+@media(min-width:861px){.prayer-glass-bar:not(.is-collapsed){height:auto;min-height:94px}.prayer-glass-content{flex-wrap:wrap;row-gap:6px}.prayer-glass-content>.prayer-glass-next{order:1}.prayer-glass-content>.prayer-friday-label{order:2;margin-left:auto}.prayer-glass-content>a{order:3;margin-left:0}.prayer-glass-content>.prayer-glass-times{order:4;flex-basis:100%;justify-content:space-between}}

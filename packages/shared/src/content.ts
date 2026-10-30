@@ -1,5 +1,6 @@
 import { hbicSettings } from "./constants";
 import { normalizeRatingCampaign } from "./ratingCampaign";
+import { getAcademyStarMonths, type AcademyStarMonth } from "./academyStars";
 import { discontinuedEventIds } from "./eventLifecycle";
 import {
   getCurrentDailyBenefit,
@@ -45,6 +46,7 @@ import type {
 export type ContentStatus = "draft" | "published";
 
 export interface HbicContent {
+  academyStars?: AcademyStarMonth[];
   settings: MasjidSettings;
   prayerTime: PrayerTime;
   iqamahTime: IqamahTime;
@@ -199,6 +201,7 @@ export function toPublicContent(content: HbicContent, now = new Date()): HbicCon
       overrides: undefined,
       automaticIqamah: undefined
     },
+    academyStars: getAcademyStarMonths(content.academyStars, now),
     announcements: content.announcements.filter((announcement) => {
       if (!isVisibleItem(announcement)) return false;
       return !announcement.expiresAt || Date.parse(announcement.expiresAt) > currentTimestamp;

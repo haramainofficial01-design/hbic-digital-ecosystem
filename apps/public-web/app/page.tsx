@@ -3,6 +3,7 @@ import { PrayerTable } from "../components/PrayerTable";
 import { SiteChrome } from "../components/SiteChrome";
 import { WelcomeFilm } from "../components/WelcomeFilm";
 import { AppLaunchPromotion } from "../components/AppLaunchPromotion";
+import { AcademyStars } from "../components/AcademyStars";
 import { getEffectiveJumuahDoorNotice, getPublicEvents, isVisibleItem } from "@hbic/shared";
 import Image from "next/image";
 import Link from "next/link";
@@ -47,7 +48,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {academyEnabled ? (
+      <AcademyStars months={content.academyStars ?? []} />
+
+      {academyEnabled && !content.academyStars?.length ? (
         <section className="section home-academy-intro" aria-labelledby="home-academy-heading">
           <div className="home-academy-card">
             <div className="home-academy-copy">

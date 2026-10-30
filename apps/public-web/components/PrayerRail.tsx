@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CloudMoon, CloudSun, Minimize2, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
-import { deriveDisplayFocus, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
+import { deriveDisplayFocus, isJumuahDisplayWindow, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
 import { fetchPublicDisplay } from "../lib/displayClient";
 
 const names = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -68,6 +68,7 @@ export function PrayerRail() {
       <div id="desktop-prayer-times" className="prayer-glass-content" aria-hidden={desktopCollapsed} inert={desktopCollapsed}>
         <span className="prayer-glass-next"><strong>Next: {nextLabel}</strong><span>{countdown(focus.date, now)}</span></span>
         <span className="prayer-glass-times">{entries.map((entry) => <span key={entry.key}><b>{entry.name}</b> <time>{entry.adhan}</time>{entry.iqamah ? <small> · Iqamah <time>{entry.iqamah}</time></small> : null}</span>)}</span>
+        {isJumuahDisplayWindow(payload.snapshot, now) ? <span className="prayer-friday-label"><span lang="ar" dir="rtl">يَوْمُ الْجُمُعَةِ</span><small>Yawm al-Jumu’ah</small></span> : null}
         <Link href="/prayer-times" aria-label="Open complete prayer and iqamah times">Full times ↗</Link>
       </div>
     </div>

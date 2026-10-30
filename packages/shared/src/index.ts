@@ -21,6 +21,7 @@ export * from "./jumuah";
 export * from "./widgetSnapshot";
 export * from "./qibla";
 export * from "./academy";
+export * from "./academyStars";
 export * from "./quran";
 export * from "./quranPlayback";
 export * from "./quranMushaf";

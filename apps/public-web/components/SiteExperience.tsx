@@ -3,8 +3,6 @@
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isJumuahDisplayWindow } from "../lib/tvDisplay";
-import { fetchPublicDisplay } from "../lib/displayClient";
 
 const blessings = [
   "May your visit bring benefit.",
@@ -18,7 +16,6 @@ export function SiteExperience() {
   const [introVisible, setIntroVisible] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const [blessing, setBlessing] = useState<string | null>(null);
-  const [jumuahActive, setJumuahActive] = useState(false);
   const loaderFallback = useRef<number | null>(null);
   const blessingTimer = useRef<number | null>(null);
   const requestedVersion = useRef(0);
@@ -100,25 +97,6 @@ export function SiteExperience() {
     };
   }, [pathname, router]);
 
-  useEffect(() => {
-    if (pathname.startsWith("/display") || pathname === "/potluck") return;
-    let disposed = false;
-    const refresh = async () => {
-      if (document.visibilityState === "hidden") return;
-      try {
-        const payload = await fetchPublicDisplay();
-        if (!disposed) setJumuahActive(isJumuahDisplayWindow(payload.snapshot, new Date()));
-      } catch {
-        // Occasion styling is decorative and never interrupts public content.
-      }
-    };
-    void refresh();
-    const timer = window.setInterval(refresh, 60_000);
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, [pathname]);
 
   useEffect(() => {
     if ((pathname.startsWith("/display") || pathname === "/potluck") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -172,10 +150,6 @@ export function SiteExperience() {
 
   return (
     <>
-      <div className={`jumuah-site-accent${jumuahActive ? " visible" : ""}`} aria-hidden={!jumuahActive}>
-        <span lang="ar" dir="rtl">يَوْمُ الْجُمُعَةِ</span>
-        <small>Yawm al-Jumu’ah</small>
-      </div>
       <div className={`site-loader${loaderVisible ? " visible" : ""}`} aria-hidden={!loaderVisible}>
         <div className="site-loader-mark">
           <Image src="/brand/hbic-logo.png" alt="" width={58} height={58} priority />

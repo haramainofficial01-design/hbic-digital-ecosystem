@@ -10,6 +10,7 @@ import { AppScreen } from "../../src/components/AppScreen";
 import { EventCard } from "../../src/components/EventCard";
 import { GlassCard } from "../../src/components/GlassCard";
 import { PrayerHero } from "../../src/components/PrayerHero";
+import { AcademyStars } from "../../src/components/AcademyStars";
 import { DesktopColumns } from "../../src/components/DesktopColumns";
 import { PrayerTimesList } from "../../src/components/PrayerTimesList";
 import { WhiteDaysNotice } from "../../src/components/WhiteDaysNotice";
@@ -55,6 +56,7 @@ export default function HomeScreen() {
 
       <SectionHeader title="Today at Masjid Bilal" subtitle="A quick glance. Open Prayer for the full adhan, iqamah, and Jumu'ah schedule." />
       <PrayerTimesList compact maxItems={3} />
+      <AcademyStars months={content.academyStars ?? []} onRegister={() => router.push("/quran-academy" as never)} />
       {announcement ? (
         <GlassCard compact tone={announcement.urgent ? "gold" : "light"}>
           <Text style={[styles.cardKicker, { color: announcement.urgent ? theme.colors.navy : theme.colors.teal }]}>
