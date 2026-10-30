@@ -54,3 +54,6 @@ apps/public-web/public/quran-runtime/ort-wasm-simd-threaded.wasm
 .env
 .env.*
 !.env.example
+
+# Finder custom-folder icon resource files are not app resources.
+**/Icon?
