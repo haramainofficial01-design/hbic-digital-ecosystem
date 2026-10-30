@@ -9,3 +9,5 @@ Approved, metadata-free WebP images are held in the private `academyStarPhotos` 
 Adding a month must patch only this CMS field in published and draft content, preserving unrelated content. Never publish unrelated draft changes to add recognition. When a new month is published, remove old photo documents as part of the publication workflow after verifying names remain visible. Optional highlight links are omitted until supplied.
 
 Verification covers monthly replacement, optional cutoff, invalid content, controlled URLs, private image failures, and native component behavior through explicit adapters. Adapter checks are not physical-device validation. Native app changes require a verified store build; this project currently has no OTA update configuration.
+
+Locale formatting explicitly uses the Gregorian calendar for the `YYYY-MM` Academy month, including Dari; it must not silently relabel the month using the Persian calendar. Publication must also advance the existing content publication revision and revalidate Home so already-open pages refresh through the normal version check. The recognition operation must not send a mass announcement.
