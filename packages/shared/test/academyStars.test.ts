@@ -41,3 +41,12 @@ test("the public content contract strips superseded image routes while preservin
   assert.deepEqual(view.settings, toPublicContent(normalizeContent(defaultContent), new Date("2026-11-02T12:00:00Z")).settings);
   assert.equal(academyStarMonthLabel("2026-10"), "October 2026");
 });
+
+test("month labels retain the Academy Gregorian month in every supported language", () => {
+  const dari = academyStarMonthLabel("2026-10", "fa-AF");
+  assert.match(dari, /اکتوبر/);
+  assert.match(dari, /۲۰۲۶/);
+  assert.doesNotMatch(dari, /میزان|۱۴۰۵/);
+  assert.match(academyStarMonthLabel("2026-10", "ar"), /أكتوبر/);
+  assert.match(academyStarMonthLabel("2026-10", "ur"), /اکتوبر/);
+});

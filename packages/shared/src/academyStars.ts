@@ -34,5 +34,5 @@ export function getAcademyStarMonths(input: unknown, now = new Date()) {
 }
 
 export function academyStarMonthLabel(month: string, locale = "en-CA") {
-  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", calendar: "gregory", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
 }
