@@ -2,9 +2,10 @@
 import { academyStarMonthLabel, getAcademyStarMonths, type AcademyStarMonth } from "@hbic/shared";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowUpRight, Play } from "lucide-react";
 import styles from "./AcademyStars.module.css";
 
-export function AcademyStars({ months }: { months: AcademyStarMonth[] }) {
+export function AcademyStars({ months, registrationHref = "/quran-academy" }: { months: AcademyStarMonth[]; registrationHref?: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const expiry = Math.min(...months.map(row => Date.parse(row.photosUntil || "")).filter(at => at > Date.now()));
@@ -23,8 +24,12 @@ export function AcademyStars({ months }: { months: AcademyStarMonth[] }) {
         <figcaption>{winner.name}</figcaption>
         {winner.photoUrl ? <img src={winner.photoUrl} alt={`${winner.name}, HBIC Qur’an Academy Star of the Month`} loading="lazy" decoding="async" width={900} height={1050} /> : null}
       </figure>)}</div>
-      {row.highlightUrl ? <a className={styles.reel} href={row.highlightUrl} target="_blank" rel="noopener noreferrer">Watch the class celebration ↗</a> : null}
+      {row.highlightUrl ? <a className={styles.reel} href={row.highlightUrl} target="_blank" rel="noopener noreferrer">
+        <span className={styles.play} aria-hidden="true"><Play size={22} fill="currentColor" /></span>
+        <span className={styles.reelCopy}><strong>Watch the class celebration</strong><span>{academyStarMonthLabel(row.month)} · Instagram</span></span>
+        <ArrowUpRight className={styles.arrow} size={22} aria-hidden="true" />
+      </a> : null}
     </div>)}
-    <div className={styles.registration}><div><h3>A place to learn and grow.</h3><p>Qur’an reading, recitation and good character.</p></div><Link className="button primary" href="/quran-academy">Register for HBIC Qur’an Academy <span aria-hidden="true">↗</span></Link></div>
+    <div className={styles.registration}><div><h3>A place to learn and grow.</h3><p>Qur’an reading, recitation and good character.</p></div><Link className="button primary" href={registrationHref}>Register for HBIC Qur’an Academy <span aria-hidden="true">↗</span></Link></div>
   </section>;
 }

@@ -3,6 +3,7 @@ import { SiteChrome } from "../../components/SiteChrome";
 import { getPublishedContent } from "../../lib/contentStore";
 import { AcademyParent } from "../../components/AcademyParent";
 import { InterfaceLanguage } from "../../components/InterfaceLanguage";
+import { AcademyStars } from "../../components/AcademyStars";
 
 export const dynamic = "force-dynamic";
 export function generateMetadata() {
@@ -13,5 +14,5 @@ export function generateMetadata() {
 export default async function AcademyPage() {
   if (process.env.ACADEMY_PREVIEW_ENABLED !== "true") notFound();
   const { content } = await getPublishedContent();
-  return <SiteChrome settings={content.settings} contentVersion={content.version}><InterfaceLanguage /><AcademyParent /></SiteChrome>;
+  return <SiteChrome settings={content.settings} contentVersion={content.version}><InterfaceLanguage /><AcademyParent /><AcademyStars months={content.academyStars ?? []} registrationHref="#academy-account" /></SiteChrome>;
 }

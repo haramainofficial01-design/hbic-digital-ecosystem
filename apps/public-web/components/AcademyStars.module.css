@@ -12,6 +12,13 @@
 .registration { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 28px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .registration h3 { font-size: 27px; line-height: 1.2; margin: 0 0 8px; }
 .registration p { margin: 0; color: var(--muted); }
-.reel { display: inline-flex; min-height: 44px; align-items: center; margin-top: 16px; color: var(--teal); text-underline-offset: 5px; font-weight: 650; }
+.reel { display: flex; min-height: 84px; align-items: center; gap: 18px; margin-top: 24px; padding: 18px 22px; border-radius: 16px; background: var(--navy, #092d40); color: #fff; text-decoration: none; }
+.play { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; background: #edcb76; color: #092d40; }
+.reelCopy { display: grid; gap: 5px; min-width: 0; }
+.reelCopy strong { font-size: clamp(18px, 2vw, 24px); line-height: 1.25; }
+.reelCopy > span { color: #d0e4e8; font-size: 15px; line-height: 1.4; }
+.arrow { flex-shrink: 0; margin-left: auto; }
+.reel:hover .reelCopy strong { text-decoration: underline; text-underline-offset: 5px; }
+.reel:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
 @media (max-width: 540px) { .students { grid-template-columns: 1fr; gap: 28px; } .heading { margin-bottom: 24px; } .registration .button { width: 100%; } }
 @media (prefers-color-scheme: dark) { .sisters figcaption { color: inherit; } }
