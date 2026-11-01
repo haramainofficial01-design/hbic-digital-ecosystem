@@ -78,7 +78,7 @@ test("staff iqamah survives provider outage; obsolete upcoming values cannot lea
 test("provider updates adhan only; saved staff iqamah and Jumuah never change automatically", () => {
   const content = overridden(), resolved = resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-06", sourceUpdatedAt, now);
   assert.equal(resolved.content.prayerTime.asr, "4:25 PM"); assert.equal(resolved.content.iqamahTime.asrIqamah, "5:00 PM");
-  assert.equal(resolved.content.iqamahTime.fajrIqamah, content.iqamahTime.fajrIqamah);
+  assert.equal(resolved.content.iqamahTime.fajrIqamah, "6:28 AM");
   assert.deepEqual(resolved.content.jumuahSchedule, content.jumuahSchedule);
   assert.equal(resolved.content.iqamahTime.upcomingWeekIqamah, undefined); assert.equal(resolved.schedule.upcomingWeek, undefined);
   assert.deepEqual(resolved.activeOverrides, ["asr"]);
@@ -106,7 +106,7 @@ test("public, TV and mobile/Watch/widget snapshots agree across Saturday to Sund
   const publicContent = toPublicContent(resolved.content, saturday), snapshot = createWidgetPrayerSnapshot(resolved.content, saturday);
   assert.equal(publicContent.iqamahTime.asrIqamah, "5:00 PM"); assert.equal(publicContent.iqamahTime.upcomingWeekIqamah, undefined);
   assert.equal(snapshot.prayers.find(p => p.key === "asr")?.iqamah, "5:00 PM");
-  assert.equal(snapshot.nextIqamah, content.iqamahTime.fajrIqamah);
+  assert.equal(snapshot.nextIqamah, "6:28 AM");
   assert.equal(deriveDisplayFocus(snapshot, saturday)?.iqamahDate?.toISOString(), snapshot.nextIqamahDate);
 });
 
@@ -159,4 +159,22 @@ test("both prayer editors create persistent overrides without weekly expiry word
     assert.equal(source.includes("Overrides expire Sunday"), false);
     assert.equal(source.includes("endsAt: iqamahOverrideWeekEndsAt"), false);
   }
+});
+
+
+test("Fajr follows each day's adhan by ten minutes and preserves all other staff overrides", () => {
+  const content = overridden(); content.iqamahTime.overrides = {
+    dhuhr: { enabled: true, value: "1:30 PM" }, asr: { enabled: true, value: "4:00 PM" }, isha: { enabled: true, value: "8:00 PM" }
+  };
+  for (const [date, adhan, expected] of [["2026-10-31", "6:57 AM", "7:07 AM"], ["2026-11-01", "6:58 AM", "7:08 AM"], ["2026-11-08", "7:10 AM", "7:20 AM"]]) {
+    const instant = new Date(`${date}T18:00:00Z`), resolved = resolveEffectivePrayerSchedule(content, { ...baseFeed, salah_fajr: adhan }, "live", date, instant.toISOString(), instant).content;
+    assert.equal(resolved.iqamahTime.fajrIqamah, expected);
+    assert.equal(retainPrayerScheduleDuringOutage(resolved, instant).iqamahTime.fajrIqamah, expected);
+    for (const prayer of ["dhuhr", "asr", "isha"] as const) assert.equal(resolved.iqamahTime[`${prayer}Iqamah`], content.iqamahTime.overrides![prayer]!.value);
+    const snapshot = createWidgetPrayerSnapshot(resolved, instant);
+    assert.equal(snapshot.prayers.find(p => p.key === "fajr")?.iqamah, expected);
+    assert.equal(snapshot.tomorrowFajrIqamah, expected);
+  }
+  content.iqamahTime.overrides.fajr = { enabled: true, value: "7:30 AM" };
+  assert.equal(resolveEffectivePrayerSchedule(content, baseFeed, "live", "2026-10-31", sourceUpdatedAt, now).content.iqamahTime.fajrIqamah, "7:30 AM");
 });

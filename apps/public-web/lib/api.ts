@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { getAuth } from "firebase-admin/auth";
 import { getFirebaseApp } from "./firebaseAdmin";
 
 export const corsHeaders = {
@@ -66,6 +65,7 @@ export async function requireAdminSecret(request: Request) {
       // Verify the signed token locally. The production service account does not
       // have permission to look up Auth users, so getUser/checkRevoked blocks
       // otherwise-valid personal admin sessions.
+      const { getAuth } = await import("firebase-admin/auth");
       const token = await getAuth(app).verifyIdToken(authorization.slice("Bearer ".length));
       const email = token.email?.trim().toLowerCase();
       const allowlistedRole = email && configuredSuperAdmins().has(email) ? "superAdmin" : undefined;

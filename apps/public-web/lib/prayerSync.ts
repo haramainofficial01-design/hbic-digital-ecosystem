@@ -123,14 +123,17 @@ function normalizeTime(value: string) {
     .replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase());
 }
 
-/** Maghrib follows today's official adhan, except for an explicit staff override. */
-export function defaultMaghribIqamah(adhan: string) {
+/** Daily adhan-relative iqamah, except for an explicit staff override. */
+export function defaultAdhanRelativeIqamah(adhan: string) {
   const clock = parseClock(normalizeTime(adhan));
   if (!clock) return "";
   const minutes = (clock.hour * 60 + clock.minute + 10) % 1440;
   const hour = Math.floor(minutes / 60);
   return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
 }
+
+/** Existing Maghrib API remains compatible with the shared +10-minute rule. */
+export const defaultMaghribIqamah = defaultAdhanRelativeIqamah;
 
 export function isOverrideActive(override?: IqamahOverride | null, now = new Date(), fallbackUpdatedAt?: string) {
   return isIqamahOverrideActive(override, now, fallbackUpdatedAt);
@@ -158,6 +161,7 @@ export function retainPrayerScheduleDuringOutage(content: HbicContent, nowDate =
         ? normalizeTime(overrides[prayer]!.value)
         : content.iqamahTime.automaticIqamah?.[prayer] ?? "";
     }
+    if (!active.includes("fajr")) retainedIqamah.fajrIqamah = defaultAdhanRelativeIqamah(content.prayerTime.fajr);
     if (!active.includes("maghrib")) retainedIqamah.maghribIqamah = defaultMaghribIqamah(content.prayerTime.maghrib);
     return normalizeContent({
       ...content,
@@ -250,6 +254,7 @@ export function resolveEffectivePrayerSchedule(
     (Object.keys(iqamahFieldByPrayer) as IqamahPrayerName[]).map(prayer =>
       [prayer, content.iqamahTime[iqamahFieldByPrayer[prayer]]])
   ) as IqamahScheduleValues;
+  automaticIqamah.fajr = defaultAdhanRelativeIqamah(prayerTime.fajr);
   automaticIqamah.maghrib = defaultMaghribIqamah(prayerTime.maghrib);
 
   const overrides = content.iqamahTime.overrides ?? {};

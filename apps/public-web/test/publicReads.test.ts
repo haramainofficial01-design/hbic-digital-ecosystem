@@ -37,7 +37,7 @@ test("public caches preserve display/mobile contracts and invalidate after publi
     for (const read of [display, published, snapshot, version]) {
       const response = await read(new Request("https://hbic.ca/api/content/published"));
       assert.equal(response.status, 200);
-      assert.equal(response.headers.get("cache-control"), "public, max-age=0, s-maxage=15, must-revalidate");
+      assert.equal(response.headers.get("cache-control"), "public, max-age=0, s-maxage=60, must-revalidate");
     }
     invalidatePublicReads(); await display(new Request("https://hbic.ca/api/display"));
     assert.equal(upstream, 2);
