@@ -3,9 +3,9 @@
 import { HeartHandshake, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20260828-remastered";
-const teaserFilm = "/media/videos/hbic-welcome-story-teaser.mp4";
-const poster = "/media/videos/hbic-welcome-story-poster.jpg";
+const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20261031-community";
+const teaserFilm = "/media/videos/hbic-welcome-story-teaser.mp4?v=20261031";
+const poster = "/media/videos/hbic-welcome-story-poster.jpg?v=20261031";
 
 export function WelcomeFilm() {
   const [isWatching, setIsWatching] = useState(false);
@@ -17,15 +17,23 @@ export function WelcomeFilm() {
     const preview = previewRef.current;
     if (!preview) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    let inView = !("IntersectionObserver" in window);
     const updatePreview = () => {
-      if (reducedMotion.matches || document.hidden || isWatching) preview.pause();
+      if (!inView || reducedMotion.matches || connection?.saveData || document.hidden || isWatching) preview.pause();
       else void preview.play().catch(() => undefined);
     };
+    const observer = "IntersectionObserver" in window ? new IntersectionObserver(entries => {
+      inView = entries.some(entry => entry.isIntersecting);
+      updatePreview();
+    }, { threshold: 0.05 }) : undefined;
+    observer?.observe(preview);
     updatePreview();
     reducedMotion.addEventListener("change", updatePreview);
     document.addEventListener("visibilitychange", updatePreview);
     return () => {
       preview.pause();
+      observer?.disconnect();
       reducedMotion.removeEventListener("change", updatePreview);
       document.removeEventListener("visibilitychange", updatePreview);
     };
@@ -87,7 +95,7 @@ export function WelcomeFilm() {
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload="none"
                 aria-hidden="true"
               />
               <button
