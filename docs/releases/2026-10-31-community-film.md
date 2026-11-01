@@ -21,3 +21,7 @@ The full film retains manual, user-gesture playback and browser controls. The sm
 The interface refinement preserves the existing website design system. Scoped finish review returned `ship` for the reviewed web player and representative media frames. No new global design tokens were introduced. Preexisting PRODUCT.md attendance wording is unrelated and was not changed.
 
 No native binary is required for these web/static media updates. A separate YouTube channel-trailer upload is not implied by deploying the website file.
+
+## Production status
+
+Verified source `67ee6ba63ba181bfdc2d73e1601c5c492f4f80dd` was deployed and promoted as `dpl_B5LTZ9aaArJE234ntXdud3otUDeH`. The staged hosted film matched the complete export SHA-256 exactly; the public video supports byte-range streaming. Post-promotion checks confirmed the new versioned homepage reference and the expected 53,998,332-byte file. Prayer/app feed parity, staff-entered times, Academy card-payment availability, admin sign-in barriers and award photo availability passed. The previous prayer/CPU deployment remains a rollback reference. All 90 server traces passed, with a largest trace of 29.46 MiB.
