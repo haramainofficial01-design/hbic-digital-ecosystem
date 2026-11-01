@@ -38,3 +38,10 @@ Website & app: hbic.ca
 ## Artwork
 
 The YouTube thumbnail is 1920×1080. The Instagram cover is 1080×1440 so its identity remains legible in the profile grid. Both use the existing masjid mark, actual HBIC footage and licensed Montserrat typography. Rebuild them with `node scripts/media/render-community-film-covers.mjs <verified-film-output-directory>`.
+
+## Verified publication — November 1, 2026
+
+- YouTube: https://youtu.be/7u1o84wnYAY — public; saved as both channel trailer and returning-subscriber feature.
+- Instagram: https://www.instagram.com/reel/DfMss34O7w4/ — published to @hbicyouth and visible on its profile grid. Profile pin is not yet verified.
+- Website: https://hbic.ca — verified original-caption export, cache marker `20261101-original`.
+- YouTube reports a Content ID audio claim for the credited original nasheed with no impact on viewing or channel standing. No copyright dispute was filed.
