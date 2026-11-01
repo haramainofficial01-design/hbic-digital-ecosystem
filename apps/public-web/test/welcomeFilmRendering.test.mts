@@ -28,7 +28,7 @@ test('film preview runs only in view, respecting visibility, motion and data sav
       assert.ok(await page.evaluate(()=>(window as any).paused.length)>0);
       await page.getByRole('button',{name:'Watch Our Story',exact:true}).click();
       assert.equal(await page.locator('video').count(),1);
-      assert.match(await page.locator('video').getAttribute('src')||'',/20261101-cinematic/);
+      assert.match(await page.locator('video').getAttribute('src')||'',/20261101-original/);
       assert.ok((await page.evaluate(()=>(window as any).played)).includes('Welcome to Hazrat Bilal Islamic Centre community film'));
       await page.close();
     }
