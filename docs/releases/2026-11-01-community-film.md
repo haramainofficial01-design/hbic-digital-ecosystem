@@ -14,4 +14,4 @@ Verification:
 
 Final export: 81,953,903 bytes; SHA-256 `cd5f13fb9a6f1e9302ce41a2b46f08c852ff8a59f955d7c9c1bb042669a4a161`. The website cache marker is `20261101-original`. Raw masters, render caches and private verification artifacts remain outside Git.
 
-Deployment verification and promotion are pending for this revision. YouTube upload/trailer selection and Instagram publishing/pinning have not been completed. Those statuses must be reported separately from the website release.
+This revision was verified on its staged deployment, promoted as `dpl_3xBZ9wUN4deJ7sxPoaWcZiuMdGsi`, and checked again on `https://hbic.ca`. The entire hosted film matches the verified SHA-256, byte-range playback works, the homepage references `20261101-original`, both award photos remain available, payment setup remains available, and protected admin/parent routes require sign-in. YouTube upload/trailer selection and Instagram publishing/pinning have not been completed. Those statuses must be reported separately from the website release.
