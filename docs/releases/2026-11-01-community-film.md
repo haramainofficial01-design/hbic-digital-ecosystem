@@ -16,3 +16,11 @@ The unlisted original HBIC fundraiser was inspected through the authorized chann
 - The website preview remains silent, visibility-aware and reduced-motion/data-saving aware. It is 194,516 bytes, uses `preload=none` and requires a deliberate action to open the full film.
 
 The licensed editing fonts and renderer are retained in source. Intermediate renders, private source footage and publication sessions remain outside Git. No native app dependency or binary change is required for this static website asset.
+
+## Live website publication
+
+Functional source `4ad2570` was deployed and promoted as `dpl_6zYn2jnxjVNET68AtnNKc9G7hddy` (`hbic-calgary-8h7qy5e9w-hbic.vercel.app`). The complete staged video matched the verified SHA-256. All production website aliases expose the new versioned film and October celebration link; byte-range streaming reports the expected full file length. The preceding Academy-reel deployment `dpl_CZBNo1SUqTsun85XcWffspjf4Zqu` remains recoverable.
+
+Canonical app/display parity passed after the Calgary date changed to November 1: Fajr adhan 6:59 AM, iqamah 7:09 AM. Other staff-entered times, Academy card-payment availability, admin sign-in barriers and both approved recognition photo endpoints passed. The native release remains 1.7.9; these static web changes do not require a new app binary.
+
+The social artwork and publication copy are committed separately in `assets/community-film`. YouTube/Instagram upload and channel/profile placement remain pending Chrome's file-URL upload access. YouTube channel customization additionally requires the account owner's passkey verification. No successful social upload or public social publication is asserted.
