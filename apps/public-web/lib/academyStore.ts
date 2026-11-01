@@ -108,6 +108,8 @@ function publicFamily(id: string, data: Record<string, unknown>, month: Record<s
     paymentState: paymentState as AcademyPublicFamily["paymentState"],
     noTuitionDue: children.some(child => child.tuitionExempt === true) && academyBillableChildCount(children, Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5)) - 1, 1, 12)) === 0,
     cardSetupComplete: data.paymentChoice === "card" && typeof data.stripeSubscriptionId === "string" && typeof data.stripeCustomerId === "string",
+    cardPaymentPending: paymentState === "card_attention" && data.paymentChoice === "card" &&
+      typeof data.stripeSubscriptionId === "string" && Boolean(data.recurringAuthorizedAt) && !month?.invoiceId,
     passToken: String(data.passToken),
     cashReminderEligible: data.firstCashPaidAt !== undefined && data.paymentChoice === "cash",
     createdAt: String(data.createdAt)

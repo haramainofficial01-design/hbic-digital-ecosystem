@@ -1,4 +1,4 @@
-import { getPublishedContentVersion } from "../../../../lib/contentStore";
+import { getPublishedContentVersion } from "../../../../lib/publishedContentVersion";
 import { getPublicationState } from "../../../../lib/publicationStore";
 import { jsonResponse, optionsResponse } from "../../../../lib/api";
 import { createReadCache } from "../../../../lib/readCache";

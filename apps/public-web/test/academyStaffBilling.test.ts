@@ -35,6 +35,21 @@ process.env.FIREBASE_PROJECT_ID = "hbic-isolated-billing-test";
 process.env.GOOGLE_APPLICATION_CREDENTIALS = "isolated-test-not-a-credential";
 process.env.ACADEMY_PREVIEW_ENABLED = "true";
 
+test("a new monthly ledger awaits card confirmation; a failed invoice still needs attention", async () => {
+  const { getAcademyFamily } = await import("../lib/academyStore");
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
+  const path = "academyFamilies/renewal-fixture", ledger = `${path}/months/${period}`;
+  records.set(path, { reference: "QA-FIXTURE", guardianName: "Fixture", email: "fixture@example.invalid", children: [{ id: "child", name: "Fixture" }],
+    paymentChoice: "card", enrollmentState: "active", recurringAuthorizedAt: "2026-10-05T12:00:00Z", stripeSubscriptionId: "sub_fixture", stripeCustomerId: "cus_fixture", passToken: "fixture", createdAt: "2026-10-05T12:00:00Z" });
+  records.set("academySettings/config", { tuitionMode: "per_child", monthlyCents: 5000 });
+  records.set(ledger, { period, method: "card", status: "card_attention", amountCents: 5000 });
+  assert.equal((await getAcademyFamily("renewal-fixture"))?.cardPaymentPending, true);
+  records.set(ledger, { ...records.get(ledger), invoiceId: "in_failed_fixture", lastStripeEventRank: 2 });
+  assert.equal((await getAcademyFamily("renewal-fixture"))?.cardPaymentPending, false);
+  records.set(ledger, { ...records.get(ledger), status: "paid" });
+  assert.equal((await getAcademyFamily("renewal-fixture"))?.cardPaymentPending, false);
+});
+
 test("staff cash arrangement preserves paid tuition; card setup requires parent action and is audited once", async () => {
   const { changeAcademyPaymentMethod, requestAcademyCardSetup } = await import("../lib/academyStripe");
   const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);

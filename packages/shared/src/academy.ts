@@ -163,6 +163,8 @@ export interface AcademyPublicFamily {
   underchargeCorrectionStatus?: string | null;
   paymentState: AcademyPaymentState;
   cardSetupComplete?: boolean;
+  /** A configured renewal awaiting its invoice webhook, not a confirmed decline. */
+  cardPaymentPending?: boolean;
   noTuitionDue?: boolean;
   passToken: string;
   cashReminderEligible: boolean;

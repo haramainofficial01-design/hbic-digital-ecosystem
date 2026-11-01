@@ -111,23 +111,7 @@ async function readPublishedContent(): Promise<{ content: HbicContent; status: C
   return { content: synced.content, status };
 }
 
-export async function getPublishedContentVersion() {
-  const db = getDatabase();
-  if (!db) {
-    return {
-      version: defaultContent.version,
-      updatedAt: defaultContent.updatedAt,
-      publishedAt: defaultContent.publishedAt
-    };
-  }
-  const snapshot = await db.collection(CMS_COLLECTION).doc(PUBLISHED_DOC).get();
-  const data = snapshot.data();
-  return {
-    version: Number(data?.content?.version ?? data?.version ?? defaultContent.version),
-    updatedAt: String(data?.content?.updatedAt ?? data?.updatedAt ?? defaultContent.updatedAt),
-    publishedAt: String(data?.content?.publishedAt ?? data?.publishedAt ?? defaultContent.publishedAt)
-  };
-}
+export { getPublishedContentVersion } from "./publishedContentVersion";
 
 export async function getDraftContent(): Promise<{ content: HbicContent; status: ContentStoreStatus; draftUpdatedAt: string | null }> {
   const status = getContentStoreStatus();

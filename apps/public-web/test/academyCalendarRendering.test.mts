@@ -9,7 +9,7 @@ import { academyCalendarNavigationScript } from "../../mobile/src/services/acade
 
 const root = path.resolve(import.meta.dirname, "../../..");
 
-async function fixture() {
+async function fixture(cashDue = false) {
   const result = await build({ write: false, bundle: true, platform: "browser", format: "iife", jsx: "automatic", outdir: "/tmp/hbic-academy-calendar-render-only", define: { "process.env.NODE_ENV": '"production"' },
     stdin: { resolveDir: root, loader: "tsx", contents: `import React from'react';import{createRoot}from'react-dom/client';import{AcademyParent}from'./apps/public-web/components/AcademyParent';
 const items=[{id:'past',date:'2026-10-01',type:'no_class',title:'Preparation day'},
@@ -22,7 +22,7 @@ const items=[{id:'past',date:'2026-10-01',type:'no_class',title:'Preparation day
 {id:'jan',date:'2027-01-04',type:'class',title:'Quran Academy class'},
 {id:'final',date:'2027-02-01',type:'class',title:'Final class'},
 {id:'break',date:'2027-02-02',type:'no_class',title:'Ramadan/Eid break',note:'Next term to be announced.'}];
-const family={id:'fixture-family',guardianName:'Example Parent',reference:'QA-FIXTURE',enrollmentState:'active',enrollmentStartPeriod:'2026-10',children:[{id:'fixture-child',name:'Example Child',classId:null}],paymentChoice:'cash',paymentState:'not_due',billingPeriod:'2026-10',amountCents:0,passToken:null};
+const family={id:'fixture-family',guardianName:'Example Parent',reference:'QA-FIXTURE',enrollmentState:'active',enrollmentStartPeriod:'2026-10',children:[{id:'fixture-child',name:'Example Child',classId:null}],paymentChoice:'cash',paymentState:'${cashDue ? 'cash_due' : 'not_due'}',billingPeriod:'${cashDue ? '2026-11' : '2026-10'}',amountCents:${cashDue ? 10000 : 0},passToken:null};
 window.qaRequests=[];window.qaFailCalendar=false;
 window.fetch=async(url,options)=>{window.qaRequests.push({url,authorized:Boolean(options?.headers?.Authorization)});let data={ok:true};let ok=true;
 if(url==='/api/academy/billing')data={registrationOpen:true,cardAvailable:true};
@@ -130,4 +130,23 @@ test("shipped app route retains WebView authentication and wires a Calendar shor
   assert.match(route, /disabled=\{error \|\| !onAcademyPage\}/);
   assert.match(route, /sharedCookiesEnabled/);
   assert.doesNotMatch(route, /QuranAcademyNativeScreen/);
+});
+
+
+test("cash parents see November amount and Monday collection on phone and desktop", async () => {
+  const { script, css } = await fixture(true);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const width of [320, 390, 1280]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      await page.clock.install({ time: new Date("2026-11-01T19:00:00Z") });
+      await page.setContent(`<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui}${css}</style><div id="root"></div><script>${script}</script>`);
+      const notice = page.getByRole("status").filter({ hasText: "November 2026 cash tuition" });
+      await notice.waitFor();
+      assert.match(await notice.innerText(), /\$100\.00 cash tuition for November 2026/);
+      assert.match(await notice.innerText(), /Monday, November 2, 2026 · 5:30–7:00 PM/);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Overflow at ${width}`);
+      await page.close();
+    }
+  } finally { await browser.close(); }
 });

@@ -53,3 +53,20 @@ export function academyParentCalendar(items: readonly ParentCalendarItem[], toda
   const months = [...new Set(upcoming.map(item => item.date.slice(0, 7)))];
   return { upcoming, nextClass, months };
 }
+
+/** Collection instructions use the authenticated class calendar, never an invented class date. */
+export function academyCashCollectionNotice(family: {
+  paymentChoice: string; paymentState: string; enrollmentState: string; billingPeriod: string;
+  amountCents: number | null; enrollmentStartPeriod?: string; noTuitionDue?: boolean;
+}, items: readonly ParentCalendarItem[], today: string) {
+  if (family.paymentChoice !== "cash" || family.enrollmentState === "withdrawn" || family.noTuitionDue ||
+      !["cash_due", "past_due"].includes(family.paymentState) || !Number.isSafeInteger(family.amountCents) ||
+      Number(family.amountCents) <= 0 || !calendarDate(`${family.billingPeriod}-01`)) return null;
+  const amount = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(Number(family.amountCents) / 100);
+  const month = academyCalendarMonthLabel(family.billingPeriod);
+  const from = today > `${family.billingPeriod}-01` ? today : `${family.billingPeriod}-01`;
+  const next = academyParentCalendar(items, from, family.enrollmentStartPeriod).nextClass;
+  const collection = next?.date.startsWith(`${family.billingPeriod}-`) ? next : undefined;
+  const when = collection ? `to class on ${academyCalendarDateLabel(collection.date)} · ${collection.type === "time_changed" ? collection.note || "See the updated class time in your calendar" : academyClassTimeLabel}` : "in person at HBIC; check your Academy calendar for your next class";
+  return { title: `${month} cash tuition`, text: `Please bring ${amount} cash tuition for ${month} ${when.replace(/[.!?]+\s*$/, "")}. Tuition is required to continue attending. Staff will record your payment and issue a receipt.` };
+}

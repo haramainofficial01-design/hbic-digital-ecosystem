@@ -1,8 +1,10 @@
 import "server-only";
 
-import { getDatabase } from "./contentStore";
+import { getFirestore } from "firebase-admin/firestore";
+import { getFirebaseApp } from "./firebaseAdmin";
 import { invalidatePublicReads } from "./publicReadPolicy";
 
+const getDatabase = () => { const app = getFirebaseApp(); return app ? getFirestore(app) : null; };
 const publicationStateRef = () => getDatabase()?.collection("publicationState").doc("current") ?? null;
 
 export type PublicationKind = "content" | "halal-directory" | "prayer-sync";

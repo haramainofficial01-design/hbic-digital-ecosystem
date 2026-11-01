@@ -7,8 +7,11 @@ test("approved photos only: unknown, superseded and unobscured sister assets sta
   const result = await build({ bundle: true, write: false, platform: "node", format: "esm", stdin: {
     resolveDir: path.resolve(import.meta.dirname, "../../.."), contents: "export * from './apps/public-web/app/api/academy/stars/[month]/[side]/route'"
   }, plugins: [{ name: "photo-store-fixture", setup(b) {
-    b.onResolve({ filter: /lib\/contentStore$/ }, () => ({ path: "store", namespace: "fixture" }));
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: `export const getPublishedContent=async()=>({content:{academyStars:globalThis.__stars.months}});export const getDatabase=()=>({collection(){return{doc(id){return{async get(){return{data(){return globalThis.__stars.photos[id]}}}}}}}});` }));
+    b.onResolve({ filter: /\/firebaseAdmin$/ }, () => ({ path: "app", namespace: "fixture" }));
+    b.onResolve({ filter: /^firebase-admin\/firestore$/ }, () => ({ path: "store", namespace: "fixture" }));
+    b.onResolve({ filter: /^server-only$/ }, () => ({ path: "empty", namespace: "fixture" }));
+    b.onResolve({ filter: /\/contentStore$|\/prayerSync$/ }, () => { throw new Error("Photo delivery must not load or resolve prayer content"); });
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path === "app" ? `export const getFirebaseApp=()=>({});` : args.path === "empty" ? "" : `export const getFirestore=()=>({collection(name){return{doc(id){return{async get(){return{data(){return name==='cmsContent'?{content:{academyStars:globalThis.__stars.months}}:globalThis.__stars.photos[id]}}}}}}}});` }));
   } }] });
   const route = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
   const month = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Edmonton" }).slice(0, 7);

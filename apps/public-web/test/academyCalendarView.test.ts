@@ -1,10 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarKind, academyCalendarMonthCells, academyCalendarMonths, academyCalendarMonthLabel, academyParentCalendar } from "../lib/academyCalendarView";
+import { academyCalendarBadge, academyCalendarDateLabel, academyCalendarKind, academyCalendarMonthCells, academyCalendarMonths, academyCalendarMonthLabel, academyParentCalendar, academyCashCollectionNotice } from "../lib/academyCalendarView";
 import { translateUi } from "../../../packages/shared/src/i18n/ui";
 import { academyRecurringClasses } from "../../../packages/shared/src/academy";
 
 const item = (date: string, type = "class", title = "Quran Academy class") => ({ id: `${date}-${type}`, date, type, title });
+
+test("November cash collection names the actual Monday class, amount and month", () => {
+  const family = { paymentChoice: "cash", paymentState: "cash_due", enrollmentState: "active", billingPeriod: "2026-11", amountCents: 10000 };
+  const calendar = [item("2026-11-02"), item("2026-11-05")];
+  const notice = academyCashCollectionNotice(family, calendar, "2026-11-01");
+  assert.equal(notice?.title, "November 2026 cash tuition");
+  assert.match(notice!.text, /\$100\.00 cash tuition for November 2026/);
+  assert.match(notice!.text, /Monday, November 2, 2026 · 5:30–7:00 PM/);
+  assert.match(notice!.text, /Staff will record your payment and issue a receipt/);
+  for (const change of [{ paymentState: "paid" }, { paymentState: "not_due" }, { paymentChoice: "card" }, { enrollmentState: "withdrawn" }, { amountCents: 0 }, { noTuitionDue: true }]) {
+    assert.equal(academyCashCollectionNotice({ ...family, ...change }, calendar, "2026-11-01"), null);
+  }
+});
+
+test("cash instructions respect staff closures, changed times and calendar availability", () => {
+  const family = { paymentChoice: "cash", paymentState: "past_due", enrollmentState: "active", billingPeriod: "2026-11", amountCents: 5000 };
+  const closed = [item("2026-11-02", "no_class"), { ...item("2026-11-05", "time_changed"), note: "Class starts at 6:00 PM." }];
+  const notice = academyCashCollectionNotice(family, closed, "2026-11-01")!;
+  assert.match(notice.text, /Thursday, November 5, 2026 · Class starts at 6:00 PM/);
+  assert.doesNotMatch(notice.text, /November 2,|5:30|PM\.\./);
+  const missing = academyCashCollectionNotice(family, [], "2026-11-01")!;
+  assert.match(missing.text, /check your Academy calendar/);
+  assert.doesNotMatch(missing.text, /Monday|5:30/);
+  assert.doesNotMatch(academyCashCollectionNotice(family, [item("2026-12-03")], "2026-11-30")!.text, /December 3/);
+});
 
 test("month grids use real Gregorian days, Monday-first columns and leap-year dates", () => {
   const october = academyCalendarMonthCells("2026-10");
