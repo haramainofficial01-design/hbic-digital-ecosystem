@@ -3,9 +3,9 @@
 import { HeartHandshake, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20261031-community";
-const teaserFilm = "/media/videos/hbic-welcome-story-teaser.mp4?v=20261031";
-const poster = "/media/videos/hbic-welcome-story-poster.jpg?v=20261031";
+const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20261101-cinematic";
+const teaserFilm = "/media/videos/hbic-welcome-story-teaser.mp4?v=20261101";
+const poster = "/media/videos/hbic-welcome-story-poster.jpg?v=20261101";
 
 export function WelcomeFilm() {
   const [isWatching, setIsWatching] = useState(false);
