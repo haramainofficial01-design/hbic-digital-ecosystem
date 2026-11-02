@@ -3,7 +3,7 @@
     "name": "Masjid Bilal",
     "slug": "hbic-calgary-app",
     "scheme": "hbiccalgary",
-    "version": "1.7.9",
+    "version": "1.7.10",
     "orientation": "default",
     "icon": "./assets/brand/hbic-app-icon.png",
     "userInterfaceStyle": "automatic",
@@ -38,7 +38,9 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "googleServicesFile": "./google-services.json",
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/hbic-app-icon.png",
         "backgroundColor": "#062238"
