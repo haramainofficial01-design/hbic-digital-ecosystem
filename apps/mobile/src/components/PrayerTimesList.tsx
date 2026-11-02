@@ -34,7 +34,15 @@ export function PrayerTimesList({
   const { content, source } = usePublishedContent();
   const { width, fontScale } = useAppViewport();
   const [tableWidth, setTableWidth] = useState<number | null>(null);
-  const stacked = (tableWidth ?? width - 64) < 330 || fontScale > 1.4;
+  const availableWidth = tableWidth ?? width - 66;
+  const textScale = Math.max(1, fontScale);
+  const timeColumnWidth = 72 * textScale;
+  // Reserve space for the prayer name and both times before choosing a table.
+  // Font scaling must change the layout, not squeeze or truncate a prayer time.
+  const stacked = availableWidth < 120 * textScale + timeColumnWidth * 2 + 43;
+  const inlineTimes = availableWidth >= 520 * textScale;
+  const timeColumn = { width: timeColumnWidth };
+  const stackedColumn = { flexBasis: Math.max(100, 60 * textScale) };
   const next = getNextPrayerFocus(content.prayerTime, content.iqamahTime);
   const rows = typeof maxItems === "number" ? prayerOrder.slice(0, maxItems) : prayerOrder;
 
@@ -56,8 +64,8 @@ export function PrayerTimesList({
       }}>
       {!stacked ? <View style={[styles.columnHeader, { borderBottomColor: theme.colors.border }]}>
         <Text style={[styles.columnLabel, styles.nameColumn, styles.nameColumnLabel, { color: theme.colors.subtle }]}>{t("prayer")}</Text>
-        <Text style={[styles.columnLabel, { color: theme.colors.subtle }]}>{t("adhan")}</Text>
-        <Text style={[styles.columnLabel, { color: theme.colors.subtle }]}>{t("iqamah")}</Text>
+        <Text style={[styles.columnLabel, timeColumn, { color: theme.colors.subtle }]}>{t("adhan")}</Text>
+        <Text style={[styles.columnLabel, timeColumn, { color: theme.colors.subtle }]}>{t("iqamah")}</Text>
       </View> : null}
 
       {rows.map((name) => {
@@ -92,11 +100,11 @@ export function PrayerTimesList({
               {isHighlighted ? <Text style={[styles.nextLabel, { color: theme.colors.warningText }]}>Prayer alert</Text> : null}
             </View>
             {stacked ? <View style={styles.stackedTimes}>
-              <View style={styles.stackedTime}><Text style={[styles.stackedTimeLabel, { color: theme.colors.subtle }]}>{t("adhan")}</Text><Text style={[styles.stackedTimeValue, { color: theme.colors.text }]}>{dataAvailable ? content.prayerTime[name] : "--"}</Text></View>
-              <View style={styles.stackedTime}><Text style={[styles.stackedTimeLabel, { color: theme.colors.subtle }]}>{t("iqamah")}</Text><Text style={[styles.stackedTimeValue, styles.iqamah, { color: iqamah ? theme.colors.teal : theme.colors.subtle }]}>{iqamah ?? "—"}</Text></View>
+              <View style={[styles.stackedTime, stackedColumn]}><Text style={[styles.stackedTimeLabel, { color: theme.colors.subtle }]}>{t("adhan")}</Text><PrayerTimeValue value={dataAvailable ? content.prayerTime[name] : "--"} color={theme.colors.text} inline={inlineTimes} /></View>
+              <View style={[styles.stackedTime, stackedColumn]}><Text style={[styles.stackedTimeLabel, { color: theme.colors.subtle }]}>{t("iqamah")}</Text><PrayerTimeValue value={iqamah ?? "—"} color={iqamah ? theme.colors.teal : theme.colors.subtle} inline={inlineTimes} iqamah /></View>
             </View> : <>
-              <Text style={[styles.time, { color: theme.colors.text }]}>{dataAvailable ? content.prayerTime[name] : "--"}</Text>
-              <Text style={[styles.time, styles.iqamah, { color: iqamah ? theme.colors.teal : theme.colors.subtle }]}>{iqamah ?? "—"}</Text>
+              <View style={timeColumn}><PrayerTimeValue value={dataAvailable ? content.prayerTime[name] : "--"} color={theme.colors.text} inline={inlineTimes} /></View>
+              <View style={timeColumn}><PrayerTimeValue value={iqamah ?? "—"} color={iqamah ? theme.colors.teal : theme.colors.subtle} inline={inlineTimes} iqamah /></View>
             </>}
           </View>
         );
@@ -104,6 +112,19 @@ export function PrayerTimesList({
       </View>
     </GlassCard>
   );
+}
+
+function PrayerTimeValue({ value, color, inline, iqamah = false }: {
+  value: string;
+  color: string;
+  inline: boolean;
+  iqamah?: boolean;
+}) {
+  const parts = /^(\d{1,2}:\d{2})\s+(AM|PM)$/i.exec(value.trim());
+  return <View style={[styles.timeValue, inline && styles.inlineTime]}>
+    <Text style={[styles.time, iqamah && styles.iqamah, { color }]}>{parts?.[1] ?? value}</Text>
+    {parts ? <Text style={[styles.timePeriod, { color }]}>{parts[2]}</Text> : null}
+  </View>;
 }
 
 const styles = StyleSheet.create({
@@ -137,10 +158,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomWidth: 1,
     paddingHorizontal: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
+    gap: 12,
     paddingBottom: 8
   },
   columnLabel: {
-    width: 78,
     textAlign: "right",
     fontSize: 10,
     fontWeight: "900",
@@ -157,6 +180,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     minHeight: 62,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -181,19 +205,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "900"
   },
+  timeValue: { alignItems: "flex-end", gap: 2, direction: "ltr" },
+  inlineTime: { flexDirection: "row", justifyContent: "flex-end", alignItems: "baseline", gap: 4 },
   time: {
-    width: 78,
     textAlign: "right",
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    writingDirection: "ltr"
   },
+  timePeriod: { fontSize: 11, fontWeight: "700", writingDirection: "ltr" },
   iqamah: {
     fontWeight: "900"
   },
   stackedRow: { flexDirection: "column", alignItems: "stretch", gap: 10 },
   stackedName: { flex: 0 },
   stackedTimes: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  stackedTime: { flex: 1, minWidth: 70, gap: 3 },
-  stackedTimeLabel: { fontSize: 10, fontWeight: "800" },
-  stackedTimeValue: { fontSize: 15, fontWeight: "800" }
+  stackedTime: { flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 3 },
+  stackedTimeLabel: { fontSize: 10, fontWeight: "800", textAlign: "right" }
 });
