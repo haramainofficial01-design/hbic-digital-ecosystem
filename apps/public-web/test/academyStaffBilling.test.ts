@@ -35,6 +35,28 @@ process.env.FIREBASE_PROJECT_ID = "hbic-isolated-billing-test";
 process.env.GOOGLE_APPLICATION_CREDENTIALS = "isolated-test-not-a-credential";
 process.env.ACADEMY_PREVIEW_ENABLED = "true";
 
+test("staff child cancellation retains siblings and paid history, records its actor, and prevents repeat changes", async () => {
+  const { cancelAcademyChild } = await import("../lib/academyStripe");
+  const path = "academyFamilies/cancel-fixture";
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
+  records.set("academySettings/config", { tuitionMode: "per_child", monthlyCents: 5000 });
+  records.set(path, { reference: "QA-FIXTURE", guardianName: "Fixture", email: "fixture@example.invalid", paymentChoice: "cash", enrollmentState: "active",
+    children: [{ id: "a", name: "Fixture A" }, { id: "b", name: "Fixture B" }], createdAt: new Date().toISOString() });
+  const month = { period, status: "paid", method: "cash", amountCents: 10000, receiptId: "fixture-receipt" };
+  records.set(`${path}/months/${period}`, month);
+  await assert.rejects(cancelAcademyChild("cancel-fixture", "a", { uid: "staff", reason: "" }), /reason/);
+  const result = await cancelAcademyChild("cancel-fixture", "a", { uid: "staff", reason: "Parent requested cancellation" });
+  assert.ok(Date.parse(result.effectiveAt) > Date.now());
+  const children = records.get(path)?.children as { id: string; cancelEffectiveAt?: string }[];
+  assert.equal(children[0].cancelEffectiveAt, result.effectiveAt);
+  assert.equal(children[1].cancelEffectiveAt, undefined);
+  assert.deepEqual(records.get(`${path}/months/${period}`), month);
+  const audit = [...records.values()].filter(row => row.familyId === "cancel-fixture" && row.action === "child_cancellation");
+  assert.equal(audit.length, 1); assert.equal(audit[0].actorUid, "staff"); assert.equal(audit[0].reason, "Parent requested cancellation");
+  await assert.rejects(cancelAcademyChild("cancel-fixture", "a", { uid: "staff", reason: "Repeated request" }), /already canceled/);
+  assert.equal(records.has("academyBillingLocks/cancel-fixture"), false);
+});
+
 test("a new monthly ledger awaits card confirmation; a failed invoice still needs attention", async () => {
   const { getAcademyFamily } = await import("../lib/academyStore");
   const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);

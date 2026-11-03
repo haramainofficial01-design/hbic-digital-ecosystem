@@ -1,0 +1,11 @@
+# TV clock compatibility and staff child cancellation
+
+The TV display's digital clock, formatted prayer instants and calendar date now use the canonical Alberta timezone compatibility resolver. This prevents older Fire TV timezone databases from applying the obsolete November winter rollback. The existing display response's HTTP Date and Age headers also establish a monotonic clock sample, avoiding dependence on an incorrectly set device clock without adding requests. Invalid time headers leave the last valid sample intact. The existing 60-second timetable and 15-minute weather polling remain unchanged.
+
+The public display page uses the existing published-page cache and 60-second ISR rather than resolving the full public page for every reload. Private Academy/admin/payment routes remain dynamic and uncached. This reduces repeated page-render work; it does not reclaim already-used Vercel quota or establish a measured account-wide saving.
+
+Directors and super administrators can now select a family/student and cancel an individual child's future enrolment from the existing record view. The parent cancellation service is reused, including its billing lock, subscription checks, no-proration renewal adjustment, effective date and retained paid history. Staff must supply a reason, and the actor is recorded privately. Siblings remain unaffected. Existing pending-family withdrawal is separate. No real child is cancelled by this code release; exact students and the intended end date require confirmation.
+
+Validation: 24 service tests pass, including the actual cash-child cancellation function, repeat protection, paid-history/sibling preservation, webhook regressions, timezone compatibility, clock synchronization and display state. An additional route-boundary test verifies authentication, both permitted roles, denied roles, malformed family IDs, actor attribution and no-store responses. Public/admin TypeScript and builds pass. Native 1.7.10 builds separately contain the previously committed mobile prayer timetable layout; these web changes require no new native permission or signing changes.
+
+Deployment and store states must be recorded after verification; this source note alone does not establish a live rollout.

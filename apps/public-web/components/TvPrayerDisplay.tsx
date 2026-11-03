@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { formatCountdown, masjidTimeZone, type PrayerName, type WidgetPrayerEntry } from "@hbic/shared";
+import { dateStringInTimeZone, formatCountdown, masjidTimeZone, type PrayerName, type WidgetPrayerEntry } from "@hbic/shared";
 import {
   deriveCurrentPrayerKey,
   deriveDisplayFocus,
@@ -22,6 +22,7 @@ import {
   type TvWeatherVisualState
 } from "../lib/tvDisplay";
 import styles from "./TvPrayerDisplay.module.css";
+import { formatDisplayClock, formatDisplayDate, formatDisplayTime, displayNow, syncDisplayClock } from "../lib/tvClock";
 import { publicDisplayUrl } from "../lib/displayClient";
 import { appDownloadQr, appDownloadUrl } from "../lib/appLaunch";
 import { startTvWeatherScene } from "../lib/tvWeatherCanvas";
@@ -36,27 +37,6 @@ const arabicPrayerNames: Record<PrayerName, string> = {
   maghrib: "المغرب",
   isha: "العشاء"
 };
-
-const calgaryDigitalClockFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: masjidTimeZone,
-  hour: "numeric",
-  minute: "2-digit",
-  second: "2-digit"
-});
-
-const calgaryTimeLabelFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: masjidTimeZone,
-  hour: "numeric",
-  minute: "2-digit"
-});
-
-const calgaryDateFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: masjidTimeZone,
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-  year: "numeric"
-});
 
 function readLocalCache(key: string) {
   try {
@@ -96,7 +76,7 @@ function useAlignedClock(initialDate: string) {
 
     const tick = () => {
       if (document.visibilityState === "hidden") return;
-      const current = new Date();
+      const current = displayNow();
       setNow(current);
       timer = window.setTimeout(tick, 1_005 - current.getMilliseconds());
     };
@@ -124,7 +104,7 @@ function usePrayerScheduleClock(initialDate: string, snapshot: TvDisplayPayload[
     let timer: number | undefined;
     const tick = () => {
       if (document.visibilityState === "hidden") return;
-      const current = new Date();
+      const current = displayNow();
       setNow(current);
       timer = window.setTimeout(tick, nextDisplayScheduleUpdateMs(snapshot, current));
     };
@@ -191,7 +171,7 @@ function SocialMark({ platform }: { platform: "instagram" | "youtube" | "tiktok"
 }
 
 function timeLabel(date: Date) {
-  return calgaryTimeLabelFormatter.format(date);
+  return formatDisplayTime(date);
 }
 
 function WeatherIcon({ mode }: { mode: TvWeatherMode }) {
@@ -231,9 +211,9 @@ function ClockArea({
             <span><em>{displayWeather.condition}</em>{typeof displayWeather.windSpeed === "number" ? <small>Wind {Math.round(displayWeather.windSpeed)} km/h</small> : null}</span>
           </div>
         ) : null}
-        <strong className={styles.clock}>{calgaryDigitalClockFormatter.format(now)}</strong>
+        <strong className={styles.clock}>{formatDisplayClock(now)}</strong>
       </div>
-      {showGregorianDate ? <span className={styles.date}>{calgaryDateFormatter.format(now)}</span> : null}
+      {showGregorianDate ? <span className={styles.date}>{formatDisplayDate(now)}</span> : null}
       {showHijriDate && hijriDate ? <span className={styles.hijri}>{hijriDate}</span> : null}
     </div>
   );
@@ -376,10 +356,11 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const response = await fetch(publicDisplayUrl(), { signal: controller.signal });
+      const response = await fetch(publicDisplayUrl(displayNow()), { signal: controller.signal });
       const data = await response.json() as TvDisplayPayload & { error?: string };
       if (!response.ok || data.ok !== true) throw new Error(data.error || "Display data unavailable");
-      const receivedAt = new Date();
+      syncDisplayClock(response.headers);
+      const receivedAt = displayNow();
       if (!snapshotMatchesCalgaryDate(data.snapshot, receivedAt)) throw new Error("Daily schedule has not refreshed yet");
       if (preferCachedDisplay(data, acceptedPayload.current, receivedAt)) {
         setOffline(false);
@@ -481,14 +462,14 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
 
   useEffect(() => {
     const updateAtmosphereClock = () => {
-      if (document.visibilityState !== "hidden") setNow(new Date());
+      if (document.visibilityState !== "hidden") setNow(displayNow());
     };
     const atmosphereClock = window.setInterval(updateAtmosphereClock, 30_000);
     const contentRefresh = window.setInterval(() => void refreshDisplay(), 60_000);
     const weatherRefresh = window.setInterval(() => void refreshWeather(), 15 * 60_000);
     const reconnect = () => {
       if (document.visibilityState === "hidden") return;
-      setNow(new Date());
+      setNow(displayNow());
       void refreshDisplay();
       void refreshWeather();
     };
@@ -511,12 +492,7 @@ export function TvPrayerDisplay({ initialPayload }: { initialPayload: TvDisplayP
       requestedServiceDate.current = "";
       return;
     }
-    const serviceDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: masjidTimeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).format(now);
+    const serviceDate = dateStringInTimeZone(now, masjidTimeZone);
     if (requestedServiceDate.current !== serviceDate) {
       requestedServiceDate.current = serviceDate;
       void refreshDisplay();

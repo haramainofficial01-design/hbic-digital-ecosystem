@@ -622,7 +622,8 @@ export async function setAcademyTuitionExemption(uid: string, childId: string, e
 }
 
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */
-export async function cancelAcademyChild(uid: string, childId: string) {
+export async function cancelAcademyChild(uid: string, childId: string, actor?: { uid: string; reason: string }) {
+  if (actor && (!actor.uid || !actor.reason.trim() || actor.reason.trim().length > 500)) throw new AcademyError("A staff cancellation reason is required.");
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(childId)) throw new AcademyError("Choose a valid child.");
   const db = academyDb();
   const familyRef = db.collection("academyFamilies").doc(uid);
@@ -695,7 +696,8 @@ export async function cancelAcademyChild(uid: string, childId: string) {
         tx.update(monthRef, { amountCents: remaining === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? remaining : 1),
           status: remaining === 0 ? "not_due" : "scheduled", updatedAt: new Date().toISOString() });
       }
-      tx.create(db.collection("academyAudit").doc(), { action: "child_cancellation", familyId: uid, childId, effectiveAt, method: family.paymentChoice, at: new Date().toISOString() });
+      tx.create(db.collection("academyAudit").doc(), { action: "child_cancellation", familyId: uid, childId, effectiveAt, method: family.paymentChoice,
+        ...(actor ? { actorUid: actor.uid, reason: actor.reason.trim() } : {}), at: new Date().toISOString() });
       tx.delete(lockRef);
     });
     return { effectiveAt, family: await getAcademyFamily(uid) };

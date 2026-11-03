@@ -3,6 +3,7 @@ import {
   dateStringInTimeZone,
   derivePrayerCelestialPosition,
   masjidTimeZone,
+  resolvedMasjidTimeZone,
   timeToDate,
   type PrayerName,
   type TvDisplayAnnouncement,
@@ -341,7 +342,7 @@ export function snapshotMatchesCalgaryDate(snapshot: WidgetPrayerSnapshot, now: 
 /** Jumu'ah presentation runs from the canonical Thursday Maghrib to Friday Maghrib. */
 export function isJumuahDisplayWindow(snapshot: WidgetPrayerSnapshot, now: Date) {
   if (!snapshotMatchesCalgaryDate(snapshot, now)) return false;
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: masjidTimeZone, weekday: "short" }).format(now);
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: resolvedMasjidTimeZone(now), weekday: "short" }).format(now);
   const maghrib = snapshot.prayers.find((entry) => entry.key === "maghrib");
   const maghribTime = maghrib ? Date.parse(maghrib.adhanDate) : Number.NaN;
   if (!Number.isFinite(maghribTime)) return false;

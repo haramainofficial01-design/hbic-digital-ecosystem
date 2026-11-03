@@ -217,6 +217,19 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
     finally { setBusy(false); }
   }
 
+  async function cancelChildEnrollment(family: AcademyPublicFamily, childId: string, childName: string) {
+    const reason = window.prompt(`Reason for cancelling ${childName}'s enrolment:`, "Parent requested cancellation")?.trim();
+    if (!reason || !window.confirm(`Cancel future enrolment for ${childName}? Current tuition and receipts stay unchanged. The confirmed end date will be shown after cancellation.`)) return;
+    setBusy(true); setMessage("");
+    try {
+      const data = await adminRequest("/api/admin/academy/cancel-child", { method: "POST", body: JSON.stringify({ familyId: family.id, childId, reason }) });
+      setScanned(data.family);
+      await load();
+      setMessage(`${childName}: enrolment ends ${new Date(data.effectiveAt).toLocaleString("en-CA", { timeZone: "America/Edmonton" })}. Future renewal stopped for this child.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Cancellation was not confirmed."); }
+    finally { setBusy(false); }
+  }
+
   async function withdrawRegistration(family: AcademyPublicFamily) {
     if (!["awaiting_checkout", "conditional"].includes(family.enrollmentState)) return;
     const reason = window.prompt(`Why should ${family.guardianName}'s pending registration be withdrawn? This reason is saved in the audit history.`, "Registration entered by mistake")?.trim();
@@ -372,6 +385,7 @@ export function AcademyPanel({ adminRequest, personalSession }: { adminRequest: 
         <ul>{scanned.children.map((child) => <li key={child.id}>{child.name} · Age {child.age} · {child.level.replace("_", " ")}
           <select aria-label={`Class for ${child.name}`} value={child.classId ?? ""} onChange={(event) => void assignChild(child.id, event.target.value)}><option value="">Awaiting class</option>{classes.filter((item) => item.active).map((item) => <option key={item.id} value={item.id}>{item.name} · {days[item.dayOfWeek]} {item.startTime}</option>)}</select>
           <label><input type="checkbox" checked={child.tuitionExempt === true} disabled={busy || scanned.enrollmentState === "withdrawn"} onChange={(event) => void changeTuitionExemption(child.id, event.target.checked)} /> Tuition exempt</label>
+          {child.cancelEffectiveAt ? <span>Enrolment ends {new Date(child.cancelEffectiveAt).toLocaleDateString("en-CA", { timeZone: "America/Edmonton" })}</span> : scanned.enrollmentState !== "withdrawn" ? <button type="button" className="secondary" disabled={busy} onClick={() => void cancelChildEnrollment(scanned, child.id, child.name)}>Cancel enrolment · {child.name}</button> : null}
         </li>)}</ul>
         {familyHasTuition(scanned) ? <div className="academy-admin-payment"><strong>{paymentLabel(scanned)}</strong><span>{scanned.billingPeriod} · {amount(tuitionReportCents(scanned))} · {scanned.billingMethod === "card" ? "Card" : "Cash"}</span>{correctionSummary(scanned) ? <span>{correctionSummary(scanned)}</span> : null}<span>Policy: {scanned.policyVersion ?? "not recorded"}{scanned.policyAcceptedAt ? ` · accepted ${new Date(scanned.policyAcceptedAt).toLocaleDateString("en-CA")}` : ""}</span></div> : null}
         {familyHasTuition(scanned) && scanned.enrollmentState !== "withdrawn" ? <div className="academy-admin-card"><h4>Payment arrangement</h4>{scanned.pendingPaymentChoice === "cash" ? <p>Cash starts {scanned.paymentChangeEffectivePeriod}.</p> : null}<div className="academy-admin-actions"><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("cash")}>Arrange cash payment</button><button className="secondary" disabled={busy} onClick={() => void changeFamilyPayment("card")}>Request secure card setup</button></div><small>Card setup requires parent authorization.</small></div> : null}

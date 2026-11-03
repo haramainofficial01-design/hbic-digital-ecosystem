@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { createWidgetPrayerSnapshot, toPublicContent } from "@hbic/shared";
 import { TvPrayerDisplay } from "../../components/TvPrayerDisplay";
-import { getPublishedContent } from "../../lib/contentStore";
+import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
 import type { TvDisplayPayload } from "../../lib/tvDisplay";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Prayer Display | Masjid Bilal",
