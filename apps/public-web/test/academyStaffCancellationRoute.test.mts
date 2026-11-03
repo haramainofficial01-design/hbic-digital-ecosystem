@@ -27,5 +27,5 @@ test("staff child cancellation authenticates, restricts roles and passes the sel
     assert.equal(response.status, 200); assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal((await response.json()).effectiveAt, "2026-12-01T06:00:00Z");
   }
-  assert.deepEqual(state.calls[0], { family: "family-fixture", child: "child-fixture", actor: { uid: "staff-fixture", reason: "Parent requested cancellation" } });
+  assert.deepEqual(state.calls[0], { family: "family-fixture", child: "child-fixture", actor: { uid: "staff-fixture", reason: "Parent requested cancellation", endNow: false } });
 });

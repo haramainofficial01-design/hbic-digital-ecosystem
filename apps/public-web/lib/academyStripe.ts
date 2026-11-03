@@ -622,7 +622,7 @@ export async function setAcademyTuitionExemption(uid: string, childId: string, e
 }
 
 /** Parent-authorized cancellation prevents the canceled child's next renewal. */
-export async function cancelAcademyChild(uid: string, childId: string, actor?: { uid: string; reason: string }) {
+export async function cancelAcademyChild(uid: string, childId: string, actor?: { uid: string; reason: string; endNow?: boolean }) {
   if (actor && (!actor.uid || !actor.reason.trim() || actor.reason.trim().length > 500)) throw new AcademyError("A staff cancellation reason is required.");
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(childId)) throw new AcademyError("Choose a valid child.");
   const db = academyDb();
@@ -639,12 +639,12 @@ export async function cancelAcademyChild(uid: string, childId: string, actor?: {
     return snapshot.data()!;
   });
   try {
+    if (actor?.endNow && family.paymentChoice !== "cash") throw new AcademyError("Immediate staff cancellation is available for cash enrollment only. Card enrollment ends through the existing billing-period flow.", 409);
     const renewalChildren = family.children as { id: string; tuitionExempt?: boolean; cancelEffectiveAt?: string | null }[];
-    const activeRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt).length;
     const billableRenewals = renewalChildren.filter(child => !child.cancelEffectiveAt && child.tuitionExempt !== true).length;
     const exemptChild = renewalChildren.find(child => child.id === childId)?.tuitionExempt === true;
     const pricing = await getAcademyPricing();
-    let effectiveAt = new Date(nextCalgaryFirstBillingAnchor(new Date()) * 1000).toISOString();
+    let effectiveAt = actor?.endNow ? new Date().toISOString() : new Date(nextCalgaryFirstBillingAnchor(new Date()) * 1000).toISOString();
     let pendingCardSetup = false;
     if (family.paymentChoice === "card" && !exemptChild) {
       if (!cardBillingConfigured()) throw new AcademyError("Card billing must be available before changing a subscription.", 503);
@@ -682,7 +682,8 @@ export async function cancelAcademyChild(uid: string, childId: string, actor?: {
       if (lock.data()?.id !== lockId) throw new AcademyError("Billing change expired. Contact HBIC before trying again.", 409);
       const children = snapshot.data()?.children as { id: string; cancelEffectiveAt?: string | null }[];
       if (!children.some((child) => child.id === childId && !child.cancelEffectiveAt)) throw new AcademyError("Child cancellation was already recorded.", 409);
-      const lastChildNow = pendingCardSetup && activeRenewals === 1;
+      const endsNow = pendingCardSetup || actor?.endNow === true;
+      const lastChildNow = endsNow && children.every(child => child.id === childId || Boolean(child.cancelEffectiveAt && Date.parse(child.cancelEffectiveAt) <= Date.now()));
       const passToken = String(snapshot.data()?.passToken ?? "");
       if (lastChildNow && passToken) tx.set(db.collection("academyPasses").doc(createHash("sha256").update(passToken).digest("hex")), { uid, state: "revoked", updatedAt: new Date().toISOString() }, { merge: true });
       tx.update(familyRef, { children: children.map((child) => child.id === childId ? { ...child, cancelEffectiveAt: effectiveAt } : child),
@@ -691,13 +692,13 @@ export async function cancelAcademyChild(uid: string, childId: string, actor?: {
         // Keep class access through the already-paid period. Renewal quantity
         // changes immediately, but the child's attendance ends at effectiveAt.
         updatedAt: new Date().toISOString() });
-      if (pendingCardSetup && month.exists && month.data()?.status !== "paid") {
-        const remaining = activeRenewals - 1;
+      if (endsNow && month.exists && month.data()?.status !== "paid") {
+        const remaining = academyBillableChildCount(children.map(child => child.id === childId ? { ...child, cancelEffectiveAt: effectiveAt } : child), Date.now());
         tx.update(monthRef, { amountCents: remaining === 0 ? 0 : pricing.monthlyCents * (pricing.tuitionMode === "per_child" ? remaining : 1),
-          status: remaining === 0 ? "not_due" : "scheduled", updatedAt: new Date().toISOString() });
+          status: remaining === 0 ? "not_due" : family.paymentChoice === "cash" ? "cash_due" : "scheduled", updatedAt: new Date().toISOString() });
       }
       tx.create(db.collection("academyAudit").doc(), { action: "child_cancellation", familyId: uid, childId, effectiveAt, method: family.paymentChoice,
-        ...(actor ? { actorUid: actor.uid, reason: actor.reason.trim() } : {}), at: new Date().toISOString() });
+        ...(actor ? { actorUid: actor.uid, reason: actor.reason.trim(), endsImmediately: actor.endNow === true } : {}), at: new Date().toISOString() });
       tx.delete(lockRef);
     });
     return { effectiveAt, family: await getAcademyFamily(uid) };

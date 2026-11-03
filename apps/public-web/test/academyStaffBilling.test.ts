@@ -57,6 +57,46 @@ test("staff child cancellation retains siblings and paid history, records its ac
   assert.equal(records.has("academyBillingLocks/cancel-fixture"), false);
 });
 
+test("immediate staff cash cancellation reprices unpaid tuition and revokes the final child's pass without deleting history", async () => {
+  const { cancelAcademyChild } = await import("../lib/academyStripe");
+  const path = "academyFamilies/immediate-fixture";
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
+  records.set("academySettings/config", { tuitionMode: "per_child", monthlyCents: 5000 });
+  records.set(path, { reference: "QA-FIXTURE", guardianName: "Fixture", email: "fixture@example.invalid", paymentChoice: "cash", enrollmentState: "active", passToken: "fixture-only-token",
+    children: [{ id: "a", name: "Fixture A" }, { id: "b", name: "Fixture B" }], createdAt: new Date().toISOString() });
+  records.set(`${path}/months/${period}`, { period, status: "cash_due", method: "cash", amountCents: 10000 });
+  records.set(`${path}/months/2026-10`, { period: "2026-10", status: "paid", method: "cash", amountCents: 10000, receiptId: "retained" });
+  const actor = { uid: "staff", reason: "Parent requested immediate cancellation", endNow: true };
+  const first = await cancelAcademyChild("immediate-fixture", "a", actor);
+  assert.ok(Date.parse(first.effectiveAt) <= Date.now());
+  assert.equal(records.get(`${path}/months/${period}`)?.amountCents, 5000);
+  await cancelAcademyChild("immediate-fixture", "b", actor);
+  assert.equal(records.get(`${path}/months/${period}`)?.amountCents, 0);
+  assert.equal(records.get(`${path}/months/${period}`)?.status, "not_due");
+  assert.equal(records.get(path)?.enrollmentState, "withdrawn");
+  assert.equal(records.get(path)?.passState, "revoked");
+  assert.equal(records.get(path)?.passToken, "");
+  assert.equal(records.get(`${path}/months/2026-10`)?.receiptId, "retained");
+  assert.equal((records.get(path)?.children as unknown[]).length, 2);
+});
+
+test("immediate cancellation preserves paid tuition and a sibling with a future end date", async () => {
+  const { cancelAcademyChild } = await import("../lib/academyStripe");
+  const path = "academyFamilies/paid-immediate-fixture";
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
+  records.set("academySettings/config", { tuitionMode: "per_child", monthlyCents: 5000 });
+  const future = new Date(Date.now() + 86400000).toISOString();
+  records.set(path, { reference: "QA-FIXTURE", guardianName: "Fixture", email: "fixture@example.invalid", paymentChoice: "cash", enrollmentState: "active", passToken: "fixture-active-pass",
+    children: [{ id: "a", name: "Fixture A" }, { id: "b", name: "Fixture B", cancelEffectiveAt: future }], createdAt: new Date().toISOString() });
+  const paid = { period, status: "paid", method: "cash", amountCents: 10000, receiptId: "retained-paid-receipt" };
+  records.set(`${path}/months/${period}`, paid);
+  await cancelAcademyChild("paid-immediate-fixture", "a", { uid: "staff", reason: "Parent requested immediate cancellation", endNow: true });
+  assert.deepEqual(records.get(`${path}/months/${period}`), paid);
+  assert.equal(records.get(path)?.enrollmentState, "active");
+  assert.equal(records.get(path)?.passToken, "fixture-active-pass");
+  assert.equal((records.get(path)?.children as { cancelEffectiveAt?: string }[])[1].cancelEffectiveAt, future);
+});
+
 test("a new monthly ledger awaits card confirmation; a failed invoice still needs attention", async () => {
   const { getAcademyFamily } = await import("../lib/academyStore");
   const period = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }).slice(0, 7);
