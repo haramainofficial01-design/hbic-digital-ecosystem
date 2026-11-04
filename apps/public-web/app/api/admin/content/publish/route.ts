@@ -47,7 +47,8 @@ export async function POST(request: Request) {
       backend: published.status,
       revalidated: publicRevalidationPaths,
       publication,
-      propagation
+      propagation,
+      iqamahNotification: published.iqamahNotification
     });
   } catch (error) {
     return jsonResponse(

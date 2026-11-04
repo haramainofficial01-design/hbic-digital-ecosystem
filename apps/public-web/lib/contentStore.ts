@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 
 import { getFirestore, type DocumentData } from "firebase-admin/firestore";
 import { defaultContent, normalizeContent, validateContent, dateStringInTimeZone, masjidTimeZone, type HbicContent } from "@hbic/shared";
+import { notifyPublishedIqamahChange } from "./publishedPrayerNotifications";
 import { applyPrayerSync } from "./prayerSync";
 import { boundPrayerOverrides } from "./prayerOverrides";
 import { assertPublicationPreconditions, type PublicationPreconditions } from "./publicationGuards";
@@ -219,10 +220,16 @@ export async function publishDraftContent(expected: PublicationPreconditions = {
       publishedAt: now
     });
     transaction.set(publicationRef, publication);
-    return { content, status, publication };
+    return { content, status, publication, previousContent: publishedSnapshot.exists ? extractContent(publishedSnapshot.data()) : content };
   });
   invalidatePublicReads();
   // Broadcast the resolved published values, never stale draft/base timings.
+  const previous = await applyPrayerSync(result.previousContent, db, { preview: true });
   const resolved = await applyPrayerSync(result.content, db);
-  return { ...result, content: resolved.content };
+  let iqamahNotification;
+  try {
+    iqamahNotification = await notifyPublishedIqamahChange(db, previous.content.iqamahTime, resolved.content.iqamahTime, result.publication.revision);
+  } catch { iqamahNotification = { status: "delivery_error" }; }
+  const { previousContent: _previous, ...published } = result;
+  return { ...published, content: resolved.content, iqamahNotification };
 }
