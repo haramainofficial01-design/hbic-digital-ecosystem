@@ -1,3 +1,4 @@
+import { JumuahTimingNotice } from "../../components/JumuahTimingNotice";
 import { CopyButton } from "../../components/CopyButton";
 import { PrayerTable } from "../../components/PrayerTable";
 import { SiteChrome } from "../../components/SiteChrome";
@@ -27,6 +28,7 @@ export default async function PrayerTimesPage() {
 
   return (
     <SiteChrome settings={settings} contentVersion={content.version}>
+      <JumuahTimingNotice announcements={content.announcements} />
       <section className="section prayer-page">
         <h2>Prayer Times</h2>
         <p>

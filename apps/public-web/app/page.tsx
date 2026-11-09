@@ -1,3 +1,4 @@
+import { JumuahTimingNotice } from "../components/JumuahTimingNotice";
 import { getPublishedPageContent as getPublishedContent } from "../lib/contentStore";
 import { PrayerTable } from "../components/PrayerTable";
 import { SiteChrome } from "../components/SiteChrome";
@@ -47,6 +48,8 @@ export default async function HomePage() {
           <span className="home-hero-caption">20 Saddlestone Drive NE · Calgary, Alberta</span>
         </div>
       </section>
+
+      <JumuahTimingNotice announcements={content.announcements} />
 
       <AcademyStars months={content.academyStars ?? []} />
 
