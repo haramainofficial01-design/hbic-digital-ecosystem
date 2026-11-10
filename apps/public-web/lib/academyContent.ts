@@ -5,7 +5,7 @@ import { ACADEMY_ALBERTA_GENERAL_HOLIDAYS, ACADEMY_TERM_END_DATE, academyRecurri
 import { academyDb, AcademyError } from "./academyStore";
 
 export type AcademyClass = { id: string; name: string; teacher: string; dayOfWeek: number; startTime: string; endTime: string; room: string; level: "qaida" | "quran" | "mixed"; capacity: number; active: boolean };
-export type AcademyCalendarItem = { id: string; title: string; date: string; type: "class" | "special_class" | "no_class" | "holiday" | "time_changed" | "event"; classIds: string[]; note: string };
+export type AcademyCalendarItem = { id: string; title: string; date: string; type: "class" | "special_class" | "no_class" | "holiday" | "time_changed" | "event"; classIds: string[]; note: string; cancelledAttendanceGroup?: "girls" | "boys" };
 export type AcademyAnnouncement = { id: string; title: string; message: string; priority: "normal" | "high"; classIds: string[]; publishedAt: string; expiresAt: string | null };
 
 function text(value: unknown, label: string, max = 120) {
@@ -86,7 +86,7 @@ export async function saveAcademyItem(kind: keyof typeof collection, input: unkn
   return { id: ref.id, ...data };
 }
 
-export async function listAcademyContent(admin = false, classFilter: string[] = []) {
+export async function listAcademyContent(admin = false, classFilter: string[] = [], attendanceGroups: readonly string[] = [], familyId?: string) {
   const db = academyDb();
   const [classDocs, calendarDocs, announcementDocs] = await Promise.all([
     db.collection(collection.class).limit(200).get(),
@@ -118,13 +118,21 @@ export async function listAcademyContent(admin = false, classFilter: string[] = 
       ] as AcademyCalendarItem[]).filter((item) => item.date >= today && !normalizedExplicit.some((existing) => existing.date === item.date));
       const changedDates = new Set(normalizedExplicit.filter((item) => ["no_class", "holiday", "time_changed", "special_class"].includes(item.type)).map((item) => item.date));
       const specialDates = normalizedExplicit.filter((item) => item.type === "special_class").map((item) => item.date);
-      const recurring = academyRecurringClasses(today, 150, specialDates).filter((item) => !changedDates.has(item.date))
+      const groupClosures = normalizedExplicit.filter(item => item.type === "event" && item.cancelledAttendanceGroup);
+      const groupClosureDates = new Set(groupClosures.map(item => item.date));
+      const recurring = academyRecurringClasses(today, 150, specialDates).filter((item) => !changedDates.has(item.date) && !groupClosureDates.has(item.date))
         .map((item) => ({ id: `recurring-${item.date}`, date: item.date, title: item.title, type: item.type,
           classIds: [] as string[], note: item.note }));
-      return [...recurring, ...normalizedExplicit, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      const scoped = normalizedExplicit.map(item => {
+        if (item.type !== "event" || !item.cancelledAttendanceGroup) return item;
+        const onlyCancelled = !admin && attendanceGroups.length > 0 && attendanceGroups.every(group => group === item.cancelledAttendanceGroup);
+        return { ...item, type: onlyCancelled ? "no_class" as const : "class" as const };
+      });
+      return [...recurring, ...scoped, ...defaults].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     })() as AcademyCalendarItem[],
-    announcements: announcementDocs.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AcademyAnnouncement))
-      .filter((item) => admin || targeted(item.classIds ?? []) && Date.parse(String(item.publishedAt)) <= now && (!item.expiresAt || Date.parse(String(item.expiresAt)) >= now))
+    announcements: announcementDocs.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AcademyAnnouncement & { familyIds?: string[] }))
+      .filter((item) => admin || (item.familyIds ? !!familyId && item.familyIds.includes(familyId) : targeted(item.classIds ?? [])) && Date.parse(String(item.publishedAt)) <= now && (!item.expiresAt || Date.parse(String(item.expiresAt)) >= now))
+      .map(({ familyIds: _privateTargets, ...item }) => item)
       .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt))) as AcademyAnnouncement[]
   };
 }
