@@ -22,7 +22,9 @@ export function useQuranAudio() {
   const options = useRef({ speed: 1, loop: false });
   const applyOptions = useCallback(() => {
     player.loop = options.current.loop;
-    player.shouldCorrectPitch = true;
+    // Normal-speed playback needs no real-time pitch processing.
+    // Preserve pitch correction for every supported altered speed.
+    player.shouldCorrectPitch = options.current.speed !== 1;
     player.setPlaybackRate(options.current.speed, "high");
   }, [player]);
   const local = useRef(false);

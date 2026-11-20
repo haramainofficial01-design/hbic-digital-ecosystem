@@ -90,6 +90,8 @@ test("stream and local recording loop/speed use native properties, survive inter
     const page = await browser.newPage(); await page.setContent(`<div id="root"></div><script>${await bundle(false)}</script>`);
     await page.waitForFunction(() => (window as any).ready);
     await page.evaluate(async () => { await (window as any).audio.playStream("https://verified.example/reciter.mp3", "Reference", "Test adapter"); });
+    await page.evaluate(() => (window as any).audio.setSpeed(1));
+    assert.equal(await page.evaluate(() => (window as any).nativeOptions().pitch), false);
     await page.evaluate(() => { (window as any).audio.setSpeed(.5); (window as any).audio.setLoopCurrent(true); });
     assert.deepEqual(await page.evaluate(() => (window as any).nativeOptions()), { loop: true, rate: .5, pitch: true, currentTime: 0 });
     await page.evaluate(() => (window as any).nativeFinish());

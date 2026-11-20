@@ -1,8 +1,8 @@
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Animated, StyleSheet, View } from "react-native";
 import { Text } from "../src/i18n/LocalizedText";
 import { calculateQiblaBearing, isAlignedWithQibla, qiblaRotation } from "@hbic/shared";
 import { AppButton } from "../src/components/AppButton";
@@ -12,6 +12,8 @@ import { SectionHeader } from "../src/components/SectionHeader";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 
+import { createSensorSession } from "../src/services/sensorSession";
+
 export default function QiblaScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
@@ -20,14 +22,17 @@ export default function QiblaScreen() {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [message, setMessage] = useState("Your location is used only while Qibla is open to calculate the direction.");
   const [busy, setBusy] = useState(false);
-  const subscription = useRef<Location.LocationSubscription | null>(null);
+  const session = useRef(createSensorSession()).current;
+  const visible = useRef(false);
   const hapticSent = useRef(false);
   const rotation = useRef(new Animated.Value(0)).current;
   const aligned = bearing !== null && heading !== null && isAlignedWithQibla(bearing, heading);
 
   useEffect(() => {
     if (bearing === null) return;
-    Animated.timing(rotation, { toValue: heading === null ? bearing : qiblaRotation(bearing, heading), duration: 250, useNativeDriver: true }).start();
+    const animation = Animated.timing(rotation, { toValue: heading === null ? bearing : qiblaRotation(bearing, heading), duration: 250, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
   }, [bearing, heading, rotation]);
 
   useEffect(() => {
@@ -37,22 +42,32 @@ export default function QiblaScreen() {
     } else if (!aligned) hapticSent.current = false;
   }, [aligned]);
 
-  useEffect(() => () => subscription.current?.remove(), []);
+  useFocusEffect(useCallback(() => {
+    visible.current = true;
+    const state = AppState.addEventListener("change", value => {
+      if (value !== "active") { session.stop(); setHeading(null); setBusy(false); }
+    });
+    return () => { visible.current = false; session.stop(); setBusy(false); setHeading(null); state.remove(); };
+  }, [session]));
 
   async function start() {
+    if (!visible.current || AppState.currentState !== "active") return;
+    const token = session.begin();
     setBusy(true);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
+      if (!session.current(token)) return;
       if (permission.status !== Location.PermissionStatus.GRANTED) {
         setMessage("Location was not allowed. Use the Calgary fallback for a static bearing.");
         return;
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (!session.current(token)) return;
       setBearing(calculateQiblaBearing(location.coords));
       setAccuracy(location.coords.accuracy ?? null);
       setMessage("Hold your phone flat and rotate slowly until the marker points up.");
-      subscription.current?.remove();
-      subscription.current = await Location.watchHeadingAsync((reading) => {
+      const sensor = await Location.watchHeadingAsync((reading) => {
+        if (!session.current(token)) return;
         if (reading.trueHeading >= 0) setHeading(reading.trueHeading);
         else {
           // A magnetic heading is not interchangeable with the true-north bearing.
@@ -60,13 +75,14 @@ export default function QiblaScreen() {
           setMessage("True-north compass is unavailable. Use the static bearing with another compass.");
         }
       });
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Qibla could not be started."); }
-    finally { setBusy(false); }
+      session.attach(token, sensor);
+    } catch (error) { if (session.current(token)) setMessage(error instanceof Error ? error.message : "Qibla could not be started."); }
+    finally { if (session.current(token)) setBusy(false); }
   }
 
   function calgary() {
-    subscription.current?.remove();
-    subscription.current = null;
+    session.stop();
+    setBusy(false);
     setHeading(null);
     setAccuracy(null);
     setBearing(calculateQiblaBearing({ latitude: 51.0447, longitude: -114.0719 }));

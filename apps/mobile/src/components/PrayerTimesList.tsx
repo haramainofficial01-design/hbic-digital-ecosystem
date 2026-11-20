@@ -20,6 +20,8 @@ const prayerIcons: Record<PrayerName, PrayerIconName> = {
   isha: "weather-night"
 };
 
+import { useVisibleClock } from "../services/useVisibleClock";
+
 export function PrayerTimesList({
   compact = false,
   maxItems,
@@ -43,7 +45,8 @@ export function PrayerTimesList({
   const inlineTimes = availableWidth >= 520 * textScale;
   const timeColumn = { width: timeColumnWidth };
   const stackedColumn = { flexBasis: Math.max(100, 60 * textScale) };
-  const next = getNextPrayerFocus(content.prayerTime, content.iqamahTime);
+  const now = useVisibleClock();
+  const next = getNextPrayerFocus(content.prayerTime, content.iqamahTime, now);
   const rows = typeof maxItems === "number" ? prayerOrder.slice(0, maxItems) : prayerOrder;
 
   return (

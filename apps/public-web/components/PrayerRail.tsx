@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CloudMoon, CloudSun, Minimize2, MoonStar, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { deriveDisplayFocus, isJumuahDisplayWindow, snapshotMatchesCalgaryDate, type TvDisplayPayload } from "../lib/tvDisplay";
+import { startVisibleMinuteClock } from "../lib/visibleMinuteClock";
 import { fetchPublicDisplay } from "../lib/displayClient";
 
 const names = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -46,12 +47,12 @@ export function PrayerRail() {
       } catch { /* Keep the prior snapshot until the next retry. */ }
     };
     void refresh();
-    const clock = window.setInterval(() => setNow(new Date()), 1_000);
+    const clock = startVisibleMinuteClock(() => setNow(new Date()), () => document.visibilityState === "visible");
     const timer = window.setInterval(() => void refresh(), 60_000);
-    const onFocus = () => { setNow(new Date()); void refresh(); };
+    const onFocus = () => { clock.update(); void refresh(); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
-    return () => { disposed = true; window.clearInterval(clock); window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
+    return () => { disposed = true; clock.stop(); window.clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); };
   }, [hidden]);
 
   if (hidden || !payload || !snapshotMatchesCalgaryDate(payload.snapshot, now) || payload.snapshot.availability !== "available") return null;

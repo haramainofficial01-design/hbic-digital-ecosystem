@@ -11,16 +11,18 @@ test("metadata polling reads both stored schemas without loading the prayer reso
     b.onResolve({ filter: /\/firebaseAdmin$/ }, () => ({ path: "app", namespace: "fixture" }));
     b.onResolve({ filter: /^firebase-admin\/firestore$/ }, () => ({ path: "store", namespace: "fixture" }));
     b.onResolve({ filter: /^server-only$|^next\/cache$/ }, () => ({ path: "empty", namespace: "fixture" }));
-    b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path === "app" ? "export const getFirebaseApp=()=>globalThis.__metadata.configured?{}:null;" : args.path === "empty" ? "export function revalidateTag(){}" : `export const getFirestore=()=>({collection(name){return{doc(id){return{async get(){globalThis.__metadata.reads.push(name+'/'+id);return{data(){return name==='cmsContent'?globalThis.__metadata.content:globalThis.__metadata.publication}}}}}}}});` }));
+    b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ contents: args.path === "app" ? "export const getFirebaseApp=()=>globalThis.__metadata.configured?{}:null;" : args.path === "empty" ? "export function revalidateTag(){}" : `export const getFirestore=()=>({async getAll(ref,options){globalThis.__metadata.masks.push(options.fieldMask);return [await ref.get()]},collection(name){return{doc(id){return{async get(){globalThis.__metadata.reads.push(name+'/'+id);return{data(){return name==='cmsContent'?globalThis.__metadata.content:globalThis.__metadata.publication}}}}}}}});` }));
   } }] });
   const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
-  const state = { configured: true, content: { content: { version: 26, updatedAt: "2026-11-01T12:00:00Z", publishedAt: "2026-11-01T12:00:00Z" } } as Record<string, unknown>, publication: { revision: 4, kind: "content", updatedAt: "2026-11-01T12:00:00Z" }, reads: [] as string[] };
+  const state = { configured: true, content: { content: { version: 26, updatedAt: "2026-11-01T12:00:00Z", publishedAt: "2026-11-01T12:00:00Z" } } as Record<string, unknown>, publication: { revision: 4, kind: "content", updatedAt: "2026-11-01T12:00:00Z" }, masks: [] as string[][], reads: [] as string[] };
   (globalThis as any).__metadata = state;
   try {
     assert.equal((await api.getPublishedContentVersion()).version, 26);
     state.content = { version: 27, updatedAt: "flat", publishedAt: "flat" };
     assert.deepEqual(await api.getPublishedContentVersion(), { version: 27, updatedAt: "flat", publishedAt: "flat" });
     assert.equal((await api.getPublicationState()).revision, 4);
+    assert.equal(state.masks.length, 2);
+    assert.deepEqual(state.masks[0], ["content.version", "content.updatedAt", "content.publishedAt", "version", "updatedAt", "publishedAt"]);
     assert.deepEqual(state.reads, ["cmsContent/published", "cmsContent/published", "publicationState/current"]);
     state.configured = false;
     assert.equal((await api.getPublicationState()).revision, 0);
