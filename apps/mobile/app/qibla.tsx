@@ -12,7 +12,7 @@ import { SectionHeader } from "../src/components/SectionHeader";
 import { spacing } from "../src/theme/theme";
 import { useAppTheme } from "../src/theme/ThemeProvider";
 
-import { createSensorSession } from "../src/services/sensorSession";
+import { createSensorSession, shouldSuspendSensor } from "../src/services/sensorSession";
 
 export default function QiblaScreen() {
   const router = useRouter();
@@ -24,6 +24,7 @@ export default function QiblaScreen() {
   const [busy, setBusy] = useState(false);
   const session = useRef(createSensorSession()).current;
   const visible = useRef(false);
+  const requestingPermission = useRef(false);
   const hapticSent = useRef(false);
   const rotation = useRef(new Animated.Value(0)).current;
   const aligned = bearing !== null && heading !== null && isAlignedWithQibla(bearing, heading);
@@ -45,7 +46,9 @@ export default function QiblaScreen() {
   useFocusEffect(useCallback(() => {
     visible.current = true;
     const state = AppState.addEventListener("change", value => {
-      if (value !== "active") { session.stop(); setHeading(null); setBusy(false); }
+      // iOS permission sheets briefly make the app inactive. A real
+      // background transition still retires the pending request.
+      if (shouldSuspendSensor(value, requestingPermission.current)) { session.stop(); setHeading(null); setBusy(false); }
     });
     return () => { visible.current = false; session.stop(); setBusy(false); setHeading(null); state.remove(); };
   }, [session]));
@@ -55,7 +58,10 @@ export default function QiblaScreen() {
     const token = session.begin();
     setBusy(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      requestingPermission.current = true;
+      let permission: Location.LocationPermissionResponse;
+      try { permission = await Location.requestForegroundPermissionsAsync(); }
+      finally { requestingPermission.current = false; }
       if (!session.current(token)) return;
       if (permission.status !== Location.PermissionStatus.GRANTED) {
         setMessage("Location was not allowed. Use the Calgary fallback for a static bearing.");

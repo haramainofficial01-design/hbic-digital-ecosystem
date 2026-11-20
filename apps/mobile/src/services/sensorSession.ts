@@ -13,3 +13,8 @@ export function createSensorSession() {
     }
   };
 }
+
+/** Permission sheets can be transiently inactive; true background always stops work. */
+export function shouldSuspendSensor(state: string, requestingPermission: boolean) {
+  return state !== "active" && !(state === "inactive" && requestingPermission);
+}
