@@ -3,7 +3,7 @@
 import { HeartHandshake, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20261101-original";
+const fullFilm = "/media/videos/hbic-welcome-story.mp4?v=20261120-continuity";
 const teaserFilm = "/media/videos/hbic-welcome-story-teaser.mp4?v=20261101-original";
 const poster = "/media/videos/hbic-welcome-story-poster.jpg?v=20261101-original";
 
