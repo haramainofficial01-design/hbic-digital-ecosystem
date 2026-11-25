@@ -469,26 +469,15 @@ h1 {
 .welcome-play-overlay {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  gap: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: clamp(10px, 2vw, 18px);
   border: 0;
   color: white;
-  background:
-    radial-gradient(circle at center, rgba(3, 24, 39, 0.16), rgba(3, 24, 39, 0.48)),
-    linear-gradient(180deg, rgba(3, 24, 39, 0.04), rgba(3, 24, 39, 0.46));
+  background: none;
   cursor: pointer;
   font: inherit;
-  font-weight: 900;
-  letter-spacing: 0;
-  transition: background 180ms ease;
-}
-
-.welcome-play-overlay:hover,
-.welcome-play-overlay:focus-visible {
-  background:
-    radial-gradient(circle at center, rgba(8, 123, 131, 0.2), rgba(3, 24, 39, 0.48)),
-    linear-gradient(180deg, rgba(3, 24, 39, 0.02), rgba(3, 24, 39, 0.42));
 }
 
 .welcome-play-overlay:focus-visible {
@@ -496,23 +485,27 @@ h1 {
   outline-offset: -8px;
 }
 
-.welcome-play-icon {
-  display: grid;
-  place-items: center;
-  width: clamp(66px, 8vw, 88px);
-  height: clamp(66px, 8vw, 88px);
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 50%;
-  color: var(--gold);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 18px 60px rgba(3, 24, 39, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.34);
-  backdrop-filter: blur(18px) saturate(130%);
-  transition: transform 180ms ease, background 180ms ease;
+.welcome-play-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(3, 24, 39, 0.92);
+  box-shadow: 0 5px 16px rgba(3, 24, 39, 0.32);
+  font-size: clamp(12px, 1.1vw, 14px);
+  font-weight: 800;
 }
 
-.welcome-play-overlay:hover .welcome-play-icon {
-  transform: scale(1.04);
-  background: rgba(255, 255, 255, 0.22);
+.welcome-play-control svg {
+  color: var(--gold);
+}
+
+.welcome-play-overlay:hover .welcome-play-control,
+.welcome-play-overlay:focus-visible .welcome-play-control {
+  border-color: var(--gold);
 }
 
 .welcome-film-meta {

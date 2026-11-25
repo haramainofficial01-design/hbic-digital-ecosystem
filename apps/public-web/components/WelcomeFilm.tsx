@@ -113,8 +113,10 @@ export function WelcomeFilm() {
                 onClick={playFullFilm}
                 aria-label="Watch the full Hazrat Bilal Islamic Centre story film"
               >
-                <span className="welcome-play-icon"><Play size={30} fill="currentColor" aria-hidden="true" /></span>
-                <span>Watch Our Story</span>
+                <span className="welcome-play-control">
+                  <Play size={16} fill="currentColor" aria-hidden="true" />
+                  Watch Our Story
+                </span>
               </button>
             </>
           ) : null}
