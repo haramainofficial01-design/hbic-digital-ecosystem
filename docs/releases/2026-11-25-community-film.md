@@ -29,4 +29,7 @@ Unmuted playback, 16 seeks, and pause/resume passed at 390 and 1440 pixels. The 
 
 Source commit `1640510` was promoted to the existing public-web project as `dpl_8Gqh4P8ptknCyhHTvsN6h6mvzCKp`. Both the staged deployment and `hbic.ca` served all three matching media hashes and the `20261125-community` reference. The film returned HTTP 206 for byte-range playback. Academy billing availability and the prayer display schedule responded normally.
 
-The social master and matching covers are ready. Upload, channel-trailer placement, Instagram pinning and retirement of the previous posts remain pending authenticated browser access.
+## Social publication
+
+- [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The older HBIC video (`7u1o84wnYAY`) remains pending confirmation for permanent deletion.
+- [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film and the matching cover. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.

@@ -1,5 +1,7 @@
 # Masjid Bilal introduction
 
+The November 25 re-edit replaced the website film and is now featured on [YouTube](https://youtu.be/ve2xJi9khW0) and [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/). See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for verification and the earlier uploads’ status. The copy and artwork notes below describe the November 1 release.
+
 Use the verified complete community film. YouTube and Instagram publication, processing and profile placement must each be checked after upload. The original unlisted fundraiser remains unchanged.
 
 ## YouTube
