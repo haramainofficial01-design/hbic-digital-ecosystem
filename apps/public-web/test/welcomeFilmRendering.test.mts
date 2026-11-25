@@ -22,13 +22,15 @@ test('film preview runs only in view, respecting visibility, motion and data sav
       await page.addScriptTag({content:bundled.outputFiles[0].text});await page.waitForTimeout(40);
       assert.equal(await page.evaluate(()=>(window as any).played.length),0,'offscreen preview never starts');
       assert.equal(await page.locator('video[aria-hidden=true]').getAttribute('preload'),'none');
+      assert.match(await page.locator('video[aria-hidden=true]').getAttribute('src')||'',/20261125-community/);
+      assert.match(await page.locator('video[aria-hidden=true]').getAttribute('poster')||'',/20261125-community/);
       await page.evaluate(()=>(window as any).inView(true));
       assert.equal(await page.evaluate(()=>(window as any).played.length),mode==='normal'?1:0);
       await page.evaluate(()=>(window as any).inView(false));
       assert.ok(await page.evaluate(()=>(window as any).paused.length)>0);
       await page.getByRole('button',{name:'Watch Our Story',exact:true}).click();
       assert.equal(await page.locator('video').count(),1);
-      assert.match(await page.locator('video').getAttribute('src')||'',/20261120-continuity/);
+      assert.match(await page.locator('video').getAttribute('src')||'',/20261125-community/);
       assert.ok((await page.evaluate(()=>(window as any).played)).includes('Welcome to Hazrat Bilal Islamic Centre community film'));
       await page.close();
     }
