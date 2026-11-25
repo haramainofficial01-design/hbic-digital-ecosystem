@@ -1,4 +1,4 @@
-import publicMediaFiles from "../../lib/publicMediaFiles.json";
+import mediaFileManifest from "../../lib/publicMediaFiles.json";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { SiteChrome } from "../../components/SiteChrome";
@@ -32,6 +32,7 @@ export default async function MediaPage() {
   const { mediaItems, settings } = content;
   const featured = mediaItems.find((item) => item.featured && item.visible) ?? mediaItems[0];
   const featuredVideoPublicPath = featured?.videoUrl.startsWith("/") ? featured.videoUrl.slice(1) : featured?.videoUrl;
+  const publicMediaFiles: readonly string[] = mediaFileManifest;
   const hasFeaturedVideo = featuredVideoPublicPath ? publicMediaFiles.includes(featuredVideoPublicPath) : false;
   const socialLinks = [
     { label: "Instagram", href: settings.social.instagram, note: "Reminders, clips, and youth updates" },
