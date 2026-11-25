@@ -24,3 +24,9 @@ Unmuted playback, 16 seeks, and pause/resume passed at 390 and 1440 pixels. The 
 - Poster · 287,698 bytes · SHA-256 `5b6a43c170f461d662ae4fbd365f859372c9db24fad083d5436d04d5e3779934`
 - Silent preview · 596,152 bytes · SHA-256 `f753a70331cab2af5bd69d9cfe6e2ff26cb94a84fadf3b4b6db48676f1ff93fb`
 - Social master · 210,308,360 bytes · SHA-256 `17e2a92aa78df5d0afae63a16d2c390b47a8997ba426189cf3031e0a744ce321`
+
+## Production
+
+Source commit `1640510` was promoted to the existing public-web project as `dpl_8Gqh4P8ptknCyhHTvsN6h6mvzCKp`. Both the staged deployment and `hbic.ca` served all three matching media hashes and the `20261125-community` reference. The film returned HTTP 206 for byte-range playback. Academy billing availability and the prayer display schedule responded normally.
+
+The social master and matching covers are ready. Upload, channel-trailer placement, Instagram pinning and retirement of the previous posts remain pending authenticated browser access.
