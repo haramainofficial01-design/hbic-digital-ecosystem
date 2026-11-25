@@ -112,7 +112,6 @@ export function SiteExperience() {
           ".app-feature-intro",
           ".app-feature",
           ".app-final-cta",
-          ".welcome-film-section > *",
           ".app-home-promotion > *",
           ".section > .card",
           ".section > .grid > *",
