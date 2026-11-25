@@ -32,7 +32,7 @@ Source commit `1640510` was promoted to the existing public-web project as `dpl_
 ## Social publication
 
 - [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The superseded HBIC upload (`7u1o84wnYAY`) and the temporary private duplicate (`Z3IGOG4P07k`) were permanently deleted in Studio. The public trailer remained available after both removals.
-- [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film and the matching cover. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.
+- [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.
 
 ## Matching covers
 
@@ -41,3 +41,7 @@ The covers share the frame at 00:33.367, where the speaker looks forward with hi
 - [YouTube artwork](../../assets/community-film/YouTube%20Thumbnail.jpg) · 1920 × 1080 · 330,224 bytes · SHA-256 `6070d184257964c2d2c2101dded0307cc446ffd8b15d7ba4d5ee1e1205432230`
 - [Instagram artwork](../../assets/community-film/Instagram%20Cover.jpg) · 1080 × 1920 · 240,567 bytes · SHA-256 `9c05b9d049f388d5bfde3ff3333a43d062e8197a671a80eaab90f60987980790`
 - Website artwork · 1536 × 864 · 142,392 bytes · SHA-256 `dae7a868e977243fa85d3c7560fc662931eada9c08fe6c57f07c148e488e67c3`
+
+The website cover and unobstructed play control are live from source commit `51abcf8` on Vercel deployment `dpl_47sBChRVckzHVE2VfeveU6HsYTCL`. The production poster matched the artwork hash, video byte ranges returned HTTP 206, and the prayer-display and Academy-card availability checks passed. At 390 and 1440 pixels, the poster appeared before any video request and the full film played on tap or click.
+
+The updated YouTube artwork is live on the existing public trailer. The published thumbnail matched the new speaker crop after saving in Studio. The Instagram portrait artwork is ready. The existing reel is live with its earlier cover while the in-place cover update is pending.

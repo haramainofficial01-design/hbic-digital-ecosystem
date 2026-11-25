@@ -17,7 +17,7 @@ test("Friday badges use a neutral day name across website and app languages", ()
   assert.equal(translateUi("ur", label), "یومِ جمعہ");
   assert.equal(translateUi("fa-AF", label), "روز جمعه");
   assert.equal(translateUi("ar", label), "يوم الجمعة");
-  for (const path of ["../src/components/PrayerHero.tsx", "../../public-web/components/SiteExperience.tsx"]) {
+  for (const path of ["../src/components/PrayerHero.tsx", "../../public-web/components/PrayerRail.tsx"]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.ok(source.includes("يَوْمُ الْجُمُعَةِ"));
     assert.ok(source.includes(label));

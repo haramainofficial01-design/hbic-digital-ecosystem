@@ -15,6 +15,7 @@ function css(style,box=false){const s={borderWidth:0,...flatten(style)};for(cons
 export function View({children,style,onLayout,accessibilityLabel,pointerEvents}){const ref=useRef();useLayoutEffect(()=>{if(!onLayout)return;const notify=()=>{const b=ref.current.getBoundingClientRect();onLayout({nativeEvent:{layout:{width:b.width,height:b.height}}})};const observer=new ResizeObserver(notify);observer.observe(ref.current);notify();return()=>observer.disconnect()},[!!onLayout]);return <div ref={ref} aria-label={accessibilityLabel} style={{...css(style,true),pointerEvents}}>{children}</div>}
 export const Text=forwardRef(function Text({children,style,numberOfLines},ref){const s=css(style);if(s.fontSize)s.fontSize*=window.qaScale;return <span ref={ref} style={{...s,...(numberOfLines===1?{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}:{})}}>{children}</span>});
 export const TextInput=()=>null,Image=()=>null,Alert={alert(){}};
+export const AppState={currentState:'active',addEventListener:()=>({remove(){}})};
 export const StyleSheet={create:s=>s,hairlineWidth:1};export const useWindowDimensions=()=>({width:innerWidth,height:innerHeight,fontScale:window.qaScale});`;
 
 async function scheduleBundle() {
@@ -22,9 +23,10 @@ async function scheduleBundle() {
     define: { "process.env.NODE_ENV": '"production"' },
     stdin: { resolveDir: root, loader: "tsx", contents: `import React from'react';import{createRoot}from'react-dom/client';import{PrayerTimesList}from'./apps/mobile/src/components/PrayerTimesList';createRoot(document.getElementById('root')).render(<PrayerTimesList compact={window.qaCompact} maxItems={window.qaCompact?3:undefined} highlightedPrayer={window.qaHighlight?'maghrib':undefined}/>);` },
     plugins: [{ name: "scaled-native-prayer-schedule", setup(b) {
-      b.onResolve({ filter: /^react-native$|LanguageProvider$|ThemeProvider$|services\/content$|^@expo\/vector-icons$/ }, a => ({ path: a.path.split("/").at(-1)!, namespace: "fixture" }));
+      b.onResolve({ filter: /^react-native$|^expo-router$|LanguageProvider$|ThemeProvider$|services\/content$|^@expo\/vector-icons$/ }, a => ({ path: a.path.split("/").at(-1)!, namespace: "fixture" }));
       b.onLoad({ filter: /.*/, namespace: "fixture" }, a => ({ loader: "tsx", resolveDir: root, contents: {
         "react-native": native,
+        "expo-router": `export {useEffect as useFocusEffect} from 'react';`,
         LanguageProvider: `import{t,translateUi}from'@hbic/shared';export const useAppLanguage=()=>({language:window.qaLanguage,isRtl:window.qaLanguage!=='en',translate:s=>translateUi(window.qaLanguage,s),t:key=>t(window.qaLanguage,key)});`,
         ThemeProvider: `import{lightTheme,darkTheme}from'${root}/apps/mobile/src/theme/theme';export const useAppTheme=()=>({theme:window.qaDark?darkTheme:lightTheme});`,
         content: `import{defaultContent}from'@hbic/shared';export const usePublishedContent=()=>({content:{...defaultContent,prayerTime:{...defaultContent.prayerTime,date:'2026-11-02',fajr:'7:00 AM',sunrise:'8:30 AM',dhuhr:'1:20 PM',asr:'3:41 PM',maghrib:'6:08 PM',isha:'7:38 PM'},iqamahTime:{...defaultContent.iqamahTime,fajrIqamah:'7:10 AM',dhuhrIqamah:'1:30 PM',asrIqamah:'4:00 PM',maghribIqamah:'6:18 PM',ishaIqamah:'8:00 PM'}},source:window.qaFallback?'bundled-fallback':'api'});`,
