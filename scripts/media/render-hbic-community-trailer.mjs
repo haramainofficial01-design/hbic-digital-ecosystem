@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import sharp from "sharp";
 import { filmEnd, sources, timeline } from "./community-film-timeline.mjs";
+import { renderHbicYouTubeThumbnail } from "./render-hbic-youtube-thumbnail.mjs";
 
 const [archive, sound, cameraDirectory, destination] = process.argv.slice(2).map(arg => resolve(arg));
 if (!destination) {
@@ -291,7 +292,7 @@ async function assemble(scenes) {
 async function renderPreviewAssets(master) {
   const poster = join(destination, "poster.jpg");
   await render(["-ss", "60.5", "-i", master, "-frames:v", "1", "-q:v", "2", poster]);
-  await render(["-ss", "1.9", "-i", master, "-frames:v", "1", "-q:v", "2", join(destination, "YouTube Thumbnail.jpg")]);
+  await renderHbicYouTubeThumbnail(master, join(destination, "YouTube Thumbnail.jpg"), ffmpeg);
   // Match the film's dissolves in the silent preview. Keep every preview shot
   // free of film titles so it reads clearly under the website's play control.
   const tease = [26.1, 60.5, 82.7, 125.85];

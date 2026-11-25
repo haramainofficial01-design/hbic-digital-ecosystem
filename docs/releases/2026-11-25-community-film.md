@@ -31,5 +31,7 @@ Source commit `1640510` was promoted to the existing public-web project as `dpl_
 
 ## Social publication
 
-- [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The older HBIC video (`7u1o84wnYAY`) remains pending confirmation for permanent deletion.
+- [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The superseded HBIC upload (`7u1o84wnYAY`) and the temporary private duplicate (`Z3IGOG4P07k`) were permanently deleted in Studio. The public trailer remained available after both removals.
 - [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film and the matching cover. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.
+
+The [YouTube cover](../../assets/community-film/YouTube%20Thumbnail.jpg) uses a frame at 00:33.95, the HBIC mark and Montserrat type. It was reviewed at 1920 × 1080 and at 288 pixels wide. A standalone rebuild of the 330,736-byte JPEG matched SHA-256 `4e339e3322c3f319d5a01aa89cc49043d3ad313de7a6fd08960ad927c62b332e`. The cover persisted in Studio after reload, and YouTube’s public 320 × 180 rendition matched the new artwork.

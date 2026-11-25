@@ -1,6 +1,6 @@
 # Masjid Bilal introduction
 
-The November 25 re-edit replaced the website film and is now featured on [YouTube](https://youtu.be/ve2xJi9khW0) and [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/). See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for verification and the earlier uploads’ status. The copy and artwork notes below describe the November 1 release.
+The November 25 re-edit replaced the website film and is now featured on [YouTube](https://youtu.be/ve2xJi9khW0) and [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/). See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for verification and the earlier uploads’ status. The copy below describes the November 1 release.
 
 Use the verified complete community film. YouTube and Instagram publication, processing and profile placement must each be checked after upload. The original unlisted fundraiser remains unchanged.
 
@@ -39,7 +39,9 @@ Website & app: hbic.ca
 
 ## Artwork
 
-The YouTube thumbnail is 1920×1080. The Instagram cover is 1080×1440 so its identity remains legible in the profile grid. Both use the existing masjid mark, actual HBIC footage and licensed Montserrat typography. Rebuild them with `node scripts/media/render-community-film-covers.mjs <verified-film-output-directory>`.
+The [current YouTube thumbnail](YouTube%20Thumbnail.jpg) is 1920 × 1080. Rebuild it with `node scripts/media/render-hbic-youtube-thumbnail.mjs <november-25-master> <output.jpg>`. It uses a real frame from the film, the HBIC mark and a short, high-contrast title that reads at phone size.
+
+The November 1 Instagram cover is 1080 × 1440. The two November 1 covers can be rebuilt with `node scripts/media/render-community-film-covers.mjs <verified-film-output-directory>`.
 
 ## Verified publication — November 1, 2026
 
