@@ -32,7 +32,9 @@ const caps = {
   ".": [23, "M0 62h23v18H0z"],
 };
 
-export function titlePaths(text, { x = 960, top, height, maxWidth = 1560, spacing = 8, fill = "#fffaf1" }) {
+export function titlePaths(text, {
+  x = 960, top, height, maxWidth = 1560, spacing = 8, fill = "#fffaf1", visible = Infinity, caret = false,
+}) {
   let advance = 0;
   const placed = [];
   for (const letter of text) {
@@ -43,11 +45,17 @@ export function titlePaths(text, { x = 960, top, height, maxWidth = 1560, spacin
     const glyph = caps[letter];
     if (!glyph) throw new Error(`Missing title character: ${letter}`);
     const [width, path] = glyph;
-    placed.push(`<path transform="translate(${advance} 0)" d="${path}"/>`);
+    placed.push({ at: advance, width, path });
     advance += width + spacing;
   }
 
   const width = advance - spacing;
   const scale = Math.min(height / 80, maxWidth / width);
-  return `<g transform="translate(${x - width * scale / 2} ${top}) scale(${scale})" fill="${fill}" fill-rule="evenodd">${placed.join("")}</g>`;
+  const shown = placed.slice(0, visible);
+  const shapes = shown.map(glyph => `<path transform="translate(${glyph.at} 0)" d="${glyph.path}"/>`);
+  if (caret && shown.length) {
+    const last = shown.at(-1);
+    shapes.push(`<rect x="${last.at + last.width + 11}" y="-10" width="4" height="100"/>`);
+  }
+  return `<g transform="translate(${x - width * scale / 2} ${top}) scale(${scale})" fill="${fill}" fill-rule="evenodd">${shapes.join("")}</g>`;
 }

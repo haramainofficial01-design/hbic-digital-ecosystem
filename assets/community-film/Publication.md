@@ -2,7 +2,7 @@
 
 The November 25 re-edit was withdrawn from the website. Its YouTube upload is private and its Instagram reel is archived. See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for verification. The copy and artwork below document earlier versions.
 
-The original fundraiser remains in the private production archive. The current private cut includes the revised wudu area and closing.
+The original fundraiser remains in the private production archive. The current private cut carries its title reveals and panel motion through the wudu area and restores the original animated close.
 
 ## YouTube
 

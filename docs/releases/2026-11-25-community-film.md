@@ -68,10 +68,22 @@ The review file is kept outside Git and public deployment.
 
 The picture revision starts at 2:52.133 with a dissolve out of the final wudu quotation card. The before-and-after, wudu area and community support scenes use clean windows into the archival footage. The titles extend the wide lettering of the original opening, with the same centered placement and soft glow. The rounded frames carry through the facility shots. The thank-you and donation cards use the archival contour artwork and the original Masjid Bilal mark, including the source’s glowing “Donate Generously” line.
 
-Run `node scripts/media/render-hbic-wudu-review.mjs <original-film> <first-private-review> <private-output-directory>`. The original lettering is embedded in the archived picture. The new title paths draw on its cap proportions, and the closing mark and donation line are extracted from the source.
+This cut was rendered with `scripts/media/render-hbic-wudu-review.mjs` at commit `e9b6ff8`. The original lettering is embedded in the archived picture. The new title paths draw on its cap proportions, and the closing mark and donation line were extracted from the source.
 
 The full 1080p export decoded cleanly. All 6,207 picture timestamps are continuous at 30 fps, and the first 5,080 decoded frames match the first private cut exactly. The 9,700 audio packets retain the same SHA-256 as that cut. There were no full-field black gaps of 0.10 seconds or longer, and the audio silence check found only the original opening and closing fades. The frame review covered each new hold, each dissolve and the final call to action.
 
 - `Masjid Bilal Trailer - Wudu Area Revision.mp4` · 144,684,405 bytes · SHA-256 `3a8d21a9c03af11b8d5bd2d98f706001bba95564d4df0d1c2a8c48609acc54e2`
 
 This export is for private review.
+
+## Motion review
+
+The Drive original was retrieved and matched the local archive byte for byte. Its opening reveals the centered title rapidly with a short cursor hold. The wudu project introduces the before-and-after pictures from opposite edges and then moves the next view up from the bottom. The closing raises the logo before typing “Donate Generously.”
+
+The comparison, wudu and community-support headings use the opening's reveal and keep their final centering while they type on. The rounded panels slide in from the sides for the comparison and rise in sequence for the wudu area. The thank-you card clears before the closing logo enters. The logo entrance, “Donate Generously” reveal and exit use the original animated frames over the contour background. The donation URL appears after the archived wording settles. A readable hold fills the continuous soundtrack through the final fade.
+
+Run `node scripts/media/render-hbic-wudu-review.mjs <original-film> <first-private-review> <private-output-directory>`. The script checks both input files by SHA-256 and keeps the video outside the published site and Git.
+
+The 1080p master decoded in software and on macOS hardware. All 6,207 picture timestamps are continuous at 30 fps. The first 5,080 decoded frames match the first private cut, and all 9,700 audio packets retain the same hash. The silence check found only the opening and closing fades. The last 0.10 seconds reach the near-black threshold as the end card fades. Frame review covered the entrances, partial title reveals, settled titles, and closing fade.
+
+- `Masjid Bilal Trailer - Motion Review.mp4` · 145,151,051 bytes · SHA-256 `b872e5c075f207e1609892ff5b864173338697a249ebcc81da3cda0e46179fc2`
