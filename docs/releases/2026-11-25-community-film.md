@@ -52,7 +52,7 @@ Vercel promoted source commit `37c7a15` as `dpl_DoKwth3NaDVqdL3t2ejwTKszyspc`. T
 
 YouTube Studio saved the exact trailer as **Private** and its anonymous oEmbed request returned HTTP 403. Instagram archived the exact 3:27 reel and removed it from the HBIC Youth profile grid.
 
-## Private review cut
+## First private review cut
 
 The review cut retains the typography, centered wording, quotation cards, contour artwork and closing mark from the original edit. Four Brothers Night shots use the original contour backdrop with a warm, rounded frame and 12-frame dissolves. Short picture dissolves bridge two black gaps in the earlier cut. The soundtrack carries through at the same timings, including its closing fade.
 
@@ -63,3 +63,15 @@ The review MP4 decodes at 1920 × 1080 and 30 fps, with 6,207 frames and 206.9 s
 - `Masjid Bilal Trailer - Private Review.mp4` · 152,484,012 bytes · SHA-256 `1562cd81d3edb4e7489106db940fbb222c9ea7b4cb8f28398f597f0ed6caf848`
 
 The review file is kept outside Git and public deployment.
+
+## Wudu area and closing revision
+
+The picture revision starts at 2:52.133 with a dissolve out of the final wudu quotation card. The before-and-after, wudu area and community support scenes use clean windows into the archival footage. The titles extend the wide lettering of the original opening, with the same centered placement and soft glow. The rounded frames carry through the facility shots. The thank-you and donation cards use the archival contour artwork and the original Masjid Bilal mark, including the source’s glowing “Donate Generously” line.
+
+Run `node scripts/media/render-hbic-wudu-review.mjs <original-film> <first-private-review> <private-output-directory>`. The original lettering is embedded in the archived picture. The new title paths draw on its cap proportions, and the closing mark and donation line are extracted from the source.
+
+The full 1080p export decoded cleanly. All 6,207 picture timestamps are continuous at 30 fps, and the first 5,080 decoded frames match the first private cut exactly. The 9,700 audio packets retain the same SHA-256 as that cut. There were no full-field black gaps of 0.10 seconds or longer, and the audio silence check found only the original opening and closing fades. The frame review covered each new hold, each dissolve and the final call to action.
+
+- `Masjid Bilal Trailer - Wudu Area Revision.mp4` · 144,684,405 bytes · SHA-256 `3a8d21a9c03af11b8d5bd2d98f706001bba95564d4df0d1c2a8c48609acc54e2`
+
+This export is for private review.
