@@ -6,7 +6,7 @@ The 3:26.9 story and both spoken passages are preserved. The re-edit uses the or
 
 The soundtrack is copied from the verified November 20 master. It retains both spoken passages, the continuous vocal bed, and the closing fade at their original times. The AAC packet SHA-256 is `6561a07432f7162dd3b8430f19c4eafa0128f2f7615b95cfaf618163aa8532ee`. Nasheed credit remains Hona Marro by Mubarak al Nwaibet.
 
-The public homepage uses separate, versioned assets for the film, poster and silent eight-second preview. The full film plays on demand. Preview playback continues to respect visibility, reduced motion and data saving.
+The original deployment used separate, versioned assets for the film, poster and silent eight-second preview. The full film played on demand, and the preview respected visibility, reduced motion and data saving.
 
 ## Rebuild
 
@@ -31,8 +31,8 @@ Source commit `1640510` was promoted to the existing public-web project as `dpl_
 
 ## Social publication
 
-- [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The superseded HBIC upload (`7u1o84wnYAY`) and the temporary private duplicate (`Z3IGOG4P07k`) were permanently deleted in Studio. The public trailer remained available after both removals.
-- [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.
+- YouTube originally published the film (`ve2xJi9khW0`) on Bilal Islamic Centre (`@HBICYouth`) in both Home spotlight slots. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The superseded HBIC upload (`7u1o84wnYAY`) and the temporary private duplicate (`Z3IGOG4P07k`) were permanently deleted in Studio.
+- Instagram originally published and pinned the film (`DgLM4ITNfa2`) on `@hbicyouth`. Instagram confirmed deletion of the older reel (`DfMss34O7w4`).
 
 ## Matching covers
 
@@ -42,6 +42,24 @@ The covers share the frame at 00:33.367, where the speaker looks forward with hi
 - [Instagram artwork](../../assets/community-film/Instagram%20Cover.jpg) · 1080 × 1920 · 240,567 bytes · SHA-256 `9c05b9d049f388d5bfde3ff3333a43d062e8197a671a80eaab90f60987980790`
 - Website artwork · 1536 × 864 · 142,392 bytes · SHA-256 `dae7a868e977243fa85d3c7560fc662931eada9c08fe6c57f07c148e488e67c3`
 
-The website cover and unobstructed play control are live from source commit `51abcf8` on Vercel deployment `dpl_47sBChRVckzHVE2VfeveU6HsYTCL`. The production poster matched the artwork hash, video byte ranges returned HTTP 206, and the prayer-display and Academy-card availability checks passed. At 390 and 1440 pixels, the poster appeared before any video request and the full film played on tap or click.
+The website cover and unobstructed play control shipped from source commit `51abcf8` on Vercel deployment `dpl_47sBChRVckzHVE2VfeveU6HsYTCL`. The production poster matched the artwork hash, video byte ranges returned HTTP 206, and the prayer-display and Academy-card availability checks passed. At 390 and 1440 pixels, the poster appeared before any video request and the full film played on tap or click.
 
-The updated YouTube artwork is live on the existing public trailer. The published thumbnail matched the new speaker crop after saving in Studio. The Instagram portrait artwork is ready. The existing reel is live with its earlier cover while the in-place cover update is pending.
+The YouTube thumbnail matched the new speaker crop after saving in Studio. The Instagram reel kept its earlier cover.
+
+## Withdrawal
+
+Vercel promoted source commit `37c7a15` as `dpl_DoKwth3NaDVqdL3t2ejwTKszyspc`. The trailer is absent from the homepage, media page and published app content. All 20 checked requests for the former film, teaser and poster URLs across the four public aliases returned HTTP 404. The prior November 25 deployment URLs require Vercel sign-in. Academy card availability and prayer-display checks passed after promotion.
+
+YouTube Studio saved the exact trailer as **Private** and its anonymous oEmbed request returned HTTP 403. Instagram archived the exact 3:27 reel and removed it from the HBIC Youth profile grid.
+
+## Private review cut
+
+The review cut retains the typography, centered wording, quotation cards, contour artwork and closing mark from the original edit. Four Brothers Night shots use the original contour backdrop with a warm, rounded frame and 12-frame dissolves. Short picture dissolves bridge two black gaps in the earlier cut. The soundtrack carries through at the same timings, including its closing fade.
+
+Run `node scripts/media/render-hbic-original-style-review.mjs <original-film> <november-20-master> <graded-clips-directory> <private-output-directory>`. Use the original welcome film from the private Drive archive, the November 20 social master, and its four graded clips named `brothers-1.mp4` through `brothers-4.mp4`. The renderer verifies all six inputs by SHA-256.
+
+The review MP4 decodes at 1920 × 1080 and 30 fps, with 6,207 frames and 206.9 seconds of synchronized audio and video. The full decode found no black interval of 0.10 seconds or longer. The AAC packets match the November 20 master exactly. Integrated loudness measured −16.5 LUFS and true peak measured −2.8 dBTP. The silence check at −54 dB for 0.12 seconds found only the opening and closing fades.
+
+- `Masjid Bilal Trailer - Private Review.mp4` · 152,484,012 bytes · SHA-256 `1562cd81d3edb4e7489106db940fbb222c9ea7b4cb8f28398f597f0ed6caf848`
+
+The review file is kept outside Git and public deployment.
