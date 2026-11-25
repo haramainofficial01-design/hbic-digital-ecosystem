@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import sharp from "sharp";
 import { filmEnd, sources, timeline } from "./community-film-timeline.mjs";
-import { renderHbicYouTubeThumbnail } from "./render-hbic-youtube-thumbnail.mjs";
+import { renderHbicTrailerCovers } from "./render-hbic-youtube-thumbnail.mjs";
 
 const [archive, sound, cameraDirectory, destination] = process.argv.slice(2).map(arg => resolve(arg));
 if (!destination) {
@@ -290,9 +290,7 @@ async function assemble(scenes) {
 }
 
 async function renderPreviewAssets(master) {
-  const poster = join(destination, "poster.jpg");
-  await render(["-ss", "60.5", "-i", master, "-frames:v", "1", "-q:v", "2", poster]);
-  await renderHbicYouTubeThumbnail(master, join(destination, "YouTube Thumbnail.jpg"), ffmpeg);
+  await renderHbicTrailerCovers(master, destination, ffmpeg);
   // Match the film's dissolves in the silent preview. Keep every preview shot
   // free of film titles so it reads clearly under the website's play control.
   const tease = [26.1, 60.5, 82.7, 125.85];
@@ -305,20 +303,6 @@ async function renderPreviewAssets(master) {
   await render([...tease.flatMap(from => ["-ss", String(from), "-t", "2.25", "-i", master]), "-filter_complex_threads", "2",
     "-filter_complex", previewGraph.join(";"), "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "25",
     "-maxrate", "640k", "-bufsize", "1250k", "-movflags", "+faststart", join(destination, "teaser.mp4")]);
-
-  const photo = await sharp(poster).extract({ left: 86, top: 51, width: 1748, height: 978 })
-    .resize(980, 552, { fit: "cover" }).ensureAlpha().composite([
-      { input: svg('<rect width="980" height="552" rx="30" fill="white"/>', 980, 552), blend: "dest-in" },
-    ]).png().toBuffer();
-  const cover = svg(`<defs><linearGradient id="paper" x2=".9" y2="1"><stop stop-color="#26394b"/><stop offset="1" stop-color="${ink}"/></linearGradient></defs><rect width="1080" height="1440" fill="url(#paper)"/>`, 1080, 1440);
-  const coverMark = await sharp(mark).resize({ height: 157 }).png().toBuffer();
-  const coverMarkSize = await sharp(coverMark).metadata();
-  await sharp(cover).composite([
-    { input: photo, left: 50, top: 407 },
-    { input: coverMark, left: Math.round((1080 - coverMarkSize.width) / 2), top: 136 },
-    await typeset("Masjid Bilal", 540, 1032, { size: 99, max: 960 }),
-    await typeset("HAZRAT BILAL ISLAMIC CENTRE · CALGARY", 540, 1173, { size: 25, track: 2, color: gold, max: 960 }),
-  ]).jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toFile(join(destination, "Instagram Cover.jpg"));
 }
 
 const selected = process.env.HBIC_FILM_PROOF?.split(",");

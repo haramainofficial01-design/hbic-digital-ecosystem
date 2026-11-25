@@ -4,7 +4,7 @@ import path from 'node:path';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
-test('film preview runs only in view, respecting visibility, motion and data saving; full film needs a gesture', async () => {
+test('the film shows its cover before hover or playback and respects motion and data preferences', async () => {
   const root = path.resolve(import.meta.dirname, '../../..');
   const bundled = await build({ bundle:true, write:false, platform:'browser', format:'iife', jsx:'automatic', define:{'process.env.NODE_ENV':'"production"'}, stdin:{resolveDir:root,loader:'tsx',contents:`import React from'react';import{createRoot}from'react-dom/client';import{WelcomeFilm}from'./apps/public-web/components/WelcomeFilm';createRoot(document.getElementById('root')).render(<WelcomeFilm/>);`} });
   const browser=await chromium.launch({headless:true});
@@ -22,12 +22,22 @@ test('film preview runs only in view, respecting visibility, motion and data sav
       await page.addScriptTag({content:bundled.outputFiles[0].text});await page.waitForTimeout(40);
       assert.equal(await page.evaluate(()=>(window as any).played.length),0,'offscreen preview never starts');
       assert.equal(await page.locator('video[aria-hidden=true]').getAttribute('preload'),'none');
-      assert.match(await page.locator('video[aria-hidden=true]').getAttribute('src')||'',/20261125-community/);
-      assert.match(await page.locator('video[aria-hidden=true]').getAttribute('poster')||'',/20261125-community/);
+      const cover = page.locator('video[aria-hidden=true]');
+      const shell = page.locator('.welcome-video-shell');
+      assert.equal(await cover.getAttribute('src'), null);
+      assert.match(await cover.getAttribute('poster') || '', /20261125-cover/);
+      await shell.dispatchEvent('pointerover', { pointerType: 'touch', bubbles: true });
+      assert.equal(await cover.getAttribute('src'), null, 'touch keeps the cover visible until play');
+      await shell.hover();
+      await page.locator('video[aria-hidden=true][src]').waitFor();
+      assert.match(await cover.getAttribute('src') || '', /20261125-community/);
       await page.evaluate(()=>(window as any).inView(true));
       assert.equal(await page.evaluate(()=>(window as any).played.length),mode==='normal'?1:0);
       await page.evaluate(()=>(window as any).inView(false));
       assert.ok(await page.evaluate(()=>(window as any).paused.length)>0);
+      await page.getByRole('heading', { name: /Built by community/ }).hover();
+      await page.locator('video[aria-hidden=true]:not([src])').waitFor();
+      assert.match(await cover.getAttribute('poster') || '', /20261125-cover/);
       await page.getByRole('button',{name:'Watch Our Story',exact:true}).click();
       assert.equal(await page.locator('video').count(),1);
       assert.match(await page.locator('video').getAttribute('src')||'',/20261125-community/);

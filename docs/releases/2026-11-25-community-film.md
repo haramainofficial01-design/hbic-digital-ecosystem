@@ -34,4 +34,10 @@ Source commit `1640510` was promoted to the existing public-web project as `dpl_
 - [YouTube](https://youtu.be/ve2xJi9khW0) is public on Bilal Islamic Centre (`@HBICYouth`). Studio saved the new video in both Home spotlight slots, and the public channel Home page linked to the new ID. YouTube’s initial check reported no Community Guidelines issues and a music claim that could affect earnings. The superseded HBIC upload (`7u1o84wnYAY`) and the temporary private duplicate (`Z3IGOG4P07k`) were permanently deleted in Studio. The public trailer remained available after both removals.
 - [Instagram](https://www.instagram.com/reel/DgLM4ITNfa2/) is live on `@hbicyouth` with the widescreen film and the matching cover. The app played the reel, and the profile grid showed its pin after refresh. Instagram confirmed deletion of the old reel (`DfMss34O7w4`), after which the profile still showed the new reel pinned.
 
-The [YouTube cover](../../assets/community-film/YouTube%20Thumbnail.jpg) uses a frame at 00:33.95, the HBIC mark and Montserrat type. It was reviewed at 1920 × 1080 and at 288 pixels wide. A standalone rebuild of the 330,736-byte JPEG matched SHA-256 `4e339e3322c3f319d5a01aa89cc49043d3ad313de7a6fd08960ad927c62b332e`. The cover persisted in Studio after reload, and YouTube’s public 320 × 180 rendition matched the new artwork.
+## Matching covers
+
+The covers share the frame at 00:33.367, where the speaker looks forward with his eyes open. The Instagram edition keeps the portrait, title and mark inside the profile-grid crop. The website shows a still cover by default and plays the existing silent teaser on mouse hover when viewing conditions allow. Touch, reduced motion and data-saving modes retain the still until the viewer presses play.
+
+- [YouTube artwork](../../assets/community-film/YouTube%20Thumbnail.jpg) · 1920 × 1080 · 330,224 bytes · SHA-256 `6070d184257964c2d2c2101dded0307cc446ffd8b15d7ba4d5ee1e1205432230`
+- [Instagram artwork](../../assets/community-film/Instagram%20Cover.jpg) · 1080 × 1920 · 240,567 bytes · SHA-256 `9c05b9d049f388d5bfde3ff3333a43d062e8197a671a80eaab90f60987980790`
+- Website artwork · 1536 × 864 · 142,392 bytes · SHA-256 `dae7a868e977243fa85d3c7560fc662931eada9c08fe6c57f07c148e488e67c3`

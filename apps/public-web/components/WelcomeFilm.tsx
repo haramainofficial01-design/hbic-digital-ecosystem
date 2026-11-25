@@ -6,17 +6,18 @@ import { useEffect, useRef, useState } from "react";
 const filmRevision = "20261125-community";
 const fullFilm = `/media/videos/hbic-welcome-story.mp4?v=${filmRevision}`;
 const teaserFilm = `/media/videos/hbic-welcome-story-teaser.mp4?v=${filmRevision}`;
-const poster = `/media/videos/hbic-welcome-story-poster.jpg?v=${filmRevision}`;
+const poster = "/media/videos/hbic-welcome-story-poster.jpg?v=20261125-cover";
 
 export function WelcomeFilm() {
   const [isWatching, setIsWatching] = useState(false);
+  const [previewRequested, setPreviewRequested] = useState(false);
   const [playbackMessage, setPlaybackMessage] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const preview = previewRef.current;
-    if (!preview) return;
+    if (!preview || !previewRequested) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
     let inView = !("IntersectionObserver" in window);
@@ -38,7 +39,7 @@ export function WelcomeFilm() {
       reducedMotion.removeEventListener("change", updatePreview);
       document.removeEventListener("visibilitychange", updatePreview);
     };
-  }, [isWatching]);
+  }, [isWatching, previewRequested]);
 
   const playFullFilm = () => {
     previewRef.current?.pause();
@@ -72,7 +73,13 @@ export function WelcomeFilm() {
       </div>
 
       <div className={`welcome-cinema-card${isWatching ? " is-playing" : ""}`}>
-        <div className="welcome-video-shell">
+        <div
+          className="welcome-video-shell"
+          onPointerEnter={event => {
+            if (!isWatching && event.pointerType === "mouse") setPreviewRequested(true);
+          }}
+          onPointerLeave={() => setPreviewRequested(false)}
+        >
             <video
               ref={videoRef}
               className="welcome-video"
@@ -89,9 +96,10 @@ export function WelcomeFilm() {
           {!isWatching ? (
             <>
               <video
+                key={previewRequested ? "teaser" : "cover"}
                 ref={previewRef}
                 className="welcome-video"
-                src={teaserFilm}
+                src={previewRequested ? teaserFilm : undefined}
                 poster={poster}
                 muted
                 loop

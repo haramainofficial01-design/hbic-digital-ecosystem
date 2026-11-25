@@ -39,9 +39,7 @@ Website & app: hbic.ca
 
 ## Artwork
 
-The [current YouTube thumbnail](YouTube%20Thumbnail.jpg) is 1920 × 1080. Rebuild it with `node scripts/media/render-hbic-youtube-thumbnail.mjs <november-25-master> <output.jpg>`. It uses a real frame from the film, the HBIC mark and a short, high-contrast title that reads at phone size.
-
-The November 1 Instagram cover is 1080 × 1440. The two November 1 covers can be rebuilt with `node scripts/media/render-community-film-covers.mjs <verified-film-output-directory>`.
+The [YouTube thumbnail](YouTube%20Thumbnail.jpg), [Instagram cover](Instagram%20Cover.jpg) and website poster use the same frame from the film, the HBIC mark and a short, high-contrast title. Rebuild the set with `node scripts/media/render-hbic-youtube-thumbnail.mjs <november-25-master> <output-directory> --all`. The portrait edition leaves room for Instagram’s profile crop.
 
 ## Verified publication — November 1, 2026
 
