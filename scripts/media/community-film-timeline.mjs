@@ -29,6 +29,14 @@ export const gradedBrothersNight = [
 ];
 export const brothersNightEnd = 3345;
 
+// The March 27 selects are normalized to 448 × 796 SDR and 30 frames per second.
+export const marchBrothersNight = [
+  { file: "march-1.mp4", at: 2580, frames: 165, hash: "5eb776d648f5e8295ac60ce6c06776eca1b76fc8c901477bbfed8f21dea52e1b" },
+  { file: "march-2.mp4", at: 2745, frames: 168, hash: "08b10ef9247a2e5730ebb7e25c8c357ee6cecf78ec56e89bf1bfd39bfe5d65ea" },
+  { file: "march-3.mp4", at: 2913, frames: 174, hash: "60a2d58e8979d024cc49e1b00afadf5e648d099e598f4d25a2c279e95b9c4535" },
+  { file: "march-4.mp4", at: 3087, frames: 258, hash: "d9311b0a225978656e8b7978d83da5e4b920e943f224bfb9306b447ecebe1302" },
+];
+
 const openingRoom = [1780, 800, 68, 140];
 const washroom = [516, 906, 702, 85];
 const brothers = { kicker: "NOVEMBER 2025", title: ["Brothers", "Night"], fixedTitle: true };

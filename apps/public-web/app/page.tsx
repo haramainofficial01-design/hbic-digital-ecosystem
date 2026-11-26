@@ -2,6 +2,7 @@ import { JumuahTimingNotice } from "../components/JumuahTimingNotice";
 import { getPublishedPageContent as getPublishedContent } from "../lib/contentStore";
 import { PrayerTable } from "../components/PrayerTable";
 import { SiteChrome } from "../components/SiteChrome";
+import { WelcomeFilm } from "../components/WelcomeFilm";
 import { AppLaunchPromotion } from "../components/AppLaunchPromotion";
 import { AcademyStars } from "../components/AcademyStars";
 import { getEffectiveJumuahDoorNotice, getPublicEvents, isVisibleItem } from "@hbic/shared";
@@ -65,6 +66,8 @@ export default async function HomePage() {
           </div>
         </section>
       ) : null}
+
+      <WelcomeFilm />
 
       <AppLaunchPromotion />
 

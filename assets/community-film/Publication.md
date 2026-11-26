@@ -1,8 +1,8 @@
 # Masjid Bilal introduction
 
-The November 25 re-edit was withdrawn from the website. Its YouTube upload is private and its Instagram reel is archived. See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for verification. The copy and artwork below document earlier versions.
+The earlier November 25 re-edit was withdrawn. Its YouTube upload is private and its Instagram reel is archived. See the [November 25 release record](../../docs/releases/2026-11-25-community-film.md) for the current cut and publication checks.
 
-The original fundraiser remains in the private production archive. The current private cut restores the original framing, carries the title motion through Brothers Night, M7 Hike and the wudu area, and returns to the full-size animated closing mark.
+The original fundraiser remains in the private production archive. The current cut incorporates the March 27 Brothers Night gathering and preserves the original-style titles and animated closing mark.
 
 ## YouTube
 

@@ -1,21 +1,24 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { brothersNightEnd, filmEnd, gradedBrothersNight, sources } from "./community-film-timeline.mjs";
+import { brothersNightEnd, filmEnd, gradedBrothersNight, marchBrothersNight, sources } from "./community-film-timeline.mjs";
 import { titlePaths, typeOnHeadline } from "./hbic-film-titles.mjs";
 
-const [archive, review, clips, destination] = process.argv.slice(2);
+const [archive, review, clips, destination, edition] = process.argv.slice(2);
 if (!destination) throw new Error("Provide the original film, motion review, graded clips directory and a private output directory.");
+if (edition && edition !== "--march-2026") throw new Error(`Unknown edition: ${edition}`);
+const march = edition === "--march-2026";
+const shots = march ? marchBrothersNight : gradedBrothersNight;
 
 const ffmpeg = process.env.FFMPEG || "ffmpeg";
 const fps = 30;
 const frameCount = Math.round(filmEnd * fps);
-const splice = [2473, 3401]; // The enclosing keyframes in the verified Motion Review.
+const splice = march ? [2564, 3361] : [2473, 3401]; // Keyframes enclosing the chapter in each review.
 const joinFrames = 10;
-const first = gradedBrothersNight[0].at - 6 - joinFrames;
+const first = shots[0].at - 6 - joinFrames;
 const resume = brothersNightEnd + 6 + joinFrames;
 const frames = resume - first;
 const exit = frames - 24;
@@ -63,7 +66,7 @@ async function writeArtwork(work) {
       .png().toFile(rim),
   ]);
   const gold = "#dfc58c";
-  const date = titlePaths("NOVEMBER 2025", { top: 181, height: 26, spacing: 12, fill: gold });
+  const date = titlePaths(march ? "MARCH 2026" : "NOVEMBER 2025", { top: 181, height: 26, spacing: 12, fill: gold });
   for (let frame = 0; frame <= 36; frame++) {
     const alpha = Math.max(0, Math.min(1, (frame - 27) / 9));
     await artwork(`<defs><filter id="bloom" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="7"/></filter></defs>
@@ -87,7 +90,7 @@ function renderMiddle(work, { plate, mask, rim, title }) {
   const original = join(work, "original-1.mp4");
   const inputs = ["-threads", "2", "-i", original, ...picture(plate), ...picture(title)];
   const graph = [`[1:v]format=rgba,tpad=stop_mode=clone:stop=${frames - 1}[plate]`];
-  const exchanges = gradedBrothersNight.slice(1).map(shot => ease(shot.at - first - 8, 16));
+  const exchanges = shots.slice(1).map(shot => ease(shot.at - first - 8, 16));
   const firstEntrance = ease(joinFrames + 4, 18);
   const lastExit = ease(exit, 18);
   const travels = [
@@ -97,14 +100,14 @@ function renderMiddle(work, { plate, mask, rim, title }) {
     { x: "0", y: `900*(1-${exchanges[2]})+900*${lastExit}` },
   ];
   let base = "plate";
-  for (const [i, shot] of gradedBrothersNight.entries()) {
+  const crop = march ? "" : `crop=440:782:740:144,scale=${panelWidth}:${panelHeight}:flags=lanczos,`;
+  for (const [i, shot] of shots.entries()) {
     const input = 3 + i * 3;
     const lead = shot.at - first;
     const tail = frames - lead - shot.frames;
     inputs.push("-threads", "2", "-i", join(clips, shot.file), ...picture(mask), ...picture(rim));
-    // The extracts carry the SDR grade. Crop inside their previous baked-in frame.
     graph.push(
-      `[${input}:v]trim=end_frame=${shot.frames},${frameTimes},crop=440:782:740:144,scale=${panelWidth}:${panelHeight}:flags=lanczos,setsar=1,format=rgba[clip${i}]`,
+      `[${input}:v]trim=end_frame=${shot.frames},${frameTimes},${crop}setsar=1,format=rgba[clip${i}]`,
       `[${input + 1}:v]format=gray,tpad=stop_mode=clone:stop=${shot.frames - 1}[mask${i}]`,
       `[clip${i}][mask${i}]alphamerge[portrait${i}]`,
       `[${input + 2}:v]format=rgba,tpad=stop_mode=clone:stop=${shot.frames - 1}[rim${i}]`,
@@ -114,12 +117,26 @@ function renderMiddle(work, { plate, mask, rim, title }) {
     base = `panel${i}`;
   }
 
-  // Hide the old dissolves under the new chapter. The moving archive footage
-  // shows through the new joins on either side of the previous gallery.
+  // Use the original film under both March fades so the old portraits
+  // never show through, even where the previous edit was mid-dissolve.
+  if (march) {
+    const input = 3 + shots.length * 3;
+    const returnFrame = resume - joinFrames - (brothersNightEnd - shots[0].at);
+    for (const frame of [first, returnFrame]) {
+      inputs.push("-ss", seconds(frame - 0.01), "-threads", "2", "-i", archive);
+    }
+    graph.push(
+      `[${input}:v]trim=end_frame=${joinFrames},setsar=1,${frameTimes}[entry]`,
+      `[0:v]trim=start_frame=${joinFrames}:end_frame=${frames - joinFrames},setsar=1,${frameTimes}[center]`,
+      `[${input + 1}:v]trim=end_frame=${joinFrames},setsar=1,${frameTimes}[return]`,
+      `[entry][center][return]concat=n=3:v=1:a=0,${frameTimes}[archive]`,
+    );
+  } else {
+    graph.push(`[0:v]${frameTimes}[archive]`);
+  }
   graph.push(
     `[2:v]format=rgba,tpad=stop_mode=clone:stop=${frames},fade=t=out:s=${exit + 4}:n=12:alpha=1[type]`,
     `[${base}][type]overlay=format=auto:shortest=1,format=yuva420p,fade=t=in:s=0:n=${joinFrames}:alpha=1,fade=t=out:s=${frames - joinFrames}:n=${joinFrames}:alpha=1,settb=1/30,setpts=N+${first - splice[0]}[chapter]`,
-    `[0:v]${frameTimes}[archive]`,
     "[archive][chapter]overlay=eof_action=pass:format=yuv420[out]",
   );
   render([
@@ -130,8 +147,8 @@ function renderMiddle(work, { plate, mask, rim, title }) {
 
 await Promise.all([
   verifyInput(archive, sources.archive),
-  verifyInput(review, "b872e5c075f207e1609892ff5b864173338697a249ebcc81da3cda0e46179fc2"),
-  ...gradedBrothersNight.map(({ file, hash }) => verifyInput(join(clips, file), hash)),
+  verifyInput(review, march ? "2294dbe652a4b15083350a35feb7329006b000fd4a79a795c64266cfa18ad53f" : "b872e5c075f207e1609892ff5b864173338697a249ebcc81da3cda0e46179fc2"),
+  ...shots.map(({ file, hash }) => verifyInput(join(clips, file), hash)),
 ]);
 await mkdir(destination, { recursive: true });
 const work = await mkdtemp(join(destination, ".brothers-night-"));
@@ -159,7 +176,8 @@ try {
       streams.some(stream => stream.start_time !== "0.000000" || stream.duration !== seconds(frameCount))) {
     throw new Error("The replacement chapter changed the video or audio timing.");
   }
-  const output = join(destination, "Masjid Bilal Trailer - Brothers Night Review.mp4");
+  const output = join(destination, march ? "Masjid Bilal Community Film.mp4" : "Masjid Bilal Trailer - Brothers Night Review.mp4");
+  await chmod(temp, 0o600);
   await rename(temp, output);
   console.log(output);
 } finally {

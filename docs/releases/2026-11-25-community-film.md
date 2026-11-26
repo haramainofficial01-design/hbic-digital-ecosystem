@@ -123,4 +123,24 @@ The full export decoded in software and macOS hardware. The 6,131 frames outside
 
 - `Masjid Bilal Trailer - Halaqa Footage Review.mp4` · 146,958,677 bytes · SHA-256 `2294dbe652a4b15083350a35feb7329006b000fd4a79a795c64266cfa18ad53f` · local private master.
 
-Brothers Night footage review and publication are pending signed-in access to the original event folder.
+## March 27 Brothers Night release
+
+The replacement gallery uses three audience clips from the supplied March 2026 archive and a 4K source recording of the same March 27 gathering. The chapter title now reads “March 2026.” It retains the centered lettering, contour artwork and portrait-panel motion. The first and last 10 frames of the gallery dissolve over the corresponding original film footage.
+
+Run `node scripts/media/render-hbic-brothers-night-review.mjs <original-film> <halaqa-footage-review> <graded-march-clips-directory> <private-output-directory> --march-2026`. The renderer checks the source and all four graded selects by SHA-256.
+
+| Select | Source | In point | Frames at 30 fps |
+| --- | --- | ---: | ---: |
+| `march-1.mp4` | March archive, wide audience view | 2.05 s | 165 |
+| `march-2.mp4` | `IMG_4381.MOV`, March 27 speaker | 488.00 s | 168 |
+| `march-3.mp4` | March archive, seated listeners | 0.15 s | 174 |
+| `march-4.mp4` | March archive, audience pan | 6.05 s | 258 |
+
+The graded selects are 448 × 796, 30 fps and BT.709 SDR. The speaker extract uses the 1216 × 2160 crop at x=1380 and y=0, with HLG converted to SDR. The supplied ZIP has SHA-256 `c6bb6c3a049676d18c4bb05f632730e9295ec46ddbe4ffa7038c47c9a728e117`. The 4K recording has SHA-256 `f5ca13a84e898e161df8e22e49ae963dcf18117a3c7981721fe9241a32c054c9`.
+
+The 1080p master runs 206.9 seconds with 6,207 continuous picture timestamps. All 5,410 frames outside the Brothers Night splice match the Halaqa Footage Review (SHA-256 `83c6aa5690bc69370583acb85d199c1edfc60e25163bd06984bbf6e22659a007`). All 9,700 AAC packets match the previous review (SHA-256 `6561a07432f7162dd3b8430f19c4eafa0128f2f7615b95cfaf618163aa8532ee`). The hardware decode found near-black and quiet intervals only during the opening and closing fades.
+
+- `Masjid Bilal Community Film.mp4` · 144,381,391 bytes · SHA-256 `e63e92268c4b13bb483b1baed7618240fd11612a09ea837f2ef2a9c193abb645` · full-quality upload master kept outside Git.
+- Website MP4 · 70,296,228 bytes · SHA-256 `120ce591cc5602142245f05642c2bd3fd2618e45d88b6c12d65a4ac425ffa7c1` · asset revision `20261125-march`.
+
+The web player passed play with sound, pause and resume, and 16 seek checks at 320, 390, 1024 and 1440 px across light and dark appearance. No video was requested before interaction. The two touch viewport checks used reduced motion.
