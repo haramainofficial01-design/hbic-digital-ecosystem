@@ -213,7 +213,7 @@ export default function QuranReaderScreen() {
     <Animated.View style={[{ flex: 1 }, transition]}>
     {mode === "read" && !focused && library.library.preferences.layout !== "madinah" ? <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}><QuranReadingLayout library={library} /></View> : null}
     {mode === "challenges" ? <Suspense fallback={<ActivityIndicator color={theme.colors.teal} />}><QuranChallenges /></Suspense> : mode === "review" ? <QuranReviewLibrary library={library} audio={audio} onPractise={(chapter, ayah) => { setChapterId(chapter); setTarget(ayah); onMode("practice"); }} /> : mode === "listen" ? <QuranListening chapters={reader.chapters} audio={audio} library={library} />
-      : usesMushaf ? <QuranMushaf focused={focused} immersive={routeFocused} tabletopToolbar={duoTabletop ? mobileToolbar : undefined}
+      : usesMushaf ? <QuranMushaf focused={focused} tabletopToolbar={duoTabletop ? mobileToolbar : undefined}
         reference={`${chapterId}:${target}`} library={library} audio={audio} onReaderLayoutChange={setMushafLayout} onOpenAyah={(key) => {
         void updateLibrary((s) => ({ ...s, preferences: { ...s.preferences, layout: "ayah" } })).then(() => { const ref = parseAyahReference(key)!; open(ref.chapter, ref.ayah); }).catch(() => {});
       }} /> : <FlatList ref={list} data={rows} key={`${mode}:${chapterId}`} style={styles.list} contentContainerStyle={[styles.listContent, { maxWidth: workspace.readingWidth, paddingHorizontal: workspace.horizontalPadding }]} ListHeaderComponent={header}

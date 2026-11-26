@@ -63,10 +63,6 @@ public final class QuranFoldRegionView: ExpoView {
   private var isDuo = false
   private var hasHinge = false
   private var tentAngle = false
-  private weak var immersiveWindow: UIWindow?
-  var immersiveRequested = false {
-    didSet { updateImmersiveAppearance() }
-  }
 
   public required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -86,7 +82,6 @@ public final class QuranFoldRegionView: ExpoView {
 
   public override func didMoveToWindow() {
     super.didMoveToWindow()
-    updateImmersiveAppearance()
     setNeedsUpdateConstraints()
   }
 
@@ -100,25 +95,11 @@ public final class QuranFoldRegionView: ExpoView {
     reportRegion()
   }
 
-  private func updateImmersiveAppearance() {
-    let requestedWindow = immersiveRequested && isDuo ? window : nil
-    guard requestedWindow !== immersiveWindow else { return }
-    let notification = Notification.Name("ca.hbic.quran.mushaf.immersive")
-    if let previous = immersiveWindow {
-      NotificationCenter.default.post(name: notification, object: previous, userInfo: ["active": false])
-    }
-    immersiveWindow = requestedWindow
-    if let requestedWindow {
-      NotificationCenter.default.post(name: notification, object: requestedWindow, userInfo: ["active": true])
-    }
-  }
-
   private func reportRegion() {
     guard #available(iOS 27.1, *), window != nil, !bounds.isEmpty else { return }
     let region = reservedRegions(kind: .division, options: .includeInactive).first
     if !isDuo && (hasHinge || region != nil || traitCollection.verticalBarEdge != .unspecified) {
       isDuo = true
-      updateImmersiveAppearance()
     }
     var geometry: [String: Double] = [
       "width": bounds.width.rounded(), "height": bounds.height.rounded(),
@@ -153,14 +134,10 @@ public final class MasjidAppleBridgeModule: Module {
     Constants([
       "isIOSAppOnMac": ProcessInfo.processInfo.isiOSAppOnMac,
       "isMacCatalyst": ProcessInfo.processInfo.isMacCatalystApp,
-      "hasQuranFoldRegionView": true,
-      "hasQuranImmersiveView": true
+      "hasQuranFoldRegionView": true
     ])
     View(QuranFoldRegionView.self) {
       Events("onRegionChange")
-      Prop("immersive") { (view: QuranFoldRegionView, enabled: Bool) in
-        view.immersiveRequested = enabled
-      }
     }
     Events("onMacQuranCommand")
     OnStartObserving {

@@ -35,11 +35,12 @@ function pageHasAyah(page: MushafPage | null | undefined, key: string) {
   return page?.lines.some(line => line.words.some(word => word.key === key)) ?? false;
 }
 
-function MushafLeaf({ number, page, selected, revision, onReady, onAyah, onTurn, onRetry }: {
+function MushafLeaf({ number, page, selected, revision, showFolio, onReady, onAyah, onTurn, onRetry }: {
   number: number | null;
   page: MushafPage | null | undefined;
   selected: string;
   revision: number;
+  showFolio: boolean;
   onReady: (page: MushafPage) => void;
   onAyah: (page: MushafPage, key: string) => void;
   onTurn: (direction: 1 | -1) => void;
@@ -83,21 +84,20 @@ function MushafLeaf({ number, page, selected, revision, onReady, onAyah, onTurn,
         : message ? <View style={styles.leafStatus}><QuranMessage message={message} onRetry={onRetry} /></View>
         : <ActivityIndicator color={theme.colors.teal} style={styles.loading} accessibilityLabel="Loading Madinah Mushaf" />}
     </View>
-    {number !== null ? <Text style={[styles.folio, { color: theme.colors.muted }]}>Page {number}</Text> : null}
+    {showFolio && number !== null ? <Text style={[styles.folio, { color: theme.colors.muted }]}>Page {number}</Text> : null}
   </View>;
 }
 
 export const mushafNightBackground = "#070F16";
 export type MushafReaderLayout = { duo: boolean; tabletop: boolean; night: boolean };
 
-export function QuranMushaf({ reference, library, audio, onOpenAyah, onReaderLayoutChange, tabletopToolbar, immersive, focused = false }: {
+export function QuranMushaf({ reference, library, audio, onOpenAyah, onReaderLayoutChange, tabletopToolbar, focused = false }: {
   reference: string;
   library: QuranLibrary;
   audio: ReturnTypeQuranAudio;
   onOpenAyah: (key: string) => void;
   onReaderLayoutChange: (layout: MushafReaderLayout) => void;
   tabletopToolbar?: ReactNode;
-  immersive: boolean;
   focused?: boolean;
 }) {
   const { theme } = useAppTheme();
@@ -221,7 +221,8 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onReaderLay
   }
 
   const renderLeaf = (number: number | null, data: MushafPage | null | undefined) =>
-    <MushafLeaf number={number} page={data} selected={selected} revision={reload} onReady={ready} onAyah={choose} onTurn={turn} onRetry={retry} />;
+    <MushafLeaf number={number} page={data} selected={selected} revision={reload} showFolio={!tabletop}
+      onReady={ready} onAyah={choose} onTurn={turn} onRetry={retry} />;
 
   const facingPages = spread && secondNumber !== null;
   const leafWidth = facingPages && geometry ? Math.max(210, Math.floor((geometry.height - (duo ? 76 : 94)) / 1.53)) : undefined;
@@ -276,7 +277,7 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onReaderLay
   const audioLabel = playing ? "Pause" : "Listen to Ayah";
 
   return <View style={styles.reader}>
-    {!isMacQuranHost ? <QuranFoldRegion immersive={immersive} onChange={setGeometry} /> : null}
+    {!isMacQuranHost ? <QuranFoldRegion onChange={setGeometry} /> : null}
     {night ? <ScrollView testID="mushaf-night-stand" style={[styles.reader, styles.nightSurface]}
       showsVerticalScrollIndicator={false} contentContainerStyle={styles.nightContent}>
       <View style={styles.nightHeading}>
