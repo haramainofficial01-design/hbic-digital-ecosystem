@@ -252,13 +252,15 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
         {pages}
       </ScrollView>
       <View style={{ height: tabletop.gap }} />
-      <ScrollView testID="mushaf-tabletop-controls" style={styles.reader} contentContainerStyle={styles.controlDeck} keyboardShouldPersistTaps="handled">
+      <ScrollView testID="mushaf-tabletop-controls" style={styles.reader} contentContainerStyle={styles.controlDeck}
+        automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {controls}
         {deck}
         {layoutSwitch}
         {tools}
       </ScrollView>
-    </> : <ScrollView testID={spread ? "mushaf-spread" : "mushaf-single"} style={styles.reader} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+    </> : <ScrollView testID={spread ? "mushaf-spread" : "mushaf-single"} style={styles.reader}
+      automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       contentContainerStyle={[styles.scroller, spread && styles.spreadScroller, hinge && styles.hingeScroller]}>
       <View style={hinge ? { width: hinge.right, paddingHorizontal: 12, alignSelf: "flex-end", gap: 10 } : styles.controls}>
         {!spread ? layoutSwitch : null}
