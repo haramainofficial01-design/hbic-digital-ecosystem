@@ -56,3 +56,13 @@ The live responses for pages 5 and 7 each include one legitimate multi-glyph wor
 Android 1.7.12 build 60 from `8fbf6e2` passed bundle validation, signing, target API 36, and 16 KB alignment across 42 native libraries. The exact bundle-derived APK opened both pages on Android 16 and exposed the expected ayahs through the reader's accessibility tree. The emulator uses 4 KB pages. Signed AAB SHA-256 `64c5642c33777a31f84f620adddfd3474bfc630815fa30afb5e09f59cd98472e`. QA APK SHA-256 `03bde328aacf07ba4ee68198e047a626ac20eb477aa65f29fd6558dcefcecadf`.
 
 Google Play accepted edit `11873509176799267161` for production review. A fresh track read returned version code 60 and the requested `completed` rollout status. The public Canadian Play listing showed 1.7.11 at the time of that submission check.
+
+## Immersive Mushaf and Night Stand · iOS 1.7.14
+
+The Duo reader hides its section navigation and native status bar while the Madinah Mushaf is active. It restores the normal bars on exit. Fully open landscape recovers 84 points of width for the reader. In tabletop, the page stays above the reserved hinge while the toolbar, page turns, bookmarks, audio and meaning sit below. The cover layout keeps the camera inset where required.
+
+Night Stand opens in a low-angle landscape tent while the Mushaf is open. It shows the current surah and reading position with a dim palette. The user can play the selected ayah or return to the same page. The cover also has a manual Night Stand control. Opening the device again returns to the reader.
+
+The 1.7.14 source passed 16 native checks on iOS 27.1 in Xcode 27.2 after the simulator bundle and executable were matched byte for byte with the installed copies. The checks covered all four orientations fully open and at 130°, the three supported cover rotations, both tent directions at 30°, dismissal, reopening and navigation away from the reader. Both tent cases activated automatically and preserved page 8 and ayah 2:49. The run used light and dark appearance with accessibility-medium text. Ten focused source tests, TypeScript and lint passed.
+
+A separate iPhone 18 Pro simulator check passed with typical single-page reading and the standard Quran navigation. SHA-256 of the local evidence manifest for the 16 captures and three logs is `27ba6c285e209de15eac5923a02ec2f8c5d2682979c810f4cacb29d7d4883bf5`.
