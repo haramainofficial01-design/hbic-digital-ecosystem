@@ -38,6 +38,15 @@ function withSceneAppDelegate(config) {
       /#if os\(iOS\) \|\| os\(tvOS\)\n\s*window = UIWindow\(frame: UIScreen\.main\.bounds\)\n\s*factory\.startReactNative\([\s\S]*?\)\n#endif/,
       "#if os(iOS) || os(tvOS)\n    sceneLaunchOptions = launchOptions\n#endif"
     );
+    if (!source.includes("return MasjidSceneRootController()")) {
+      const delegate = "class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {";
+      if (!source.includes(delegate)) throw new Error("HBIC iOS scene lifecycle requires the Expo React delegate.");
+      if (!source.includes("import UIKit")) source = `import UIKit\n${source}`;
+      source = source.replace(delegate, `${delegate}
+  override func createRootViewController() -> UIViewController {
+    return MasjidSceneRootController()
+  }`);
+    }
     mod.modResults.contents = source;
     return mod;
   });

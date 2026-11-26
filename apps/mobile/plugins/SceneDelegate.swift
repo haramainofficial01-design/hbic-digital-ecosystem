@@ -84,6 +84,38 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   }
 }
 
+final class MasjidSceneRootController: UIViewController {
+  private var immersiveMushaf = false
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(mushafAppearanceChanged(_:)),
+      name: Notification.Name("ca.hbic.quran.mushaf.immersive"), object: nil
+    )
+  }
+
+  @objc private func mushafAppearanceChanged(_ notification: Notification) {
+    guard let window = viewIfLoaded?.window, notification.object as? UIWindow === window else { return }
+    let active = notification.userInfo?["active"] as? Bool ?? false
+    guard immersiveMushaf != active else { return }
+    immersiveMushaf = active
+    setNeedsStatusBarAppearanceUpdate()
+    if #available(iOS 27.1, *) { setNeedsUpdateOfVerticalBarConfiguration() }
+  }
+
+  override var childForStatusBarHidden: UIViewController? {
+    immersiveMushaf ? nil : super.childForStatusBarHidden
+  }
+
+  override var prefersStatusBarHidden: Bool { immersiveMushaf }
+
+  @available(iOS 27.1, *)
+  override var preferredVerticalBarBehavior: UIVerticalBarBehavior {
+    immersiveMushaf ? .disabled : .automatic
+  }
+}
+
 /// Desktop commands are active only while the Quran workspace is mounted.
 /// Phone, tablet, prayer, Academy and embedded web screens keep their commands.
 private final class MasjidSceneWindow: UIWindow {

@@ -60,9 +60,33 @@ private struct BridgePrayerSnapshot: Decodable {
 public final class QuranFoldRegionView: ExpoView {
   let onRegionChange = EventDispatcher()
   private var lastGeometry: [String: Double]?
+  private var isDuo = false
+  private var hasHinge = false
+  private var tentAngle = false
+  private weak var immersiveWindow: UIWindow?
+  var immersiveRequested = false {
+    didSet { updateImmersiveAppearance() }
+  }
+
+  public required init(appContext: AppContext? = nil) {
+    super.init(appContext: appContext)
+    if #available(iOS 27.1, *) {
+      addInteraction(UIHingeInteraction { [weak self] _, update in
+        guard let self else { return }
+        let angle = update.hinge.map { $0.angle * 180 / .pi } ?? 0
+        let window = self.tentAngle ? 12.0...58.0 : 18.0...50.0
+        let tent = update.hinge != nil && window.contains(angle)
+        guard self.hasHinge != (update.hinge != nil) || self.tentAngle != tent else { return }
+        self.hasHinge = update.hinge != nil
+        self.tentAngle = tent
+        self.reportRegion()
+      })
+    }
+  }
 
   public override func didMoveToWindow() {
     super.didMoveToWindow()
+    updateImmersiveAppearance()
     setNeedsUpdateConstraints()
   }
 
@@ -76,21 +100,38 @@ public final class QuranFoldRegionView: ExpoView {
     reportRegion()
   }
 
+  private func updateImmersiveAppearance() {
+    let requestedWindow = immersiveRequested && isDuo ? window : nil
+    guard requestedWindow !== immersiveWindow else { return }
+    let notification = Notification.Name("ca.hbic.quran.mushaf.immersive")
+    if let previous = immersiveWindow {
+      NotificationCenter.default.post(name: notification, object: previous, userInfo: ["active": false])
+    }
+    immersiveWindow = requestedWindow
+    if let requestedWindow {
+      NotificationCenter.default.post(name: notification, object: requestedWindow, userInfo: ["active": true])
+    }
+  }
+
   private func reportRegion() {
     guard #available(iOS 27.1, *), window != nil, !bounds.isEmpty else { return }
-    guard let region = reservedRegions(kind: .division, options: .includeInactive).first else {
-      if lastGeometry != nil {
-        lastGeometry = nil
-        onRegionChange(["width": 0, "height": 0])
-      }
-      return
+    let region = reservedRegions(kind: .division, options: .includeInactive).first
+    if !isDuo && (hasHinge || region != nil || traitCollection.verticalBarEdge != .unspecified) {
+      isDuo = true
+      updateImmersiveAppearance()
     }
-    let geometry: [String: Double] = [
+    var geometry: [String: Double] = [
       "width": bounds.width.rounded(), "height": bounds.height.rounded(),
-      "x": region.frame.minX.rounded(.down), "y": region.frame.minY.rounded(.down),
-      "right": region.frame.maxX.rounded(.up), "bottom": region.frame.maxY.rounded(.up),
-      "active": region.isActive ? 1 : 0
+      "duo": isDuo ? 1 : 0,
+      "tent": tentAngle && region?.isActive != true ? 1 : 0
     ]
+    if let region {
+      geometry["x"] = region.frame.minX.rounded(.down)
+      geometry["y"] = region.frame.minY.rounded(.down)
+      geometry["right"] = region.frame.maxX.rounded(.up)
+      geometry["bottom"] = region.frame.maxY.rounded(.up)
+      geometry["active"] = region.isActive ? 1 : 0
+    }
     guard geometry != lastGeometry else { return }
     lastGeometry = geometry
     onRegionChange(geometry)
@@ -112,10 +153,14 @@ public final class MasjidAppleBridgeModule: Module {
     Constants([
       "isIOSAppOnMac": ProcessInfo.processInfo.isiOSAppOnMac,
       "isMacCatalyst": ProcessInfo.processInfo.isMacCatalystApp,
-      "hasQuranFoldRegionView": true
+      "hasQuranFoldRegionView": true,
+      "hasQuranImmersiveView": true
     ])
     View(QuranFoldRegionView.self) {
       Events("onRegionChange")
+      Prop("immersive") { (view: QuranFoldRegionView, enabled: Bool) in
+        view.immersiveRequested = enabled
+      }
     }
     Events("onMacQuranCommand")
     OnStartObserving {

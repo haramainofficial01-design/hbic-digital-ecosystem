@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, View } from "react-native";
+import { AccessibilityInfo, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "../src/i18n/LanguageProvider";
 import { OnboardingExperience } from "../src/onboarding/OnboardingExperience";
@@ -49,12 +49,13 @@ function AppShell() {
 
   return (
     <View style={{ flex: 1 }} collapsable={false}>
-      <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} />
+      {Platform.OS !== "ios" ? <StatusBar style={resolvedMode === "dark" ? "light" : "dark"} /> : null}
       {!onboardingActive ? <NotificationRouter /> : null}
       <BilalCompanion><MacAppFrame><Stack
         initialRouteName="(tabs)"
         screenOptions={{
           headerShown: false,
+          statusBarStyle: Platform.OS === "ios" ? (resolvedMode === "dark" ? "light" : "dark") : undefined,
           animation: reduceMotion ? "none" : "fade_from_bottom",
           contentStyle: { backgroundColor: theme.colors.background }
         }}

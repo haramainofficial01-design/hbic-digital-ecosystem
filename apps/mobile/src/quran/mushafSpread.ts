@@ -6,6 +6,8 @@ export type MushafGeometry = {
   right?: number;
   bottom?: number;
   active?: number;
+  duo?: number;
+  tent?: number;
 };
 
 type MushafPresentation =
@@ -28,6 +30,10 @@ export function mushafPresentation(geometry: MushafGeometry | null): MushafPrese
     }
   }
   return width >= 600 && !active ? { kind: "spread" } : { kind: "single" };
+}
+
+export function isMushafNightStand(geometry: MushafGeometry | null) {
+  return geometry?.duo === 1 && geometry.tent === 1 && geometry.width > geometry.height;
 }
 
 export function mushafSpreadStart(page: number) {

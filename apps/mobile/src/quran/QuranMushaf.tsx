@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Keyboard, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { parseAyahReference, validMushafPageNumber, type MushafPage } from "@hbic/shared";
 import { Text, TextInput, Alert } from "../i18n/LocalizedText";
@@ -12,7 +12,7 @@ import { QuranReadingLayout } from "./QuranReadingLayout";
 import { QuranFoldRegion } from "./QuranFoldRegion";
 import { isMacQuranHost } from "./macRuntime";
 import { mushafDocument } from "./mushafDocument";
-import { mushafPresentation, mushafSpreadStart, mushafTurn, type MushafGeometry } from "./mushafSpread";
+import { isMushafNightStand, mushafPresentation, mushafSpreadStart, mushafTurn, type MushafGeometry } from "./mushafSpread";
 import type { QuranLibrary, ReturnTypeQuranAudio } from "./types";
 
 const pageLoadError = "Madinah page could not load. Check your connection and retry, or choose Ayah View.";
@@ -87,12 +87,17 @@ function MushafLeaf({ number, page, selected, revision, onReady, onAyah, onTurn,
   </View>;
 }
 
-export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopChange, focused = false }: {
+export const mushafNightBackground = "#070F16";
+export type MushafReaderLayout = { duo: boolean; tabletop: boolean; night: boolean };
+
+export function QuranMushaf({ reference, library, audio, onOpenAyah, onReaderLayoutChange, tabletopToolbar, immersive, focused = false }: {
   reference: string;
   library: QuranLibrary;
   audio: ReturnTypeQuranAudio;
   onOpenAyah: (key: string) => void;
-  onTabletopChange: (active: boolean) => void;
+  onReaderLayoutChange: (layout: MushafReaderLayout) => void;
+  tabletopToolbar?: ReactNode;
+  immersive: boolean;
   focused?: boolean;
 }) {
   const { theme } = useAppTheme();
@@ -104,6 +109,8 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [jump, setJump] = useState("");
+  const [nightDismissed, setNightDismissed] = useState(false);
+  const [nightRequested, setNightRequested] = useState(false);
   const selectedKey = useRef(reference);
   const lastSaved = useRef<string | null>(null);
   const presentation = mushafPresentation(geometry);
@@ -117,11 +124,20 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
   const second = useMushafPage(secondNumber, reload);
   const current = first?.page === page ? first : second?.page === page ? second : null;
   const tabletopActive = tabletop !== null;
+  const duo = geometry?.duo === 1;
+  const landscapeCover = !!geometry && duo && presentation.kind === "single" && geometry.width > geometry.height;
+  const standPose = isMushafNightStand(geometry);
+  const night = landscapeCover && (nightRequested || (standPose && !nightDismissed));
 
   useEffect(() => {
-    onTabletopChange(tabletopActive);
-    return () => onTabletopChange(false);
-  }, [onTabletopChange, tabletopActive]);
+    if (!standPose) setNightDismissed(false);
+    if (!landscapeCover) setNightRequested(false);
+    if (night) Keyboard.dismiss();
+  }, [landscapeCover, night, standPose]);
+  useEffect(() => {
+    onReaderLayoutChange({ duo, tabletop: tabletopActive, night });
+  }, [duo, night, onReaderLayoutChange, tabletopActive]);
+  useEffect(() => () => onReaderLayoutChange({ duo: false, tabletop: false, night: false }), [onReaderLayoutChange]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -208,7 +224,7 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
     <MushafLeaf number={number} page={data} selected={selected} revision={reload} onReady={ready} onAyah={choose} onTurn={turn} onRetry={retry} />;
 
   const facingPages = spread && secondNumber !== null;
-  const leafWidth = facingPages && geometry ? Math.max(210, Math.floor((geometry.height - 94) / 1.53)) : undefined;
+  const leafWidth = facingPages && geometry ? Math.max(210, Math.floor((geometry.height - (duo ? 76 : 94)) / 1.53)) : undefined;
   const pages = facingPages ? <View style={styles.spread}>
     <View style={hinge ? [styles.hingeLeaf, { width: hinge.right }] : styles.facingLeaf}>
       <View style={{ width: "100%", maxWidth: leafWidth, alignSelf: "flex-start" }}>{renderLeaf(firstNumber, first)}</View>
@@ -257,17 +273,36 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
     <Text style={[styles.credit, { color: theme.colors.subtle }]}>Madinah Hafs · QCF V2 · 15-line edition{"\n"}Opening pages retain their special layout.{"\n"}Quran data and fonts provided by Quran Foundation.</Text>
   </>;
   const layoutSwitch = !focused ? <QuranReadingLayout library={library} onAyahView={() => onOpenAyah(selectedKey.current)} /> : null;
+  const audioLabel = playing ? "Pause" : "Listen to Ayah";
 
   return <View style={styles.reader}>
-    {!isMacQuranHost ? <QuranFoldRegion onChange={setGeometry} /> : null}
-    {tabletop ? <>
+    {!isMacQuranHost ? <QuranFoldRegion immersive={immersive} onChange={setGeometry} /> : null}
+    {night ? <ScrollView testID="mushaf-night-stand" style={[styles.reader, styles.nightSurface]}
+      showsVerticalScrollIndicator={false} contentContainerStyle={styles.nightContent}>
+      <View style={styles.nightHeading}>
+        <Text accessibilityRole="header" style={styles.nightTitle}>{current?.chapterNames.join(" · ") ?? "Madinah Mushaf"}</Text>
+        {page !== null ? <Text style={styles.nightPosition}>{ayahReady ? `${translate(`Page ${page}`)} · ${translate(`Ayah ${selected}`)}` : `Page ${page}`}</Text> : null}
+        {error ? <Text accessibilityRole="alert" style={styles.nightPosition}>{error}</Text> : null}
+      </View>
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" onPress={() => { setNightRequested(false); setNightDismissed(true); }}
+          style={({ pressed }) => [styles.nightAction, pressed && styles.nightPressed]}>
+          <Text style={styles.nightActionLabel}>Return to Mushaf</Text>
+        </Pressable>
+        {ayahReady ? <Pressable accessibilityRole="button" onPress={() => listen(selected)}
+          style={({ pressed }) => [styles.nightAction, styles.nightAudio, pressed && styles.nightPressed]}>
+          <Text style={styles.nightActionLabel}>{audioLabel}</Text>
+        </Pressable> : null}
+      </View>
+    </ScrollView> : tabletop ? <>
       <ScrollView testID="mushaf-tabletop-page" style={{ height: tabletop.top, flexGrow: 0, flexShrink: 0 }}
-        contentContainerStyle={styles.upperPage} keyboardShouldPersistTaps="handled">
+        contentContainerStyle={styles.upperPage} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={!duo}>
         {pages}
       </ScrollView>
       <View style={{ height: tabletop.gap }} />
       <ScrollView testID="mushaf-tabletop-controls" style={styles.reader} contentContainerStyle={styles.controlDeck}
-        automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={!duo}>
+        {tabletopToolbar}
         {controls}
         {deck}
         {layoutSwitch}
@@ -275,14 +310,16 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
       </ScrollView>
     </> : <ScrollView testID={spread ? "mushaf-spread" : "mushaf-single"} style={styles.reader}
       automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={!duo}
       contentContainerStyle={[styles.scroller, spread && styles.spreadScroller, hinge && styles.hingeScroller]}>
       <View style={hinge ? { width: hinge.right, paddingHorizontal: 12, alignSelf: "flex-end", gap: 10 } : styles.controls}>
-        {!spread ? layoutSwitch : null}
+        {!spread && !duo ? layoutSwitch : null}
         {controls}
+        {landscapeCover ? <AppButton label="Night Stand" icon="moon-outline" variant="ghost" onPress={() => setNightRequested(true)} /> : null}
       </View>
       {pages}
       <View style={hinge ? { width: hinge.right, paddingHorizontal: 12, alignSelf: "flex-end", gap: 10 } : styles.controls}>
-        {spread ? layoutSwitch : null}
+        {spread || duo ? layoutSwitch : null}
         {!spread ? <Text style={[styles.credit, { color: theme.colors.muted }]}>Tap an ayah for audio, bookmarks or meaning. Swipe to turn the page.</Text> : null}
         {tools}
       </View>
@@ -316,4 +353,13 @@ const styles = StyleSheet.create({
   jump: { flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
   jumpField: { flex: 1, minWidth: 0, minHeight: 48, fontSize: 16 },
   credit: { fontSize: 12, lineHeight: 18, textAlign: "center" },
+  nightSurface: { backgroundColor: mushafNightBackground },
+  nightContent: { flexGrow: 1, justifyContent: "center", alignItems: "center", gap: 24, paddingHorizontal: 24, paddingVertical: 16 },
+  nightHeading: { gap: 8, width: "100%", maxWidth: 520 },
+  nightTitle: { color: "#F0DEB4", fontSize: 38, fontWeight: "600", textAlign: "center" },
+  nightPosition: { color: "#B9CBCB", fontSize: 16, textAlign: "center", fontVariant: ["tabular-nums"] },
+  nightAction: { minHeight: 48, justifyContent: "center", paddingHorizontal: 15, paddingVertical: 10, borderRadius: 24 },
+  nightAudio: { backgroundColor: "#173534" },
+  nightActionLabel: { color: "#ECF3EF", fontSize: 15, fontWeight: "600", textAlign: "center" },
+  nightPressed: { opacity: 0.7 },
 });

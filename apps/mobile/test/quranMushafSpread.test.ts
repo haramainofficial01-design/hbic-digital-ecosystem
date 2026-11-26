@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validMushafPageNumber } from "@hbic/shared";
-import { mushafPresentation, mushafSpreadStart, mushafTurn } from "../src/quran/mushafSpread";
+import { isMushafNightStand, mushafPresentation, mushafSpreadStart, mushafTurn } from "../src/quran/mushafSpread";
+
+test("night stand is available in the Duo landscape tent pose", () => {
+  assert.equal(isMushafNightStand({ width: 678, height: 466, duo: 1, tent: 1 }), true);
+  assert.equal(isMushafNightStand({ width: 466, height: 678, duo: 1, tent: 1 }), false);
+  assert.equal(isMushafNightStand({ width: 678, height: 466, duo: 1, tent: 0 }), false);
+  assert.equal(isMushafNightStand({ width: 678, height: 466 }), false);
+  assert.equal(isMushafNightStand(null), false);
+});
 
 test("fold layouts use the reported hinge, preserving a standard window", () => {
   assert.deepEqual(mushafPresentation(null), { kind: "single" });
