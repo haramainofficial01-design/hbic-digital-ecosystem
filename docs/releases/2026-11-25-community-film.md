@@ -100,3 +100,15 @@ The master decoded in software and with macOS hardware acceleration at 1920 × 1
 
 - `Masjid Bilal Trailer - Brothers Night Review.mp4` · 144,343,473 bytes · SHA-256 `b12cee820f41d29a7b22f4d076b2196d550e4fea93bf75ffeca64bc194635d0c`
 - Private Drive viewing copy · 1920 × 1080 at 30 fps · 84,377,010 bytes · SHA-256 `04f8e170c862a68295d3817f3ae4becc555edae69c32bc8bc4ed0f3f8f8f6cae`. The downloaded bytes matched the local viewing copy, and Drive showed owner-only access.
+
+## Full original style review
+
+The full private trailer was compared with the verified 3:00 Drive archive. The review mapped the source at its original time before Brothers Night and 25.5 seconds later after the insert. Chapter comparisons covered the opening, both quotations, the prayer hall, Ramadan, Halaqa Night, Brothers Night, the outdoor gallery and hike, Qur’an Academy, and the facilities and closing sequences.
+
+The archive supplies the original framing and authored title motion in 4,258 delivered frames. Two black gaps in the source, from 34.567 to 35.500 and from 43.833 to 44.000, use picture dissolves. The centered hike title reveals with the same wide lettering and cursor as Brothers Night. Its panel expands into the clean mountain shot at 2:01.033. The facility comparison restores the original line about community support and clears the previous panel images before the next views appear. The welcome card brings back the centre’s full name, then clears for the original logo animation and “Donate Generously” line at their full source scale. The donation link follows with a matching reveal.
+
+Run `node scripts/media/render-hbic-full-style-review.mjs <original-drive-film> <brothers-night-review> <private-output-directory>`. The renderer verifies the two inputs by SHA-256 and assembles the picture against the 206.9-second review soundtrack. Keep the master, proofs and source recordings outside Git and public hosting.
+
+The finished 1080p master passed software and macOS hardware decoding. All 6,207 frames have continuous timestamps at 30 fps, each of the 12 section entries is seekable, and the 9,700 AAC packets match the previous review. The 4,258 restored source frames were checked in five time-aligned ranges. Each range averaged under 0.072 of one 8-bit luma level of difference on a 96 × 54 comparison. The black and silence checks found only the opening and closing fades.
+
+- `Masjid Bilal Trailer - Original Style Review.mp4` · 145,491,542 bytes · SHA-256 `0f98d14526cbf7bc243cf99938d138b543725656c4ecd1ee0ebf4a84bd1e9497` · local private master.
