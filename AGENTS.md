@@ -15,5 +15,6 @@ For future HBIC work in this checkout:
 - The real Expo app is `apps/mobile`, project `79283015-cb87-48ef-9761-81ab87641205`, owner `hbiccas-team`, bundle/package `ca.hbic.calgary.app`. Run mobile release commands only from that directory. Never use a root Expo project or initialize a new project.
 - Preserve the canonical prayer API/resolver/cache, manual overrides, TV flow, existing signing credentials, and Watch/widget identifiers.
 - Use [Impeccable](https://impeccable.style/) for interface work on the HBIC website and apps. Apply its guidance within the existing Masjid Bilal brand and each platform’s native conventions. Verify the affected layouts at representative widths, in light and dark appearance, and with large text and reduced motion where applicable.
+- Consult the [HBIC design references](docs/design/references.md) for app flows, web layouts, typography, motion and platform-specific verification.
 
 The default branch contains the current integrated source. Continue feature/release work on the existing appropriate branch and push that branch; do not merge unverified release changes merely to update the default branch.
