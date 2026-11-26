@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { runInNewContext } from "node:vm";
 import { emptyQuranState, memorizationLabels, mushafFontUrl, normalizeQuranState, validateMushafPage, type MushafPage } from "@hbic/shared";
 import { createQuranClient } from "../src/services/quranClient";
 import { mushafDocument } from "../src/quran/mushafDocument";
@@ -46,7 +47,41 @@ test("browser Mushaf uses an explicit channel without weakening the native sandb
   assert.match(html, /channel:"mushaf_test_1"/);
   assert.match(html, /connect-src 'none'/);
   assert.doesNotMatch(html, /ReactNativeWebView/);
+  assert.doesNotMatch(html, /hbicSelectMushafAyah/);
   assert.throws(() => mushafDocument(page, false, "", {channel: "<script>"}));
+});
+test("both native facing pages reflect the reader's latest ayah without reloading", async () => {
+  async function openLeaf(number: number, key: string) {
+    let selected = false;
+    const sample = { ...structuredClone(page), page: number };
+    sample.lines[0].words[0].key = key;
+    const html = mushafDocument(sample, false, "");
+    const script = html.match(/<script[^>]*>([\s\S]+)<\/script>/)![1];
+    const word = { dataset: { key }, style: {}, classList: { toggle: (_: string, next: boolean) => { selected = next; } } };
+    const { promise: firstMessage, resolve } = Promise.withResolvers<{ type: string }>();
+    const window = {
+      addEventListener() {},
+      ReactNativeWebView: { postMessage: (message: string) => resolve(JSON.parse(message)) },
+      hbicSelectMushafAyah: undefined as ((key: string) => void) | undefined,
+    };
+    const document = {
+      fonts: { load: async () => [], check: () => true },
+      createElement: () => ({ getContext: () => ({}) }),
+      querySelectorAll: (selector: string) => selector === ".word" ? [word] : [],
+      getElementById: () => ({ style: {}, classList: { add() {} } }),
+      addEventListener() {},
+    };
+    runInNewContext(script, { document, window, setTimeout, clearTimeout });
+    assert.equal((await firstMessage).type, "ready");
+    return { select: window.hbicSelectMushafAyah!, isSelected: () => selected };
+  }
+  const right = await openLeaf(3, "2:6");
+  const left = await openLeaf(4, "2:17");
+  for (const [key, expected] of [["2:6", [true, false]], ["2:17", [false, true]], ["2:6", [true, false]]] as const) {
+    right.select(key);
+    left.select(key);
+    assert.deepEqual([right.isSelected(), left.isSelected()], expected);
+  }
 });
 test("saved reading mode preserves old state and capitalized progress labels", () => {
   const previous = emptyQuranState(); delete (previous.preferences as Partial<typeof previous.preferences>).layout;

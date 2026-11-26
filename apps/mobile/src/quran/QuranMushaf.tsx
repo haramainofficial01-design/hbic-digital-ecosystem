@@ -48,17 +48,21 @@ function MushafLeaf({ number, page, selected, revision, onReady, onAyah, onTurn,
   const { theme } = useAppTheme();
   const [width, setWidth] = useState(0);
   const [problem, setProblem] = useState<{ page: number; revision: number; message: string }>();
-  // Keep the WebView source stable while the reader selects an ayah or changes pose.
-  const initialSelection = useRef(selected);
-  initialSelection.current = selected;
-  const html = useMemo(() => ({ html: page ? mushafDocument(page, theme.mode === "dark", initialSelection.current) : "" }), [page, theme.mode]);
+  const webView = useRef<WebView>(null);
+  // The reader owns selection across both leaves. Keep the loaded fonts and page stable.
+  const html = useMemo(() => ({ html: page ? mushafDocument(page, theme.mode === "dark", "") : "" }), [page, theme.mode]);
   const message = page === null ? pageLoadError : problem?.page === number && problem.revision === revision ? problem.message : null;
+  const selectionScript = `window.hbicSelectMushafAyah?.(${JSON.stringify(selected)}); true;`;
+
+  useEffect(() => {
+    webView.current?.injectJavaScript(selectionScript);
+  }, [selectionScript]);
 
   return <View style={styles.leaf}>
     <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={[styles.paper, {
       height: width ? width * 1.53 : 530, backgroundColor: theme.mode === "dark" ? "#152B35" : "#FBF8EF",
     }]}>
-      {page && !message ? <WebView key={`${page.page}:${revision}:${theme.mode}`} source={html} originWhitelist={["about:blank"]}
+      {page && !message ? <WebView ref={webView} key={`${page.page}:${revision}:${theme.mode}`} source={html} originWhitelist={["about:blank"]}
         style={styles.webPage} scrollEnabled={false} bounces={false} showsVerticalScrollIndicator={false}
         setSupportMultipleWindows={false} allowFileAccess={false} allowUniversalAccessFromFileURLs={false}
         javaScriptCanOpenWindowsAutomatically={false} onShouldStartLoadWithRequest={request => request.url === "about:blank"}
@@ -66,7 +70,10 @@ function MushafLeaf({ number, page, selected, revision, onReady, onAyah, onTurn,
           try {
             if (event.nativeEvent.data.length > 500) return;
             const result = JSON.parse(event.nativeEvent.data);
-            if (result.type === "ready" && result.page === page.page && result.overflow === false) onReady(page);
+            if (result.type === "ready" && result.page === page.page && result.overflow === false) {
+              webView.current?.injectJavaScript(selectionScript);
+              onReady(page);
+            }
             else if (result.type === "error") setProblem({ page: page.page, revision, message: fontLoadError });
             else if (result.type === "ayah" && typeof result.key === "string") onAyah(page, result.key);
             else if (result.type === "page" && (result.direction === 1 || result.direction === -1)) onTurn(result.direction);
