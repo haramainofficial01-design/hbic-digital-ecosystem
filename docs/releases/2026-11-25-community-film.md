@@ -147,4 +147,6 @@ The web player passed play with sound, pause and resume, and 16 seek checks at 3
 
 Source commit `88662dd` is live on `hbic.ca` via Vercel deployment `dpl_9ojX2NREeJy8QWBFMMUnra6iLkCZ`. The staged deployment and live domain both served the verified film, poster, and preview bytes. The film honored byte-range requests, and the Academy card-availability and prayer-display checks passed. The prior deployment `dpl_DoKwth3NaDVqdL3t2ejwTKszyspc` is the rollback that withdraws the trailer from the website.
 
-The March cut is awaiting YouTube upload and Home trailer selection, and Instagram upload and pinning. The signed-in publishing tabs were unavailable in this chat.
+The March master is public on [Bilal Islamic Centre on YouTube](https://youtu.be/cpQIDdFF8WM). Studio confirmed publication with the custom thumbnail, and an anonymous request confirmed the title and channel. YouTube reported a copyright claim with no current impact on viewing and no initial Community Guidelines issues.
+
+Studio's Home trailer placement and the Instagram profile pin are pending. The complete 207-second reel was submitted on `@hbicyouth` with the custom cover, original framing and sound enabled. Instagram showed its sharing screen when the Mac locked, so publication has not yet been verified.
