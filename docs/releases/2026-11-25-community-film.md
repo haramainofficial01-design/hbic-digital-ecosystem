@@ -112,3 +112,15 @@ Run `node scripts/media/render-hbic-full-style-review.mjs <original-drive-film> 
 The finished 1080p master passed software and macOS hardware decoding. All 6,207 frames have continuous timestamps at 30 fps, each of the 12 section entries is seekable, and the 9,700 AAC packets match the previous review. The 4,258 restored source frames were checked in five time-aligned ranges. Each range averaged under 0.072 of one 8-bit luma level of difference on a 96 × 54 comparison. The black and silence checks found only the opening and closing fades.
 
 - `Masjid Bilal Trailer - Original Style Review.mp4` · 145,491,542 bytes · SHA-256 `0f98d14526cbf7bc243cf99938d138b543725656c4ecd1ee0ebf4a84bd1e9497` · local private master.
+
+## Halaqa footage review
+
+The Halaqa Night shot at 1:15.700–1:18.233 uses Ustadh Faheem’s August 8, 2026 camera recording from Drive. A new 1080p Rec. 709 extract from 40–47 seconds of the 4K original supplies the footage. The wide white title uses its original two-line placement, with the glow moved clear of the speaker. The cut returns to the original audience shot on its existing edit point.
+
+Run `node scripts/media/render-hbic-halaqa-footage-review.mjs <original-style-review> <graded-august-8-extract> <private-output-directory>`. The script checks both input files and copies the picture outside the two edit points and the complete soundtrack. The graded extract contains 210 frames and has SHA-256 `f471bafb337558c41425333af415f5e51dbaad6198715ad6227e781402ebcc04`.
+
+The full export decoded in software and macOS hardware. The 6,131 frames outside the replacement match the Original Style Review exactly. Their combined SHA-256 is `faa22e9301832478834b514fc609f76fd99ab88aba12dc0c2847a013de1065f9`. All 9,700 AAC packets match, and 6,207 video frame timestamps are continuous across 206.9 seconds.
+
+- `Masjid Bilal Trailer - Halaqa Footage Review.mp4` · 146,958,677 bytes · SHA-256 `2294dbe652a4b15083350a35feb7329006b000fd4a79a795c64266cfa18ad53f` · local private master.
+
+Brothers Night footage review and publication are pending signed-in access to the original event folder.
