@@ -22,7 +22,7 @@ App Store Connect prepared 1.7.12 (`8f9931cd-ae22-475b-8c8d-0573e517f493`) for t
 
 Signed build 61 came from `995ba0fb52bf3105505fdb86f2d221fb4fdfe92f`. The archive passed signature, SDK, expected iOS/Watch/widget bundle, version and Mushaf bridge checks. SHA-256 `de8673b3ec1ce6d294fa911632395c08ce0bbb8ecb35d3230c9025f317f3af18`. The transport upload completed. Earlier builds were superseded during checks before App Review.
 
-Apple validated build 61 (`b66e5375-b307-4190-b4f9-69d9ec5220f5`) and accepted review submission `5ac5be23-7283-4ca6-a5ad-ed3548bfbf76`. App Store Connect reports `WAITING_FOR_REVIEW` with automatic release after approval. Public distribution and the public badge remain pending verification.
+Apple validated build 61 (`b66e5375-b307-4190-b4f9-69d9ec5220f5`) and accepted review submission `5ac5be23-7283-4ca6-a5ad-ed3548bfbf76`. The review is complete, App Store Connect reports `READY_FOR_DISTRIBUTION`, and Apple's Canadian storefront lookup verified version 1.7.12 and its iPhone Duo release notes. The badge itself was not observable on the public web listing checked.
 
 Apple describes the product-page badge in its [iPhone Duo preparation guide](https://developer.apple.com/iphone-duo/prepare/). Store review, public availability, the public badge and editorial featuring are separate from simulator verification.
 
@@ -30,10 +30,10 @@ Apple describes the product-page badge in its [iPhone Duo preparation guide](htt
 
 The next build synchronizes selection between the two facing pages without reloading their fonts. The Xcode simulator opened ayahs 2:41 and 2:49 from opposite leaves in sequence, then displayed the highlight only on the left for 2:49. Both the light and dark screenshots had zero pixels of the respective selection color on the right leaf. The dark capture used accessibility-medium text. The updated simulator also reopened the live spreads 5–6 and 7–8, and all 18 focused contract, page layout and selection tests passed.
 
-The follow-up iOS 1.7.13 build 62 from `6c12f25` passed signature, SDK and bundle checks. App Store Connect reports `VALID` (`844576a8-e6f7-4ef1-9d6f-22cea467b7f1`). Its SHA-256 is `7a4be83548b66e4c11d2b88a210a274b37e8cafc3abb6a43ee8779c84ec885fd`. Apple's 1.7.12 review remains in place. App Store Connect requires the preceding version to reach Ready for Distribution before creating the follow-up version for review.
+The follow-up iOS 1.7.13 build 62 from `6c12f25` passed signature, SDK and bundle checks. App Store Connect reports `VALID` (`844576a8-e6f7-4ef1-9d6f-22cea467b7f1`). Its SHA-256 is `7a4be83548b66e4c11d2b88a210a274b37e8cafc3abb6a43ee8779c84ec885fd`. After 1.7.12 cleared review, the follow-up retained all ten ordered Duo screenshots and was submitted under `5080fd60-17e3-4718-b314-9322ac595087`. The submission reports `WAITING_FOR_REVIEW`, with automatic release after approval.
 
 The live responses for pages 5 and 7 each include one legitimate multi-glyph word that the shipping Android 1.7.11 client rejected. This prompted a separately verified Android build using the same corrected shared validator. The dedicated iPhone Duo layouts remain an iOS feature.
 
 Android 1.7.12 build 60 from `8fbf6e2` passed bundle validation, signing, target API 36, and 16 KB alignment across 42 native libraries. The exact bundle-derived APK opened both pages on Android 16 and exposed the expected ayahs through the reader's accessibility tree. The emulator uses 4 KB pages. Signed AAB SHA-256 `64c5642c33777a31f84f620adddfd3474bfc630815fa30afb5e09f59cd98472e`. QA APK SHA-256 `03bde328aacf07ba4ee68198e047a626ac20eb477aa65f29fd6558dcefcecadf`.
 
-Google Play accepted edit `11873509176799267161` for production review. A fresh track read returned version code 60 and the requested `completed` rollout status. The public Canadian listings for both stores still showed 1.7.11 at the time of verification.
+Google Play accepted edit `11873509176799267161` for production review. A fresh track read returned version code 60 and the requested `completed` rollout status. The public Canadian Play listing showed 1.7.11 at the time of that submission check.
