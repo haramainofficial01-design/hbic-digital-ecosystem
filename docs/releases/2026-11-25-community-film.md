@@ -149,4 +149,6 @@ Source commit `88662dd` is live on `hbic.ca` via Vercel deployment `dpl_9ojX2NRE
 
 The March master is public on [Bilal Islamic Centre on YouTube](https://youtu.be/cpQIDdFF8WM). Studio confirmed publication with the custom thumbnail, and an anonymous request confirmed the title and channel. YouTube reported a copyright claim with no current impact on viewing and no initial Community Guidelines issues.
 
-Studio's Home trailer placement and the Instagram profile pin are pending. The complete 207-second reel was submitted on `@hbicyouth` with the custom cover, original framing and sound enabled. Instagram showed its sharing screen when the Mac locked, so publication has not yet been verified.
+YouTube Studio saved `cpQIDdFF8WM` as the Home channel trailer for people who have not subscribed. Reloading the Home editor confirmed that the saved slot referenced the new upload.
+
+The complete [Instagram reel](https://www.instagram.com/reel/DgMH-wlBexg/) is live on `@hbicyouth` with the matching cover, original framing, and original audio. Instagram confirmed that the reel was pinned, and its tile shows the pin badge in the top-left position of the main profile grid.
