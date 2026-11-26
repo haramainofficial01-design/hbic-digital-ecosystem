@@ -36,7 +36,8 @@ document.querySelectorAll('.heading,.basmala').forEach(function(r){r.style.fontS
 return {type:'ready',page:${page.page},lines:rows.length,fontSize:size,overflow:rows.some(function(r){return r.scrollWidth>r.clientWidth+1})}}
 var result=fit();if(result.overflow)throw Error('Layout overflow');finished=true;clearTimeout(timeout);document.getElementById('status').style.display='none';document.getElementById('page').classList.add('ready');send(result);
 window.addEventListener('resize',fit);
-document.querySelectorAll('.word').forEach(function(w){w.onclick=function(){send({type:'ayah',key:w.dataset.key})}});
+document.querySelectorAll('.word').forEach(function(w){w.onclick=function(){
+${browser ? "" : "document.querySelectorAll('.word').forEach(function(word){word.classList.toggle('selected',word.dataset.key===w.dataset.key)});"}send({type:'ayah',key:w.dataset.key})}});
 var x=null,y=null;document.addEventListener('touchstart',function(e){x=e.touches[0].clientX;y=e.touches[0].clientY},{passive:true});
 document.addEventListener('touchend',function(e){if(x!==null){var dx=e.changedTouches[0].clientX-x,dy=e.changedTouches[0].clientY-y;if(Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*2)send({type:'page',direction:dx>0?1:-1});x=null;y=null}},{passive:true});
 }).catch(function(){finished=true;clearTimeout(timeout);document.getElementById('status').textContent='Page font could not load. Please retry.';send({type:'error'})});})();</script></body></html>`;

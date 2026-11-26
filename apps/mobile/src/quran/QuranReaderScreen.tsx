@@ -50,6 +50,7 @@ export default function QuranReaderScreen() {
   const { update: updateLibrary, bookmark: toggleBookmark } = library;
   const [mode, setMode] = useState<QuranMode>("home"), [chapterId, setChapterId] = useState(1), [target, setTarget] = useState(1);
   const [focused, setFocused] = useState(false);
+  const [mushafTabletop, setMushafTabletop] = useState(false);
   const showSidebar = workspace.sidebar && (!workspace.desktop || sidebarVisible) && !focused;
   const showInspector = workspace.inspector && inspectorVisible && !focused && mode === "read";
   const [captureActive, setCaptureActive] = useState(false);
@@ -183,7 +184,9 @@ export default function QuranReaderScreen() {
     {error ? <QuranMessage message={error} onRetry={() => { setError(null); void reader.loadPage(versePage(target)).catch(() => setError("Quran content is unavailable. Please retry.")); }} /> : null}
     {reader.loading || busy || searching ? <ActivityIndicator color={theme.colors.teal} style={{ padding: 18 }} accessibilityLabel="Loading Quran content" /> : null}
   </View>;
-  return <SafeAreaView onTouchStart={practiceInteraction} style={{ flex: 1, backgroundColor: theme.colors.background }} edges={["top", "bottom"]}>
+  const usesMushaf = mode === "read" && library.library.preferences.layout === "madinah";
+  return <SafeAreaView onTouchStart={practiceInteraction} style={{ flex: 1, backgroundColor: theme.colors.background }}
+    edges={usesMushaf && !workspace.desktop ? ["top", "right", "bottom", "left"] : ["top", "bottom"]}>
     <View style={[styles.workspace, workspace.desktop && styles.macWorkspace]}>
     {workspace.sidebar && !focused && showSidebar ? workspace.desktop
       ? <QuranMacSidebar chapters={reader.chapters} chapterId={chapterId} mode={mode} onMode={onMode} onOpen={open} onBack={backToMasjid} />
@@ -193,12 +196,12 @@ export default function QuranReaderScreen() {
       onSidebar={() => setSidebarVisible(value => !value)} onInspector={() => setInspectorVisible(value => !value)} onFocus={() => setFocused(value => !value)} onMode={onMode} onBack={backToMasjid} />
       : <View style={[styles.navigation, { borderBottomColor: theme.colors.border }]}><QuranIconButton label={mode === "home" ? "Back to More" : "Quran home"} icon="chevron-back" onPress={() => { if (mode === "home") backToMasjid(); else onMode("home"); }} />
       {mode === "home" ? <View style={{ marginRight: 8 }}><QuranBrandMark size={30} /></View> : null}<Text numberOfLines={1} style={[styles.navTitle, { color: theme.colors.text }]}>{titles[mode]}</Text>{mode === "read" ? <QuranIconButton label={focused ? "Leave focus" : "Focus reading"} icon={focused ? "contract-outline" : "expand-outline"} onPress={() => setFocused(value => !value)} /> : null}{!focused ? <><QuranIconButton label="Search Quran" icon="search-outline" onPress={() => onMode("search")} /><QuranIconButton label="Quran preferences" icon="options-outline" onPress={() => onMode("settings")} /></> : null}</View>}
-    {!focused ? workspace.desktop ? !showSidebar ? <QuranMacCompactNavigation mode={mode} onMode={onMode} /> : null : <QuranNavigation mode={mode} onMode={onMode} /> : null}
+    {!focused && !(usesMushaf && mushafTabletop) ? workspace.desktop ? !showSidebar ? <QuranMacCompactNavigation mode={mode} onMode={onMode} /> : null : <QuranNavigation mode={mode} onMode={onMode} /> : null}
     {!library.ready ? <ActivityIndicator color={theme.colors.teal} accessibilityLabel="Preparing private Quran library" /> : null}
     <Animated.View style={[{ flex: 1 }, transition]}>
     {mode === "read" && !focused && library.library.preferences.layout !== "madinah" ? <View style={{ paddingHorizontal: 14, paddingVertical: 10 }}><QuranReadingLayout library={library} /></View> : null}
     {mode === "challenges" ? <Suspense fallback={<ActivityIndicator color={theme.colors.teal} />}><QuranChallenges /></Suspense> : mode === "review" ? <QuranReviewLibrary library={library} audio={audio} onPractise={(chapter, ayah) => { setChapterId(chapter); setTarget(ayah); onMode("practice"); }} /> : mode === "listen" ? <QuranListening chapters={reader.chapters} audio={audio} library={library} />
-      : mode === "read" && library.library.preferences.layout === "madinah" ? <QuranMushaf focused={focused} reference={`${chapterId}:${target}`} library={library} audio={audio} onOpenAyah={(key) => {
+      : usesMushaf ? <QuranMushaf focused={focused} reference={`${chapterId}:${target}`} library={library} audio={audio} onTabletopChange={setMushafTabletop} onOpenAyah={(key) => {
         void updateLibrary((s) => ({ ...s, preferences: { ...s.preferences, layout: "ayah" } })).then(() => { const ref = parseAyahReference(key)!; open(ref.chapter, ref.ayah); }).catch(() => {});
       }} /> : <FlatList ref={list} data={rows} key={`${mode}:${chapterId}`} style={styles.list} contentContainerStyle={[styles.listContent, { maxWidth: workspace.readingWidth, paddingHorizontal: workspace.horizontalPadding }]} ListHeaderComponent={header}
       keyboardShouldPersistTaps="handled" onScrollBeginDrag={practiceInteraction} initialNumToRender={8} maxToRenderPerBatch={6} windowSize={5}

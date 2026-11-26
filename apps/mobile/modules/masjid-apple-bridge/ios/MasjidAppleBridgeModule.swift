@@ -55,6 +55,48 @@ private struct BridgePrayerSnapshot: Decodable {
   }
 }
 
+// Keep native fold measurements in the reader's local view coordinates.
+// UIKit invalidates updateConstraints when a reserved region changes.
+public final class QuranFoldRegionView: ExpoView {
+  let onRegionChange = EventDispatcher()
+  private var lastGeometry: [String: Double]?
+
+  public override func didMoveToWindow() {
+    super.didMoveToWindow()
+    setNeedsUpdateConstraints()
+  }
+
+  public override func updateConstraints() {
+    super.updateConstraints()
+    reportRegion()
+  }
+
+  public override func layoutSubviews() {
+    super.layoutSubviews()
+    reportRegion()
+  }
+
+  private func reportRegion() {
+    guard #available(iOS 27.1, *), window != nil, !bounds.isEmpty else { return }
+    guard let region = reservedRegions(kind: .division, options: .includeInactive).first else {
+      if lastGeometry != nil {
+        lastGeometry = nil
+        onRegionChange(["width": 0, "height": 0])
+      }
+      return
+    }
+    let geometry: [String: Double] = [
+      "width": bounds.width.rounded(), "height": bounds.height.rounded(),
+      "x": region.frame.minX.rounded(.down), "y": region.frame.minY.rounded(.down),
+      "right": region.frame.maxX.rounded(.up), "bottom": region.frame.maxY.rounded(.up),
+      "active": region.isActive ? 1 : 0
+    ]
+    guard geometry != lastGeometry else { return }
+    lastGeometry = geometry
+    onRegionChange(geometry)
+  }
+}
+
 public final class MasjidAppleBridgeModule: Module {
   private var quranCommandObserver: NSObjectProtocol?
 
@@ -69,8 +111,12 @@ public final class MasjidAppleBridgeModule: Module {
 
     Constants([
       "isIOSAppOnMac": ProcessInfo.processInfo.isiOSAppOnMac,
-      "isMacCatalyst": ProcessInfo.processInfo.isMacCatalystApp
+      "isMacCatalyst": ProcessInfo.processInfo.isMacCatalystApp,
+      "hasQuranFoldRegionView": true
     ])
+    View(QuranFoldRegionView.self) {
+      Events("onRegionChange")
+    }
     Events("onMacQuranCommand")
     OnStartObserving {
       guard ProcessInfo.processInfo.isiOSAppOnMac || ProcessInfo.processInfo.isMacCatalystApp else { return }
