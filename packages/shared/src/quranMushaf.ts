@@ -14,6 +14,9 @@ export function mushafFontUrl(page: number) {
   if (!validMushafPageNumber(page)) throw new Error("Invalid Mushaf page.");
   return `https://verses.quran.foundation/fonts/quran/hafs/v2/woff2/p${page}.woff2`;
 }
+// QCF V2 may encode one word as several glyphs separated by an ASCII space.
+const qcfWordGlyphs = /^[\uE000-\uF8FF\uFB50-\uFDFF]+(?: [\uE000-\uF8FF\uFB50-\uFDFF]+)*$/;
+
 export function validateMushafPage(value: unknown, page: number): MushafPage {
   const p = value as MushafPage;
   if (!validMushafPageNumber(page) || !p || p.page !== page || !Number.isInteger(p.juz) || p.juz < 1 || p.juz > 30
@@ -28,7 +31,7 @@ export function validateMushafPage(value: unknown, page: number): MushafPage {
     for (const word of line.words) {
       const id = `${word.key}:${word.position}`;
       if (parseAyahReference(word.key)?.key !== word.key || !Number.isInteger(word.position) || word.position < 1 || word.position > 200
-        || typeof word.glyph !== "string" || !/^[\uE000-\uF8FF\uFB50-\uFDFF]{1,8}$/.test(word.glyph)
+        || typeof word.glyph !== "string" || word.glyph.length > 8 || word.glyph.trim() !== word.glyph || !qcfWordGlyphs.test(word.glyph)
         || typeof word.text !== "string" || !word.text || word.text.length > 120 || /[<>]/.test(word.text) || seen.has(id)) throw new Error("Invalid Mushaf word.");
       seen.add(id); count++;
     }

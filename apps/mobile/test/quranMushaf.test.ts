@@ -21,7 +21,7 @@ test("Madinah layout has 15 fixed lines, exact glyphs and independent 604-page n
 test("Mushaf rejects missing lines, bad page/glyphs, duplicated positions and injected headings", () => {
   assert.throws(() => validateMushafPage({ ...page, lines: page.lines.slice(1) }, 3));
   assert.throws(() => validateMushafPage(page, 4));
-  for (const change of [{ glyph: "<script>" }, { glyph: "generated text" }, { key: "115:1" }, { position: 0 }]) {
+  for (const change of [{ glyph: "<script>" }, { glyph: "generated text" }, { glyph: "ﱨ  ﱩ" }, { glyph: "ﱨ\nﱩ" }, { glyph: "ﱨ\n" }, { glyph: " ﱨ" }, { glyph: "ﱨ ".repeat(5) + "ﱩ" }, { key: "115:1" }, { position: 0 }]) {
     const broken = structuredClone(page); Object.assign(broken.lines[0].words[0], change);
     assert.throws(() => validateMushafPage(broken, 3));
   }
@@ -29,6 +29,16 @@ test("Mushaf rejects missing lines, bad page/glyphs, duplicated positions and in
   assert.throws(() => validateMushafPage(duplicate, 3));
   const heading = structuredClone(page); heading.lines[0] = { number: 1, words: [], heading: "<img onerror=alert(1)>" };
   assert.throws(() => validateMushafPage(heading, 3));
+});
+test("QCF V2 glyphs separated by a space stay together as one selectable word", () => {
+  for (const [number, line, key, glyph, text] of [[5, 4, "2:26", "\uFC68 \uFC69", "إِنَّ"], [7, 9, "2:44", "\uFC93 \uFC94", "أَتَأْمُرُونَ"]] as const) {
+    const sample = { ...structuredClone(page), page: number };
+    sample.lines[line - 1].words[0] = { key, position: 1, glyph, text };
+    assert.equal(validateMushafPage(sample, number).lines[line - 1].words[0].glyph, glyph);
+    const html = mushafDocument(sample, false, key);
+    assert.match(html, new RegExp(`data-key="${key}"[^>]+>${glyph}</button>`));
+    assert.equal((html.match(new RegExp(`data-key="${key}"`, "g")) ?? []).length, 1);
+  }
 });
 test("browser Mushaf uses an explicit channel without weakening the native sandbox", () => {
   const html = mushafDocument(page, false, "2:6", {channel: "mushaf_test_1"});
