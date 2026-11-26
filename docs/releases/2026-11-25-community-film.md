@@ -87,3 +87,16 @@ Run `node scripts/media/render-hbic-wudu-review.mjs <original-film> <first-priva
 The 1080p master decoded in software and on macOS hardware. All 6,207 picture timestamps are continuous at 30 fps. The first 5,080 decoded frames match the first private cut, and all 9,700 audio packets retain the same hash. The silence check found only the opening and closing fades. The last 0.10 seconds reach the near-black threshold as the end card fades. Frame review covered the entrances, partial title reveals, settled titles, and closing fade.
 
 - `Masjid Bilal Trailer - Motion Review.mp4` · 145,151,051 bytes · SHA-256 `b872e5c075f207e1609892ff5b864173338697a249ebcc81da3cda0e46179fc2`
+
+## Brothers Night motion review
+
+The Brothers Night insert uses the original Drive film’s contour artwork, the opening’s centered type-on reveal, and the rounded panel motion from the archival galleries. The white title holds above the four November 2025 shots while the portraits slide across the frame. The table tennis shot rises into place, and the chapter dissolves back into the moving archive footage.
+
+The two joins span 1:25.467 to 1:52.033. The four shot timings are anchored at 1:26.000, 1:31.500, 1:34.500 and 1:42.000. The 32-frame review covered the partial title reveal, each shot exchange and both joins.
+
+Run `node scripts/media/render-hbic-brothers-night-review.mjs <original-film> <motion-review> <graded-clips-directory> <private-output-directory>`. The script checks the original Drive film, Motion Review and four graded clips by SHA-256.
+
+The master decoded in software and with macOS hardware acceleration at 1920 × 1080. All 6,207 frames have continuous 30 fps timestamps. The 5,279 decoded frames outside the enclosing splice keyframes at 1:22.433 and 1:53.367 match the Motion Review exactly, including the wudu and closing sequences. Their combined frame SHA-256 is `dc043485e4b062a7982511ee4694bf48edece640d954f62b9f0c223d63493db5`. All 9,700 AAC packets match the Motion Review. The 206.9-second export passed the blackout check at 0.08 seconds, and the silence check detected only the opening and closing fades.
+
+- `Masjid Bilal Trailer - Brothers Night Review.mp4` · 144,343,473 bytes · SHA-256 `b12cee820f41d29a7b22f4d076b2196d550e4fea93bf75ffeca64bc194635d0c`
+- Private Drive viewing copy · 1920 × 1080 at 30 fps · 84,377,010 bytes · SHA-256 `04f8e170c862a68295d3817f3ae4becc555edae69c32bc8bc4ed0f3f8f8f6cae`. The downloaded bytes matched the local viewing copy, and Drive showed owner-only access.

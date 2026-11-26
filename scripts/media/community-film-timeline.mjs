@@ -20,6 +20,15 @@ export const sources = {
   "IMG_0987.MOV": "e657d6e505b1cfc53489d5c495b5b04d477040c0a9f6b8b15b0402bef1318482",
 };
 
+// These November 20 extracts carry the approved SDR grade for the four camera originals.
+export const gradedBrothersNight = [
+  { file: "brothers-1.mp4", at: 2580, frames: 165, hash: "e0d96846ee83d7f5875811254e98463f06203eeb3f743dc4b53e9933a51da017" },
+  { file: "brothers-2.mp4", at: 2745, frames: 90, hash: "211631f1adcdf013a0b03e6695202bc8231026fd9a4b362aa557a0cb8ef10d76" },
+  { file: "brothers-3.mp4", at: 2835, frames: 225, hash: "5c5a8a60e78b311f8f1d2d4fb93071c8e2af184c3931c994ff9f1a7edcfa2875" },
+  { file: "brothers-4.mp4", at: 3060, frames: 285, hash: "2ad51bfec6e6886912fabe6fe2393792d92b94e63db3ede082fc1493ae6cf69a" },
+];
+export const brothersNightEnd = 3345;
+
 const openingRoom = [1780, 800, 68, 140];
 const washroom = [516, 906, 702, 85];
 const brothers = { kicker: "NOVEMBER 2025", title: ["Brothers", "Night"], fixedTitle: true };

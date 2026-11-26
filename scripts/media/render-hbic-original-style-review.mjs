@@ -4,7 +4,7 @@ import { createReadStream } from "node:fs";
 import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { sources } from "./community-film-timeline.mjs";
+import { brothersNightEnd as returnToArchive, gradedBrothersNight as shots, sources } from "./community-film-timeline.mjs";
 
 const [archive, baseFilm, gradedDirectory, destination] = process.argv.slice(2);
 if (!destination) {
@@ -16,13 +16,6 @@ const fps = 30;
 const frameCount = 6207;
 const dissolveFrames = 12;
 const halfDissolve = dissolveFrames / 2;
-const shots = [
-  { file: "brothers-1.mp4", at: 2580, frames: 165, hash: "e0d96846ee83d7f5875811254e98463f06203eeb3f743dc4b53e9933a51da017" },
-  { file: "brothers-2.mp4", at: 2745, frames: 90, hash: "211631f1adcdf013a0b03e6695202bc8231026fd9a4b362aa557a0cb8ef10d76" },
-  { file: "brothers-3.mp4", at: 2835, frames: 225, hash: "5c5a8a60e78b311f8f1d2d4fb93071c8e2af184c3931c994ff9f1a7edcfa2875" },
-  { file: "brothers-4.mp4", at: 3060, frames: 285, hash: "2ad51bfec6e6886912fabe6fe2393792d92b94e63db3ede082fc1493ae6cf69a" },
-];
-const returnToArchive = 3345;
 const montageBridge = { start: 1314, resume: 1325 };
 const closingBridge = { start: 5893, resume: 5928 };
 const rec709 = ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv"];

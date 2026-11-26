@@ -27,6 +27,8 @@ const caps = {
   Z: [101, "M3 0h98v17L39 61h62v19H0V62l63-43H3z"],
   0: [105, "M52-2c35 0 53 15 53 42S87 82 52 82 0 67 0 40 17-2 52-2zm0 20c-17 0-25 7-25 22s8 22 25 22c18 0 26-7 26-22S70 18 52 18z"],
   1: [64, "M32 0h25v80H31V23L6 32V12z"],
+  2: [104, "M0 27C2 8 19-2 53-2c33 0 50 9 50 25 0 13-11 19-29 25l-27 8c-8 2-13 4-16 7h73v17H0V69c0-13 11-21 32-27l30-9c10-3 14-5 14-9 0-5-8-8-23-8-17 0-24 4-26 11z"],
+  5: [105, "M5 0h94v18H27l-2 13c7-4 17-5 31-5 31 0 49 10 49 28 0 19-18 28-53 28C21 82 4 73 0 56h27c3 6 10 9 25 9 17 0 25-4 25-11s-8-10-25-10c-13 0-22 2-27 6L3 44z"],
   "%": [108, "M22-1c15 0 22 8 22 21S37 41 22 41 0 33 0 20 7-1 22-1zm0 13c-6 0-9 3-9 8s3 8 9 8 9-3 9-8-3-8-9-8zM78 0h18L31 80H13zm8 40c15 0 22 8 22 21s-7 21-22 21-22-8-22-21 7-21 22-21zm0 13c-6 0-9 3-9 8s3 8 9 8 9-3 9-8-3-8-9-8z"],
   "/": [55, "M36 0h19L19 80H0z"],
   ".": [23, "M0 62h23v18H0z"],
@@ -58,4 +60,14 @@ export function titlePaths(text, {
     shapes.push(`<rect x="${last.at + last.width + 11}" y="-10" width="4" height="100"/>`);
   }
   return `<g transform="translate(${x - width * scale / 2} ${top}) scale(${scale})" fill="${fill}" fill-rule="evenodd">${shapes.join("")}</g>`;
+}
+
+export function typeOnHeadline(text, frame, start, top, height, duration = 11, caretThrough = start + duration + 6) {
+  if (frame < start) return "";
+  // Keep the completed line's width as the anchor as each character appears.
+  const letters = text.replaceAll(" ", "").length;
+  const visible = Math.ceil((frame - start + 1) * letters / duration);
+  const caret = frame < caretThrough;
+  const core = titlePaths(text, { top, height, maxWidth: 1450, visible, caret });
+  return `<g opacity=".48" filter="url(#bloom)" transform="translate(0 2)">${core}</g>${core}`;
 }

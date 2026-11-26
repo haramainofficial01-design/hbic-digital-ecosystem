@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import { sources } from "./community-film-timeline.mjs";
-import { titlePaths } from "./hbic-film-titles.mjs";
+import { titlePaths, typeOnHeadline as headline } from "./hbic-film-titles.mjs";
 
 const [archive, review, destination] = process.argv.slice(2);
 if (!destination) throw new Error("Provide the original film, first private review and a private output directory.");
@@ -73,18 +73,6 @@ async function verifyInput(file, expected) {
 
 function svg(content, w = width, h = height, top = 0) {
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 ${top} ${w} ${h}">${content}</svg>`);
-}
-
-function headline(text, frame, start, top, capHeight, length = 11, caretThrough = start + length + 6) {
-  if (frame < start) return "";
-  // Match the short opening reveal and its brief caret hold. Keep the
-  // complete line's width as the anchor while the letters appear.
-  const letters = text.replaceAll(" ", "").length;
-  const elapsed = frame - start;
-  const visible = Math.ceil((elapsed + 1) * letters / length);
-  const caret = frame < caretThrough;
-  const core = titlePaths(text, { top, height: capHeight, maxWidth: 1450, visible, caret });
-  return `<g opacity=".48" filter="url(#bloom)" transform="translate(0 2)">${core}</g>${core}`;
 }
 
 async function archiveInk(frame, crop, height) {
