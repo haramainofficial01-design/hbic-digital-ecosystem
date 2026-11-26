@@ -3,6 +3,7 @@ import { ActivityIndicator, Keyboard, ScrollView, StyleSheet, View } from "react
 import { WebView } from "react-native-webview";
 import { parseAyahReference, validMushafPageNumber, type MushafPage } from "@hbic/shared";
 import { Text, TextInput, Alert } from "../i18n/LocalizedText";
+import { useAppLanguage } from "../i18n/LanguageProvider";
 import { quranClient, quranRemoteClient } from "../services/quran";
 import { useAppTheme } from "../theme/ThemeProvider";
 import { AppButton } from "../components/AppButton";
@@ -88,6 +89,7 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
   focused?: boolean;
 }) {
   const { theme } = useAppTheme();
+  const { translate } = useAppLanguage();
   const [page, setPage] = useState<number | null>(null);
   const [selected, setSelected] = useState(reference);
   const [geometry, setGeometry] = useState<MushafGeometry | null>(null);
@@ -145,6 +147,12 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
     setJump("");
     setError(null);
     setPage(next);
+  }
+
+  function jumpToPage(value: string) {
+    const next = Number(value);
+    if (validMushafPageNumber(next)) changePage(next);
+    else setError("Choose a page between 1 and 604.");
   }
 
   function turn(direction: 1 | -1) {
@@ -234,11 +242,10 @@ export function QuranMushaf({ reference, library, audio, onOpenAyah, onTabletopC
     {error ? <QuranMessage message={error} onRetry={retry} /> : null}
     <View style={[styles.jump, { borderColor: theme.colors.border }]}>
       <TextInput accessibilityLabel="Mushaf Page Number" value={jump} onChangeText={setJump} placeholder="Page 1–604"
-        placeholderTextColor={theme.colors.subtle} keyboardType="number-pad" maxLength={3} style={[styles.jumpField, { color: theme.colors.text }]} />
-      <AppButton label="Go to Page" variant="ghost" onPress={() => {
-        if (validMushafPageNumber(Number(jump))) changePage(Number(jump));
-        else setError("Choose a page between 1 and 604.");
-      }} />
+        placeholderTextColor={theme.colors.subtle} keyboardType="number-pad" maxLength={3} style={[styles.jumpField, { color: theme.colors.text }]}
+        inputAccessoryViewButtonLabel={translate("Go to Page")} submitBehavior="blurAndSubmit"
+        onSubmitEditing={event => jumpToPage(event.nativeEvent.text)} />
+      <AppButton label="Go to Page" variant="ghost" onPress={() => jumpToPage(jump)} />
     </View>
     <Text style={[styles.credit, { color: theme.colors.subtle }]}>Madinah Hafs · QCF V2 · 15-line edition{"\n"}Opening pages retain their special layout.{"\n"}Quran data and fonts provided by Quran Foundation.</Text>
   </>;
