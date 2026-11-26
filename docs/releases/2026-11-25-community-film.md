@@ -144,3 +144,7 @@ The 1080p master runs 206.9 seconds with 6,207 continuous picture timestamps. Al
 - Website MP4 · 70,296,228 bytes · SHA-256 `120ce591cc5602142245f05642c2bd3fd2618e45d88b6c12d65a4ac425ffa7c1` · asset revision `20261125-march`.
 
 The web player passed play with sound, pause and resume, and 16 seek checks at 320, 390, 1024 and 1440 px across light and dark appearance. No video was requested before interaction. The two touch viewport checks used reduced motion.
+
+Source commit `88662dd` is live on `hbic.ca` via Vercel deployment `dpl_9ojX2NREeJy8QWBFMMUnra6iLkCZ`. The staged deployment and live domain both served the verified film, poster, and preview bytes. The film honored byte-range requests, and the Academy card-availability and prayer-display checks passed. The prior deployment `dpl_DoKwth3NaDVqdL3t2ejwTKszyspc` is the rollback that withdraws the trailer from the website.
+
+The March cut is awaiting YouTube upload and Home trailer selection, and Instagram upload and pinning. The signed-in publishing tabs were unavailable in this chat.
