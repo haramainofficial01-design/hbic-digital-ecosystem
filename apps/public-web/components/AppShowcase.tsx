@@ -13,7 +13,8 @@ export function AppShowcaseIcon() {
 }
 
 export function AppShowcaseImage({ screen, priority = false }: { screen: keyof typeof screens; priority?: boolean }) {
-  return <Image {...screens[screen]} priority={priority} unoptimized />;
+  const { src, width, height, alt } = screens[screen];
+  return <Image src={src} width={width} height={height} alt={alt} priority={priority} unoptimized />;
 }
 
 export function AppShowcaseScreens({ priority = false }: { priority?: boolean }) {
