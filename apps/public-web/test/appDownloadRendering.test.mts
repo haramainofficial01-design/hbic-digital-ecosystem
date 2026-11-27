@@ -14,14 +14,15 @@ test("shared app card renders one universal QR and safe link; fallback retains d
   const output = { exports: {} as { card: string; choices: string } };
   new Function("require", "module", "exports", result.outputFiles[0].text)(createRequire(import.meta.url), output, output.exports);
   for (const html of [output.exports.card, output.exports.choices]) {
-    assert.equal([...html.matchAll(/<img\b/g)].length, 1);
-    assert.ok(html.includes(`src="${appDownloadQr}"`));
+    assert.equal(html.split(`src="${appDownloadQr}"`).length - 1, 1);
     assert.equal([...html.matchAll(/href="https:\/\/hbic.ca\/download"/g)].length, 3);
     assert.ok(html.includes("iPhone") && html.includes("Android"));
     assert.doesNotMatch(html, /app-store-qr.png|google-play-qr.png/);
   }
   assert.ok(output.exports.choices.includes("id6790937097"));
   assert.ok(output.exports.choices.includes("id=ca.hbic.calgary.app"));
+  assert.match(output.exports.choices, /aria-label="Download Masjid Bilal on the Apple App Store"[^>]*><img[^>]*src="\/app\/badge-app-store.svg"/);
+  assert.match(output.exports.choices, /aria-label="Get Masjid Bilal on Google Play"[^>]*><img[^>]*src="\/app\/badge-google-play.png"/);
 });
 
 test("the checked-in static QR is reproducibly generated from the same canonical download URL", async () => {

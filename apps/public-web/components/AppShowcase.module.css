@@ -1,0 +1,338 @@
+.landing,
+.home {
+  width: min(calc(100% - 2rem), 76rem);
+  margin-inline: auto;
+}
+
+.landing {
+  padding-block: clamp(1.5rem, 4vw, 3.5rem) clamp(3rem, 8vw, 6rem);
+}
+
+.hero,
+.home {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3.5rem);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  border-radius: 2rem;
+  color: #f8f4ea;
+  background: radial-gradient(ellipse at 88% 62%, #145760, transparent 58%), var(--navy);
+}
+
+.home {
+  margin-block: clamp(2rem, 5vw, 4rem);
+}
+
+.intro {
+  min-width: 0;
+}
+
+.appIcon {
+  display: block;
+  width: 3.75rem;
+  height: 3.75rem;
+  margin-block-end: 1.5rem;
+  border: 1px solid #376772;
+  border-radius: 1rem;
+}
+
+.intro h1,
+.intro h2,
+.features > h2,
+.featureCopy h3,
+.download h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: -.037em;
+  text-wrap: balance;
+}
+
+.intro h1,
+.intro h2 {
+  max-width: 11ch;
+  font-size: clamp(3rem, 6.2vw, 5.5rem);
+  line-height: .98;
+}
+
+.home .intro h2 {
+  font-size: clamp(2.75rem, 5.3vw, 4.75rem);
+}
+
+.intro em {
+  color: #a2dcd5;
+}
+
+.intro > p {
+  max-width: 31ch;
+  margin: 1.375rem 0 1.625rem;
+  color: #d9e9e9;
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  line-height: 1.55;
+}
+
+.hero :global(.app-store-links) {
+  gap: .875rem;
+}
+
+.home :global(.smart-app-download) {
+  max-width: 19rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.home :global(.app-smart-qr) {
+  width: 4.75rem;
+  height: 4.75rem;
+}
+
+.home :global(.app-smart-url) {
+  color: #d9e9e9;
+}
+
+.exploreLink {
+  display: inline-flex;
+  align-items: center;
+  gap: .625rem;
+  min-height: 44px;
+  font-weight: 750;
+  text-underline-offset: .24em;
+  margin-block-start: .625rem;
+  color: #f2d990;
+}
+
+.exploreLink:hover {
+  text-decoration: underline;
+}
+
+.exploreLink:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: .25rem;
+}
+
+.screens {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(.5rem, 2vw, 1.5rem);
+  position: relative;
+  isolation: isolate;
+  padding: .625rem .375rem 1.125rem;
+}
+
+.screens::before {
+  position: absolute;
+  z-index: -1;
+  inset: 4% 1% 4% 10%;
+  border: 1px solid #82d7cf3b;
+  border-radius: 48% 52% 52% 48%;
+  transform: rotate(-23deg);
+  content: "";
+}
+
+.homeScreen,
+.prayerScreen,
+.featureScreen,
+.mushafScreen {
+  overflow: hidden;
+  background: #eff8f9;
+  box-shadow: 0 20px 40px #00172340;
+}
+
+.homeScreen,
+.prayerScreen {
+  flex: 0 1 45%;
+  min-width: 0;
+  max-width: 14rem;
+  border: 4px solid #081b2a;
+  border-radius: clamp(.875rem, 2.1vw, 1.75rem);
+}
+
+.homeScreen {
+  transform: rotate(-4deg);
+}
+
+.prayerScreen {
+  flex-basis: 40%;
+  margin-block-start: clamp(1rem, 7vw, 6rem);
+  transform: rotate(5deg);
+}
+
+.screens img,
+.featureScreen img,
+.mushafScreen img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .homeScreen,
+  .prayerScreen {
+    transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .screens:hover .homeScreen {
+    transform: translateY(-.375rem) rotate(-4deg);
+  }
+
+  .screens:hover .prayerScreen {
+    transform: translateY(-.1875rem) rotate(5deg);
+  }
+}
+
+.features {
+  margin-block-start: clamp(3rem, 8vw, 6.5rem);
+}
+
+.features > h2 {
+  margin-block-end: clamp(1.5rem, 4vw, 2.75rem);
+  font-size: clamp(2.125rem, 4vw, 3.5rem);
+  line-height: 1.05;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  gap: clamp(.75rem, 2vw, 1.5rem);
+}
+
+.mushaf,
+.prayer,
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: clamp(1.375rem, 4vw, 3rem);
+  border-radius: 1.5rem;
+}
+
+.mushaf {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, .66fr) minmax(0, 1.34fr);
+  align-items: center;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  color: #152c29;
+  background: #f1e7d2;
+}
+
+.prayer {
+  color: #f8f4ea;
+  background: #103a4a;
+}
+
+.events {
+  color: #142f35;
+  background: #dbebe7;
+}
+
+.featureCopy h3 {
+  max-width: 16ch;
+  font-size: clamp(1.875rem, 3.4vw, 3.25rem);
+  line-height: 1.08;
+}
+
+.featureCopy p {
+  max-width: 36ch;
+  margin: .875rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  line-height: 1.55;
+}
+
+.prayer .featureCopy p {
+  color: #d9e9e9;
+}
+
+.featureScreen {
+  align-self: center;
+  width: min(100%, 13.5rem);
+  margin-block-start: auto;
+  border-radius: 1rem;
+}
+
+.prayer .featureScreen {
+  width: min(100%, 16.5rem);
+}
+
+.mushafScreen {
+  border-radius: .875rem;
+}
+
+.download {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+  margin-block-start: clamp(2.5rem, 6vw, 5rem);
+  padding: clamp(1.375rem, 4vw, 2.5rem);
+  border-radius: 1.25rem;
+  color: #f8f4ea;
+  background: var(--navy);
+}
+
+.download h2 {
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  line-height: 1.12;
+}
+
+.download :global(.smart-app-download) {
+  width: min(100%, 18rem);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.download :global(.app-smart-qr) {
+  width: 4.75rem;
+  height: 4.75rem;
+}
+
+.download :global(.app-smart-url) {
+  color: #d9e9e9;
+}
+
+@media (max-width: 49rem) {
+  .hero,
+  .home {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+
+  .screens {
+    justify-self: center;
+    width: min(100%, 28rem);
+  }
+
+  .mushaf {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 37rem) {
+  .landing,
+  .home {
+    width: calc(100% - 1.25rem);
+  }
+
+  .hero,
+  .home {
+    padding: 1.375rem;
+    border-radius: 1.5rem;
+  }
+
+  .appIcon {
+    width: 3.125rem;
+    height: 3.125rem;
+    margin-block-end: 1.125rem;
+    border-radius: .875rem;
+  }
+
+  .intro h1,
+  .home .intro h2 {
+    font-size: clamp(2.5rem, 11vw, 3.5rem);
+  }
+
+  .featureGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

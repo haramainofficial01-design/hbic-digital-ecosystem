@@ -1,93 +1,68 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { SiteChrome } from "../../components/SiteChrome";
-import { StoreDownloadButtons } from "../../components/AppStoreLinks";
-import { getPublishedPageContent as getPublishedContent } from "../../lib/contentStore";
+import { AppDownloadLink, StoreDownloadButtons } from "../../components/AppStoreLinks";
+import { AppShowcaseIcon, AppShowcaseImage, AppShowcaseScreens } from "../../components/AppShowcase";
+import styles from "../../components/AppShowcase.module.css";
+import { getPublishedPageContent } from "../../lib/contentStore";
 
 export const metadata: Metadata = {
   title: "Masjid Bilal App | Hazrat Bilal Islamic Centre",
-  description: "Download the official Masjid Bilal app for prayer and iqamah times, announcements, events and community updates.",
+  description: "Check Masjid Bilal’s prayer and iqamah times, read the Madinah Mushaf, and find local events. Download for iPhone and Android.",
   alternates: { canonical: "/app" },
   openGraph: {
-    title: "Your Masjid, Wherever You Are | Masjid Bilal App",
-    description: "Stay connected with Masjid Bilal through prayer times, community events, announcements and more.",
+    title: "Masjid Bilal, every day.",
+    description: "Prayer times, the Madinah Mushaf, and life at Masjid Bilal. On iPhone and Android.",
     url: "https://hbic.ca/app",
     images: ["/brand/hbic-social-preview-v3.jpg"]
   }
 };
 
-const features = [
-  {
-    eyebrow: "Prayer & iqamah",
-    title: "The official schedule, wherever the day takes you.",
-    body: "See today’s adhan and iqamah times, the next prayer and Jumu’ah information from the same Masjid Bilal schedule used across HBIC.",
-    image: "/app/android-prayer.png",
-    alt: "Masjid Bilal Android prayer screen showing adhan, iqamah and the next prayer"
-  },
-  {
-    eyebrow: "Community",
-    title: "Stay close to what is happening at the masjid.",
-    body: "Find current announcements, events, programs and community information without searching across separate channels.",
-    image: "/app/android-community.png",
-    alt: "Masjid Bilal Android community screen showing current masjid information"
-  }
-] as const;
-
 export default async function AppPage() {
-  const { content } = await getPublishedContent();
+  const { content } = await getPublishedPageContent();
 
   return (
     <SiteChrome settings={content.settings} contentVersion={content.version}>
-      <main className="app-landing-page">
-        <section className="app-landing-hero" aria-labelledby="app-landing-title">
-          <div className="app-landing-hero-copy">
-            <div className="app-landing-identity">
-              <Image src="/brand/hbic-logo.png" alt="Masjid Bilal" width={500} height={500} priority />
-              <span><b>Masjid Bilal</b><small>Hazrat Bilal Islamic Centre · Calgary</small></span>
-            </div>
-            <span className="eyebrow">THE OFFICIAL MASJID BILAL APP</span>
-            <h1 id="app-landing-title">Your Masjid,<br /><em>Wherever You Are.</em></h1>
-            <p>Stay connected with Masjid Bilal through prayer and iqamah times, community events, announcements and more.</p>
-            <StoreDownloadButtons showQr />
-            <small className="app-verified-note">Official public downloads for iPhone and Android.</small>
+      <main className={styles.landing}>
+        <section className={styles.hero} aria-labelledby="app-landing-title">
+          <div className={styles.intro}>
+            <AppShowcaseIcon />
+            <h1 id="app-landing-title">Masjid Bilal, <em>every day.</em></h1>
+            <p>Plan around adhan and iqamah, read the Qur’an, and stay close to your Calgary masjid.</p>
+            <StoreDownloadButtons />
           </div>
-          <div className="app-landing-devices" aria-label="Masjid Bilal app on iPhone and Android">
-            <div className="app-device app-device-ios">
-              <Image src="/app/iphone-home.png" alt="Masjid Bilal iPhone home screen showing the next prayer and iqamah time" width={1206} height={2622} priority />
-            </div>
-            <div className="app-device app-device-android">
-              <Image src="/app/android-prayer.png" alt="Masjid Bilal Android prayer screen showing today’s prayer and iqamah times" width={1080} height={1920} priority />
-            </div>
+          <AppShowcaseScreens priority />
+        </section>
+
+        <section className={styles.features} aria-labelledby="app-features-title">
+          <h2 id="app-features-title">Prayer, Qur’an and community.</h2>
+          <div className={styles.featureGrid}>
+            <article className={styles.mushaf}>
+              <div className={styles.featureCopy}>
+                <h3>Read the Madinah Mushaf.</h3>
+                <p>Read the 15-line Mushaf, listen to an ayah, or bookmark your place. Unfold an iPhone Duo to read facing pages together.</p>
+              </div>
+              <div className={styles.mushafScreen}><AppShowcaseImage screen="mushaf" /></div>
+            </article>
+            <article className={styles.prayer}>
+              <div className={styles.featureCopy}>
+                <h3>Know when to arrive.</h3>
+                <p>See Masjid Bilal’s daily adhan and iqamah times, the next prayer, and Friday’s khutbah starts.</p>
+              </div>
+              <div className={styles.featureScreen}><AppShowcaseImage screen="prayer" /></div>
+            </article>
+            <article className={styles.events}>
+              <div className={styles.featureCopy}>
+                <h3>Find your next gathering.</h3>
+                <p>Find Qur’an Academy classes, halaqas, youth programs, and announcements from the masjid.</p>
+              </div>
+              <div className={styles.featureScreen}><AppShowcaseImage screen="events" /></div>
+            </article>
           </div>
         </section>
 
-        <section className="app-feature-intro" aria-labelledby="app-feature-title">
-          <span className="eyebrow">MADE FOR OUR COMMUNITY</span>
-          <h2 id="app-feature-title">The essentials, thoughtfully connected.</h2>
-          <p>Everything shown here comes from the real Masjid Bilal app.</p>
-        </section>
-
-        <div className="app-feature-list">
-          {features.map((feature, index) => (
-            <section className={`app-feature${index % 2 ? " app-feature-reverse" : ""}`} key={feature.title}>
-              <div className="app-feature-copy">
-                <span>{feature.eyebrow}</span>
-                <h2>{feature.title}</h2>
-                <p>{feature.body}</p>
-              </div>
-              <div className="app-feature-screen">
-                <Image src={feature.image} alt={feature.alt} width={1080} height={1920} />
-              </div>
-            </section>
-          ))}
-        </div>
-
-        <section className="app-final-cta" aria-labelledby="app-final-title">
-          <Image src="/brand/hbic-logo.png" alt="" width={500} height={500} />
-          <span className="eyebrow">MASJID BILAL · CALGARY</span>
-          <h2 id="app-final-title">Carry your masjid with you.</h2>
-          <p>Download the official Masjid Bilal app today.</p>
-          <StoreDownloadButtons showQr />
+        <section className={styles.download} aria-labelledby="app-download-title">
+          <h2 id="app-download-title">Get Masjid Bilal on your phone.</h2>
+          <AppDownloadLink />
         </section>
       </main>
     </SiteChrome>

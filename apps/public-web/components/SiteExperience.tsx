@@ -108,12 +108,7 @@ export function SiteExperience() {
         const elements = Array.from(document.querySelectorAll<HTMLElement>([
           ".page-hero",
           ".hero-panel",
-          ".app-landing-hero",
-          ".app-feature-intro",
-          ".app-feature",
-          ".app-final-cta",
           ".welcome-film-section > *",
-          ".app-home-promotion > *",
           ".section > .card",
           ".section > .grid > *",
           ".directory-form-band",
