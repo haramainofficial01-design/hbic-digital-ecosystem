@@ -7,13 +7,7 @@
     player = el("player"),
     audio = el("recitation");
   if (!screen || !el("stage-arabic") || !el("record-duration")) return;
-  var artist = {
-    arabic: "أحمد النفيس",
-    title: "Ahmad Al Nufais",
-    credit: "Qur’an recitation",
-    art: "mushaf-gold",
-    position: "63% 53%",
-  };
+  var artist;
   var editions = {
     "Al-Kahf": {
       arabic: "سورة الكهف",
@@ -50,14 +44,14 @@
     evening: {
       arabic: "أذكار المساء",
       title: "Evening adhkar",
-      art: "madinah-blue",
-      position: "82% 48%",
+      art: "blue-hour-minarets",
+      position: "55% 54%",
     },
     ruqyah: {
       arabic: "الرُّقية الشرعية",
       title: "Ruqyah",
-      art: "mushaf-sunlight",
-      position: "44% 69%",
+      art: "window-mushaf",
+      position: "55% 48%",
     },
   };
   function setArt(node, entry) {
@@ -67,10 +61,9 @@
     );
     node.style.setProperty("--record-position", entry.position);
   }
-  var current = artist,
+  var current,
     sceneIndex = 0,
     scenes = screen.querySelectorAll(".artist-scene i");
-  setArt(scenes[0], artist);
   function focusEntry(entry) {
     if (current === entry) return;
     current = entry;
@@ -81,7 +74,7 @@
     previous.classList.remove("is-visible");
     el("stage-arabic").textContent = entry.arabic;
     el("stage-english").textContent = entry.title;
-    el("stage-detail").textContent = entry.credit || "Ahmad Al Nufais";
+    el("stage-detail").textContent = entry === artist ? "Qur’an recitation" : entry.credit || artist.title;
   }
   function attachFocus(button, entry) {
     button.addEventListener("focus", function () {
@@ -120,18 +113,25 @@
   Object.keys(devotions).forEach(function (key) {
     var button = el(key),
       entry = devotions[key];
+    entry.credit = "Ahmad Al Nufais";
     setArt(button, entry);
     attachFocus(button, entry);
   });
-  el("nav-listen").addEventListener("focus", function () {
+  [el("nav-listen"), el("change-reciter")].forEach(function (button) {
+    button.addEventListener("focus", function () { focusEntry(artist); });
+  });
+  document.addEventListener("prayer-room-reciter", function (event) {
+    artist = event.detail;
     focusEntry(artist);
   });
+  document.dispatchEvent(new Event("prayer-room-artist-ready"));
   var lastTrack = "";
   function updateTrack() {
     var title = el("track-title").textContent,
       entry = editions[title];
     if (!entry || lastTrack === title) return;
     lastTrack = title;
+    player.dataset.edition = entry.number;
     setArt(player, entry);
     el("record-arabic").textContent = entry.arabic;
     el("record-number").textContent = "Surah " + entry.number;

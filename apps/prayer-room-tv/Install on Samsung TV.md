@@ -1,18 +1,21 @@
 # Install Prayer Room on a Samsung TV
 
-## Save it in the TV browser now
+## On your 75-inch Samsung
 
-1. Put the TV and the Mac on the same home network.
-2. Open Internet on the TV and enter `http://MAC-LAN-IP:8765/`. If the Mac's
-   network address changes, use its new local address with port 8765.
-3. Select the star by the browser address bar to bookmark the page, where
-   offered. The bookmark reopens the dashboard whenever the Mac is awake
-   and serving it at that address.
-4. If Internet offers **Add to Home** in **Home → Apps → App Settings**,
-   pin it for quicker access to your bookmarks.
+1. Connect the TV to the same home Wi-Fi as the Mac. The Mac must be signed in and awake.
+2. On the Samsung remote press **Home**, open **Apps**, then **Internet**. Enter **http://MAC-LAN-IP:8765/**. Select the **star** to save Prayer Room to bookmarks.
+3. Open **Settings → All Settings → Advanced Features → Start Screen Option**. Turn **Start with Smart Hub Home** off. If offered, turn **Autorun Samsung TV Plus** off and **Autorun Last App** on.
+4. Return to the Internet app with Prayer Room showing. Press **Power** once to put the TV in standby; turn it back on. If it opens Prayer Room, leave Prayer Room open before switching the TV off each night.
 
-[Samsung TV bookmark instructions](https://www.samsung.com/co/support/tv-audio-video/smart-tv-uhd-4k-un50ku6000-how-to-add-a-page-to-bookmarks/) ·
-[Samsung Canada Smart Hub instructions](https://www.samsung.com/ca/support/tv-audio-video/install-an-app-on-your-samsung-tv/)
+Samsung's manual makes last-app startup dependent on the TV and the app. A bookmark stays saved, but some firmware opens the browser start page or Smart Hub after standby. Use the HDMI setup below for a dedicated display. If your router changes the Mac’s address, reserve its current address in the router’s DHCP settings to keep the same bookmark.
+
+## Permanent display through HDMI
+
+Use a Raspberry Pi 4 or 5 that can stay plugged into wall power beside the TV. The [standalone setup](kiosk/README.md) installs the included Prayer Room files on the Pi and starts them full-screen at desktop login. Once set up, the Pi works independently of the Mac. Internet is needed for live times and media.
+
+On the Samsung, select the Pi’s HDMI input. Keep **Start with Smart Hub Home** and **Autorun Samsung TV Plus** off where available. Keep the Pi powered and leave the TV on its Prayer Room HDMI input before pressing Power. Samsung resumes the last source. After using another app or input, return to this HDMI input before turning off the TV. Press **Home** whenever you want Samsung apps, including YouTube and Prime Video. Use a keyboard or wireless mini-keyboard with the Pi for navigation.
+
+[Samsung Canada support and manual for UN75U7900FFXZC](https://www.samsung.com/ca/support/model/UN75U7900FFXZC/) · [Samsung start screen settings](https://www.samsung.com/au/support/tv-audio-video/configuring-start-screen-for-the-samsung-tv/)
 
 ## Install locally as a Samsung TV app
 

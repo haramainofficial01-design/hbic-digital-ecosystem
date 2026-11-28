@@ -13,6 +13,7 @@ The built-in streams are standard definition. The dashboard renders at 4K in a
 compatible browser. Samsung can scale the interface of a packaged TV app.
 
 Qur’an and reminders
+Sheikh Saud Al-Shuraim audio: https://www.mp3quran.net/ar/shur
 Ahmad Al Nufais audio: https://www.mp3quran.net/ar/nufais
 Morning and evening adhkar, ruqyah, and Alfba’iyyat use linked reciter uploads.
 The short Arabic greetings are customary greetings and supplications.
@@ -38,12 +39,13 @@ Home listening image: Jahra Tasfia Reza, “Open Quran on Wooden Stand in Low Li
 cropped for the listening shortcut. https://www.pexels.com/photo/36188878/
 https://www.pexels.com/license/
 
-Aref Ruqaa, Amiri, Newsreader, Instrument Sans and Noto Naskh Arabic are
+Aref Ruqaa, Amiri, Cormorant Garamond, Manrope, IBM Plex Sans Arabic and Noto Naskh Arabic are
 self-hosted. See the accompanying licenses for each typeface.
 https://fonts.google.com/specimen/Aref+Ruqaa
 https://fonts.google.com/specimen/Amiri
-https://fonts.google.com/specimen/Newsreader
-https://fonts.google.com/specimen/Instrument+Sans
+https://fonts.google.com/specimen/Cormorant+Garamond
+https://fonts.google.com/specimen/Manrope
+https://fonts.google.com/specimen/IBM+Plex+Sans+Arabic
 
 
 Listening library photography
@@ -64,3 +66,16 @@ https://www.pexels.com/photo/majestic-mosque-silhouette-at-twilight-37105315/
 
 prayer-window.webp — Ahmed Mulla, “Old mosque interior with arched windows”.
 https://www.pexels.com/photo/old-mosque-interior-with-arched-windows-4630983/
+
+blue-hour-minarets.webp — Betül Balcı, “Illuminated Blue Mosque at Sunset”.
+https://www.pexels.com/photo/illuminated-blue-mosque-at-sunset-16136083/
+
+window-mushaf.webp — Ebru DOĞAN, “Open Quran on an Ornamented Wooden Book Stand in a Mosque”.
+https://www.pexels.com/photo/open-quran-on-an-ornamented-wooden-book-stand-in-a-mosque-16698195/
+
+Both photographs are supplied under the Pexels License and optimized for the TV.
+https://www.pexels.com/license/
+
+Sheikh Saud Al-Shuraim collection backdrop: Wurzelgnohm, “Makkah Panorama”.
+Photograph cropped for display. CC0 1.0.
+https://commons.wikimedia.org/wiki/File:Makkah_Panorama.jpg

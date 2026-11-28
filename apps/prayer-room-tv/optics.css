@@ -1,0 +1,341 @@
+/* Narrow highlights along the glass perimeter leave a quiet centre for type. */
+:root {
+  --optic-x: 34%;
+  --optic-base: rgb(13 17 20 / 61%);
+  --optic-light: radial-gradient(
+    ellipse at var(--optic-x) -45%,
+    rgb(255 248 230 / 24%),
+    transparent 65%
+  );
+  --optic-depth: linear-gradient(
+    155deg,
+    rgb(233 228 214 / 11%),
+    transparent 30% 78%,
+    rgb(207 220 230 / 8%)
+  );
+  --optic-edges:
+    inset 0 1px 0 rgb(255 253 244 / 34%), inset 0 -1px 0 rgb(223 232 238 / 12%),
+    0 0.15rem 0.45rem rgb(1 5 8 / 26%);
+}
+.glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tabs.glass,
+.prayer-strip.glass,
+.icon-button.glass,
+.play-mark,
+.quiet,
+.drawer:not(.full-record),
+.record-transport .primary-transport {
+  color: #fffaf1;
+  border: 1px solid rgb(244 244 234 / 17%);
+  background: var(--optic-light), var(--optic-depth), var(--optic-base);
+  box-shadow: var(--optic-edges);
+}
+.tabs,
+.icon-button.glass,
+.play-mark {
+  isolation: isolate;
+  position: relative;
+}
+.tabs button {
+  position: relative;
+  z-index: 1;
+}
+.tabs button[aria-current] {
+  color: #211e1b;
+  background: linear-gradient(160deg, #fff9eb, #e5dfd2 75%, #ddd8ca);
+  box-shadow:
+    inset 0 1px 0 #fffaf0,
+    inset 0 -1px 0 #bbb2a5,
+    0 0.08rem 0.17rem #080a0c44;
+}
+.glass,
+.play-mark {
+  -webkit-backdrop-filter: blur(4px) saturate(0.9);
+  backdrop-filter: blur(4px) saturate(0.9);
+}
+.prayer-strip.glass {
+  --optic-base: rgb(9 14 16 / 72%);
+  --optic-light: linear-gradient(
+    109deg,
+    rgb(234 227 211 / 7%),
+    transparent 45%,
+    rgb(184 196 205 / 4%)
+  );
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow:
+    inset 0 1px rgb(255 252 239 / 27%),
+    inset 0 -1px rgb(198 192 171 / 8%),
+    0 0.18rem 0.65rem #01060a36;
+}
+.drawer:not(.full-record) {
+  --optic-base: rgb(16 18 23 / 90%);
+  --optic-light: radial-gradient(
+    ellipse at 10% -40%,
+    rgb(214 220 231 / 19%),
+    transparent 66%
+  );
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  box-shadow:
+    inset 0 1px rgb(253 245 226 / 30%),
+    0 0.65rem 1.8rem #0204096b;
+}
+.watch-drawer:not(.full-record) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.quiet {
+  --optic-base: rgb(36 36 38 / 76%);
+}
+.play-mark {
+  --optic-base: rgb(15 18 23 / 50%);
+}
+.record-transport .primary-transport {
+  --optic-base: rgb(42 43 45 / 72%);
+  --optic-light: radial-gradient(
+    ellipse at 30% -12%,
+    rgb(245 235 213 / 30%),
+    transparent 70%
+  );
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.quiet[aria-pressed="true"],
+.solid .quiet[aria-pressed="true"] {
+  background: #f2ead8;
+  color: #1d211f;
+}
+@supports (corner-shape: squircle) {
+  .prayer-strip.glass,
+  .drawer:not(.full-record),
+  .channel,
+  .listen-sleeve,
+  .record-sleeve {
+    corner-shape: squircle;
+  }
+}
+/* Keep large surfaces free of distortion. Only displace the
+   2–3 px bevels, where changing the sample direction imitates the curvature of a lens. */
+@supports (backdrop-filter: url("#room-glass-bevel")) and
+  (-webkit-mask-composite: xor) {
+  .tabs::before,
+  .icon-button.glass::before,
+  .analog::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: max(2px, 0.09rem);
+    -webkit-backdrop-filter: url("#room-glass-bevel");
+    backdrop-filter: url("#room-glass-bevel");
+    -webkit-mask:
+      linear-gradient(white 0 0) content-box,
+      linear-gradient(white 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(white 0 0) content-box,
+      linear-gradient(white 0 0);
+    mask-composite: exclude;
+  }
+}
+.tabs::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+  border-top: 1px solid rgb(255 251 242 / 29%);
+  border-bottom: 1px solid rgb(255 248 237 / 17%);
+  -webkit-mask-image: linear-gradient(
+    105deg,
+    transparent,
+    black 19%,
+    transparent 53% 73%,
+    black 88%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    105deg,
+    transparent,
+    black 19%,
+    transparent 53% 73%,
+    black 88%,
+    transparent
+  );
+}
+.quiet:focus-visible,
+.channel:focus-visible .play-mark,
+.tabs button:focus-visible:not([aria-current]),
+.icon-button.glass:focus-visible,
+.record-transport .primary-transport:focus-visible {
+  color: #fffdf7;
+  background:
+    radial-gradient(
+      ellipse at var(--optic-x, 34%) 0%,
+      rgb(255 250 231 / 34%),
+      transparent 71%
+    ),
+    linear-gradient(145deg, rgb(204 208 205 / 14%), transparent 60%),
+    rgb(30 32 36 / 86%);
+}
+button:focus-visible,
+a:focus-visible {
+  outline: max(2px, 0.13rem) solid #fff6de;
+  outline-offset: max(3px, 0.17rem);
+}
+.analog {
+  background:
+    radial-gradient(ellipse at 26% 9%, rgb(127 142 155 / 18%), transparent 48%),
+    linear-gradient(
+      145deg,
+      rgb(14 21 27 / 71%),
+      rgb(4 7 11 / 84%) 56%,
+      rgb(22 26 30 / 69%)
+    );
+  -webkit-backdrop-filter: blur(2px) saturate(0.48);
+  backdrop-filter: blur(2px) saturate(0.48);
+  box-shadow:
+    inset 0 0 0 1px rgb(220 193 169 / 47%),
+    0 0.5rem 1.2rem rgb(2 7 12 / 29%);
+}
+.analog::before {
+  inset: 0;
+  padding: max(1.5px, calc(var(--dial-size) * 0.006));
+  border: 0;
+  box-shadow: none;
+  background: conic-gradient(
+    from -38deg,
+    #b39a86,
+    #fbebd0 25deg,
+    #8b7768 79deg,
+    #6b5c53 122deg,
+    #edcdb8 157deg,
+    #a78b79 192deg,
+    #554d47 240deg,
+    #dfbdac 285deg,
+    #8e7d70 322deg,
+    #b39a86
+  );
+  -webkit-mask:
+    linear-gradient(white 0 0) content-box,
+    linear-gradient(white 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(white 0 0) content-box,
+    linear-gradient(white 0 0);
+  mask-composite: exclude;
+}
+.analog .minute-track {
+  stroke: #d8ceba;
+  stroke-width: 0.62;
+  opacity: 0.84;
+}
+.analog .tick::before {
+  background: #ebdfc8;
+}
+.analog .tick.major::before {
+  background: #fff1d7;
+}
+.analog .numeral {
+  font-family: "Amiri", "Noto Naskh", serif;
+  font-weight: 400;
+  font-size: calc(var(--dial-size) * 0.126);
+  color: #fff1d5;
+  text-shadow: 0 1px 2px #07090c;
+}
+.analog .hour,
+.analog .minute {
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.analog .hand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0, 100% 75%, 68% 100%, 32% 100%, 0 75%);
+}
+.analog .hour {
+  width: 3.2%;
+  height: 25.8%;
+  margin-left: -1.6%;
+}
+.analog .hour::after {
+  background: linear-gradient(90deg, #d1bd9c 0 47%, #fff2d4 53%, #f4dcad);
+}
+.analog .minute {
+  width: 2.15%;
+  height: 37.8%;
+  margin-left: -1.075%;
+}
+.analog .minute::after {
+  background: linear-gradient(90deg, #b79a77 0 45%, #f5dcad 52%, #ffebbb);
+}
+.analog .pivot {
+  width: 3.9%;
+  height: 3.9%;
+  box-shadow: 0 1px 2px #09090caa;
+  background: radial-gradient(
+    circle at 36% 27%,
+    #fff4cf 0%,
+    #e6c795 50%,
+    #ad8869 88%
+  );
+}
+.analog .pivot::after {
+  inset: 36%;
+  background: #f4d9af;
+  box-shadow: 0 0.3px 0.7px #6b5846;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .analog.dial-advancing .hand {
+    transition: transform 620ms cubic-bezier(0.21, 0.76, 0.29, 1);
+  }
+}
+.solid
+  :is(
+    .tabs.glass,
+    .icon-button.glass,
+    .prayer-strip.glass,
+    .drawer:not(.full-record),
+    .play-mark,
+    .record-transport .primary-transport,
+    .quiet:not([aria-pressed="true"]),
+    .analog
+  ) {
+  background: #191c20;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.solid .tabs::before,
+.solid .icon-button.glass::before,
+.solid .analog::after {
+  display: none;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .tabs.glass,
+  .icon-button.glass,
+  .prayer-strip.glass,
+  .drawer:not(.full-record),
+  .play-mark,
+  .record-transport .primary-transport,
+  .quiet:not([aria-pressed="true"]),
+  .analog {
+    background: #191c20;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .tabs::before,
+  .icon-button.glass::before,
+  .analog::after {
+    display: none;
+  }
+}

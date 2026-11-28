@@ -8,7 +8,31 @@
   var endpoint = "https://hbic.ca/api/display";
   var adhanSource =
     "https://hbic.ca/audio/adhan_madinah_marwan_qassas_short.mp3";
-  var audioRoot = "https://cdn.mp3quran.net/audio/ahmad-nufais/r1/";
+  var reciters = [
+    {
+      id: "saud-shuraim",
+      title: "Sheikh Saud Al-Shuraim",
+      arabic: "الشيخ سعود الشريم",
+      art: "shuraim-makkah",
+      position: "61% 53%",
+      homeCover: "art/shuraim-makkah.webp",
+      page: "https://www.mp3quran.net/ar/shur",
+      audioRoot: "https://cdn.mp3quran.net/audio/saud-shuraim/r1/",
+    },
+    {
+      id: "ahmad-nufais",
+      title: "Ahmad Al Nufais",
+      arabic: "أحمد النفيس",
+      art: "mushaf-gold",
+      position: "63% 53%",
+      homeCover: "mushaf-stand.webp",
+      page: "https://www.mp3quran.net/ar/nufais",
+      audioRoot: "https://cdn.mp3quran.net/audio/ahmad-nufais/r1/",
+    },
+  ];
+  var savedReciter = store("prayer-room-reciter");
+  var artist = reciters.find(function (reciter) { return reciter.id === savedReciter; }) || reciters[0];
+
   var tracks = [
     { arabic: "سورة الكهف", name: "Al-Kahf", path: "018.mp3" },
     { arabic: "سورة البقرة", name: "Al-Baqarah", path: "002.mp3" },
@@ -103,6 +127,8 @@
   var selectedTrack,
     pendingPosition = 0,
     lastSavedPosition = -1;
+  var trackRequest = 0;
+  var trackArtist = artist;
   var trackButtons = {};
   var armed = false,
     lastEvent = "",
@@ -176,6 +202,20 @@
       : null;
   }
 
+  var previousDial;
+  function setDialHands(hour, minute, now) {
+    var position = hour * 60 + minute;
+    var epochMinute = Math.floor(now.getTime() / 60000);
+    var consecutive = previousDial && epochMinute === previousDial.epoch + 1 &&
+      (previousDial.position + 1) % 720 === position;
+    // Keep the direction at 11:59. Resume and timezone corrections snap directly.
+    var phase = consecutive ? previousDial.phase + 1 : position;
+    byId("analog").classList.toggle("dial-advancing", Boolean(consecutive));
+    byId("hour-hand").style.transform = "rotate(" + phase / 2 + "deg)";
+    byId("minute-hand").style.transform = "rotate(" + phase * 6 + "deg)";
+    previousDial = { position: position, phase: phase, epoch: epochMinute };
+  }
+
   function clock(now) {
     var supplied =
       publishedOffset != null &&
@@ -208,9 +248,7 @@
     var hour = Number(parts[1]) % 12,
       minute = Number(parts[2]);
     byId("analog").setAttribute("aria-label", "Calgary time " + label);
-    byId("hour-hand").style.transform =
-      "rotate(" + (hour * 30 + minute / 2) + "deg)";
-    byId("minute-hand").style.transform = "rotate(" + minute * 6 + "deg)";
+    setDialHands(hour, minute, now);
     write("clock-date", dateLabel);
     write(
       "wall-time",
@@ -487,7 +525,9 @@
     byId("settings").setAttribute("aria-expanded", "false");
     if (drawer === player) {
       rememberTrack();
+      trackRequest++;
       recitation.pause();
+      selectedTrack = null;
       recitation.removeAttribute("src");
       recitation.load();
     }
@@ -648,12 +688,42 @@
     };
   });
 
+  // The original single-reciter release saved Nufais under the unqualified
+  // keys. Continue to use those keys for his corresponding recordings only.
+  function progressKey(reciter, key) {
+    return "prayer-room-" + (reciter.id === "ahmad-nufais" ? "" : reciter.id + "-") + key;
+  }
+
+  function selectReciter(next, announce) {
+    artist = next;
+    var home = byId("home-listen");
+    home.querySelector("strong").textContent = artist.title;
+    home.querySelector(".channel-ar").textContent = artist.arabic;
+    home.style.setProperty("--reciter-cover", 'url("' + artist.homeCover + '")');
+    document.querySelector(".record-by").textContent = artist.title;
+    document.querySelector(".record-reciter").textContent = artist.arabic;
+    document.querySelector(".collection-footer a").href = artist.page;
+    var alternate = reciters.find(function (entry) { return entry !== artist; });
+    byId("change-reciter").setAttribute("aria-label", "Change reciter to " + alternate.title);
+    if (announce) {
+      store("prayer-room-reciter", artist.id);
+      byId("reciter-status").textContent = artist.title + " selected";
+    }
+    showResume();
+    document.dispatchEvent(new CustomEvent("prayer-room-reciter", {detail: artist}));
+  }
+  // The listening screen shares the same selected artist without an extra
+  // catalog request, including when browser storage is unavailable.
+  document.addEventListener("prayer-room-artist-ready", function () {
+    document.dispatchEvent(new CustomEvent("prayer-room-reciter", {detail: artist}));
+  });
+  byId("change-reciter").onclick = function () {
+    selectReciter(artist === reciters[0] ? reciters[1] : reciters[0], true);
+  };
   function showResume() {
     var resume = byId("resume");
-    var path = store("prayer-room-last-track");
-    var item = tracks.filter(function (track) {
-      return track.path === path;
-    })[0];
+    var path = store(progressKey(artist, "last-track"));
+    var item = tracks.find(function (track) { return track.path === path; });
     resume.hidden = !item;
     if (item) {
       resume.textContent = "Continue " + item.name;
@@ -664,37 +734,35 @@
   }
   function rememberTrack() {
     var position = Math.floor(recitation.currentTime);
-    if (
-      !selectedTrack ||
-      !isFinite(position) ||
-      position < 3 ||
-      recitation.ended
-    )
-      return;
+    if (!selectedTrack || !isFinite(position) || position < 3 || recitation.ended) return;
     if (position !== lastSavedPosition) {
-      store("prayer-room-position-" + selectedTrack.path, position);
-      store("prayer-room-last-track", selectedTrack.path);
+      store(progressKey(trackArtist, "position-" + selectedTrack.path), position);
+      store(progressKey(trackArtist, "last-track"), selectedTrack.path);
       lastSavedPosition = position;
       showResume();
     }
   }
   function chooseTrack(track, trigger, backup) {
+    trackArtist = artist;
     selectedTrack = track;
-    pendingPosition = Number(store("prayer-room-position-" + track.path)) || 0;
+    pendingPosition = Number(store(progressKey(trackArtist, "position-" + track.path))) || 0;
     lastSavedPosition = -1;
     write("track-title", track.name);
-    recitation.src = audioRoot + track.path;
+    recitation.src = trackArtist.audioRoot + track.path;
     openDrawer(player, trigger, byId("toggle-play"), backup);
     startTrack();
   }
   recitation.addEventListener("loadedmetadata", function () {
+    if (!selectedTrack || !recitation.currentSrc.endsWith("/" + selectedTrack.path)) return;
     if (pendingPosition > 0 && pendingPosition < recitation.duration - 2)
       recitation.currentTime = pendingPosition;
     pendingPosition = 0;
   });
 
   function audioState() {
-    write("toggle-play", recitation.paused ? "Play" : "Pause");
+    var control = byId("toggle-play");
+    control.setAttribute("aria-label", recitation.paused ? "Play" : "Pause");
+    control.dataset.state = recitation.paused ? "play" : "pause";
   }
   function updateProgress() {
     var duration = recitation.duration;
@@ -712,15 +780,18 @@
   recitation.addEventListener("durationchange", updateProgress);
   recitation.addEventListener("emptied", updateProgress);
   function startTrack() {
+    var request = ++trackRequest;
     adhan.pause();
     write("track-status", "Loading audio…");
     play(
       recitation,
       function () {
-        write("track-status", "Ahmad Al Nufais · MP3Quran");
+        if (request !== trackRequest) return;
+        write("track-status", "MP3Quran");
         audioState();
       },
       function () {
+        if (request !== trackRequest) return;
         write("track-status", "Audio didn’t start. Try Play again.");
         audioState();
       },
@@ -732,8 +803,8 @@
   });
   recitation.addEventListener("playing", audioState);
   recitation.addEventListener("ended", function () {
-    if (selectedTrack) store("prayer-room-position-" + selectedTrack.path, 0);
-    store("prayer-room-last-track", "");
+    if (selectedTrack) store(progressKey(trackArtist, "position-" + selectedTrack.path), 0);
+    store(progressKey(trackArtist, "last-track"), "");
     showResume();
     write("track-status", "Finished");
     audioState();
@@ -748,7 +819,7 @@
   };
   byId("restart").onclick = function () {
     pendingPosition = 0;
-    if (selectedTrack) store("prayer-room-position-" + selectedTrack.path, 0);
+    if (selectedTrack) store(progressKey(trackArtist, "position-" + selectedTrack.path), 0);
     if (recitation.readyState) recitation.currentTime = 0;
     startTrack();
   };
@@ -823,7 +894,8 @@
     byId("library").appendChild(button);
   });
 
-  showResume();
+  selectReciter(artist, false);
+  audioState();
 
   function moveFocus(key, area) {
     var candidates = area.querySelectorAll("button, a[href]");

@@ -1,434 +1,218 @@
-/* The selected recording supplies the artwork on the listening stage. */
-body[data-view="listen"] {
-  background: #0b1013;
-}
-.listening-room {
-  isolation: isolate;
-}
+body[data-view="listen"] { background: #0d1012; }
+.listening-room { isolation: isolate; }
+body[data-view="listen"] .top { position: relative; z-index: 1; }
+body[data-view="listen"] .scenery { visibility: hidden; }
 .artist-stage {
-  height: 32vh;
-  min-height: 9.4rem;
+  position: relative;
+  height: 31.2vh;
+  min-height: 9.25rem;
   display: flex;
   align-items: center;
-  position: relative;
 }
 .artist-scene {
   position: absolute;
-  top: -7rem;
-  bottom: -1.5rem;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  inset: -7rem calc(50% - 50vw) -2.5rem;
   z-index: -1;
   overflow: hidden;
-  background: #11171b;
+  background: #14191d;
+  pointer-events: none;
 }
-body[data-view="listen"] .top {
-  position: relative;
-  z-index: 1;
-}
-.artist-scene i,
-.artist-scene::after {
-  position: absolute;
-  inset: 0;
-}
+.artist-scene i, .artist-scene::after { position: absolute; inset: 0; }
 .artist-scene i {
-  background-image: var(--record-photo);
-  background-size: cover;
-  background-position: var(--record-position);
+  background: var(--record-photo) var(--record-position) / cover no-repeat;
   opacity: 0;
 }
-.artist-scene i.is-visible {
-  opacity: 1;
-}
+.artist-scene i.is-visible { opacity: 1; }
 .artist-scene::after {
   content: "";
   background:
-    linear-gradient(
-      90deg,
-      #081013ed,
-      rgba(7, 13, 17, 0.78) 30%,
-      rgba(7, 13, 17, 0.08) 72%
-    ),
-    linear-gradient(0deg, #0a1115, transparent 32%, transparent 70%, #0b1116bf);
+    linear-gradient(0deg, #0d1012 1%, rgba(13,16,18,.84) 10%, transparent 36%),
+    radial-gradient(ellipse 56% 130% at 8% 69%, rgba(6,9,12,.94), rgba(7,10,13,.70) 55%, transparent 100%),
+    linear-gradient(180deg, rgba(5,8,12,.64), transparent 42%);
 }
-.artist-credit {
-  position: relative;
-  padding: 0.8rem 0 0;
-}
-#stage-arabic {
-  font:
-    400 3.45rem/1.25 Amiri,
-    serif;
-  color: #ffe8c2;
-  text-align: left;
-  width: fit-content;
-}
-#stage-english {
-  font-size: 2.12rem;
-  font-weight: 550;
-  letter-spacing: -0.045em;
-}
-#stage-detail {
-  font-size: 0.94rem;
-  margin-top: 0.25rem;
-  color: var(--silver);
-}
-.listening-heading {
-  position: relative;
-}
-.listening-heading #friday-note {
-  font-size: 0.85rem;
-  color: var(--sand);
-}
-.listening-heading #resume {
-  padding-block: 0.27rem;
-  font-size: 0.81rem;
-}
-#library .tile {
-  display: block;
-  position: relative;
-  min-height: 0;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  overflow: visible;
-  box-shadow: none;
-  border-radius: 0.92rem;
-}
-#library .tile::after {
-  content: none;
-}
-.listen-sleeve {
-  display: flex;
-  align-items: flex-end;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  height: 15.6vh;
-  min-height: 5.7rem;
-  border-radius: 0.88rem;
-  background-image:
-    linear-gradient(0deg, rgba(4, 9, 13, 0.78), transparent 90%),
-    var(--record-photo);
-  background-position: center, var(--record-position);
-  background-size: cover;
-  box-shadow:
-    inset 0 1px 0 #fff5,
-    0 0.3rem 0.8rem #0003;
-}
-#library .tile .arabic {
-  font:
-    400 1.88rem/1.35 Amiri,
-    serif;
-  color: #fff3de;
-  margin: 0;
-  padding: 0.3rem 0.73rem;
-}
-.library-caption {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.3rem;
-  padding: 0.37rem 0.1rem 0.11rem;
-}
-#library .english {
-  font-weight: 550;
-  font-size: 1rem;
-  margin: 0;
-}
-#library .surah-number {
-  color: #c6c9c6;
-  font-size: 0.74rem;
-}
-.remembrance-heading {
-  margin-top: 1.15rem;
-}
-.remembrance-shelf {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-}
-.remembrance {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  text-align: left;
-  border-radius: 0.8rem;
-}
-.devotional-photo {
-  width: 4rem;
-  height: 3.3rem;
-  border-radius: 0.55rem;
-  flex: none;
-  background: var(--record-photo) var(--record-position) / cover;
-  box-shadow: inset 0 1px 0 #fff4;
-}
-.devotional-label {
-  display: grid;
-  justify-items: start;
-}
-.devotional-label span {
-  font:
-    400 1.22rem/1.45 Amiri,
-    serif;
-  color: #f1d9b5;
-}
-.devotional-label strong {
-  font-size: 0.86rem;
-  font-weight: 550;
-}
-.full-record.drawer {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  transform: none;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 4.5vh 5vw;
-  background: #10191c;
-  overflow: auto;
-  isolation: isolate;
-  backdrop-filter: none;
-}
-.record-atmosphere {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(90deg, rgba(8, 15, 19, 0.45), rgba(9, 17, 21, 0.9) 56%),
-    linear-gradient(0deg, rgba(7, 15, 19, 0.92), rgba(7, 15, 19, 0.44) 68%),
-    var(--record-photo) var(--record-position) / cover;
-}
-.record-edges {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 1.05rem;
-  font-weight: 550;
-}
-.record-main {
-  min-height: 78vh;
-  display: grid;
-  align-items: center;
-  grid-template-columns: minmax(0, 26rem) minmax(0, 24rem);
-  justify-content: center;
-  gap: 5.2vw;
-}
-.record-sleeve {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 1.25rem;
-  padding: 1.6rem;
-  box-shadow:
-    inset 0 1px 0 #fff5,
-    0 1rem 2.8rem #0005;
-  background:
-    linear-gradient(0deg, #071018e6, transparent 72%),
-    var(--record-photo) var(--record-position) / cover;
-}
-#record-arabic {
-  font:
-    400 3.25rem/1.32 Amiri,
-    serif;
-  color: #fff1d7;
-}
-#record-number {
-  font-size: 1rem;
-  color: #e4d7c1;
-}
-.record-reciter {
-  display: inline-block;
-  font:
-    400 1.6rem/1.4 Amiri,
-    serif;
-  color: var(--sand);
-}
-.record-info #track-title {
-  font-size: 3.45rem;
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-}
-.record-info .record-by {
-  font-size: 1.14rem;
-  margin: 0.45rem 0 1.5rem;
-  color: #ede8dd;
-}
-.record-time {
-  display: block;
-}
-.record-time progress {
-  height: 0.34rem;
-  display: block;
-  width: 100%;
-  border: 0;
-  border-radius: 1rem;
-  overflow: hidden;
-  background: #a5a6a144;
-}
-.record-time progress::-webkit-progress-bar {
-  background: #a5a6a144;
-}
-.record-time progress::-webkit-progress-value {
-  background: var(--sand);
-}
-.record-time > div {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  margin-top: 0.3rem;
-  color: var(--silver);
-  font-variant-numeric: tabular-nums;
-}
-.record-transport {
-  display: flex;
-  align-items: center;
-  gap: 1.15rem;
-  margin: 1.15rem 0;
-}
-.record-transport button,
-.record-secondary button {
-  border-radius: 2rem;
-}
-.record-transport button:disabled {
-  opacity: 0.45;
-}
-.record-transport svg {
-  display: block;
-  width: 1.8rem;
-  height: 1.8rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.6;
-}
-.record-transport text {
-  font:
-    7px "Room Sans",
-    sans-serif;
-  fill: currentColor;
-  stroke: none;
-  text-anchor: middle;
-}
-.primary-transport {
-  background: var(--ink);
-  color: #16232a;
-  min-width: 5.1rem;
-  padding: 0.64rem 1rem;
-  font-weight: 650;
-}
-.record-secondary {
-  display: flex;
-  align-items: baseline;
-  gap: 1.05rem;
-}
-.record-secondary button {
-  text-decoration: underline;
-  text-underline-offset: 0.22rem;
-  font-size: 0.85rem;
-}
-.record-info #track-status {
-  font-size: 0.79rem;
-  color: var(--silver);
-  margin: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .artist-scene i {
-    transition: opacity 0.28s ease-out;
-  }
-}
-@media (max-width: 760px) {
-  .artist-stage {
-    height: 13rem;
-  }
-  .artist-credit {
-    padding: 0;
-  }
-  #stage-arabic {
-    font-size: 2.4rem;
-  }
-  #stage-english {
-    font-size: 1.6rem;
-  }
-  .artist-scene {
-    top: 0;
-  }
-  .listen-sleeve {
-    height: 6.8rem;
-    min-height: 0;
-  }
-  #library .tile .arabic {
-    font-size: 1.33rem;
-  }
-  #library .english {
-    font-size: 0.88rem;
-  }
-  #library .surah-number {
-    font-size: 0.66rem;
-  }
-  .remembrance-shelf {
-    grid-template-columns: 1fr;
-    gap: 0.66rem;
-  }
-  .record-main {
-    min-height: 0;
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-    padding: 1.25rem 0;
-  }
-  .record-sleeve {
-    width: min(84vw, 35vh);
-    margin: auto;
-  }
-  #record-arabic {
-    font-size: 2rem;
-  }
-  .record-info #track-title {
-    font-size: 2.2rem;
-  }
-  .record-info .record-by {
-    margin-bottom: 0.7rem;
-  }
-}
-#stage-arabic,
-#record-arabic,
-#library .tile .arabic {
+.artist-credit { position: relative; padding-top: .44rem; max-width: 80%; }
+#stage-arabic, #record-arabic, #library .arabic {
   font-family: "Aref Ruqaa", Amiri, serif;
   font-weight: 700;
+  letter-spacing: normal;
+  text-align: left;
 }
 #stage-arabic {
+  width: max-content;
+  max-width: 100%;
+  font-size: 3.38rem;
   line-height: 1.45;
+  color: #fae8c8;
 }
-#stage-english,
-.record-info #track-title {
-  font-family: Newsreader, Georgia, serif;
-  font-weight: 500;
-  letter-spacing: -0.025em;
+#stage-english, .record-info #track-title {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  text-wrap: balance;
 }
-#stage-english {
-  font-size: 2.48rem;
+#stage-english { font-size: 2.52rem; line-height: 1.07; }
+#stage-detail { margin-top: .45rem; color: #e4e4df; font-size: .91rem; }
+.listening-heading { position: relative; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; }
+.listening-heading h2 { margin-right: auto; }
+.listening-heading #friday-note { font-size: .86rem; color: var(--sand); }
+.listening-heading .quiet { min-height: 1.9rem; padding-block: .33rem; font-size: .84rem; }
+.sr-only { position: absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.listening-room .library { gap: 1rem; }
+#library .tile {
+  display: block; position: relative; min-height: 0;
+  padding: 0; border: 0; border-radius: .82rem;
+  background: transparent; overflow: visible; box-shadow: none;
 }
-.record-info #track-title {
-  font-size: 3.65rem;
+#library .tile::after { content: none; }
+.listen-sleeve {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; align-items: flex-end;
+  height: 16.9vh; min-height: 5.7rem; border-radius: .82rem;
+  background: var(--record-photo) var(--record-position) / cover;
+  box-shadow: 0 .2rem .65rem #03050866;
+}
+.listen-sleeve::before, .record-sleeve::before {
+  content: ""; position: absolute; inset: 0; z-index:-1; pointer-events: none;
+  background: radial-gradient(ellipse 106% 102% at 0 110%, rgba(2,5,8,.94), rgba(2,5,8,.55) 48%, transparent 78%),
+    linear-gradient(0deg, rgba(3,6,10,.43), transparent 47%);
 }
 #library .tile .arabic {
-  font-size: 1.76rem;
-  line-height: 1.55;
+  margin: 0; padding: 0 .79rem .33rem; font-size: 1.82rem;
+  line-height: 1.54; color: #fff5e6;
+  text-shadow: 0 .06em .22em rgba(0,0,0,.5);
 }
-@media (max-width: 760px) {
-  #stage-english {
-    font-size: 1.8rem;
-  }
-  .record-info #track-title {
-    font-size: 2.3rem;
-  }
-  #library .tile .arabic {
-    font-size: 1.4rem;
-  }
+.library-caption {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: .44rem .05rem .08rem; gap: .3rem;
+}
+#library .english { font-weight: 600; font-size: 1.03rem; margin: 0; }
+#library .surah-number { font-size: .81rem; color: #c9cbd0; }
+.remembrance-heading { margin-top: 1.05rem; }
+.remembrance-shelf { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }
+.remembrance {
+  display: flex; align-items: center; gap: .83rem; text-align: left;
+  padding: .16rem .05rem .16rem 0; border-radius: .76rem;
+}
+.devotional-photo {
+  width: 5.5rem; height: 3.65rem; flex: none; border-radius: .65rem;
+  background: var(--record-photo) var(--record-position) / cover;
+}
+.devotional-label { display: grid; justify-items: start; }
+.devotional-label span {
+  font: 400 1.36rem/1.5 Amiri, serif;
+  letter-spacing: normal; color: #f8e5c9;
+}
+.devotional-label strong { font-size: .93rem; font-weight: 550; }
+.collection-footer a { color: #d2d4d5; }
+#library .tile:focus-visible .listen-sleeve, .remembrance:focus-visible .devotional-photo {
+  box-shadow: inset 0 .06rem 0 #fff9, 0 .45rem 1rem #06080a60;
+}
+.full-record.drawer {
+  inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+  padding: 4.6vh 5.5vw; transform: none; border: 0; border-radius: 0;
+  background: #15191b; box-shadow: none; overflow: auto;
+  isolation: isolate; backdrop-filter:none;
+}
+/* Each recording carries three low-luminance tones sampled from its sleeve. */
+.full-record { --cover-edge: #22262a; --cover-mid: #4d4034; --cover-light: #7b6148; }
+.full-record[data-edition="2"] { --cover-edge: #20252a; --cover-mid: #4b353b; --cover-light: #806651; }
+.full-record[data-edition="36"] { --cover-edge: #252028; --cover-mid: #493b31; --cover-light: #937547; }
+.full-record[data-edition="67"] { --cover-edge: #171c2a; --cover-mid: #3c3242; --cover-light: #66516a; }
+.record-atmosphere {
+  position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(ellipse 62% 106% at 12% 35%, var(--cover-light), transparent 85%),
+    radial-gradient(ellipse 74% 110% at 57% 112%, var(--cover-mid), transparent 80%),
+    linear-gradient(110deg, var(--cover-mid), var(--cover-edge) 63%, #12161b);
+}
+.record-edges { display:flex; align-items:center; justify-content:space-between; }
+.record-edges > span { font-size:1rem; font-weight:550; color:#f0ece6; }
+.record-close { width:2.27rem; height:2.27rem; border-radius:50%; padding:0; }
+.record-close svg { width:1.02rem; height:1.02rem; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; }
+.record-main {
+  min-height: 79vh; display:grid; align-items:center; justify-content:center;
+  grid-template-columns:minmax(0,min(32vw,58vh)) minmax(0,26.4rem);
+  gap:min(7.1vw,6.8rem);
+}
+.record-sleeve {
+  position:relative; isolation:isolate; display:flex; flex-direction:column;
+  align-items:flex-start; justify-content:flex-end;
+  aspect-ratio:1; width:100%; padding:1.25rem 1.5rem 1.5rem;
+  border-radius:1.02rem; overflow:hidden;
+  background:var(--record-photo) var(--record-position) / cover;
+  box-shadow:0 .78rem 1.8rem rgba(8,7,9,.29);
+}
+#record-arabic { font-size:3.18rem; line-height:1.4; color:#fff4df; }
+#record-number { font-size:.93rem; font-weight:550; color:#ece0c8; }
+.record-reciter {
+  display:inline-block; font:400 1.7rem/1.55 Amiri,serif;
+  letter-spacing:normal; color:#f7dbb2;
+}
+.record-info #track-title { font-size:3.86rem; line-height:1.08; margin:.04rem 0 .3rem; }
+.record-info .record-by { margin:0 0 1.35rem; color:#f4ede6; font-size:1.09rem; }
+.record-time { display:block; }
+.record-time progress {
+  display:block; width:100%; height:.24rem; overflow:hidden; border:0;
+  border-radius:2rem; background:rgba(233,228,221,.28);
+}
+.record-time progress::-webkit-progress-bar { background:transparent; }
+.record-time progress::-webkit-progress-value { background:#f8dfb8; border-radius:inherit; }
+.record-time > div {
+  display:flex; justify-content:space-between; margin-top:.37rem;
+  font-size:.85rem; font-variant-numeric:tabular-nums; color:#e4dfda;
+}
+.record-transport { display:flex; align-items:center; gap:.65rem; margin:.85rem 0 .9rem; }
+.record-transport button {
+  display:grid; place-items:center; width:2.47rem; height:2.47rem;
+  padding:0; border-radius:50%; color:#f7f1e8;
+}
+.record-transport button:disabled { opacity:.40; }
+.record-transport svg {
+  width:1.45rem; height:1.45rem; fill:none; stroke:currentColor;
+  stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;
+}
+.record-transport text { font:600 7px Manrope,sans-serif; fill:currentColor; stroke:none; text-anchor:middle; }
+.record-transport .primary-transport {
+  width:3.2rem; height:3.2rem; min-width:0; margin:0 .28rem;
+  background:rgba(245,237,219,.17);
+  border:1px solid rgba(247,238,220,.46);
+}
+.primary-transport svg { width:1.26rem; height:1.26rem; fill:currentColor; stroke:none; }
+.primary-transport .pause-symbol,.primary-transport[data-state="pause"] .play-symbol { display:none; }
+.primary-transport[data-state="pause"] .pause-symbol { display:block; }
+.record-transport #restart { margin-right:.12rem; color:#dfd7c9; }
+#restart svg { width:1.12rem; height:1.12rem; }
+.record-info #track-status { color:#dfd9d1; margin:0; font-size:.83rem; min-height:1.4em; }
+@media(prefers-reduced-motion:no-preference) {
+  .artist-scene i { transition:opacity .27s ease-out; }
+  .full-record:not([hidden]) .record-main { animation:record-in .28s cubic-bezier(.22,.7,.23,1) both; }
+  @keyframes record-in { from{opacity:.82; transform:translateY(.25rem)} to{opacity:1; transform:none} }
+}
+@media(max-width:760px) {
+  .artist-stage { height:13.2rem; min-height:0; }
+  .artist-credit { padding:0; max-width:100%; }
+  #stage-arabic {font-size:2.1rem;}
+  #stage-english {font-size:1.88rem;}
+  #stage-detail {font-size:.88rem;}
+  .artist-scene {top:0;}
+  .listening-heading {justify-content:flex-start;gap:.5rem;}
+  .listening-heading h2 {margin-right:auto;}
+  .listening-heading #resume {font-size:.80rem;}
+  .listening-room .library {gap:.8rem;}
+  .listen-sleeve {height:7.2rem;min-height:0;}
+  #library .tile .arabic {font-size:1.45rem; padding-inline:.56rem;}
+  #library .english {font-size:.88rem;}
+  #library .surah-number {font-size:.74rem;}
+  .remembrance-heading {margin-top:1.25rem;}
+  .remembrance-shelf {grid-template-columns:1fr;gap:.4rem;}
+  .devotional-photo {width:4.7rem;height:3.35rem;}
+  .devotional-label span {font-size:1.16rem;}
+  .full-record.drawer {padding:3.5vh 5%;}
+  .record-main {min-height:0;grid-template-columns:1fr;gap:1.05rem;padding:1rem 0;}
+  .record-sleeve {width:min(84vw,38vh);margin:auto;padding:.75rem .85rem;}
+  #record-arabic {font-size:2rem;}
+  #record-number {font-size:.76rem;}
+  .record-info #track-title {font-size:2.65rem;}
+  .record-reciter {font-size:1.25rem;}
+  .record-info .record-by {font-size:.96rem;margin-bottom:.7rem;}
 }

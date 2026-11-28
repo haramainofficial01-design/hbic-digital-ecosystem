@@ -5,14 +5,14 @@
   font-display: swap;
 }
 @font-face {
-  font-family: Newsreader;
-  src: url("newsreader-display.woff2") format("woff2");
-  font-weight: 500;
+  font-family: "Cormorant Garamond";
+  src: url("cormorant-semibold.woff2") format("woff2");
+  font-weight: 600;
   font-display: swap;
 }
 @font-face {
-  font-family: Room Sans;
-  src: url("instrument-sans.woff2") format("woff2");
+  font-family: Manrope;
+  src: url("manrope.woff2") format("woff2");
   font-weight: 400 700;
   font-style: normal;
   font-display: swap;
@@ -44,7 +44,7 @@
     0 0.32rem 1.1rem rgba(0, 8, 12, 0.22);
   --round: 1.38rem;
   font:
-    400 clamp(14px, 1.3vw, 60px) / 1.3 "Room Sans",
+    400 clamp(14px, 1.3vw, 60px) / 1.3 Manrope,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -1508,7 +1508,7 @@ body {
 .prayer-title h1,
 .channel strong,
 .collection-title h1 {
-  font-family: Newsreader, Georgia, serif;
+  font-family: "Cormorant Garamond", Georgia, serif;
   font-weight: 500;
   letter-spacing: -0.026em;
 }

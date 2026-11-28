@@ -1,0 +1,73 @@
+/* The family emblem is flat champagne vector artwork. The darker field is painted on the photograph. */
+@font-face {
+  font-family: "Plex Arabic";
+  src: url("plex-arabic-medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+.brand { gap: .62rem; }
+.brand img.family-mark {
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0;
+  box-shadow: none;
+}
+.brand strong {
+  font: 600 1.55rem/1.02 "Cormorant Garamond", Georgia, serif;
+  letter-spacing: -.025em;
+  color: #fff5e8;
+}
+.brand span {
+  margin-top: .17rem;
+  font: 450 .76rem/1.26 Manrope, sans-serif;
+  color: #d6d3ca;
+  letter-spacing: .014em;
+}
+.ambient .brand strong { font-size: 1.42rem; }
+.ambient .brand span { font-size: .72rem; }
+body[data-view="home"]:not(.ambient) .scenery::after {
+  background:
+    linear-gradient(to top, var(--night) 0%, rgba(7,13,16,.87) 9%, transparent 38%),
+    radial-gradient(ellipse 40% 58% at 6% 43%, rgba(4,9,12,.84) 19%, rgba(4,10,14,.65) 59%, transparent 100%),
+    radial-gradient(ellipse 17% 55% at 90% 43%, rgba(7,11,14,.56), transparent),
+    linear-gradient(to bottom, rgba(4,9,13,.81), rgba(5,9,13,.21) 20%, transparent 40%);
+}
+.prayer-title h1, .channel strong, .collection-title h1 { font-weight: 600; }
+[lang="ar"] { letter-spacing: normal; }
+.prayer-strip li + li { border-left-color: rgba(240,230,210,.13); }
+.prayer-strip small { color: #e6e2d7; font-size: .91rem; }
+.prayer-strip .next::before {
+  background: radial-gradient(ellipse at 5% 0%, rgba(216,183,125,.22), rgba(195,169,122,.055) 72%, transparent);
+  box-shadow: inset 0 1px 0 rgba(250,224,174,.26);
+}
+.dates, .clock-aside #arabic-reminder, .prayer-pair { text-shadow: 0 1px 5px rgba(0,0,0,.68); }
+.main-listen .listen-by { background: rgba(12,14,17,.69); }
+@media (max-width: 760px) {
+  .brand strong { font-size: 1.35rem; }
+  .brand span { font-size: .75rem; }
+  .brand img.family-mark { width: 1.78rem; height: 1.78rem; }
+  .prayer-strip small { font-size: .81rem; }
+}
+.channel.main-listen::before {
+  background-image: var(--reciter-cover, url("art/shuraim-makkah.webp"));
+}
+.main-listen .channel-baseline strong {
+  font-size: clamp(1.3rem, 2.04vw, 1.66rem);
+  line-height: 1.04;
+}
+@media (min-width: 761px) {
+  .schedule .dates {
+    position: relative;
+    isolation: isolate;
+    color: #f0e9df;
+  }
+  .schedule .dates::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: -.42rem -.8rem;
+    background: linear-gradient(90deg, transparent, #0c1116cf 13%, #0c1116cf 87%, transparent);
+    filter: blur(.25rem);
+    pointer-events: none;
+  }
+}
