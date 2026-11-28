@@ -21,6 +21,7 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
   const { isRtl } = useAppLanguage();
   const { width, fontScale } = useAppViewport();
   const { lastUpdatedAt, loading, refresh, refreshError, source } = usePublishedContent();
+  const inlineBilal = fontScale >= 1.5;
   const isWide = width >= 768;
   const desktop = desktopAppLayout(width, isMacQuranHost, fontScale);
   const cachedAt = lastUpdatedAt
@@ -71,11 +72,12 @@ export function AppScreen({ children, style, onReady, onInteraction }: PropsWith
                 </View>
               </View>
             ) : null}
+            {inlineBilal ? <BilalLauncher inline /> : null}
             {children}
           </View>
         </ScrollView>
       </SafeAreaView>
-      <BilalLauncher />
+      {!inlineBilal ? <BilalLauncher /> : null}
     </View>
   );
 }

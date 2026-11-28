@@ -25,12 +25,12 @@ const LauncherContext = createContext<{ bottom: number; right: number; reduced: 
 const suggestionIcons = ["time-outline", "school-outline", "heart-outline", "call-outline"] as const;
 
 /** Belongs inside the focused native screen, not behind the native navigator. */
-export function BilalLauncher() {
+export function BilalLauncher({ inline = false }: { inline?: boolean }) {
   const launcher = useContext(LauncherContext), focused = useIsFocused(), { translate: t } = useAppLanguage();
   if (!launcher || !focused) return null;
-  return <View pointerEvents="box-none" collapsable={false} style={styles.launcherHost}>
+  return <View pointerEvents="box-none" collapsable={false} style={inline ? undefined : styles.launcherHost}>
     <BilalPressable reduced={launcher.reduced} accessibilityRole="button" accessibilityLabel={t("Open Bilal")} testID="bilal-companion-launcher" onPress={launcher.open}
-      style={[styles.launcher, { right: launcher.right, bottom: launcher.bottom }]}>
+      style={[styles.launcher, inline ? styles.launcherInline : { position: "absolute", right: launcher.right, bottom: launcher.bottom }]}>
       <Image source={brandAssets.bilalMark} style={{ width: 30, height: 30 }} accessible={false} /><Text style={styles.launcherLabel}>{t("Ask Bilal")}</Text>
     </BilalPressable>
   </View>;
@@ -145,8 +145,9 @@ export function BilalCompanion({ children }: PropsWithChildren) {
 
 const styles = StyleSheet.create({
   launcherHost: { ...StyleSheet.absoluteFillObject, zIndex: 80, elevation: 80 },
-  launcher: { position: "absolute", zIndex: 80, flexDirection: "row", alignItems: "center", gap: 9, minHeight: 52, borderRadius: 20, borderWidth: 1, borderColor: "#648B91", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#082C3C", boxShadow: "0px 6px 18px #001C3828" },
-  launcherLabel: { color: "#FFF9E8", fontSize: 14, fontWeight: "700" },
+  launcherInline: { alignSelf: "flex-end", maxWidth: "100%" },
+  launcher: { zIndex: 80, flexDirection: "row", alignItems: "center", gap: 9, minHeight: 52, borderRadius: 20, borderWidth: 1, borderColor: "#648B91", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#082C3C", boxShadow: "0px 6px 18px #001C3828" },
+  launcherLabel: { flexShrink: 1, color: "#FFF9E8", fontSize: 14, fontWeight: "700" },
   overlay: { flex: 1, justifyContent: "flex-end", alignItems: "flex-end" },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(3,24,39,0.4)" },
   panel: { width: "100%", maxWidth: 460, height: 720, flexShrink: 1, borderRadius: 28, borderWidth: 1, overflow: "hidden" },
