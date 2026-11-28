@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="https://hbic.ca/prayer-room-tv"
+        version="1.1.0"
+        viewmodes="maximized">
+  <tizen:application id="HbicRoomTV.PrayerRoom"
+                     package="HbicRoomTV"
+                     required_version="9.0"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <icon src="tizen-icon.png"/>
+  <name>Prayer Room</name>
+  <tizen:profile name="tv-samsung"/>
+  <tizen:setting screen-orientation="landscape" background-support="disable" pointing-device-support="disable"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <access origin="https://hbic.ca" subdomains="false"/>
+  <access origin="https://cdn.mp3quran.net" subdomains="false"/>
+  <access origin="https://www.mp3quran.net" subdomains="false"/>
+  <access origin="https://www.youtube.com" subdomains="false"/>
+  <access origin="https://www.youtube-nocookie.com" subdomains="false"/>
+  <access origin="https://youtu.be" subdomains="false"/>
+  <access origin="https://www.primevideo.com" subdomains="false"/>
+  <access origin="https://cdn-globecast.akamaized.net" subdomains="false"/>
+  <access origin="https://aloula.sba.sa" subdomains="false"/>
+</widget>

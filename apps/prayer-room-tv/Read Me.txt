@@ -1,0 +1,50 @@
+PRAYER ROOM TV
+Masjid Bilal · Calgary
+
+To preview on your Mac, open index.html in Chrome and press Full Screen in Settings.
+On the TV, open the Internet browser and enter http://MAC-LAN-IP:8765/ while the Mac is at that address. The Mac and TV need to be on the same Wi-Fi. The Mac needs to stay on
+while the page is served. If your TV has trouble with its browser, a Mac connected
+by HDMI provides the same dashboard.
+
+Use the directional buttons and OK to navigate. Back closes Settings or the
+audio player. If your browser handles arrows itself, try its cursor mode.
+
+The analog clock uses Calgary time. HBIC supplies the prayer schedule, including
+local iqamah times and the Hijri date. Prayer data refreshes every five minutes.
+After a connection loss, the saved schedule is shown only until it expires.
+The Quran streams use MP3Quran's Ahmad Al Nufais recordings.
+
+In Settings, Enable & preview adhan plays HBIC’s Madinah adhan excerpt by Muhammad Marwan Qassas. This
+also enables playback when an adhan time arrives while the page is visible.
+You need to enable it again after reopening the page. TV browser autoplay,
+standby and power-saving behavior can prevent scheduled audio. This page does
+not wake the TV. Try the preview through your TV speakers before relying on it.
+
+To stop the current preview server, run launchctl remove ca.hbic.prayer-room-preview.
+If it has stopped, open Terminal and run:
+python3 -m http.server 8765 --directory "$HOME/Downloads/Prayer Room TV"
+
+The Makkah and Madinah tiles open the Saudi live channels inside Prayer Room.
+The broadcaster and YouTube links are available if a feed cannot play. Only
+one broadcast loads at a time. Adhkar and ruqyah also have YouTube viewing links.
+
+YouTube and Prime Video in the dock open their web destinations. Press the
+Samsung Home button for the installed Smart Hub apps. The themed icons belong
+to this dashboard.
+
+See Install on Samsung TV.md for the model-specific local app workflow.
+The Samsung source ZIP contains an unsigned Tizen web app. It is not a USB
+installer and needs a Samsung certificate and physical TV verification.
+
+Home shows the next Calgary prayer and its countdown. After adhan, the
+countdown runs to the published iqamah and then moves to the next prayer.
+Select HBIC app beside the schedule for the Masjid Bilal app page.
+
+Choose Listen for Ahmad Al Nufais’s recitations, adhkar and ruqyah. Use the
+direction keys to browse the photographic covers. Play a surah to open
+Now Playing, with pause, 15-second skip and resume. Back returns to the shelf.
+
+Home enters ambient mode after two idle minutes. Select Enter ambient mode
+in Settings for immediate access. The first remote press returns to navigation.
+Reduce transparency in Settings for stronger contrast. Device Reduce Motion
+settings suppress focus motion.

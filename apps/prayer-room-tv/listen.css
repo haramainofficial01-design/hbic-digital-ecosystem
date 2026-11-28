@@ -1,0 +1,434 @@
+/* The selected recording supplies the artwork on the listening stage. */
+body[data-view="listen"] {
+  background: #0b1013;
+}
+.listening-room {
+  isolation: isolate;
+}
+.artist-stage {
+  height: 32vh;
+  min-height: 9.4rem;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.artist-scene {
+  position: absolute;
+  top: -7rem;
+  bottom: -1.5rem;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  z-index: -1;
+  overflow: hidden;
+  background: #11171b;
+}
+body[data-view="listen"] .top {
+  position: relative;
+  z-index: 1;
+}
+.artist-scene i,
+.artist-scene::after {
+  position: absolute;
+  inset: 0;
+}
+.artist-scene i {
+  background-image: var(--record-photo);
+  background-size: cover;
+  background-position: var(--record-position);
+  opacity: 0;
+}
+.artist-scene i.is-visible {
+  opacity: 1;
+}
+.artist-scene::after {
+  content: "";
+  background:
+    linear-gradient(
+      90deg,
+      #081013ed,
+      rgba(7, 13, 17, 0.78) 30%,
+      rgba(7, 13, 17, 0.08) 72%
+    ),
+    linear-gradient(0deg, #0a1115, transparent 32%, transparent 70%, #0b1116bf);
+}
+.artist-credit {
+  position: relative;
+  padding: 0.8rem 0 0;
+}
+#stage-arabic {
+  font:
+    400 3.45rem/1.25 Amiri,
+    serif;
+  color: #ffe8c2;
+  text-align: left;
+  width: fit-content;
+}
+#stage-english {
+  font-size: 2.12rem;
+  font-weight: 550;
+  letter-spacing: -0.045em;
+}
+#stage-detail {
+  font-size: 0.94rem;
+  margin-top: 0.25rem;
+  color: var(--silver);
+}
+.listening-heading {
+  position: relative;
+}
+.listening-heading #friday-note {
+  font-size: 0.85rem;
+  color: var(--sand);
+}
+.listening-heading #resume {
+  padding-block: 0.27rem;
+  font-size: 0.81rem;
+}
+#library .tile {
+  display: block;
+  position: relative;
+  min-height: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  box-shadow: none;
+  border-radius: 0.92rem;
+}
+#library .tile::after {
+  content: none;
+}
+.listen-sleeve {
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 15.6vh;
+  min-height: 5.7rem;
+  border-radius: 0.88rem;
+  background-image:
+    linear-gradient(0deg, rgba(4, 9, 13, 0.78), transparent 90%),
+    var(--record-photo);
+  background-position: center, var(--record-position);
+  background-size: cover;
+  box-shadow:
+    inset 0 1px 0 #fff5,
+    0 0.3rem 0.8rem #0003;
+}
+#library .tile .arabic {
+  font:
+    400 1.88rem/1.35 Amiri,
+    serif;
+  color: #fff3de;
+  margin: 0;
+  padding: 0.3rem 0.73rem;
+}
+.library-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.37rem 0.1rem 0.11rem;
+}
+#library .english {
+  font-weight: 550;
+  font-size: 1rem;
+  margin: 0;
+}
+#library .surah-number {
+  color: #c6c9c6;
+  font-size: 0.74rem;
+}
+.remembrance-heading {
+  margin-top: 1.15rem;
+}
+.remembrance-shelf {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.remembrance {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-align: left;
+  border-radius: 0.8rem;
+}
+.devotional-photo {
+  width: 4rem;
+  height: 3.3rem;
+  border-radius: 0.55rem;
+  flex: none;
+  background: var(--record-photo) var(--record-position) / cover;
+  box-shadow: inset 0 1px 0 #fff4;
+}
+.devotional-label {
+  display: grid;
+  justify-items: start;
+}
+.devotional-label span {
+  font:
+    400 1.22rem/1.45 Amiri,
+    serif;
+  color: #f1d9b5;
+}
+.devotional-label strong {
+  font-size: 0.86rem;
+  font-weight: 550;
+}
+.full-record.drawer {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  transform: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4.5vh 5vw;
+  background: #10191c;
+  overflow: auto;
+  isolation: isolate;
+  backdrop-filter: none;
+}
+.record-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(8, 15, 19, 0.45), rgba(9, 17, 21, 0.9) 56%),
+    linear-gradient(0deg, rgba(7, 15, 19, 0.92), rgba(7, 15, 19, 0.44) 68%),
+    var(--record-photo) var(--record-position) / cover;
+}
+.record-edges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.05rem;
+  font-weight: 550;
+}
+.record-main {
+  min-height: 78vh;
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 24rem);
+  justify-content: center;
+  gap: 5.2vw;
+}
+.record-sleeve {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 1.25rem;
+  padding: 1.6rem;
+  box-shadow:
+    inset 0 1px 0 #fff5,
+    0 1rem 2.8rem #0005;
+  background:
+    linear-gradient(0deg, #071018e6, transparent 72%),
+    var(--record-photo) var(--record-position) / cover;
+}
+#record-arabic {
+  font:
+    400 3.25rem/1.32 Amiri,
+    serif;
+  color: #fff1d7;
+}
+#record-number {
+  font-size: 1rem;
+  color: #e4d7c1;
+}
+.record-reciter {
+  display: inline-block;
+  font:
+    400 1.6rem/1.4 Amiri,
+    serif;
+  color: var(--sand);
+}
+.record-info #track-title {
+  font-size: 3.45rem;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+.record-info .record-by {
+  font-size: 1.14rem;
+  margin: 0.45rem 0 1.5rem;
+  color: #ede8dd;
+}
+.record-time {
+  display: block;
+}
+.record-time progress {
+  height: 0.34rem;
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #a5a6a144;
+}
+.record-time progress::-webkit-progress-bar {
+  background: #a5a6a144;
+}
+.record-time progress::-webkit-progress-value {
+  background: var(--sand);
+}
+.record-time > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+  color: var(--silver);
+  font-variant-numeric: tabular-nums;
+}
+.record-transport {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  margin: 1.15rem 0;
+}
+.record-transport button,
+.record-secondary button {
+  border-radius: 2rem;
+}
+.record-transport button:disabled {
+  opacity: 0.45;
+}
+.record-transport svg {
+  display: block;
+  width: 1.8rem;
+  height: 1.8rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+.record-transport text {
+  font:
+    7px "Room Sans",
+    sans-serif;
+  fill: currentColor;
+  stroke: none;
+  text-anchor: middle;
+}
+.primary-transport {
+  background: var(--ink);
+  color: #16232a;
+  min-width: 5.1rem;
+  padding: 0.64rem 1rem;
+  font-weight: 650;
+}
+.record-secondary {
+  display: flex;
+  align-items: baseline;
+  gap: 1.05rem;
+}
+.record-secondary button {
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  font-size: 0.85rem;
+}
+.record-info #track-status {
+  font-size: 0.79rem;
+  color: var(--silver);
+  margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .artist-scene i {
+    transition: opacity 0.28s ease-out;
+  }
+}
+@media (max-width: 760px) {
+  .artist-stage {
+    height: 13rem;
+  }
+  .artist-credit {
+    padding: 0;
+  }
+  #stage-arabic {
+    font-size: 2.4rem;
+  }
+  #stage-english {
+    font-size: 1.6rem;
+  }
+  .artist-scene {
+    top: 0;
+  }
+  .listen-sleeve {
+    height: 6.8rem;
+    min-height: 0;
+  }
+  #library .tile .arabic {
+    font-size: 1.33rem;
+  }
+  #library .english {
+    font-size: 0.88rem;
+  }
+  #library .surah-number {
+    font-size: 0.66rem;
+  }
+  .remembrance-shelf {
+    grid-template-columns: 1fr;
+    gap: 0.66rem;
+  }
+  .record-main {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    padding: 1.25rem 0;
+  }
+  .record-sleeve {
+    width: min(84vw, 35vh);
+    margin: auto;
+  }
+  #record-arabic {
+    font-size: 2rem;
+  }
+  .record-info #track-title {
+    font-size: 2.2rem;
+  }
+  .record-info .record-by {
+    margin-bottom: 0.7rem;
+  }
+}
+#stage-arabic,
+#record-arabic,
+#library .tile .arabic {
+  font-family: "Aref Ruqaa", Amiri, serif;
+  font-weight: 700;
+}
+#stage-arabic {
+  line-height: 1.45;
+}
+#stage-english,
+.record-info #track-title {
+  font-family: Newsreader, Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+#stage-english {
+  font-size: 2.48rem;
+}
+.record-info #track-title {
+  font-size: 3.65rem;
+}
+#library .tile .arabic {
+  font-size: 1.76rem;
+  line-height: 1.55;
+}
+@media (max-width: 760px) {
+  #stage-english {
+    font-size: 1.8rem;
+  }
+  .record-info #track-title {
+    font-size: 2.3rem;
+  }
+  #library .tile .arabic {
+    font-size: 1.4rem;
+  }
+}

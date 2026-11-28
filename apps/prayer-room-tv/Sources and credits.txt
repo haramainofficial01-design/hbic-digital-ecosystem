@@ -1,0 +1,66 @@
+PRAYER ROOM TV · SOURCES
+
+Prayer times and Masjid Bilal assets
+Hazrat Bilal Islamic Centre, Calgary. https://hbic.ca/
+Live schedule: https://hbic.ca/api/display
+The adhan sound is HBIC’s Madinah excerpt by Muhammad Marwan Qassas.
+
+Live video
+Saudi Broadcasting Authority’s Qur’an TV and Sunnah TV, delivered by Globecast.
+Official Makkah page: https://aloula.sba.sa/live/quran
+Official Madinah page: https://aloula.sba.sa/live/sunna
+The built-in streams are standard definition. The dashboard renders at 4K in a
+compatible browser. Samsung can scale the interface of a packaged TV app.
+
+Qur’an and reminders
+Ahmad Al Nufais audio: https://www.mp3quran.net/ar/nufais
+Morning and evening adhkar, ruqyah, and Alfba’iyyat use linked reciter uploads.
+The short Arabic greetings are customary greetings and supplications.
+
+Photographs
+Makkah: Bjelica, “Kaaba at night in 2024.jpg”, cropped, CC0 1.0.
+https://commons.wikimedia.org/wiki/File:Kaaba_at_night_in_2024.jpg
+Madinah: TheHadiRahim, “Wide shot of the Green Dome at The Prophet's Mosque
+(Al Masjid-e-Nabawi).jpg”, cropped, CC0 1.0.
+https://commons.wikimedia.org/wiki/File:Wide_shot_of_the_Green_Dome_at_The_Prophet%27s_Mosque_(Al_Masjid-e-Nabawi).jpg
+
+Software and font
+hls.js 1.7.4 light build, Apache 2.0, loaded when requested by the video player.
+https://github.com/video-dev/hls.js
+Noto Naskh Arabic, SIL Open Font License 1.1.
+
+Home background: saudipics, “Great Mosque of Mecca” (2019).
+The 4K and HD crops are distributed under CC BY-SA 4.0.
+https://commons.wikimedia.org/wiki/File:Great_Mosque_of_Mecca.jpg
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Home listening image: Jahra Tasfia Reza, “Open Quran on Wooden Stand in Low Light”,
+cropped for the listening shortcut. https://www.pexels.com/photo/36188878/
+https://www.pexels.com/license/
+
+Aref Ruqaa, Amiri, Newsreader, Instrument Sans and Noto Naskh Arabic are
+self-hosted. See the accompanying licenses for each typeface.
+https://fonts.google.com/specimen/Aref+Ruqaa
+https://fonts.google.com/specimen/Amiri
+https://fonts.google.com/specimen/Newsreader
+https://fonts.google.com/specimen/Instrument+Sans
+
+
+Listening library photography
+The following are photographs from Pexels, cropped and exported as WebP.
+Pexels License: https://www.pexels.com/license/
+
+mushaf-sunlight.webp — Yaşar Başkurt, “Koran in Sunlight and Shadow”.
+https://www.pexels.com/photo/koran-in-sunlight-and-shadow-26755335/
+
+mushaf-gold.webp — Ahmet Polat, “Quran on a Stand”.
+https://www.pexels.com/photo/quran-on-a-stand-9325736/
+
+mihrab.webp — Konevi, “Intricate Islamic Mosque Interior Design”.
+https://www.pexels.com/photo/intricate-islamic-mosque-interior-design-36568567/
+
+madinah-blue.webp — Abdulbasit Bilici, “Majestic Mosque Silhouette at Twilight”.
+https://www.pexels.com/photo/majestic-mosque-silhouette-at-twilight-37105315/
+
+prayer-window.webp — Ahmed Mulla, “Old mosque interior with arched windows”.
+https://www.pexels.com/photo/old-mosque-interior-with-arched-windows-4630983/
