@@ -56,7 +56,7 @@ function AppShell() {
         screenOptions={{
           headerShown: false,
           statusBarStyle: Platform.OS === "ios" ? (resolvedMode === "dark" ? "light" : "dark") : undefined,
-          animation: reduceMotion ? "none" : "fade_from_bottom",
+          animation: reduceMotion ? "none" : "default",
           contentStyle: { backgroundColor: theme.colors.background }
         }}
       /></MacAppFrame>

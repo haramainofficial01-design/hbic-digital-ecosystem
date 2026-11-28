@@ -37,8 +37,7 @@ export default async function HomePage() {
         <div className="hero-panel">
           <Image className="hero-photo" src="/photos/masjid-exterior.png" alt="Hazrat Bilal Islamic Centre exterior in Calgary at sunset" fill sizes="(max-width: 800px) 100vw, 1440px" priority />
           <div className="hero-content">
-            <span className="eyebrow">HAZRAT BILAL ISLAMIC CENTRE · CALGARY</span>
-            <h1 id="home-story-heading">A place<br />to belong.</h1>
+            <h1 id="home-story-heading">A place to belong.</h1>
             <p className="lead">Come for prayer. Stay for learning, friendship, and the life of a community built around the masjid.</p>
             <div className="actions">
               <a className="button primary" href="/about">Discover Masjid Bilal</a>

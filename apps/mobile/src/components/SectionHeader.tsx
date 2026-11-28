@@ -7,7 +7,7 @@ export function SectionHeader({ title, subtitle }: { title: string; subtitle?: s
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+      <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
       {subtitle ? <Text style={[styles.subtitle, { color: theme.colors.muted }]}>{subtitle}</Text> : null}
     </View>
   );
@@ -18,9 +18,9 @@ const styles = StyleSheet.create({
     gap: 5
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
-    letterSpacing: -0.35
+    letterSpacing: -0.4
   },
   subtitle: {
     fontSize: 14,

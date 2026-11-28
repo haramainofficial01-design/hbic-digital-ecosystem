@@ -45,7 +45,7 @@ export default function HomeScreen() {
       <ImageBackground source={photoAssets.exterior} onLoadEnd={() => setHeroLoaded(true)} resizeMode="cover" style={styles.hero} imageStyle={styles.heroImage}>
         <LinearGradient colors={theme.gradients.hero} style={StyleSheet.absoluteFill} />
         <Image source={brandAssets.appMark} style={styles.logo} />
-        <Text style={styles.heroTitle}>Masjid Bilal</Text>
+        <Text accessibilityRole="header" style={styles.heroTitle}>Masjid Bilal</Text>
         <Text style={styles.heroSub}>Prayer, learning, youth programs, and community services in Calgary.</Text>
       </ImageBackground>
 
@@ -149,27 +149,27 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: "#FFFFFF",
     fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: 0
+    fontWeight: "700",
+    letterSpacing: -0.5
   },
   heroSub: {
     color: "rgba(255,255,255,0.86)",
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     marginTop: 6
   },
   cardKicker: {
-    fontWeight: "900",
+    fontWeight: "700",
     marginBottom: 6
   },
   cardTitle: {
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "700",
     marginBottom: 6
   },
   spotlightTitle: {
     fontSize: 26,
-    fontWeight: "900",
+    fontWeight: "700",
     marginBottom: 8
   },
   body: {
